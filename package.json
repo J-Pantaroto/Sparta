@@ -1,0 +1,36 @@
+{
+  "name": "sparta",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Sparta desktop assistant for League of Legends profile, draft and post-game analysis.",
+  "packageManager": "pnpm@10.34.4",
+  "scripts": {
+    "dev": "pnpm --parallel --filter @sparta/api --filter @sparta/desktop dev",
+    "dev:api": "pnpm --filter @sparta/api dev",
+    "dev:desktop": "pnpm --filter @sparta/desktop dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "test": "vitest run scripts/read-git-remote.test.ts && pnpm -r test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "github:setup": "tsx scripts/read-git-remote.ts",
+    "github:push": "bash scripts/push-to-github.sh"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.30.1",
+    "@types/node": "^24.0.10",
+    "@typescript-eslint/eslint-plugin": "^8.35.1",
+    "@typescript-eslint/parser": "^8.35.1",
+    "eslint": "^9.30.1",
+    "eslint-config-prettier": "^10.1.5",
+    "prettier": "^3.6.2",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["@prisma/client", "@prisma/engines", "electron", "esbuild", "prisma"]
+  }
+}

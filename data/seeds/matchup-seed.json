@@ -1,0 +1,12 @@
+[
+  {
+    "championId": 61,
+    "championName": "Orianna",
+    "enemyChampionId": 157,
+    "enemyChampionName": "Yasuo",
+    "role": "MID",
+    "score": 58,
+    "sampleSize": 100,
+    "notes": "Seed manual para testar fluxo; substituir por dados confiáveis quando disponíveis."
+  }
+]

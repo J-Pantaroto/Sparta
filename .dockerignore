@@ -1,0 +1,12 @@
+node_modules
+dist
+build
+coverage
+.git
+.env
+.env.*
+!.env.example
+*.log
+services/analyzer/.venv
+__pycache__
+.pytest_cache

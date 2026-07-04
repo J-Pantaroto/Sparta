@@ -1,0 +1,208 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String?  @unique
+  createdAt DateTime @default(now())
+  accounts  RiotAccount[]
+}
+
+model RiotAccount {
+  id              String   @id @default(uuid())
+  userId          String?
+  puuid           String   @unique
+  gameName        String
+  tagLine         String
+  platformRegion  String
+  regionalRouting String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User?    @relation(fields: [userId], references: [id])
+  profile         PlayerProfile?
+  matches         MatchParticipant[]
+
+  @@index([puuid])
+}
+
+model PlayerProfile {
+  id            String   @id @default(uuid())
+  riotAccountId String   @unique
+  preferredRoles String[]
+  strengthsJson Json     @default("[]")
+  weaknessesJson Json    @default("[]")
+  recentFormJson Json    @default("{}")
+  updatedAt     DateTime @updatedAt
+  riotAccount   RiotAccount @relation(fields: [riotAccountId], references: [id])
+  championStats PlayerChampionStats[]
+}
+
+model Champion {
+  id          Int      @id
+  key         String   @unique
+  name        String
+  title       String?
+  roles       String[]
+  version     String?
+  tags        ChampionTag?
+  participants MatchParticipant[]
+  playerStats PlayerChampionStats[]
+}
+
+model ChampionTag {
+  id             String   @id @default(uuid())
+  championId     Int      @unique
+  damageProfile  String
+  tags           String[]
+  blindSafety    Float
+  difficulty     Float
+  engage         Float
+  peel           Float
+  frontline      Float
+  pickoff        Float
+  waveclear      Float
+  scaling        Float
+  earlyPressure  Float
+  champion       Champion @relation(fields: [championId], references: [id])
+
+  @@index([championId])
+}
+
+model Match {
+  id          String   @id @default(uuid())
+  matchId     String   @unique
+  platform    String
+  patch       String?
+  durationSeconds Int?
+  startedAt   DateTime?
+  rawJson      Json?
+  participants MatchParticipant[]
+  timeline     MatchTimeline?
+  postgameReports PostgameReport[]
+
+  @@index([matchId])
+}
+
+model MatchParticipant {
+  id                    String @id @default(uuid())
+  matchId               String
+  riotAccountId          String?
+  puuid                 String
+  championId            Int
+  role                  String
+  won                   Boolean
+  kills                 Int
+  deaths                Int
+  assists               Int
+  csPerMinute           Float
+  goldPerMinute         Float
+  damagePerMinute       Float
+  visionScorePerMinute  Float
+  killParticipation     Float
+  objectiveParticipation Float
+  match                 Match @relation(fields: [matchId], references: [id])
+  riotAccount           RiotAccount? @relation(fields: [riotAccountId], references: [id])
+  champion              Champion @relation(fields: [championId], references: [id])
+
+  @@index([puuid])
+  @@index([championId])
+}
+
+model MatchTimeline {
+  id              String @id @default(uuid())
+  matchId          String @unique
+  deathsBefore10   Int    @default(0)
+  deathsBefore15   Int    @default(0)
+  csAt10           Float?
+  csAt15           Float?
+  goldDiffAt15     Float?
+  eventsJson       Json   @default("[]")
+  match            Match  @relation(fields: [matchId], references: [id])
+}
+
+model PlayerChampionStats {
+  id                     String @id @default(uuid())
+  playerProfileId         String
+  championId              Int
+  role                   String
+  games                  Int
+  wins                   Int
+  kills                  Int
+  deaths                 Int
+  assists                Int
+  csPerMinute            Float
+  goldPerMinute          Float
+  damagePerMinute        Float
+  visionScorePerMinute   Float
+  killParticipation      Float
+  objectiveParticipation Float
+  recentMatchesJson      Json @default("[]")
+  updatedAt              DateTime @updatedAt
+  playerProfile          PlayerProfile @relation(fields: [playerProfileId], references: [id])
+  champion               Champion @relation(fields: [championId], references: [id])
+
+  @@unique([playerProfileId, championId, role])
+  @@index([championId])
+}
+
+model DraftSession {
+  id                    String   @id @default(uuid())
+  puuid                 String
+  patch                 String?
+  playerRole            String
+  pickOrder             Int
+  draftStateJson         Json
+  selectedChampionId     Int?
+  createdAt             DateTime @default(now())
+  recommendations        PickRecommendation[]
+
+  @@index([puuid])
+}
+
+model PickRecommendation {
+  id              String   @id @default(uuid())
+  draftSessionId  String
+  championId      Int
+  totalScore      Float
+  confidence      String
+  category        String
+  snapshotJson    Json
+  createdAt       DateTime @default(now())
+  draftSession    DraftSession @relation(fields: [draftSessionId], references: [id])
+
+  @@index([championId])
+}
+
+model PostgameReport {
+  id              String   @id @default(uuid())
+  matchId          String
+  puuid           String
+  draftSessionId   String?
+  reportJson       Json
+  createdAt        DateTime @default(now())
+  match            Match @relation(fields: [matchId], references: [id])
+
+  @@index([puuid])
+}
+
+model ReplayImportJob {
+  id          String   @id @default(uuid())
+  fileName    String
+  status      String
+  metadataJson Json    @default("{}")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model ApiCacheEntry {
+  key       String   @id
+  valueJson Json
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}

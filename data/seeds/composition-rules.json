@@ -1,0 +1,10 @@
+{
+  "minimumFrontline": 35,
+  "minimumEngage": 35,
+  "minimumWaveclear": 35,
+  "preferDamageBalance": true,
+  "notes": [
+    "Valores iniciais são heurísticos para MVP.",
+    "O motor deve explicar riscos de draft em vez de esconder decisões atrás de score bruto."
+  ]
+}

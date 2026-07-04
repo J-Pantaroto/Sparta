@@ -1,0 +1,56 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: sparta
+      POSTGRES_PASSWORD: sparta
+      POSTGRES_DB: sparta
+    ports:
+      - "5432:5432"
+    volumes:
+      - sparta-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sparta -d sparta"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - sparta-redis:/data
+    command: ["redis-server", "--appendonly", "yes"]
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    env_file:
+      - .env
+    environment:
+      API_HOST: 0.0.0.0
+      DATABASE_URL: postgresql://sparta:sparta@postgres:5432/sparta
+      REDIS_URL: redis://redis:6379
+      ANALYZER_URL: http://analyzer:8000
+    ports:
+      - "3333:3333"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      analyzer:
+        condition: service_started
+
+  analyzer:
+    build:
+      context: .
+      dockerfile: services/analyzer/Dockerfile
+    ports:
+      - "8000:8000"
+
+volumes:
+  sparta-postgres:
+  sparta-redis:
