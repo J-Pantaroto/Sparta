@@ -10,7 +10,9 @@ export const envSchema = z.object({
   RIOT_PLATFORM_REGION: z.string().default("br1"),
   RIOT_REGIONAL_ROUTING: z.string().default("americas"),
   DATA_DRAGON_LOCALE: z.string().default("pt_BR"),
-  ANALYZER_URL: z.string().default("http://localhost:8000")
+  ANALYZER_URL: z.string().default("http://localhost:8000"),
+  // Segredo usado para assinar os tokens de sessao (HMAC). Troque em producao.
+  AUTH_TOKEN_SECRET: z.string().default("sparta-dev-secret-nao-use-em-producao")
 });
 
 export type Env = z.infer<typeof envSchema>;

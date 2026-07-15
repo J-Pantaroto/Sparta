@@ -2,6 +2,7 @@ import cors from "@fastify/cors";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
 import Fastify from "fastify";
+import { authRoutes } from "./modules/auth/routes";
 import { draftsRoutes } from "./modules/drafts/routes";
 import { healthRoutes } from "./modules/health/routes";
 import { playersRoutes } from "./modules/players/routes";
@@ -23,6 +24,7 @@ export async function buildApp() {
   await app.register(swaggerUi, { routePrefix: "/docs" });
 
   await app.register(healthRoutes);
+  await app.register(authRoutes);
   await app.register(playersRoutes);
   await app.register(draftsRoutes);
   await app.register(postgameRoutes);

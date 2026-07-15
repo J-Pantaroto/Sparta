@@ -8,10 +8,12 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  email     String?  @unique
-  createdAt DateTime @default(now())
-  accounts  RiotAccount[]
+  id           String   @id @default(uuid())
+  email        String?  @unique
+  passwordHash String?
+  displayName  String?
+  createdAt    DateTime @default(now())
+  accounts     RiotAccount[]
 }
 
 model RiotAccount {
