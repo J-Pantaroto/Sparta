@@ -1,4 +1,5 @@
 import cors from "@fastify/cors";
+import rateLimit from "@fastify/rate-limit";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
 import Fastify from "fastify";
@@ -29,6 +30,9 @@ export async function buildApp() {
       callback(new Error("Origem nao permitida"), false);
     }
   });
+  // Limite global generoso; rotas sensiveis a forca bruta (login/registro)
+  // tem limite proprio, mais restrito, definido em modules/auth/routes.ts.
+  await app.register(rateLimit, { max: 100, timeWindow: "1 minute" });
   await app.register(swagger, {
     openapi: {
       info: {
