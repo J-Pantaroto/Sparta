@@ -1,3 +1,3 @@
-export * from "./types/domain";
-export * from "./scoring/champion-performance";
-export * from "./draft/recommendation-engine";
+export * from "./types/domain.js";
+export * from "./scoring/champion-performance.js";
+export * from "./draft/recommendation-engine.js";

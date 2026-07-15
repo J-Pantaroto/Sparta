@@ -1,9 +1,9 @@
 import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { z } from "zod";
-import { prisma } from "../../db/prisma";
-import { loadEnv } from "../../config/env";
-import { hashPassword, verifyPassword } from "./password";
-import { signToken, verifyToken } from "./token";
+import { prisma } from "../../db/prisma.js";
+import { loadEnv } from "../../config/env.js";
+import { hashPassword, verifyPassword } from "./password.js";
+import { signToken, verifyToken } from "./token.js";
 
 const env = loadEnv();
 

@@ -1,4 +1,4 @@
-import { scoreChampionPerformance } from "../scoring/champion-performance";
+import { scoreChampionPerformance } from "../scoring/champion-performance.js";
 import type {
   ChampionTag,
   CompositionRules,
@@ -10,7 +10,7 @@ import type {
   PlayerProfile,
   RecommendationReason,
   TeamComposition
-} from "../types/domain";
+} from "../types/domain.js";
 
 export function recommendPicks(input: {
   draft: DraftState;

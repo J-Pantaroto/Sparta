@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { analyzeTeamComposition, recommendPicks } from "./recommendation-engine";
-import type { ChampionTag, PlayerChampionStats, PlayerProfile } from "../types/domain";
+import { analyzeTeamComposition, recommendPicks } from "./recommendation-engine.js";
+import type { ChampionTag, PlayerChampionStats, PlayerProfile } from "../types/domain.js";
 
 const championStats: PlayerChampionStats[] = [
   {

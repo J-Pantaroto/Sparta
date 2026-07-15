@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildApp } from "./app";
-import { playerSyncSchema } from "./modules/players/routes";
+import { buildApp } from "./app.js";
+import { playerSyncSchema } from "./modules/players/routes.js";
 
 describe("api", () => {
   it("responds to healthcheck", async () => {

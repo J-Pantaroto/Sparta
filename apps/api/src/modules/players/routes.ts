@@ -2,9 +2,9 @@ import type { FastifyPluginAsync } from "fastify";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { rankChampionPool } from "@sparta/core";
-import { prisma } from "../../db/prisma";
-import { mockChampionStats, mockPlayerProfile } from "../../routes/mock-data";
-import { getAuthenticatedUserId } from "../auth/routes";
+import { prisma } from "../../db/prisma.js";
+import { mockChampionStats, mockPlayerProfile } from "../../routes/mock-data.js";
+import { getAuthenticatedUserId } from "../auth/routes.js";
 
 export const playerSyncSchema = z.object({
   riotId: z.string().min(3).regex(/^.+#.+$/, "Use o formato Nome#TAG"),

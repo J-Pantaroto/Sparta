@@ -1,4 +1,4 @@
-import type { Confidence, PlayerChampionStats, RecentChampionMatch, Role } from "../types/domain";
+import type { Confidence, PlayerChampionStats, RecentChampionMatch, Role } from "../types/domain.js";
 
 export interface ChampionPerformanceScore {
   championId: number;
