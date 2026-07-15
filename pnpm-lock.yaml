@@ -78,6 +78,9 @@ importers:
       '@sparta/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@sparta/riot':
+        specifier: workspace:*
+        version: link:../../packages/riot
       '@sparta/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -119,7 +122,11 @@ importers:
         specifier: ^24.0.10
         version: 24.13.2
 
-  packages/riot: {}
+  packages/riot:
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.10
+        version: 24.13.2
 
   packages/ui:
     dependencies:
