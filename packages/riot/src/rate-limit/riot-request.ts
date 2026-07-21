@@ -1,4 +1,4 @@
-import { RiotApiError } from "../errors/riot-api-error";
+import { RiotApiError } from "../errors/riot-api-error.js";
 
 const RETRYABLE_STATUSES = new Set([429, 502, 503, 504]);
 

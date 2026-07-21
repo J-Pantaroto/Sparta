@@ -1,6 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import type { MatchSummary, MatchTimelineSummary } from "@sparta/core";
-import { prisma } from "../../db/prisma";
+import { prisma } from "../../db/prisma.js";
 
 export async function findExistingMatchIds(matchIds: string[]): Promise<Set<string>> {
   if (matchIds.length === 0) return new Set();

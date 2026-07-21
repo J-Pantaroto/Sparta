@@ -1,5 +1,5 @@
-import { getCached, setCached } from "../../db/api-cache";
-import { getRiotApiClient } from "./client-factory";
+import { getCached, setCached } from "../../db/api-cache.js";
+import { getRiotApiClient } from "./client-factory.js";
 
 const ACCOUNT_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 

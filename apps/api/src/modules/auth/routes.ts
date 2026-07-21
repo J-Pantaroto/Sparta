@@ -1,9 +1,9 @@
 import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { z } from "zod";
-import { prisma } from "../../db/prisma";
-import { loadEnv } from "../../config/env";
-import { hashPassword, verifyPassword } from "./password";
-import { signToken, verifyToken } from "./token";
+import { prisma } from "../../db/prisma.js";
+import { loadEnv } from "../../config/env.js";
+import { hashPassword, verifyPassword } from "./password.js";
+import { signToken, verifyToken } from "./token.js";
 
 const env = loadEnv();
 
@@ -34,8 +34,12 @@ function toPublicUser(user: { id: string; email: string | null; displayName: str
   return { id: user.id, email: user.email, displayName: user.displayName };
 }
 
+// Limite restrito nas rotas de credencial: mitiga forca bruta de senha e
+// enumeracao de emails cadastrados.
+const CREDENTIAL_RATE_LIMIT = { max: 5, timeWindow: "1 minute" };
+
 export const authRoutes: FastifyPluginAsync = async (app) => {
-  app.post("/auth/register", async (request, reply) => {
+  app.post("/auth/register", { config: { rateLimit: CREDENTIAL_RATE_LIMIT } }, async (request, reply) => {
     const payload = registerSchema.parse(request.body);
 
     const existing = await prisma.user.findUnique({ where: { email: payload.email } });
@@ -57,7 +61,7 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
     return { token, user: toPublicUser(user) };
   });
 
-  app.post("/auth/login", async (request, reply) => {
+  app.post("/auth/login", { config: { rateLimit: CREDENTIAL_RATE_LIMIT } }, async (request, reply) => {
     const payload = loginSchema.parse(request.body);
     const user = await prisma.user.findUnique({ where: { email: payload.email } });
 

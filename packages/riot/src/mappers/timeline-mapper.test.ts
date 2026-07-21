@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import matchTimelineFixture from "./__fixtures__/match-timeline.json";
-import { mapTimelineToSummary, type RiotMatchTimelineDto } from "./timeline-mapper";
+import matchTimelineFixture from "./__fixtures__/match-timeline.json" with { type: "json" };
+import { mapTimelineToSummary, type RiotMatchTimelineDto } from "./timeline-mapper.js";
 
 const fixture = matchTimelineFixture as RiotMatchTimelineDto;
 const teams = [

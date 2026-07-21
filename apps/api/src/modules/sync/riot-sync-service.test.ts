@@ -17,12 +17,12 @@ const {
   recomputeChampionStatsMock: vi.fn()
 }));
 
-vi.mock("../matches/match-repository", () => ({
+vi.mock("../matches/match-repository.js", () => ({
   findExistingMatchIds: findExistingMatchIdsMock,
   persistMatch: persistMatchMock
 }));
 
-vi.mock("../riot-integration/client-factory", () => ({
+vi.mock("../riot-integration/client-factory.js", () => ({
   getRiotApiClient: () => ({
     getMatchIdsByPuuid: getMatchIdsByPuuidMock,
     getMatch: getMatchMock,
@@ -30,11 +30,11 @@ vi.mock("../riot-integration/client-factory", () => ({
   })
 }));
 
-vi.mock("../players/player-stats-repository", () => ({
+vi.mock("../players/player-stats-repository.js", () => ({
   recomputeChampionStats: recomputeChampionStatsMock
 }));
 
-import { syncPlayerMatches } from "./riot-sync-service";
+import { syncPlayerMatches } from "./riot-sync-service.js";
 
 const PUUID = "puuid-player-1";
 const player = { riotAccountId: "acc-1", puuid: PUUID, platformRegion: "br1" };

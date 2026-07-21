@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { RiotApiError } from "../errors/riot-api-error";
-import { requestWithRiotRateLimit } from "./riot-request";
+import { RiotApiError } from "../errors/riot-api-error.js";
+import { requestWithRiotRateLimit } from "./riot-request.js";
 
 function jsonResponse(status: number, body: unknown, headers: Record<string, string> = {}) {
   return {

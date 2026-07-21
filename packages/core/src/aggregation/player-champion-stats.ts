@@ -1,4 +1,4 @@
-import type { PlayerChampionStats, RecentChampionMatch, Role } from "../types/domain";
+import type { PlayerChampionStats, RecentChampionMatch, Role } from "../types/domain.js";
 
 export interface MatchParticipationRecord {
   matchId: string;

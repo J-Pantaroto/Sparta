@@ -1,6 +1,6 @@
 import { fetchDataDragonChampions, fetchDataDragonVersions, type DataDragonChampion } from "@sparta/riot";
-import { prisma } from "../../db/prisma";
-import { getCached, setCached } from "../../db/api-cache";
+import { prisma } from "../../db/prisma.js";
+import { getCached, setCached } from "../../db/api-cache.js";
 
 const DATA_DRAGON_LOCALE = "pt_BR";
 const VERSIONS_TTL_MS = 7 * 24 * 60 * 60 * 1000;

@@ -2,16 +2,16 @@ import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { rankChampionPool, type RecentChampionMatch, type Role } from "@sparta/core";
 import { RiotApiError } from "@sparta/riot";
-import { prisma } from "../../db/prisma";
-import { getAuthenticatedUserId } from "../auth/routes";
-import { findParticipationHistory } from "../matches/match-repository";
-import { lookupRiotAccount } from "../riot-integration/account-lookup";
+import { prisma } from "../../db/prisma.js";
+import { getAuthenticatedUserId } from "../auth/routes.js";
+import { findParticipationHistory } from "../matches/match-repository.js";
+import { lookupRiotAccount } from "../riot-integration/account-lookup.js";
 import {
   derivePreferredRoles,
   findChampionStatsByPuuid,
   findRiotAccountByRiotId
-} from "./player-stats-repository";
-import { syncPlayerMatches } from "../sync/riot-sync-service";
+} from "./player-stats-repository.js";
+import { syncPlayerMatches } from "../sync/riot-sync-service.js";
 
 export const linkRiotAccountSchema = z.object({
   gameName: z.string().min(3, "Informe o nome do invocador"),

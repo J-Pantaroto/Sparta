@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import matchDetailFixture from "./__fixtures__/match-detail.json";
-import { extractParticipantTeams, extractPatch, mapMatchToSummaries, type RiotMatchDto } from "./match-mapper";
+import matchDetailFixture from "./__fixtures__/match-detail.json" with { type: "json" };
+import { extractParticipantTeams, extractPatch, mapMatchToSummaries, type RiotMatchDto } from "./match-mapper.js";
 
 const fixture = matchDetailFixture as RiotMatchDto;
 

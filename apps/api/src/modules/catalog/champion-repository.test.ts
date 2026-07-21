@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { upsertMock } = vi.hoisted(() => ({ upsertMock: vi.fn() }));
 
-vi.mock("../../db/prisma", () => ({
+vi.mock("../../db/prisma.js", () => ({
   prisma: { champion: { upsert: upsertMock } }
 }));
 
@@ -15,12 +15,12 @@ vi.mock("@sparta/riot", () => ({
   ])
 }));
 
-vi.mock("../../db/api-cache", () => ({
+vi.mock("../../db/api-cache.js", () => ({
   getCached: vi.fn().mockResolvedValue(null),
   setCached: vi.fn().mockResolvedValue(undefined)
 }));
 
-import { syncChampionCatalog } from "./champion-repository";
+import { syncChampionCatalog } from "./champion-repository.js";
 
 describe("champion-repository", () => {
   beforeEach(() => {

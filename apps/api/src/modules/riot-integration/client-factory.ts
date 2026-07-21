@@ -1,5 +1,5 @@
 import { RiotApiClient } from "@sparta/riot";
-import { loadEnv } from "../../config/env";
+import { loadEnv } from "../../config/env.js";
 
 let cachedClient: RiotApiClient | null = null;
 

@@ -6,17 +6,17 @@ const { findRiotAccountByRiotIdMock, findChampionStatsByPuuidMock, findParticipa
   findParticipationHistoryMock: vi.fn()
 }));
 
-vi.mock("./player-stats-repository", () => ({
+vi.mock("./player-stats-repository.js", () => ({
   findRiotAccountByRiotId: findRiotAccountByRiotIdMock,
   findChampionStatsByPuuid: findChampionStatsByPuuidMock,
   derivePreferredRoles: (stats: { role: string }[]) => Array.from(new Set(stats.map((entry) => entry.role)))
 }));
 
-vi.mock("../matches/match-repository", () => ({
+vi.mock("../matches/match-repository.js", () => ({
   findParticipationHistory: findParticipationHistoryMock
 }));
 
-import { buildApp } from "../../app";
+import { buildApp } from "../../app.js";
 
 describe("players routes", () => {
   beforeEach(() => {

@@ -1,5 +1,5 @@
-import { syncChampionCatalog } from "./champion-repository";
-import { prisma } from "../../db/prisma";
+import { syncChampionCatalog } from "./champion-repository.js";
+import { prisma } from "../../db/prisma.js";
 
 syncChampionCatalog()
   .then(({ version, count }) => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { aggregatePlayerChampionStats, type MatchParticipationRecord } from "./player-champion-stats";
+import { aggregatePlayerChampionStats, type MatchParticipationRecord } from "./player-champion-stats.js";
 
 function match(overrides: Partial<MatchParticipationRecord>): MatchParticipationRecord {
   return {

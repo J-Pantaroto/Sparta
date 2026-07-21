@@ -1,7 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { aggregatePlayerChampionStats, type PlayerChampionStats, type RecentChampionMatch, type Role } from "@sparta/core";
-import { prisma } from "../../db/prisma";
-import { findParticipationHistory } from "../matches/match-repository";
+import { prisma } from "../../db/prisma.js";
+import { findParticipationHistory } from "../matches/match-repository.js";
 
 /**
  * PlayerProfile nunca era criado em nenhum lugar do codigo antes desta

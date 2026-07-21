@@ -7,9 +7,9 @@ import {
   type RiotMatchDto,
   type RiotMatchTimelineDto
 } from "@sparta/riot";
-import { getRiotApiClient } from "../riot-integration/client-factory";
-import { findExistingMatchIds, persistMatch } from "../matches/match-repository";
-import { recomputeChampionStats, type ChampionRolePair } from "../players/player-stats-repository";
+import { getRiotApiClient } from "../riot-integration/client-factory.js";
+import { findExistingMatchIds, persistMatch } from "../matches/match-repository.js";
+import { recomputeChampionStats, type ChampionRolePair } from "../players/player-stats-repository.js";
 
 export interface SyncFailure {
   matchId: string;

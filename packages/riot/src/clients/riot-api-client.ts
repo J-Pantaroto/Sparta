@@ -1,4 +1,4 @@
-import { requestWithRiotRateLimit } from "../rate-limit/riot-request";
+import { requestWithRiotRateLimit } from "../rate-limit/riot-request.js";
 
 export interface RiotApiClientOptions {
   apiKey: string;
