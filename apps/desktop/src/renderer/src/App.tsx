@@ -6,6 +6,8 @@ import { championSplashUrl, championSquareUrl, fetchLatestDataDragonVersion } fr
 import { fetchSession, SESSION_TOKEN_KEY, type RiotAccountSummary, type SessionUser } from "./features/api-client";
 import { AuthScreen } from "./features/AuthScreen";
 import { LinkRiotAccountScreen } from "./features/LinkRiotAccountScreen";
+import { ChampionThemePicker } from "./features/ChampionThemePicker";
+import { FeaturedChampionProvider, useFeaturedChampion } from "./features/featured-champion-context";
 
 type Page = "dashboard" | "profile" | "select" | "pregame" | "postgame";
 
@@ -20,6 +22,15 @@ const pageLabels: Record<Page, string> = {
 type SessionStatus = "checking" | "auth" | "link-account" | "ready";
 
 export function App() {
+  return (
+    <FeaturedChampionProvider>
+      <AppShell />
+    </FeaturedChampionProvider>
+  );
+}
+
+function AppShell() {
+  const { featuredChampion } = useFeaturedChampion();
   const [page, setPage] = useState<Page>("dashboard");
   const [draft, setDraft] = useState<DraftState>({
     playerRole: "MID",
@@ -98,7 +109,10 @@ export function App() {
     setSessionStatus("ready");
   }
 
-  const loginSplash = useMemo(() => championSplashUrl("Yasuo"), []);
+  const loginSplash = useMemo(
+    () => championSplashUrl(featuredChampion.key, featuredChampion.skinIndex),
+    [featuredChampion]
+  );
 
   if (sessionStatus === "checking") {
     return <div className="auth-shell" style={{ backgroundImage: `url(${loginSplash})` }} />;
@@ -143,6 +157,7 @@ export function App() {
             </button>
           ))}
         </nav>
+        <ChampionThemePicker ddragonVersion={ddragonVersion} />
       </aside>
 
       <section className="content">
@@ -160,9 +175,11 @@ export function App() {
 
 function Dashboard({ riotAccounts }: { riotAccounts: RiotAccountSummary[] }) {
   const account = riotAccounts[0];
+  const { featuredChampion } = useFeaturedChampion();
+  const heroSplash = championSplashUrl(featuredChampion.key, featuredChampion.skinIndex);
   return (
     <>
-      <header className="page-header hero-splash" style={{ backgroundImage: `url(${championSplashUrl("Orianna")})` }}>
+      <header className="page-header hero-splash" style={{ backgroundImage: `url(${heroSplash})` }}>
         <span>{account ? `${account.gameName}#${account.tagLine}` : "Sparta MVP"}</span>
         <h1>Escolhas melhores antes da partida. Revisões melhores depois.</h1>
       </header>
