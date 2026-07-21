@@ -1,4 +1,4 @@
-import { retryWithBackoff } from "../rate-limit/backoff";
+import { retryWithBackoff } from "../rate-limit/backoff.js";
 
 export interface RiotApiClientOptions {
   apiKey: string;

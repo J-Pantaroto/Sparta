@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { calculateKda, recencyWeight, scoreChampionPerformance } from "./champion-performance";
-import type { PlayerChampionStats } from "../types/domain";
+import { calculateKda, recencyWeight, scoreChampionPerformance } from "./champion-performance.js";
+import type { PlayerChampionStats } from "../types/domain.js";
 
 const baseStats: PlayerChampionStats = {
   championId: 61,

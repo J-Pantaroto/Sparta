@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { signToken, verifyToken } from "./token";
+import { signToken, verifyToken } from "./token.js";
 
 describe("auth token", () => {
   it("assina e valida um token corretamente", () => {

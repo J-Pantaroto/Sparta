@@ -3,12 +3,12 @@ import rateLimit from "@fastify/rate-limit";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
 import Fastify from "fastify";
-import { authRoutes } from "./modules/auth/routes";
-import { draftsRoutes } from "./modules/drafts/routes";
-import { healthRoutes } from "./modules/health/routes";
-import { playersRoutes } from "./modules/players/routes";
-import { postgameRoutes } from "./modules/postgame/routes";
-import { replaysRoutes } from "./modules/replays/routes";
+import { authRoutes } from "./modules/auth/routes.js";
+import { draftsRoutes } from "./modules/drafts/routes.js";
+import { healthRoutes } from "./modules/health/routes.js";
+import { playersRoutes } from "./modules/players/routes.js";
+import { postgameRoutes } from "./modules/postgame/routes.js";
+import { replaysRoutes } from "./modules/replays/routes.js";
 
 // Origens permitidas a chamar a API. O app empacotado carrega o renderer via
 // file:// e o Chromium envia Origin "null" nesse caso; localhost:5173 e o

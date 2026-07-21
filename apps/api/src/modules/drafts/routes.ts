@@ -1,13 +1,13 @@
 import type { FastifyPluginAsync } from "fastify";
 import { recommendPicks } from "@sparta/core";
-import { draftRecommendationRequestSchema } from "../../routes/schemas";
+import { draftRecommendationRequestSchema } from "../../routes/schemas.js";
 import {
   compositionRules,
   mockChampionStats,
   mockChampionTags,
   mockMatchups,
   mockPlayerProfile
-} from "../../routes/mock-data";
+} from "../../routes/mock-data.js";
 
 export const draftsRoutes: FastifyPluginAsync = async (app) => {
   app.post("/drafts/recommendations", async (request) => {

@@ -3,7 +3,7 @@ ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
 WORKDIR /app
-COPY package.json pnpm-workspace.yaml tsconfig.base.json eslint.config.js ./
+COPY package.json pnpm-workspace.yaml tsconfig.base.json tsconfig.node.json eslint.config.js ./
 COPY packages ./packages
 COPY apps/desktop ./apps/desktop
 RUN pnpm install --frozen-lockfile=false
