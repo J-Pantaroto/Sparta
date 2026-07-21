@@ -1,5 +1,5 @@
 import type { Prisma } from "@prisma/client";
-import { aggregatePlayerChampionStats, type Role } from "@sparta/core";
+import { aggregatePlayerChampionStats, type PlayerChampionStats, type RecentChampionMatch, type Role } from "@sparta/core";
 import { prisma } from "../../db/prisma";
 import { findParticipationHistory } from "../matches/match-repository";
 
@@ -85,4 +85,83 @@ export async function recomputeChampionStats(
       }
     });
   }
+}
+
+export interface RiotAccountLookup {
+  puuid: string;
+  gameName: string;
+  tagLine: string;
+  platformRegion: string;
+  regionalRouting: string;
+}
+
+/**
+ * Le o RiotAccount por gameName+tagLine (case-insensitive) - usado pelo
+ * perfil publico do jogador. Retorna null se a conta nunca foi vinculada
+ * por ninguem no Sparta.
+ */
+export async function findRiotAccountByRiotId(gameName: string, tagLine: string): Promise<RiotAccountLookup | null> {
+  const account = await prisma.riotAccount.findFirst({
+    where: {
+      gameName: { equals: gameName, mode: "insensitive" },
+      tagLine: { equals: tagLine, mode: "insensitive" }
+    }
+  });
+  if (!account) return null;
+
+  return {
+    puuid: account.puuid,
+    gameName: account.gameName,
+    tagLine: account.tagLine,
+    platformRegion: account.platformRegion,
+    regionalRouting: account.regionalRouting
+  };
+}
+
+/**
+ * PlayerChampionStats reais do jogador via puuid (RiotAccount ->
+ * PlayerProfile -> PlayerChampionStats). Retorna [] se a conta existe mas
+ * nunca foi sincronizada (sem partidas persistidas ainda).
+ */
+export async function findChampionStatsByPuuid(puuid: string): Promise<PlayerChampionStats[]> {
+  const account = await prisma.riotAccount.findUnique({ where: { puuid }, include: { profile: true } });
+  if (!account?.profile) return [];
+
+  const rows = await prisma.playerChampionStats.findMany({
+    where: { playerProfileId: account.profile.id },
+    include: { champion: true }
+  });
+
+  return rows.map((row) => ({
+    championId: row.championId,
+    championName: row.champion.name,
+    role: row.role as Role,
+    games: row.games,
+    wins: row.wins,
+    kills: row.kills,
+    deaths: row.deaths,
+    assists: row.assists,
+    csPerMinute: row.csPerMinute,
+    goldPerMinute: row.goldPerMinute,
+    damagePerMinute: row.damagePerMinute,
+    visionScorePerMinute: row.visionScorePerMinute,
+    killParticipation: row.killParticipation ?? 0,
+    objectiveParticipation: row.objectiveParticipation ?? 0,
+    recentMatches: (row.recentMatchesJson as unknown as RecentChampionMatch[] | null) ?? []
+  }));
+}
+
+/**
+ * Roles preferidas derivadas do volume real de partidas por role (nao e
+ * uma preferencia declarada pelo usuario, e so o que os dados mostram) -
+ * ordenadas da mais jogada pra menos jogada.
+ */
+export function derivePreferredRoles(championStats: PlayerChampionStats[]): Role[] {
+  const gamesByRole = new Map<Role, number>();
+  for (const stats of championStats) {
+    gamesByRole.set(stats.role, (gamesByRole.get(stats.role) ?? 0) + stats.games);
+  }
+  return Array.from(gamesByRole.entries())
+    .sort((a, b) => b[1] - a[1])
+    .map(([role]) => role);
 }

@@ -1,11 +1,16 @@
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { rankChampionPool } from "@sparta/core";
+import { rankChampionPool, type RecentChampionMatch, type Role } from "@sparta/core";
 import { RiotApiError } from "@sparta/riot";
 import { prisma } from "../../db/prisma";
-import { mockChampionStats, mockPlayerProfile } from "../../routes/mock-data";
 import { getAuthenticatedUserId } from "../auth/routes";
+import { findParticipationHistory } from "../matches/match-repository";
 import { lookupRiotAccount } from "../riot-integration/account-lookup";
+import {
+  derivePreferredRoles,
+  findChampionStatsByPuuid,
+  findRiotAccountByRiotId
+} from "./player-stats-repository";
 import { syncPlayerMatches } from "../sync/riot-sync-service";
 
 export const linkRiotAccountSchema = z.object({
@@ -16,15 +21,28 @@ export const linkRiotAccountSchema = z.object({
 });
 
 export const playersRoutes: FastifyPluginAsync = async (app) => {
-  app.get("/players/:riotName/:tagLine/profile", async (request) => {
+  app.get("/players/:riotName/:tagLine/profile", async (request, reply) => {
     const params = z.object({ riotName: z.string(), tagLine: z.string() }).parse(request.params);
+    const account = await findRiotAccountByRiotId(params.riotName, params.tagLine);
+    if (!account) {
+      reply.code(404);
+      return { error: "Conta Riot nao encontrada. Ela precisa ser vinculada no Sparta primeiro." };
+    }
+
+    const championStats = await findChampionStatsByPuuid(account.puuid);
+
     return {
-      ...mockPlayerProfile,
-      account: {
-        ...mockPlayerProfile.account,
-        gameName: params.riotName,
-        tagLine: params.tagLine
-      }
+      id: account.puuid,
+      account,
+      preferredRoles: derivePreferredRoles(championStats),
+      championStats,
+      // Pontos fortes/fracos e forma recente dependem de uma agregacao mais
+      // ampla entre partidas (Fase 2 - Player Intelligence); ainda nao ha
+      // funcao que os calcule, entao ficam vazios/neutros em vez de
+      // inventar uma avaliacao.
+      strengths: [],
+      weaknesses: [],
+      recentForm: { last10Score: 0, last20Score: 0, last50Score: 0, trend: "stable" as const }
     };
   });
 
@@ -66,17 +84,34 @@ export const playersRoutes: FastifyPluginAsync = async (app) => {
   });
 
   app.get("/players/:puuid/recent-matches", async (request) => {
+    const params = z.object({ puuid: z.string() }).parse(request.params);
     const query = z.object({ limit: z.coerce.number().min(1).max(50).default(10) }).parse(request.query);
-    return {
-      puuid: z.object({ puuid: z.string() }).parse(request.params).puuid,
-      matches: mockChampionStats[0].recentMatches.slice(0, query.limit)
-    };
+
+    const history = await findParticipationHistory(params.puuid);
+    const matches: RecentChampionMatch[] = history.slice(0, query.limit).map((entry) => ({
+      matchId: entry.matchId,
+      championId: entry.championId,
+      role: entry.role as Role,
+      won: entry.won,
+      kills: entry.kills,
+      deaths: entry.deaths,
+      assists: entry.assists,
+      csPerMinute: entry.csPerMinute,
+      goldPerMinute: entry.goldPerMinute,
+      damagePerMinute: entry.damagePerMinute,
+      visionScorePerMinute: entry.visionScorePerMinute,
+      killParticipation: entry.killParticipation ?? 0,
+      objectiveParticipation: entry.objectiveParticipation ?? 0
+    }));
+
+    return { puuid: params.puuid, matches };
   });
 
-  app.get("/players/:puuid/champion-performance", async (request) => ({
-    puuid: z.object({ puuid: z.string() }).parse(request.params).puuid,
-    champions: rankChampionPool(mockChampionStats)
-  }));
+  app.get("/players/:puuid/champion-performance", async (request) => {
+    const params = z.object({ puuid: z.string() }).parse(request.params);
+    const championStats = await findChampionStatsByPuuid(params.puuid);
+    return { puuid: params.puuid, champions: rankChampionPool(championStats) };
+  });
 
   /**
    * Vincula um Riot ID (gameName#tagLine) ao usuario autenticado, resolvendo
