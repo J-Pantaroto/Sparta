@@ -6,12 +6,7 @@ import { prisma } from "../../db/prisma";
 import { mockChampionStats, mockPlayerProfile } from "../../routes/mock-data";
 import { getAuthenticatedUserId } from "../auth/routes";
 import { lookupRiotAccount } from "../riot-integration/account-lookup";
-
-export const playerSyncSchema = z.object({
-  riotId: z.string().min(3).regex(/^.+#.+$/, "Use o formato Nome#TAG"),
-  platformRegion: z.string().min(2),
-  regionalRouting: z.string().min(2)
-});
+import { syncPlayerMatches } from "../sync/riot-sync-service";
 
 export const linkRiotAccountSchema = z.object({
   gameName: z.string().min(3, "Informe o nome do invocador"),
@@ -33,14 +28,41 @@ export const playersRoutes: FastifyPluginAsync = async (app) => {
     };
   });
 
+  /**
+   * Sincroniza as partidas novas do jogador autenticado. Nao recebe riotId
+   * no payload - resolve a conta Riot ja vinculada ao usuario (evita
+   * sincronizar a conta de outra pessoa so porque o cliente mandou um puuid
+   * diferente no corpo da requisicao).
+   */
   app.post("/players/sync", async (request, reply) => {
-    const payload = playerSyncSchema.parse(request.body);
-    reply.code(202);
-    return {
-      status: "queued",
-      riotId: payload.riotId,
-      message: "Sync mock criado. A integração Riot real fica no backend e requer RIOT_API_KEY."
-    };
+    const userId = await getAuthenticatedUserId(request);
+    if (!userId) {
+      reply.code(401);
+      return { error: "Nao autenticado." };
+    }
+
+    const riotAccount = await prisma.riotAccount.findFirst({ where: { userId } });
+    if (!riotAccount) {
+      reply.code(404);
+      return { error: "Nenhuma conta Riot vinculada. Vincule uma conta antes de sincronizar." };
+    }
+
+    const result = await syncPlayerMatches({
+      riotAccountId: riotAccount.id,
+      puuid: riotAccount.puuid,
+      platformRegion: riotAccount.platformRegion
+    });
+
+    for (const failure of result.failed) {
+      request.log.error({
+        event: "riot_sync_match_failed",
+        puuid: riotAccount.puuid,
+        matchId: failure.matchId,
+        reason: failure.reason
+      });
+    }
+
+    return result;
   });
 
   app.get("/players/:puuid/recent-matches", async (request) => {
