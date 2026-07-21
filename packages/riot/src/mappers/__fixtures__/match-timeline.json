@@ -1,0 +1,46 @@
+{
+  "metadata": {
+    "matchId": "BR1_2900000000",
+    "participants": ["puuid-player-1", "puuid-player-2"]
+  },
+  "info": {
+    "frameInterval": 60000,
+    "frames": [
+      {
+        "timestamp": 0,
+        "participantFrames": {
+          "1": { "participantId": 1, "minionsKilled": 0, "jungleMinionsKilled": 0, "totalGold": 500 },
+          "2": { "participantId": 2, "minionsKilled": 0, "jungleMinionsKilled": 0, "totalGold": 500 }
+        },
+        "events": []
+      },
+      {
+        "timestamp": 300000,
+        "participantFrames": {
+          "1": { "participantId": 1, "minionsKilled": 40, "jungleMinionsKilled": 1, "totalGold": 1900 },
+          "2": { "participantId": 2, "minionsKilled": 38, "jungleMinionsKilled": 0, "totalGold": 1850 }
+        },
+        "events": [{ "type": "CHAMPION_KILL", "timestamp": 300000, "killerId": 2, "victimId": 1 }]
+      },
+      {
+        "timestamp": 600000,
+        "participantFrames": {
+          "1": { "participantId": 1, "minionsKilled": 70, "jungleMinionsKilled": 2, "totalGold": 3500 },
+          "2": { "participantId": 2, "minionsKilled": 65, "jungleMinionsKilled": 0, "totalGold": 3200 }
+        },
+        "events": [{ "type": "ELITE_MONSTER_KILL", "timestamp": 595000, "killerId": 1, "teamId": 100, "monsterType": "DRAGON" }]
+      },
+      {
+        "timestamp": 900000,
+        "participantFrames": {
+          "1": { "participantId": 1, "minionsKilled": 110, "jungleMinionsKilled": 3, "totalGold": 5800 },
+          "2": { "participantId": 2, "minionsKilled": 100, "jungleMinionsKilled": 0, "totalGold": 5100 }
+        },
+        "events": [
+          { "type": "CHAMPION_KILL", "timestamp": 660000, "killerId": 2, "victimId": 1 },
+          { "type": "BUILDING_KILL", "timestamp": 870000, "teamId": 100, "buildingType": "TOWER_BUILDING" }
+        ]
+      }
+    ]
+  }
+}

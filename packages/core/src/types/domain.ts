@@ -105,8 +105,10 @@ export interface MatchPerformanceMetrics {
   goldPerMinute: number;
   damagePerMinute: number;
   visionScorePerMinute: number;
-  killParticipation: number;
-  objectiveParticipation: number;
+  // Vem do objeto "challenges" do Match-V5, ausente em patches antigos -
+  // fica undefined em vez de inventar um valor quando a Riot nao fornece.
+  killParticipation?: number;
+  objectiveParticipation?: number;
   deathsBefore10?: number;
   deathsBefore15?: number;
   csAt10?: number;

@@ -106,8 +106,8 @@ model MatchParticipant {
   goldPerMinute         Float
   damagePerMinute       Float
   visionScorePerMinute  Float
-  killParticipation     Float
-  objectiveParticipation Float
+  killParticipation     Float?
+  objectiveParticipation Float?
   match                 Match @relation(fields: [matchId], references: [id])
   riotAccount           RiotAccount? @relation(fields: [riotAccountId], references: [id])
   champion              Champion @relation(fields: [championId], references: [id])

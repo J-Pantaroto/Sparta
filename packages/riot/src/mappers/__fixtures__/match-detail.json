@@ -1,0 +1,45 @@
+{
+  "metadata": {
+    "matchId": "BR1_2900000000",
+    "participants": ["puuid-player-1", "puuid-player-2"]
+  },
+  "info": {
+    "gameDuration": 1800,
+    "gameVersion": "14.14.593.1234",
+    "participants": [
+      {
+        "puuid": "puuid-player-1",
+        "championId": 61,
+        "championName": "Orianna",
+        "teamId": 100,
+        "teamPosition": "MIDDLE",
+        "win": true,
+        "kills": 8,
+        "deaths": 3,
+        "assists": 10,
+        "totalMinionsKilled": 180,
+        "neutralMinionsKilled": 5,
+        "goldEarned": 12500,
+        "totalDamageDealtToChampions": 22000,
+        "visionScore": 28,
+        "challenges": { "killParticipation": 0.62 }
+      },
+      {
+        "puuid": "puuid-player-2",
+        "championId": 157,
+        "championName": "Yasuo",
+        "teamId": 200,
+        "teamPosition": "MIDDLE",
+        "win": false,
+        "kills": 4,
+        "deaths": 7,
+        "assists": 3,
+        "totalMinionsKilled": 160,
+        "neutralMinionsKilled": 0,
+        "goldEarned": 9800,
+        "totalDamageDealtToChampions": 15000,
+        "visionScore": 15
+      }
+    ]
+  }
+}

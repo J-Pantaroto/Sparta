@@ -123,6 +123,10 @@ importers:
         version: 24.13.2
 
   packages/riot:
+    dependencies:
+      '@sparta/core':
+        specifier: workspace:*
+        version: link:../core
     devDependencies:
       '@types/node':
         specifier: ^24.0.10
