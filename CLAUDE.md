@@ -4,15 +4,9 @@ Este arquivo é um handoff para outro agente de desenvolvimento continuar o proj
 
 ## Pendências desta sessão (ler primeiro)
 
-Esta sessão fez uma auditoria completa do repositório (real vs mock vs so-tipo), aprovou um plano de evolução em 5 épicos (Riot Sync, Player Intelligence, Draft Intelligence, Post-Game Coach, Growth Journey) e implementou a **Fase 1 inteira (Riot Sync com dados reais)**. Também corrigiu bugs de infra encontrados no caminho (Docker, CI, rate limit da API) e um hardening de segurança. Nada disso está em `main` ainda — está espalhado em 3 branches com PR aberto:
+Uma sessão anterior fez uma auditoria completa do repositório (real vs mock vs so-tipo), aprovou um plano de evolução em 5 épicos (Riot Sync, Player Intelligence, Draft Intelligence, Post-Game Coach, Growth Journey) e implementou a **Fase 1 inteira (Riot Sync com dados reais)**, além de corrigir bugs de infra (Docker, CI, rate limit da API) e um hardening de segurança. Tudo isso **já está mergeado em `main`** (3 PRs: `fix/api-esm-nodenext-imports`, `fix/security-hardening`, `feat/riot-sync-phase1`). Esta sessão em seguida fez um refinamento visual do desktop (fonte, tema por campeão, animações, remoção de caixa alta — detalhes em "Desktop atual").
 
-- `fix/api-esm-nodenext-imports` (PR #1) — corrige o bug de import ESM sem extensão que derrubava o container da API (`node dist/server.js` crash-loopava). Isolado, sem dependência das outras branches.
-- `fix/security-hardening` (PR #2) — CORS restrito (era `origin: true`, permitia ataque "drive-by localhost"), rate limit em `/auth/login`/`/auth/register`, CSP no renderer, guard contra o segredo de dev do `AUTH_TOKEN_SECRET` em produção. Também isolado.
-- `feat/riot-sync-phase1` (sem PR ainda, branch local) — a Fase 1 completa, descrita abaixo. Foi criada a partir da `main` (não tem os fixes das duas branches acima ainda).
-
-**Ordem recomendada pra fechar isso**: revisar e mergear as duas branches de fix primeiro (são pequenas e independentes), depois abrir e mergear o PR de `feat/riot-sync-phase1` rebaseado em cima da `main` já atualizada.
-
-### O que a Fase 1 entregou (`feat/riot-sync-phase1`)
+### O que a Fase 1 entregou
 
 Todo mundo que antes retornava os mesmos 2 campeões mockados (Orianna/Ahri) agora usa dado real, sincronizado da Riot API e persistido no Postgres. Validado ponta a ponta contra a conta real Zekerus#117:
 
@@ -387,13 +381,15 @@ Fluxo de sessao (`App.tsx`): ao abrir, restaura token de `localStorage` (`sparta
 
 Deteccao automatica de champion select: `packages/riot/src/lcu/read-only-client.ts` agora le o lockfile local do League (`LcuReadOnlyClient`) e faz poll de `GET /lol-gameflow/v1/gameflow-phase` a cada 2.5s no processo main (`apps/desktop/src/main/index.ts`), repassando por IPC (`sparta:gameflow-phase`) para o renderer, que troca a aba para "Champion Select" quando a fase vira `ChampSelect`. Somente leitura, sem nenhuma acao de escrita no cliente (ver `docs/riot-compliance.md`).
 
-Estetica: fonte trocada de Inter para `Rajdhani` (UI geral, visual mais "esportivo") + `Cinzel` para o wordmark "Sparta" e titulos (`h1`, classe `.font-display`), carregadas via Google Fonts no `index.html`. Icones/artes de campeao vem do Data Dragon (`features/datadragon.ts` no renderer; `packages/riot/src/datadragon/client.ts` no backend) — ver `championSquareUrl`/`championSplashUrl`. Continua minimalista/premium, sem landing page nem foco em marketing.
+Estetica: fonte unificada em `Manrope` (corpo, titulos e o wordmark "Sparta" — substituiu o par Rajdhani/Cinzel de uma sessao anterior), carregada via Google Fonts no `index.html`. Paleta migrada pra CSS custom properties em `styles/global.css` (`--color-bg`, `--color-red`, etc.), espelhando os valores de `packages/ui/src/theme/tokens.ts` sem de fato importar o pacote (`@sparta/ui` continua sem uso real pelo desktop — `theme`/`MetricCard` de la sao codigo morto do ponto de vista do desktop). `text-transform: uppercase` foi removido dos rotulos (`.page-header span`, `.auth-field label` etc.) — texto normal, so cor/peso/tamanho fazem a hierarquia agora. Adicionadas transicoes (hover em nav/cards/botoes) e animacoes de entrada (`fadeIn`/`fadeInSoft`) ao trocar de aba e ao carregar splash art — antes disso o app nao tinha nenhuma transicao. Icones/artes de campeao vem do Data Dragon (`features/datadragon.ts` no renderer; `packages/riot/src/datadragon/client.ts` no backend) — ver `championSquareUrl`/`championSplashUrl`. Continua minimalista/premium, sem landing page nem foco em marketing.
+
+Tema por campeao/skin: `features/featured-champion-context.tsx` (`FeaturedChampionProvider`/`useFeaturedChampion`) guarda em `localStorage` (`sparta:featured-champion`) qual campeao o usuario escolheu num seletor na sidebar (`features/ChampionThemePicker.tsx`). A splash art do login e do header do Dashboard passam a usar esse campeao (com uma skin especifica curada a dedo por campeao, indices conferidos contra o Data Dragon 14.14.1 — ver `FEATURED_CHAMPIONS`). A lista de ~12 campeoes e um placeholder manual: quando a Fase 2 conectar o desktop ao `/players/:puuid/champion-performance` real, o candidato natural e trocar isso pelo campeao mais jogado de verdade em vez de uma escolha estetica solta. A cor de destaque (vermelho) continua fixa por decisao explicita — so a arte muda, nao a paleta.
 
 Estilo:
 
 - preto profundo;
 - superfícies quase pretas;
-- vermelho discreto;
+- vermelho discreto (fixo, nao varia por tema);
 - minimalista/premium;
 - sem landing page;
 - foco em leitura rápida.
@@ -466,12 +462,12 @@ Não usar force push sem pedido explícito.
 
 ## Próximos passos recomendados
 
-Fase 1 (Riot Sync com dados reais) está completa em `feat/riot-sync-phase1` — ver "Pendências desta sessão" no topo. Depois de mergear as 3 branches pendentes:
+Fase 1 (Riot Sync com dados reais) e as 3 branches pendentes (`fix/api-esm-nodenext-imports`, `fix/security-hardening`, `feat/riot-sync-phase1`) já foram mergeadas em `main`. Um refinamento visual do desktop (fonte, tema por campeão, animações — ver "Desktop atual") também já foi feito. Próximo:
 
 1. **Fase 2 (Player Intelligence)**: calcular `strengths`/`weaknesses`/`RecentForm` de verdade a partir do histórico já persistido (hoje ficam vazios/neutros nas rotas de perfil). Reaproveitar/generalizar `confidenceFromGames` (hoje privada em `champion-performance.ts`) pra indicar confiança dessas novas análises também.
 2. Persistir os 10 participantes por partida (hoje só o jogador rastreado é gravado) — necessário pra matchups reais e composição de time real em `/drafts/recommendations` (que hoje cai no mock quando o cliente não manda tudo).
 3. Expandir `ChampionTag` além do seed manual de 2 campeões — o motor de recomendação já tolera ausência, mas mais cobertura melhora a qualidade das recomendações.
-4. Conectar o desktop às rotas de perfil/drafts/pós-game (hoje só auth usa a API real; o resto ainda usa `features/mock-data.ts` local no renderer).
+4. Conectar o desktop às rotas de perfil/drafts/pós-game (hoje só auth usa a API real; o resto ainda usa `features/mock-data.ts` local no renderer). Isso também destrava trocar a lista curada de `FEATURED_CHAMPIONS` (tema visual, ver "Desktop atual") pelo campeão mais jogado de verdade do jogador.
 5. Implementar `PostGameAnalysis` de verdade (tipo existe, nenhuma função o preenche) — agora que `MatchTimeline` tem dado real (mortes antes de 10/15min, CS, gold diff, objetivos).
 6. Fila real (Redis/BullMQ) para o sync, se o padrão de uso mostrar que o teto de 20-50 partidas por chamada síncrona é pouco — o `docker-compose.yml` já provisiona Redis, só falta o worker.
 7. LCU read-only: já implementado o poll de `gameflow-phase` para trocar de aba (ver `docs/riot-compliance.md`); próximo passo é ler `/lol-champ-select/v1/session` (método já existe em `LcuReadOnlyClient.getChampionSelectSession`) para pré-carregar o draft real em vez do modo manual.
