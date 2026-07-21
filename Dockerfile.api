@@ -8,6 +8,7 @@ COPY package.json pnpm-workspace.yaml tsconfig.base.json eslint.config.js ./
 COPY packages ./packages
 COPY apps/api ./apps/api
 RUN pnpm install --frozen-lockfile=false
+RUN pnpm --filter @sparta/api prisma:generate
 RUN pnpm --filter @sparta/api build
 
 EXPOSE 3333

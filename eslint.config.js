@@ -14,10 +14,16 @@ export default [
       globals: {
         console: "readonly",
         crypto: "readonly",
+        Buffer: "readonly",
         document: "readonly",
         fetch: "readonly",
         process: "readonly",
         setTimeout: "readonly",
+        setInterval: "readonly",
+        clearInterval: "readonly",
+        window: "readonly",
+        localStorage: "readonly",
+        RequestInit: "readonly",
         __dirname: "readonly"
       }
     },
