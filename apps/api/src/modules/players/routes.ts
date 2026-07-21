@@ -1,10 +1,11 @@
 import type { FastifyPluginAsync } from "fastify";
-import { createHash } from "node:crypto";
 import { z } from "zod";
 import { rankChampionPool } from "@sparta/core";
+import { RiotApiError } from "@sparta/riot";
 import { prisma } from "../../db/prisma";
 import { mockChampionStats, mockPlayerProfile } from "../../routes/mock-data";
 import { getAuthenticatedUserId } from "../auth/routes";
+import { lookupRiotAccount } from "../riot-integration/account-lookup";
 
 export const playerSyncSchema = z.object({
   riotId: z.string().min(3).regex(/^.+#.+$/, "Use o formato Nome#TAG"),
@@ -56,12 +57,9 @@ export const playersRoutes: FastifyPluginAsync = async (app) => {
   }));
 
   /**
-   * Vincula um Riot ID (gameName#tagLine) ao usuario autenticado.
-   *
-   * Ainda nao chama a Account-V1 real (requer RIOT_API_KEY apenas no
-   * backend, ver docs/riot-compliance.md). Enquanto isso, gera um puuid
-   * deterministico local para permitir o fluxo completo de vinculo de
-   * conta ponta a ponta.
+   * Vincula um Riot ID (gameName#tagLine) ao usuario autenticado, resolvendo
+   * o puuid real via Account-V1 (RIOT_API_KEY so existe no backend, ver
+   * docs/riot-compliance.md).
    */
   app.post("/players/link-riot-account", async (request, reply) => {
     const userId = await getAuthenticatedUserId(request);
@@ -71,21 +69,40 @@ export const playersRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const payload = linkRiotAccountSchema.parse(request.body);
-    const mockPuuid = createHash("sha256").update(`${payload.gameName}#${payload.tagLine}`.toLowerCase()).digest("hex");
 
-    const account = await prisma.riotAccount.upsert({
-      where: { puuid: mockPuuid },
-      create: {
-        puuid: mockPuuid,
+    let riotAccountInfo: { puuid: string; gameName: string; tagLine: string };
+    try {
+      riotAccountInfo = await lookupRiotAccount(payload.gameName, payload.tagLine);
+    } catch (error) {
+      const notFound = error instanceof RiotApiError && error.status === 404;
+      request.log.error({
+        event: "link_riot_account_failed",
         gameName: payload.gameName,
         tagLine: payload.tagLine,
+        status: error instanceof RiotApiError ? error.status : undefined,
+        message: error instanceof Error ? error.message : String(error)
+      });
+      reply.code(notFound ? 404 : 502);
+      return {
+        error: notFound
+          ? "Riot ID nao encontrado."
+          : "Nao foi possivel confirmar a conta Riot agora. Tente novamente em instantes."
+      };
+    }
+
+    const account = await prisma.riotAccount.upsert({
+      where: { puuid: riotAccountInfo.puuid },
+      create: {
+        puuid: riotAccountInfo.puuid,
+        gameName: riotAccountInfo.gameName,
+        tagLine: riotAccountInfo.tagLine,
         platformRegion: payload.platformRegion,
         regionalRouting: payload.regionalRouting,
         userId
       },
       update: {
-        gameName: payload.gameName,
-        tagLine: payload.tagLine,
+        gameName: riotAccountInfo.gameName,
+        tagLine: riotAccountInfo.tagLine,
         platformRegion: payload.platformRegion,
         regionalRouting: payload.regionalRouting,
         userId

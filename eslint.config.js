@@ -24,6 +24,7 @@ export default [
         window: "readonly",
         localStorage: "readonly",
         RequestInit: "readonly",
+        Response: "readonly",
         __dirname: "readonly"
       }
     },
