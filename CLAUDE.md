@@ -4,27 +4,35 @@ Este arquivo é um handoff para outro agente de desenvolvimento continuar o proj
 
 ## Pendências desta sessão (ler primeiro)
 
-A ultima sessao (rodando no Cowork, sandbox remoto sem rede real e com o repo montado via OneDrive) implementou quatro coisas e **nao conseguiu commitar nada**: o `.git/index.lock` daquele sandbox ficou travado (permissao negada pra remover, provavelmente o proprio OneDrive ou outro processo segurando o arquivo) e o sandbox nao tinha rede liberada pra `pnpm`/`prisma` CLI. Todo o trabalho abaixo esta no working tree, sem commit.
+Esta sessão fez uma auditoria completa do repositório (real vs mock vs so-tipo), aprovou um plano de evolução em 5 épicos (Riot Sync, Player Intelligence, Draft Intelligence, Post-Game Coach, Growth Journey) e implementou a **Fase 1 inteira (Riot Sync com dados reais)**. Também corrigiu bugs de infra encontrados no caminho (Docker, CI, rate limit da API) e um hardening de segurança. Nada disso está em `main` ainda — está espalhado em 3 branches com PR aberto:
 
-O que foi feito nessa leva (verifique com `git status` e `git diff` antes de mexer em mais nada):
+- `fix/api-esm-nodenext-imports` (PR #1) — corrige o bug de import ESM sem extensão que derrubava o container da API (`node dist/server.js` crash-loopava). Isolado, sem dependência das outras branches.
+- `fix/security-hardening` (PR #2) — CORS restrito (era `origin: true`, permitia ataque "drive-by localhost"), rate limit em `/auth/login`/`/auth/register`, CSP no renderer, guard contra o segredo de dev do `AUTH_TOKEN_SECRET` em produção. Também isolado.
+- `feat/riot-sync-phase1` (sem PR ainda, branch local) — a Fase 1 completa, descrita abaixo. Foi criada a partir da `main` (não tem os fixes das duas branches acima ainda).
 
-- **Migration inicial do Prisma** (`apps/api/prisma/migrations/20260715120000_init`), escrita a mao a partir do `schema.prisma` — nunca rodada contra um Postgres real. Schema ganhou `User.passwordHash` e `User.displayName`.
-- **Auth completo**: backend (`apps/api/src/modules/auth/*`, rotas `/auth/register`, `/auth/login`, `/auth/me`, `POST /players/link-riot-account`) e frontend (`AuthScreen.tsx`, `LinkRiotAccountScreen.tsx`, `features/api-client.ts`), gating em `App.tsx`. Zero dependencias novas (scrypt + HMAC nativos do `node:crypto`).
-- **Deteccao automatica de champion select via LCU** (`packages/riot/src/lcu/read-only-client.ts` real, poll no `apps/desktop/src/main/index.ts`, IPC no preload, `App.tsx` troca de aba sozinho).
-- **Estetica**: fontes Rajdhani/Cinzel via Google Fonts, imagens/splash de campeao via Data Dragon (`features/datadragon.ts` no renderer, `packages/riot/src/datadragon/client.ts` no backend).
+**Ordem recomendada pra fechar isso**: revisar e mergear as duas branches de fix primeiro (são pequenas e independentes), depois abrir e mergear o PR de `feat/riot-sync-phase1` rebaseado em cima da `main` já atualizada.
 
-Passo a passo pra retomar (nessa ordem):
+### O que a Fase 1 entregou (`feat/riot-sync-phase1`)
+
+Todo mundo que antes retornava os mesmos 2 campeões mockados (Orianna/Ahri) agora usa dado real, sincronizado da Riot API e persistido no Postgres. Validado ponta a ponta contra a conta real Zekerus#117:
+
+1. **Catálogo de campeões real** via Data Dragon (`apps/api/src/modules/catalog/`) — antes só havia 1 campeão no seed manual, agora `Champion` é sincronizado (~170 registros, `pnpm --filter @sparta/api catalog:sync`). `ChampionTag` continua manual (Data Dragon não fornece os atributos de gameplay do Sparta) — o motor de recomendação já tolera isso.
+2. **`RiotApiClient` conectado de verdade** (`packages/riot/src/clients/riot-api-client.ts`) — existia mas nunca era chamado pela API. Ganhou rate-limit real (`packages/riot/src/rate-limit/riot-request.ts`: respeita `Retry-After`, só retenta 429/502/503/504) e `getMatchTimeline`. `POST /players/link-riot-account` agora chama Account-V1 de verdade em vez de gerar um puuid fake.
+3. **Mapeadores puros Match-V5** (`packages/riot/src/mappers/`) — raw da Riot → `MatchSummary`/`MatchTimelineSummary`. `killParticipation`/`objectiveParticipation` ficam `undefined` quando a Riot não manda o objeto `challenges` (patches antigos) em vez de inventar 0 — por isso `MatchParticipant.killParticipation`/`objectiveParticipation` viraram nullable no schema (migration `20260716010000_nullable_participant_challenge_stats`).
+4. **Sync incremental real** (`apps/api/src/modules/sync/riot-sync-service.ts`) — `POST /players/sync` agora é autenticado, resolve a conta Riot do próprio usuário (não aceita mais `riotId` solto no payload), busca só partidas novas (`Match.matchId` único garante idempotência), processa sequencialmente (não paralelo, por causa do rate limit de chave de dev), teto de 20/50 partidas por chamada.
+5. **Agregação real de `PlayerChampionStats`** (`packages/core/src/aggregation/player-champion-stats.ts`) — `PlayerProfile` nunca era criado em lugar nenhum (bloqueador oculto corrigido: create-if-missing no `player-stats-repository.ts`). Média de `killParticipation`/`objectiveParticipation` só sobre partidas que têm o dado.
+6. **As 3 rotas GET de jogador** (`/profile`, `/recent-matches`, `/champion-performance`) trocaram o mock pelas queries reais.
+
+O que ficou deliberadamente fora de escopo (é Fase 2 "Player Intelligence" ou além):
+
+- `strengths`/`weaknesses`/`recentForm` do `PlayerProfile` — tipos existem, nenhuma função os calcula ainda.
+- `POST /drafts/recommendations` continua caindo no mock (`apps/api/src/routes/mock-data.ts`) quando o cliente não manda tudo — matchups reais exigiriam persistir os 10 participantes por partida.
+- Fila real (BullMQ/Redis) para o sync — hoje é síncrono, limitado por chamada; documentado como troca deliberada, não definitiva.
+- `PostGameAnalysis` continua sem nenhuma função geradora.
+
+Antes de rodar os testes manuais que dependem da Riot API real, o `.env` precisa de uma `RIOT_API_KEY` válida (as de desenvolvimento expiram em 24h e precisam ser regeradas no [Riot Developer Portal](https://developer.riotgames.com/)).
 
 ```bash
-git status
-git add -A
-git commit -m "feat: login vinculado a conta riot, migrations do banco, deteccao automatica do champion select e visual novo
-
-- adiciona tela de login/cadastro e vinculo de riot id antes de entrar no app
-- cria a migration inicial do prisma (faltava, banco nao rodava de verdade)
-- lcu agora detecta quando entro em champion select e troca a aba sozinho
-- troca fonte pra rajdhani/cinzel e usa arte oficial dos campeoes (data dragon) no perfil, champion select e dashboard"
-
 npx pnpm@10.34.4 install
 docker compose up -d
 npx pnpm@10.34.4 --filter @sparta/api prisma:generate
@@ -34,12 +42,6 @@ npx pnpm@10.34.4 lint
 npx pnpm@10.34.4 test
 npx pnpm@10.34.4 build
 ```
-
-Se `.git/index.lock` existir e o commit falhar (nao deveria acontecer rodando localmente, isso foi peculiaridade do sandbox anterior), so apagar o arquivo manualmente e tentar de novo.
-
-Se `prisma migrate deploy` reclamar de drift (a migration foi escrita a mao, nunca validada contra banco real), o schema e a migration devem bater — se nao bater, ajuste o `migration.sql` ou rode `prisma:migrate` (roda `migrate dev`) pra deixar o Prisma reconciliar.
-
-Depois de rodar tudo isso com sucesso, siga para "Próximos passos recomendados" no fim deste arquivo.
 
 ## Leitura obrigatória
 
@@ -213,6 +215,10 @@ O arquivo `packages/core/src/types/domain.ts` define os principais contratos:
 - `PlayerStrength`
 - `ReplayImportJob`
 
+`MatchSummary` ganhou `startedAt` (epoch ms do `gameStartTimestamp` real da Riot) — necessário pra ordenar por recência corretamente (a forma recente pondera por índice, então importa saber qual partida é a mais nova). `MatchPerformanceMetrics.killParticipation`/`objectiveParticipation` viraram opcionais (ausentes quando a Riot não manda `challenges`).
+
+Novo módulo: `packages/core/src/aggregation/player-champion-stats.ts` (`aggregatePlayerChampionStats`) — puro, agrega histórico de partidas em `PlayerChampionStats`.
+
 Priorize evoluir esses tipos antes de duplicar estruturas em API ou desktop.
 
 ## Scoring atual
@@ -299,17 +305,31 @@ Endpoints iniciais:
 - `POST /replays/import`
 - `GET /replays/:jobId`
 
-Auth (`apps/api/src/modules/auth`): senha com `scrypt` (nativo do `node:crypto`) e token de sessao assinado com HMAC-SHA256 (`node:crypto`, sem `jsonwebtoken`/`bcrypt` como dependencia). Segredo em `AUTH_TOKEN_SECRET` (novo, ver `src/config/env.ts`; tem default de dev, troque em producao). Token vai no header `Authorization: Bearer <token>`.
+Auth (`apps/api/src/modules/auth`): senha com `scrypt` (nativo do `node:crypto`) e token de sessao assinado com HMAC-SHA256 (`node:crypto`, sem `jsonwebtoken`/`bcrypt` como dependencia). Segredo em `AUTH_TOKEN_SECRET` (ver `src/config/env.ts`; `loadEnv()` recusa subir se `NODE_ENV=production` e o segredo ainda for o default de dev). Token vai no header `Authorization: Bearer <token>`.
 
-`POST /players/link-riot-account` ainda nao chama a Account-V1 real: gera um `puuid` deterministico (hash do `gameName#tagLine`) so para permitir o fluxo completo de vinculo de conta. Trocar pela chamada real e o proximo passo natural quando `RIOT_API_KEY` for integrada.
+CORS restrito a uma allowlist (`localhost:5173` em dev + origem `null` do app empacotado via `file://`) e rate limit de 5/min em `/auth/login` e `/auth/register` (`@fastify/rate-limit`) — ver `app.ts`.
 
-Ainda há mocks em:
+`POST /players/link-riot-account` chama Account-V1 de verdade (`apps/api/src/modules/riot-integration/account-lookup.ts`, cache de 24h via `ApiCacheEntry`) e grava o puuid real. `POST /players/sync` é autenticado, resolve a conta Riot do proprio usuario e sincroniza partidas novas de verdade (`apps/api/src/modules/sync/riot-sync-service.ts`) — ver "Pendências desta sessão" pra mais detalhes de como isso funciona.
+
+Módulos novos da Fase 1:
+
+```txt
+apps/api/src/modules/catalog/        # catalogo de campeoes via Data Dragon
+apps/api/src/modules/riot-integration/  # client-factory + account-lookup (Account-V1)
+apps/api/src/modules/matches/         # persistencia/consulta de Match/MatchParticipant/MatchTimeline
+apps/api/src/modules/sync/            # orquestracao do sync incremental
+apps/api/src/db/api-cache.ts          # helper generico sobre ApiCacheEntry
+```
+
+`GET /players/:riotName/:tagLine/profile`, `/recent-matches` e `/champion-performance` leem dado real agora (Fase 1, Tarefa 6). `strengths`/`weaknesses`/`recentForm` do perfil ficam vazios/neutros — ninguem calcula isso ainda (Fase 2).
+
+Ainda há mock em:
 
 ```txt
 apps/api/src/routes/mock-data.ts
 ```
 
-Quando integrar Riot API real, mantenha a chave somente no backend e preserve mocks para desenvolvimento sem chave.
+Só é usado por `POST /drafts/recommendations` (quando o cliente nao manda tudo) e por `/drafts/pre-game-analysis`/`postgame`/`replays` (100% mock ainda, fora do escopo da Fase 1).
 
 ## Banco atual
 
@@ -319,33 +339,29 @@ Schema:
 apps/api/prisma/schema.prisma
 ```
 
-Ha uma migration inicial em `apps/api/prisma/migrations/20260715120000_init`, escrita manualmente a partir do schema (o schema tambem ganhou `User.passwordHash` e `User.displayName` para suportar login). Ela ainda nao foi aplicada/validada contra um Postgres real. Depois de `docker compose up -d`, rode:
+Duas migrations aplicadas e validadas contra Postgres real:
+
+- `20260715120000_init` — schema inicial (inclui `User.passwordHash`/`displayName` pra login).
+- `20260716010000_nullable_participant_challenge_stats` — `MatchParticipant.killParticipation`/`objectiveParticipation` viraram nullable (a Riot nem sempre manda o objeto `challenges`, e persistir 0 seria inventar dado).
 
 ```bash
 npx pnpm@10.34.4 --filter @sparta/api prisma:generate
 npx pnpm@10.34.4 --filter @sparta/api prisma migrate deploy --schema prisma/schema.prisma
 ```
 
-Se preferir deixar o Prisma re-verificar/gerar a migration do zero (ex.: schema mudou desde entao), use `prisma:migrate` (que roda `migrate dev`) em vez de `migrate deploy`.
+Tabelas com uso real (Fase 1) vs ainda mock:
 
-Tabelas principais já modeladas:
+| Tabela | Status |
+|---|---|
+| `User`, `RiotAccount` | Real desde antes da Fase 1 |
+| `Champion` | Real — sincronizado via Data Dragon (`catalog:sync`) |
+| `ChampionTag` | Manual (seed) — Data Dragon nao fornece os atributos de gameplay do Sparta |
+| `Match`, `MatchParticipant`, `MatchTimeline` | Real — persistidos pelo sync incremental |
+| `PlayerProfile`, `PlayerChampionStats` | Real — agregado apos cada sync |
+| `ApiCacheEntry` | Real — cache de Account-V1 (24h) e Data Dragon (7 dias) |
+| `DraftSession`, `PickRecommendation`, `PostgameReport`, `ReplayImportJob` | Ainda sem nenhum codigo que leia/escreva — fora do escopo da Fase 1 |
 
-- `User`
-- `RiotAccount`
-- `PlayerProfile`
-- `Champion`
-- `ChampionTag`
-- `Match`
-- `MatchParticipant`
-- `MatchTimeline`
-- `PlayerChampionStats`
-- `DraftSession`
-- `PickRecommendation`
-- `PostgameReport`
-- `ReplayImportJob`
-- `ApiCacheEntry`
-
-Próximo passo natural: criar migrations reais e conectar endpoints de sync/consulta ao Prisma.
+Próximo passo natural: Fase 2 (Player Intelligence) precisa persistir `strengths`/`weaknesses`/`RecentForm` calculados, e eventualmente os 10 participantes por partida (hoje so o jogador rastreado é persistido) pra matchups reais.
 
 ## Desktop atual
 
@@ -450,17 +466,17 @@ Não usar force push sem pedido explícito.
 
 ## Próximos passos recomendados
 
-1. Validar a migration inicial (`20260715120000_init`) contra um Postgres real via `docker compose up -d` + `prisma migrate deploy` (escrita a mao, ainda nao testada rodando).
-2. Implementar repositórios/services da API para substituir mocks gradualmente (login/vinculo de conta ja usam Prisma de verdade; drafts/postgame/replays ainda sao mock).
-3. Integrar Account-V1 para Riot ID -> PUUID no backend, substituindo o puuid deterministico mock de `POST /players/link-riot-account`.
-4. Integrar Match-V5 para histórico e detalhes de partidas.
-5. Persistir `PlayerChampionStats` calculado por janelas de 10, 20 e 50 partidas.
-6. Melhorar `ChampionTag` e seeds com mais campeões (e usar o `key` real do Data Dragon em vez do nome de exibição para montar URLs de imagem).
-7. ~~Conectar desktop à API~~ feito para auth (`VITE_API_URL`); estender para os demais endpoints (perfil, drafts, pós-game) que ainda usam `features/mock-data.ts` local.
-8. Expandir análise pós-game com timeline: mortes cedo, CS aos 10/15, gold diff, visão e objetivos.
-9. Implementar jobs com Redis/BullMQ para sync de partidas.
-10. LCU read-only: ja implementado o poll de `gameflow-phase` para trocar de aba (ver `docs/riot-compliance.md`); proximo passo e ler `/lol-champ-select/v1/session` (metodo ja existe em `LcuReadOnlyClient.getChampionSelectSession`) para pre-carregar o draft real em vez do modo manual.
-11. Trocar o token HMAC caseiro por algo mais robusto (rotacao de segredo, refresh token) se o produto for alem do MVP local.
+Fase 1 (Riot Sync com dados reais) está completa em `feat/riot-sync-phase1` — ver "Pendências desta sessão" no topo. Depois de mergear as 3 branches pendentes:
+
+1. **Fase 2 (Player Intelligence)**: calcular `strengths`/`weaknesses`/`RecentForm` de verdade a partir do histórico já persistido (hoje ficam vazios/neutros nas rotas de perfil). Reaproveitar/generalizar `confidenceFromGames` (hoje privada em `champion-performance.ts`) pra indicar confiança dessas novas análises também.
+2. Persistir os 10 participantes por partida (hoje só o jogador rastreado é gravado) — necessário pra matchups reais e composição de time real em `/drafts/recommendations` (que hoje cai no mock quando o cliente não manda tudo).
+3. Expandir `ChampionTag` além do seed manual de 2 campeões — o motor de recomendação já tolera ausência, mas mais cobertura melhora a qualidade das recomendações.
+4. Conectar o desktop às rotas de perfil/drafts/pós-game (hoje só auth usa a API real; o resto ainda usa `features/mock-data.ts` local no renderer).
+5. Implementar `PostGameAnalysis` de verdade (tipo existe, nenhuma função o preenche) — agora que `MatchTimeline` tem dado real (mortes antes de 10/15min, CS, gold diff, objetivos).
+6. Fila real (Redis/BullMQ) para o sync, se o padrão de uso mostrar que o teto de 20-50 partidas por chamada síncrona é pouco — o `docker-compose.yml` já provisiona Redis, só falta o worker.
+7. LCU read-only: já implementado o poll de `gameflow-phase` para trocar de aba (ver `docs/riot-compliance.md`); próximo passo é ler `/lol-champ-select/v1/session` (método já existe em `LcuReadOnlyClient.getChampionSelectSession`) para pré-carregar o draft real em vez do modo manual.
+8. Trocar o token HMAC caseiro por algo mais robusto (rotação de segredo, refresh token) se o produto for além do MVP local.
+9. Empacotamento do desktop (electron-builder/NSIS/ASAR) — hoje não existe nenhuma configuração de build de instalador, só `electron-vite build`.
 
 ## Verificação conhecida
 
