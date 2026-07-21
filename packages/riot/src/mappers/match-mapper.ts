@@ -25,6 +25,7 @@ export interface RiotMatchDto {
   info: {
     gameDuration: number;
     gameVersion: string;
+    gameStartTimestamp: number;
     participants: RiotMatchParticipantDto[];
   };
 }
@@ -57,6 +58,7 @@ function mapParticipant(
   participant: RiotMatchParticipantDto,
   matchId: string,
   durationSeconds: number,
+  startedAt: number,
   patch: string
 ): MatchSummary {
   const role = TEAM_POSITION_TO_ROLE[participant.teamPosition] ?? "MID";
@@ -83,6 +85,7 @@ function mapParticipant(
     role,
     won: participant.win,
     durationSeconds,
+    startedAt,
     patch,
     metrics
   };
@@ -96,7 +99,7 @@ function mapParticipant(
 export function mapMatchToSummaries(raw: RiotMatchDto): MatchSummary[] {
   const patch = extractPatch(raw.info.gameVersion);
   return raw.info.participants.map((participant) =>
-    mapParticipant(participant, raw.metadata.matchId, raw.info.gameDuration, patch)
+    mapParticipant(participant, raw.metadata.matchId, raw.info.gameDuration, raw.info.gameStartTimestamp, patch)
   );
 }
 

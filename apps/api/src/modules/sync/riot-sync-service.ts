@@ -9,6 +9,7 @@ import {
 } from "@sparta/riot";
 import { getRiotApiClient } from "../riot-integration/client-factory";
 import { findExistingMatchIds, persistMatch } from "../matches/match-repository";
+import { recomputeChampionStats, type ChampionRolePair } from "../players/player-stats-repository";
 
 export interface SyncFailure {
   matchId: string;
@@ -57,6 +58,7 @@ export async function syncPlayerMatches(player: SyncablePlayer, opts?: { maxNewM
     skippedExisting: existing.size,
     failed: []
   };
+  const touchedPairs: ChampionRolePair[] = [];
 
   for (const matchId of idsToProcess) {
     try {
@@ -82,6 +84,7 @@ export async function syncPlayerMatches(player: SyncablePlayer, opts?: { maxNewM
         rawMatch: rawMatch as unknown as Prisma.InputJsonValue
       });
 
+      touchedPairs.push({ championId: summary.championId, role: summary.role });
       result.imported += 1;
     } catch (error) {
       if (error instanceof RiotApiError && error.status === 429) {
@@ -96,6 +99,8 @@ export async function syncPlayerMatches(player: SyncablePlayer, opts?: { maxNewM
   if (!result.stoppedEarly && newIds.length > idsToProcess.length) {
     result.stoppedEarly = "max_reached";
   }
+
+  await recomputeChampionStats(player.riotAccountId, player.puuid, touchedPairs);
 
   return result;
 }

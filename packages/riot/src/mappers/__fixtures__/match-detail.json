@@ -6,6 +6,7 @@
   "info": {
     "gameDuration": 1800,
     "gameVersion": "14.14.593.1234",
+    "gameStartTimestamp": 1720000000000,
     "participants": [
       {
         "puuid": "puuid-player-1",

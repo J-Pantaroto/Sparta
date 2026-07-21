@@ -35,6 +35,7 @@ export async function persistMatch(input: PersistMatchInput): Promise<void> {
         platform,
         patch: summary.patch,
         durationSeconds: summary.durationSeconds,
+        startedAt: new Date(summary.startedAt),
         rawJson: rawMatch
       }
     });
@@ -71,4 +72,52 @@ export async function persistMatch(input: PersistMatchInput): Promise<void> {
       }
     });
   });
+}
+
+export interface ParticipationRecord {
+  matchId: string;
+  championId: number;
+  championName: string;
+  role: string;
+  won: boolean;
+  kills: number;
+  deaths: number;
+  assists: number;
+  csPerMinute: number;
+  goldPerMinute: number;
+  damagePerMinute: number;
+  visionScorePerMinute: number;
+  killParticipation: number | null;
+  objectiveParticipation: number | null;
+}
+
+/**
+ * Busca todo o historico persistido do jogador (todos os campeoes/roles),
+ * do mais recente pro mais antigo - usado pra recalcular PlayerChampionStats
+ * agrupando por (championId, role). Partidas sem Match.startedAt (nao
+ * deveria acontecer, mas o campo e opcional no schema) ficam por ultimo.
+ */
+export async function findParticipationHistory(puuid: string): Promise<ParticipationRecord[]> {
+  const rows = await prisma.matchParticipant.findMany({
+    where: { puuid },
+    include: { match: true, champion: true },
+    orderBy: { match: { startedAt: "desc" } }
+  });
+
+  return rows.map((row) => ({
+    matchId: row.match.matchId,
+    championId: row.championId,
+    championName: row.champion.name,
+    role: row.role,
+    won: row.won,
+    kills: row.kills,
+    deaths: row.deaths,
+    assists: row.assists,
+    csPerMinute: row.csPerMinute,
+    goldPerMinute: row.goldPerMinute,
+    damagePerMinute: row.damagePerMinute,
+    visionScorePerMinute: row.visionScorePerMinute,
+    killParticipation: row.killParticipation,
+    objectiveParticipation: row.objectiveParticipation
+  }));
 }

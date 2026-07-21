@@ -27,6 +27,7 @@ describe("mapMatchToSummaries", () => {
     expect(player1.won).toBe(true);
     expect(player1.patch).toBe("14.14");
     expect(player1.durationSeconds).toBe(1800);
+    expect(player1.startedAt).toBe(1720000000000);
     // (180 + 5) cs / 30 min = 6.1666...
     expect(player1.metrics.csPerMinute).toBeCloseTo(6.1667, 3);
     expect(player1.metrics.killParticipation).toBe(0.62);

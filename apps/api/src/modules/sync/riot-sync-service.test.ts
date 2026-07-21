@@ -1,15 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RiotApiError } from "@sparta/riot";
 
-const { findExistingMatchIdsMock, persistMatchMock, getMatchMock, getMatchTimelineMock, getMatchIdsByPuuidMock } = vi.hoisted(
-  () => ({
-    findExistingMatchIdsMock: vi.fn(),
-    persistMatchMock: vi.fn(),
-    getMatchMock: vi.fn(),
-    getMatchTimelineMock: vi.fn(),
-    getMatchIdsByPuuidMock: vi.fn()
-  })
-);
+const {
+  findExistingMatchIdsMock,
+  persistMatchMock,
+  getMatchMock,
+  getMatchTimelineMock,
+  getMatchIdsByPuuidMock,
+  recomputeChampionStatsMock
+} = vi.hoisted(() => ({
+  findExistingMatchIdsMock: vi.fn(),
+  persistMatchMock: vi.fn(),
+  getMatchMock: vi.fn(),
+  getMatchTimelineMock: vi.fn(),
+  getMatchIdsByPuuidMock: vi.fn(),
+  recomputeChampionStatsMock: vi.fn()
+}));
 
 vi.mock("../matches/match-repository", () => ({
   findExistingMatchIds: findExistingMatchIdsMock,
@@ -24,6 +30,10 @@ vi.mock("../riot-integration/client-factory", () => ({
   })
 }));
 
+vi.mock("../players/player-stats-repository", () => ({
+  recomputeChampionStats: recomputeChampionStatsMock
+}));
+
 import { syncPlayerMatches } from "./riot-sync-service";
 
 const PUUID = "puuid-player-1";
@@ -35,6 +45,7 @@ function rawMatch(matchId: string) {
     info: {
       gameDuration: 1800,
       gameVersion: "14.14.1.1",
+      gameStartTimestamp: 1720000000000,
       participants: [
         {
           puuid: PUUID,
@@ -95,6 +106,7 @@ function rawTimeline(matchId: string) {
 describe("syncPlayerMatches", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    recomputeChampionStatsMock.mockResolvedValue(undefined);
   });
 
   it("pula partidas ja existentes e so processa as novas", async () => {
@@ -112,6 +124,20 @@ describe("syncPlayerMatches", () => {
     expect(result.failed).toEqual([]);
     expect(getMatchMock).toHaveBeenCalledTimes(1);
     expect(persistMatchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("recalcula PlayerChampionStats so para os campeoes/roles das partidas importadas", async () => {
+    getMatchIdsByPuuidMock.mockResolvedValue(["m1"]);
+    findExistingMatchIdsMock.mockResolvedValue(new Set());
+    getMatchMock.mockResolvedValue(rawMatch("m1"));
+    getMatchTimelineMock.mockResolvedValue(rawTimeline("m1"));
+    persistMatchMock.mockResolvedValue(undefined);
+
+    await syncPlayerMatches(player);
+
+    expect(recomputeChampionStatsMock).toHaveBeenCalledWith(player.riotAccountId, player.puuid, [
+      { championId: 61, role: "MID" }
+    ]);
   });
 
   it("falha isolada em uma partida nao aborta as outras", async () => {

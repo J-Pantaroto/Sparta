@@ -93,6 +93,10 @@ export interface MatchSummary {
   role: Role;
   won: boolean;
   durationSeconds: number;
+  // Epoch ms de inicio da partida (Riot gameStartTimestamp) - usado pra
+  // ordenar por recencia (forma recente depende de saber qual partida e
+  // mais nova).
+  startedAt: number;
   patch: string;
   metrics: MatchPerformanceMetrics;
 }
