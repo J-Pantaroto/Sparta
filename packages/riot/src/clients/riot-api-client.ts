@@ -1,4 +1,4 @@
-import { retryWithBackoff } from "../rate-limit/backoff.js";
+import { requestWithRiotRateLimit } from "../rate-limit/riot-request.js";
 
 export interface RiotApiClientOptions {
   apiKey: string;
@@ -26,13 +26,12 @@ export class RiotApiClient {
     return this.request(url);
   }
 
+  async getMatchTimeline(matchId: string): Promise<unknown> {
+    const url = `https://${this.options.regionalRouting}.api.riotgames.com/lol/match/v5/matches/${matchId}/timeline`;
+    return this.request(url);
+  }
+
   private async request<T>(url: string): Promise<T> {
-    return retryWithBackoff(async () => {
-      const response = await fetch(url, { headers: { "X-Riot-Token": this.options.apiKey } });
-      if (!response.ok) {
-        throw new Error(`Riot API request failed with ${response.status}`);
-      }
-      return (await response.json()) as T;
-    });
+    return requestWithRiotRateLimit<T>(url, this.options.apiKey);
   }
 }

@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { buildApp } from "./app.js";
-import { playerSyncSchema } from "./modules/players/routes.js";
 
 describe("api", () => {
   it("responds to healthcheck", async () => {
@@ -11,10 +10,10 @@ describe("api", () => {
     await app.close();
   });
 
-  it("validates player sync payloads", () => {
-    expect(() =>
-      playerSyncSchema.parse({ riotId: "Sparta#BR1", platformRegion: "br1", regionalRouting: "americas" })
-    ).not.toThrow();
-    expect(() => playerSyncSchema.parse({ riotId: "invalid", platformRegion: "br1", regionalRouting: "americas" })).toThrow();
+  it("recusa sincronizar partidas sem autenticacao", async () => {
+    const app = await buildApp();
+    const response = await app.inject({ method: "POST", url: "/players/sync" });
+    expect(response.statusCode).toBe(401);
+    await app.close();
   });
 });

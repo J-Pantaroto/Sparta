@@ -12,6 +12,9 @@
     "lint": "eslint src --ext .ts",
     "test": "vitest run --passWithNoTests"
   },
+  "dependencies": {
+    "@sparta/core": "workspace:*"
+  },
   "devDependencies": {
     "@types/node": "^24.0.10"
   }

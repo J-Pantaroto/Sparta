@@ -1,16 +1,17 @@
 import type { FastifyPluginAsync } from "fastify";
-import { createHash } from "node:crypto";
 import { z } from "zod";
-import { rankChampionPool } from "@sparta/core";
+import { rankChampionPool, type RecentChampionMatch, type Role } from "@sparta/core";
+import { RiotApiError } from "@sparta/riot";
 import { prisma } from "../../db/prisma.js";
-import { mockChampionStats, mockPlayerProfile } from "../../routes/mock-data.js";
 import { getAuthenticatedUserId } from "../auth/routes.js";
-
-export const playerSyncSchema = z.object({
-  riotId: z.string().min(3).regex(/^.+#.+$/, "Use o formato Nome#TAG"),
-  platformRegion: z.string().min(2),
-  regionalRouting: z.string().min(2)
-});
+import { findParticipationHistory } from "../matches/match-repository.js";
+import { lookupRiotAccount } from "../riot-integration/account-lookup.js";
+import {
+  derivePreferredRoles,
+  findChampionStatsByPuuid,
+  findRiotAccountByRiotId
+} from "./player-stats-repository.js";
+import { syncPlayerMatches } from "../sync/riot-sync-service.js";
 
 export const linkRiotAccountSchema = z.object({
   gameName: z.string().min(3, "Informe o nome do invocador"),
@@ -20,48 +21,102 @@ export const linkRiotAccountSchema = z.object({
 });
 
 export const playersRoutes: FastifyPluginAsync = async (app) => {
-  app.get("/players/:riotName/:tagLine/profile", async (request) => {
+  app.get("/players/:riotName/:tagLine/profile", async (request, reply) => {
     const params = z.object({ riotName: z.string(), tagLine: z.string() }).parse(request.params);
+    const account = await findRiotAccountByRiotId(params.riotName, params.tagLine);
+    if (!account) {
+      reply.code(404);
+      return { error: "Conta Riot nao encontrada. Ela precisa ser vinculada no Sparta primeiro." };
+    }
+
+    const championStats = await findChampionStatsByPuuid(account.puuid);
+
     return {
-      ...mockPlayerProfile,
-      account: {
-        ...mockPlayerProfile.account,
-        gameName: params.riotName,
-        tagLine: params.tagLine
-      }
+      id: account.puuid,
+      account,
+      preferredRoles: derivePreferredRoles(championStats),
+      championStats,
+      // Pontos fortes/fracos e forma recente dependem de uma agregacao mais
+      // ampla entre partidas (Fase 2 - Player Intelligence); ainda nao ha
+      // funcao que os calcule, entao ficam vazios/neutros em vez de
+      // inventar uma avaliacao.
+      strengths: [],
+      weaknesses: [],
+      recentForm: { last10Score: 0, last20Score: 0, last50Score: 0, trend: "stable" as const }
     };
   });
 
+  /**
+   * Sincroniza as partidas novas do jogador autenticado. Nao recebe riotId
+   * no payload - resolve a conta Riot ja vinculada ao usuario (evita
+   * sincronizar a conta de outra pessoa so porque o cliente mandou um puuid
+   * diferente no corpo da requisicao).
+   */
   app.post("/players/sync", async (request, reply) => {
-    const payload = playerSyncSchema.parse(request.body);
-    reply.code(202);
-    return {
-      status: "queued",
-      riotId: payload.riotId,
-      message: "Sync mock criado. A integração Riot real fica no backend e requer RIOT_API_KEY."
-    };
+    const userId = await getAuthenticatedUserId(request);
+    if (!userId) {
+      reply.code(401);
+      return { error: "Nao autenticado." };
+    }
+
+    const riotAccount = await prisma.riotAccount.findFirst({ where: { userId } });
+    if (!riotAccount) {
+      reply.code(404);
+      return { error: "Nenhuma conta Riot vinculada. Vincule uma conta antes de sincronizar." };
+    }
+
+    const result = await syncPlayerMatches({
+      riotAccountId: riotAccount.id,
+      puuid: riotAccount.puuid,
+      platformRegion: riotAccount.platformRegion
+    });
+
+    for (const failure of result.failed) {
+      request.log.error({
+        event: "riot_sync_match_failed",
+        puuid: riotAccount.puuid,
+        matchId: failure.matchId,
+        reason: failure.reason
+      });
+    }
+
+    return result;
   });
 
   app.get("/players/:puuid/recent-matches", async (request) => {
+    const params = z.object({ puuid: z.string() }).parse(request.params);
     const query = z.object({ limit: z.coerce.number().min(1).max(50).default(10) }).parse(request.query);
-    return {
-      puuid: z.object({ puuid: z.string() }).parse(request.params).puuid,
-      matches: mockChampionStats[0].recentMatches.slice(0, query.limit)
-    };
+
+    const history = await findParticipationHistory(params.puuid);
+    const matches: RecentChampionMatch[] = history.slice(0, query.limit).map((entry) => ({
+      matchId: entry.matchId,
+      championId: entry.championId,
+      role: entry.role as Role,
+      won: entry.won,
+      kills: entry.kills,
+      deaths: entry.deaths,
+      assists: entry.assists,
+      csPerMinute: entry.csPerMinute,
+      goldPerMinute: entry.goldPerMinute,
+      damagePerMinute: entry.damagePerMinute,
+      visionScorePerMinute: entry.visionScorePerMinute,
+      killParticipation: entry.killParticipation ?? 0,
+      objectiveParticipation: entry.objectiveParticipation ?? 0
+    }));
+
+    return { puuid: params.puuid, matches };
   });
 
-  app.get("/players/:puuid/champion-performance", async (request) => ({
-    puuid: z.object({ puuid: z.string() }).parse(request.params).puuid,
-    champions: rankChampionPool(mockChampionStats)
-  }));
+  app.get("/players/:puuid/champion-performance", async (request) => {
+    const params = z.object({ puuid: z.string() }).parse(request.params);
+    const championStats = await findChampionStatsByPuuid(params.puuid);
+    return { puuid: params.puuid, champions: rankChampionPool(championStats) };
+  });
 
   /**
-   * Vincula um Riot ID (gameName#tagLine) ao usuario autenticado.
-   *
-   * Ainda nao chama a Account-V1 real (requer RIOT_API_KEY apenas no
-   * backend, ver docs/riot-compliance.md). Enquanto isso, gera um puuid
-   * deterministico local para permitir o fluxo completo de vinculo de
-   * conta ponta a ponta.
+   * Vincula um Riot ID (gameName#tagLine) ao usuario autenticado, resolvendo
+   * o puuid real via Account-V1 (RIOT_API_KEY so existe no backend, ver
+   * docs/riot-compliance.md).
    */
   app.post("/players/link-riot-account", async (request, reply) => {
     const userId = await getAuthenticatedUserId(request);
@@ -71,21 +126,40 @@ export const playersRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const payload = linkRiotAccountSchema.parse(request.body);
-    const mockPuuid = createHash("sha256").update(`${payload.gameName}#${payload.tagLine}`.toLowerCase()).digest("hex");
 
-    const account = await prisma.riotAccount.upsert({
-      where: { puuid: mockPuuid },
-      create: {
-        puuid: mockPuuid,
+    let riotAccountInfo: { puuid: string; gameName: string; tagLine: string };
+    try {
+      riotAccountInfo = await lookupRiotAccount(payload.gameName, payload.tagLine);
+    } catch (error) {
+      const notFound = error instanceof RiotApiError && error.status === 404;
+      request.log.error({
+        event: "link_riot_account_failed",
         gameName: payload.gameName,
         tagLine: payload.tagLine,
+        status: error instanceof RiotApiError ? error.status : undefined,
+        message: error instanceof Error ? error.message : String(error)
+      });
+      reply.code(notFound ? 404 : 502);
+      return {
+        error: notFound
+          ? "Riot ID nao encontrado."
+          : "Nao foi possivel confirmar a conta Riot agora. Tente novamente em instantes."
+      };
+    }
+
+    const account = await prisma.riotAccount.upsert({
+      where: { puuid: riotAccountInfo.puuid },
+      create: {
+        puuid: riotAccountInfo.puuid,
+        gameName: riotAccountInfo.gameName,
+        tagLine: riotAccountInfo.tagLine,
         platformRegion: payload.platformRegion,
         regionalRouting: payload.regionalRouting,
         userId
       },
       update: {
-        gameName: payload.gameName,
-        tagLine: payload.tagLine,
+        gameName: riotAccountInfo.gameName,
+        tagLine: riotAccountInfo.tagLine,
         platformRegion: payload.platformRegion,
         regionalRouting: payload.regionalRouting,
         userId

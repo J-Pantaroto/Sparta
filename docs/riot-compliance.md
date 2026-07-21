@@ -13,6 +13,18 @@ Princípios do Sparta:
 - Tratar LCU como integração local e read-only no MVP.
 - Documentar qualquer endpoint LCU antes de habilitar uso real.
 
+## Endpoints Riot API em uso (backend)
+
+`RIOT_API_KEY` existe só no backend (`apps/api`), nunca no desktop/renderer — consistente com o princípio acima. Implementados em `packages/riot/src/clients/riot-api-client.ts` (`RiotApiClient`), chamados só por `apps/api/src/modules/riot-integration/` e `apps/api/src/modules/sync/`:
+
+- `GET /riot/account/v1/accounts/by-riot-id/{gameName}/{tagLine}` (Account-V1) — resolve puuid real em `POST /players/link-riot-account`. Cacheado 24h.
+- `GET /lol/match/v5/matches/by-puuid/{puuid}/ids` — lista de partidas recentes, usada pelo sync incremental pra descobrir o que é novo.
+- `GET /lol/match/v5/matches/{matchId}` e `.../timeline` (Match-V5) — detalhe e timeline de cada partida nova, mapeados pra `MatchSummary`/`MatchTimelineSummary` (`packages/riot/src/mappers/`) e persistidos.
+
+Rate limit: `packages/riot/src/rate-limit/riot-request.ts` só retenta 429/502/503/504, respeita `Retry-After` quando presente, e o sync (`riot-sync-service.ts`) interrompe a rodada inteira se um 429 esgota as tentativas — evita piorar o rate limit insistindo. Chamadas de match+timeline são sequenciais, nunca paralelas.
+
+Dados que a Riot não fornece (ex.: objeto `challenges` ausente em patches antigos) ficam `undefined`/`null` no domínio e no banco em vez de um valor inventado — ver `MatchParticipant.killParticipation`/`objectiveParticipation` (nullable) no schema.
+
 ## Endpoints LCU em uso
 
 Implementados em `packages/riot/src/lcu/read-only-client.ts` (`LcuReadOnlyClient`), consumidos apenas pelo processo `main` do Electron (`apps/desktop/src/main/index.ts`), nunca pelo backend nem por integrações remotas:
