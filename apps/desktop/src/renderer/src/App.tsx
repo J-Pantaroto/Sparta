@@ -1,4 +1,4 @@
-import { Activity, BarChart3, Crosshair, Gauge, Shield, Swords, TrendingUp } from "lucide-react";
+import { Activity, BarChart3, Crosshair, Gauge, Settings as SettingsIcon, Shield, Swords, TrendingUp } from "lucide-react";
 import { rankChampionPool, type DraftState, type PickRecommendation } from "@sparta/core";
 import { useEffect, useMemo, useState } from "react";
 import { championSplashUrl, championSquareUrl, fetchLatestDataDragonVersion } from "./features/datadragon";
@@ -16,10 +16,10 @@ import { AuthScreen } from "./features/AuthScreen";
 import { LinkRiotAccountScreen } from "./features/LinkRiotAccountScreen";
 import { PostGameScreen } from "./features/PostGameScreen";
 import { GrowthJourneyScreen } from "./features/GrowthJourneyScreen";
-import { ChampionThemePicker } from "./features/ChampionThemePicker";
+import { SettingsScreen } from "./features/SettingsScreen";
 import { FeaturedChampionProvider, useFeaturedChampion } from "./features/featured-champion-context";
 
-type Page = "dashboard" | "profile" | "select" | "pregame" | "postgame" | "growth";
+type Page = "dashboard" | "profile" | "select" | "pregame" | "postgame" | "growth" | "settings";
 
 const pageLabels: Record<Page, string> = {
   dashboard: "Dashboard",
@@ -27,7 +27,8 @@ const pageLabels: Record<Page, string> = {
   select: "Champion Select",
   pregame: "Pré-game",
   postgame: "Pós-game",
-  growth: "Evolução"
+  growth: "Evolução",
+  settings: "Configurações"
 };
 
 const trendLabels: Record<string, string> = {
@@ -120,7 +121,7 @@ function AppShell() {
   }
 
   const loginSplash = useMemo(
-    () => championSplashUrl(featuredChampion.key, featuredChampion.skinIndex),
+    () => featuredChampion.localSplashPath ?? championSplashUrl(featuredChampion.key, featuredChampion.skinIndex),
     [featuredChampion]
   );
 
@@ -164,11 +165,11 @@ function AppShell() {
               {item === "pregame" && <Shield size={18} />}
               {item === "postgame" && <BarChart3 size={18} />}
               {item === "growth" && <TrendingUp size={18} />}
+              {item === "settings" && <SettingsIcon size={18} />}
               {pageLabels[item]}
             </button>
           ))}
         </nav>
-        <ChampionThemePicker ddragonVersion={ddragonVersion} />
       </aside>
 
       <section className="content">
@@ -187,6 +188,7 @@ function AppShell() {
         {page === "pregame" && <PreGame />}
         {page === "postgame" && <PostGameScreen riotAccounts={riotAccounts} sessionToken={sessionToken} />}
         {page === "growth" && <GrowthJourneyScreen riotAccounts={riotAccounts} />}
+        {page === "settings" && <SettingsScreen ddragonVersion={ddragonVersion} />}
       </section>
     </main>
   );
@@ -195,7 +197,7 @@ function AppShell() {
 function Dashboard({ riotAccounts }: { riotAccounts: RiotAccountSummary[] }) {
   const account = riotAccounts[0];
   const { featuredChampion } = useFeaturedChampion();
-  const heroSplash = championSplashUrl(featuredChampion.key, featuredChampion.skinIndex);
+  const heroSplash = featuredChampion.localSplashPath ?? championSplashUrl(featuredChampion.key, featuredChampion.skinIndex);
 
   const profile = useAsyncData<PlayerProfileResponse>(
     () => (account ? fetchPlayerProfile(account.gameName, account.tagLine) : undefined),

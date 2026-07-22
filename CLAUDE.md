@@ -4,9 +4,23 @@ Este arquivo é um handoff para outro agente de desenvolvimento continuar o proj
 
 ## Pendências desta sessão (ler primeiro)
 
-Uma sessão anterior fez uma auditoria completa do repositório (real vs mock vs so-tipo), aprovou um plano de evolução em 5 épicos (Riot Sync, Player Intelligence, Draft Intelligence, Post-Game Coach, Growth Journey) e implementou todas as 5 fases, além de um refinamento visual do desktop e correções de infra/segurança. Esta sessão fez duas coisas: (1) **conectou o desktop às rotas reais da API** (Dashboard/Perfil/Champion Select/Pós-game/nova tela Evolução, removendo `mock-data.ts`); (2) o usuário pediu uma **nova fase futura de temas com skins** (escolher qualquer campeão + qualquer skin como tema, "baixar" = salvar no disco) - só desenhada em linhas gerais, não implementada ainda (ver "Próximos passos recomendados"). Tudo isso **já está mergeado em `main`**.
+Uma sessão anterior fez uma auditoria completa do repositório (real vs mock vs so-tipo), aprovou um plano de evolução em 5 épicos (Riot Sync, Player Intelligence, Draft Intelligence, Post-Game Coach, Growth Journey) e implementou todas as 5 fases, além de um refinamento visual do desktop e correções de infra/segurança. Uma sessão seguinte **conectou o desktop às rotas reais da API** (Dashboard/Perfil/Champion Select/Pós-game/nova tela Evolução, removendo `mock-data.ts`). Esta sessão implementou a **Sub-fase 6a (tela de Configurações + tema com campeão/skin real)**, a primeira de 3 sub-fases da "Fase 6" pedida pelo usuário (6b = configuração de partidas a analisar, 6c = ordem de pick automática via LCU — ambas ainda por implementar, ver "Próximos passos recomendados"). Tudo isso **já está mergeado em `main`**.
 
-### Desktop conectado às rotas reais (sessão atual)
+### Sub-fase 6a: tela de Configurações + tema com campeão/skin real (sessão atual)
+
+O seletor de tema visual era uma lista fixa de 12 campeões curados manualmente (`FEATURED_CHAMPIONS`), 1 skin cada, sem nenhuma UI de escolha de skin, morando na sidebar. O usuário pediu: mover isso pra uma tela de Configurações dedicada, deixar escolher **qualquer** campeão e **qualquer** skin dele, e permitir "baixar" a skin (salvar no disco, funcionar offline).
+
+**Achado importante**: não precisou de nenhuma rota nova no backend Sparta. A lista completa de campeões e a lista de skins por campeão vêm direto da CDN pública da Data Dragon (mesmo padrão que `championSquareUrl`/`championSplashUrl` já usavam) — `packages/riot/src/datadragon/client.ts` (uso do backend, Fase 1) ficou intocado.
+
+1. **`apps/desktop/src/renderer/src/features/datadragon.ts`** ganhou `fetchAllChampions(version)` e `fetchChampionSkins(championKey, version)`. **Bug real encontrado e corrigido durante a validação manual**: a Data Dragon inverte os nomes dos campos no `champion.json` — `id` é a string usada nas URLs (ex. `"Ahri"`), `key` é o id numérico como string (ex. `"103"`); a primeira versão do código tinha isso trocado, o que quebrava todos os ícones do grid (renderizavam URLs tipo `.../champion/266.png` em vez de `.../champion/Aatrox.png`). Corrigido e validado no navegador contra os ~170 campeões reais.
+2. **Novo `features/ChampionSkinPicker.tsx`** — fluxo de 2 passos: grid com busca de todos os campeões → grid de skins do campeão escolhido (nomes reais, ex. "Ezreal de Nottingham", "Ezreal Gélido") → clicar numa skin aplica como tema, botão "Baixar" separado.
+3. **`featured-champion-context.tsx`** reescrito — sem lista estática, `FeaturedChampionOption` ganhou `skinName`/`localSplashPath?`, persistido em `localStorage` como JSON (antes só a `key`). Call sites de splash art em `App.tsx` (login e Dashboard) preferem `localSplashPath` quando existir.
+4. **Download real pro disco** — primeiro uso de IPC request/response no app (`ipcRenderer.invoke`/`ipcMain.handle`, diferente do padrão push-only já usado por `sparta:gameflow-phase`). `apps/desktop/src/main/index.ts` ganhou `registerSkinDownloadHandler()` (`sparta:download-skin`, escreve em `app.getPath("userData")/skins`); `preload/index.ts`/`sparta-global.d.ts` ganharam `window.sparta.downloadSkin(url, fileName)`.
+5. **Novo `features/SettingsScreen.tsx`** + novo item de nav "Configurações" (`Page` ganhou `"settings"`). `ChampionThemePicker.tsx` (antigo, sidebar) removido.
+
+Validado manualmente contra a API real e a conta Zekerus#117 via `electron-vite dev` + Browser tool: grid de ~170 campeões reais carregando (depois do fix do bug id/key), busca funcionando, troca de campeão→skin→aplicar tema confirmada (Dashboard passou a usar a splash art do Ezreal escolhido), persistência em `localStorage` no formato novo confirmada. **Não validado nesta sessão**: o download real pro disco (`window.sparta.downloadSkin`) — o bridge `window.sparta` só existe dentro do processo Electron real (via preload), não numa aba de navegador comum apontando pro dev server do Vite; o código foi revisado mas precisa de um teste dentro do app Electron empacotado/rodando de verdade.
+
+### Desktop conectado às rotas reais (sessão anterior)
 
 Desde a Fase 1, só autenticação e `POST /players/link-riot-account` usavam a API real no desktop — as 5 telas principais rodavam 100% em cima de `apps/desktop/src/renderer/src/features/mock-data.ts` (2 campeões hardcoded) ou texto estático, mesmo com todo o backend real já entregue nas Fases 1-5.
 
@@ -24,15 +38,14 @@ O que ficou deliberadamente fora de escopo:
 - **Catálogo de campeões pro desktop** (resolver `championId` → nome/ícone fora de `PlayerChampionStats`/`PickRecommendation`, que já trazem `championName`) — afeta só a lista de partidas do Pós-game hoje.
 - **Fase de temas com skins** (pedida pelo usuário nesta sessão, pra depois) — ver desenho de alto nível abaixo.
 
-### Fase futura: temas com skins (pedida pelo usuário, não implementada)
+### Fase 6 (Configurações do app) — 6a pronta, 6b/6c pendentes
 
-Usuário quer trocar a tela de tema atual (`ChampionThemePicker.tsx`, 12 campeões curados com 1 skin cada, sem nenhuma UI de seleção de skin) por um fluxo de 2 passos: escolher qualquer campeão → escolher qualquer skin dele (base ou qualquer outra) → "baixar" o tema. Confirmado com o usuário: "baixar" significa salvar a imagem no disco (funciona offline), não só buscar ao vivo da CDN.
+Pedido do usuário, dividido em 3 sub-fases sequenciais (mesmo padrão de PR pequeno das Fases 1-5) porque tocam áreas quase disjuntas do código:
 
-Desenho de alto nível pra quando essa fase for iniciada:
-
-- **Dado de skins**: o endpoint de detalhe por campeão da Data Dragon (`cdn/{version}/data/{locale}/champion/{championId}.json`) já traz o array `skins` (`num`/`name`/`chromas`) — hoje não é usado em lugar nenhum do repo (só o `champion.json` resumido, sem skins, é buscado em `packages/riot/src/datadragon/client.ts` e no `datadragon.ts` do desktop). Não precisa de API nova, só envolver esse endpoint (paralelo ao `fetchDataDragonChampions` que já existe).
-- **Download real**: canal IPC novo (ex. `sparta:download-skin`) exposto via `apps/desktop/src/preload/index.ts`, handler no processo main (`apps/desktop/src/main/index.ts`, hoje sem nenhum uso de `fs`) que baixa a splash art e escreve em `app.getPath('userData')`.
-- **UI**: trocar `featured-champion-context.tsx`/`ChampionThemePicker.tsx` (lista curada fixa hoje) por um fluxo de 2 passos que lista todos os campeões/skins em vez da lista curada, e trocar `FEATURED_CHAMPIONS` pelo campeão mais jogado de verdade do jogador (destravado desde que o desktop passou a ler `champion-performance` real nesta sessão).
+- **6a (pronta, ver acima)**: tela de Configurações + tema com campeão/skin real + download pro disco.
+- **6b (não implementada)**: nova configuração pessoal "quantas partidas o Sparta deve analisar" (ex. últimas 20/50/100, teto 200). Desenho: migração `PlayerProfile.matchAnalysisLimit Int @default(50)`; `findParticipationHistory`/`findPostgameReportsByPuuid` ganham `limit?` opcional (`take` do Prisma); nova `findMatchAnalysisLimitByPuuid` em `player-stats-repository.ts`; `recomputeChampionStats`/`computeAndPersistPlayerInsights` passam a receber o limite (efeito só no próximo sync, mesma lógica de hoje); rotas novas `GET`/`PUT /players/settings` (autenticadas, valida `[1,200]`, dispara `syncPlayerMatches` na hora); seção nova no `SettingsScreen.tsx`.
+- **6c (não implementada)**: ordem de pick automática via LCU, substituindo o input manual 1-5 do Champion Select. Desenho: tipar de verdade `LcuChampionSelectSnapshot.actions`/`myTeam`/`theirTeam` (hoje `unknown[]`) em `packages/riot/src/lcu/read-only-client.ts`; nova `derivePickOrder(snapshot)` pura (conta picks `completed` de companheiros de time antes do próprio, +1 — `DraftState.pickOrder<=1` já significa "blind pick" no `recommendation-engine.ts`); segundo poll no `apps/desktop/src/main/index.ts` (mesmo intervalo de 2500ms do `gameflow-phase`) + novo canal IPC `sparta:pick-order`; `ChampionSelect` mostra o valor automático quando disponível, mantém o input manual como fallback (sem cliente do League aberto).
+- Plano completo com a crítica de design em `C:\Users\jhona\.claude\plans\bright-drifting-melody.md` (se ainda existir na máquina).
 
 ### O que a Fase 5 entregou (Growth Journey)
 
@@ -477,7 +490,8 @@ Telas existentes:
 - Champion Select manual (inline em `App.tsx`);
 - Pré-game (inline em `App.tsx`, ainda estático);
 - Pós-game (`features/PostGameScreen.tsx`);
-- Evolução (`features/GrowthJourneyScreen.tsx`).
+- Evolução (`features/GrowthJourneyScreen.tsx`);
+- Configurações (`features/SettingsScreen.tsx`, novo na Sub-fase 6a).
 
 Desde a sessão que conectou o desktop às rotas reais: Dashboard/Perfil/Champion Select/Pós-game/Evolução leem dado real via `features/api-client.ts` (`fetchPlayerProfile`/`fetchChampionPerformance`/`fetchRecentMatches`/`fetchGrowthJourney`/`fetchDraftRecommendations`/`analyzePostgame`/`fetchPostgameReport`), com loading/erro tratados pelo hook compartilhado `features/use-async-data.ts`. `mock-data.ts` foi removido. Pré-game continua estático — a rota `/drafts/pre-game-analysis` ainda é 100% mock no backend (ver "O que ficou fora de escopo" nas fases anteriores).
 
@@ -487,7 +501,7 @@ Deteccao automatica de champion select: `packages/riot/src/lcu/read-only-client.
 
 Estetica: fonte unificada em `Manrope` (corpo, titulos e o wordmark "Sparta" — substituiu o par Rajdhani/Cinzel de uma sessao anterior), carregada via Google Fonts no `index.html`. Paleta migrada pra CSS custom properties em `styles/global.css` (`--color-bg`, `--color-red`, etc.), espelhando os valores de `packages/ui/src/theme/tokens.ts` sem de fato importar o pacote (`@sparta/ui` continua sem uso real pelo desktop — `theme`/`MetricCard` de la sao codigo morto do ponto de vista do desktop). `text-transform: uppercase` foi removido dos rotulos (`.page-header span`, `.auth-field label` etc.) — texto normal, so cor/peso/tamanho fazem a hierarquia agora. Adicionadas transicoes (hover em nav/cards/botoes) e animacoes de entrada (`fadeIn`/`fadeInSoft`) ao trocar de aba e ao carregar splash art — antes disso o app nao tinha nenhuma transicao. Icones/artes de campeao vem do Data Dragon (`features/datadragon.ts` no renderer; `packages/riot/src/datadragon/client.ts` no backend) — ver `championSquareUrl`/`championSplashUrl`. Continua minimalista/premium, sem landing page nem foco em marketing.
 
-Tema por campeao/skin: `features/featured-champion-context.tsx` (`FeaturedChampionProvider`/`useFeaturedChampion`) guarda em `localStorage` (`sparta:featured-champion`) qual campeao o usuario escolheu num seletor na sidebar (`features/ChampionThemePicker.tsx`). A splash art do login e do header do Dashboard passam a usar esse campeao (com uma skin especifica curada a dedo por campeao, indices conferidos contra o Data Dragon 14.14.1 — ver `FEATURED_CHAMPIONS`). A lista de ~12 campeoes e um placeholder manual: quando a Fase 2 conectar o desktop ao `/players/:puuid/champion-performance` real, o candidato natural e trocar isso pelo campeao mais jogado de verdade em vez de uma escolha estetica solta. A cor de destaque (vermelho) continua fixa por decisao explicita — so a arte muda, nao a paleta.
+Tema por campeao/skin (Sub-fase 6a): `features/featured-champion-context.tsx` (`FeaturedChampionProvider`/`useFeaturedChampion`) guarda em `localStorage` (`sparta:featured-champion`, JSON `{key,name,skinIndex,skinName,localSplashPath?}`) o campeao+skin escolhido na tela de Configuracoes (`features/ChampionSkinPicker.tsx`, fluxo de 2 passos - qualquer campeao, qualquer skin, lista vinda direto da CDN da Data Dragon). A splash art do login e do header do Dashboard preferem `localSplashPath` (arquivo baixado pro disco via `window.sparta.downloadSkin`, novo IPC request/response) quando existir, senao caem pra CDN. Antiga lista curada de 12 campeoes (`ChampionThemePicker.tsx`) removida. A cor de destaque (vermelho) continua fixa por decisao explicita — so a arte muda, nao a paleta.
 
 Estilo:
 
@@ -566,9 +580,9 @@ Não usar force push sem pedido explícito.
 
 ## Próximos passos recomendados
 
-Fase 1 (Riot Sync), o refinamento visual do desktop, Fase 2 (Player Intelligence), Fase 3 (Draft Intelligence), Fase 4 (Post-Game Coach) e Fase 5 (Growth Journey) estão todas completas em `main`, e o desktop já foi conectado às rotas reais — ver "Pendências desta sessão" no topo. O roadmap original de 5 épicos está encerrado. Próximo:
+Fase 1 (Riot Sync), o refinamento visual do desktop, Fase 2 (Player Intelligence), Fase 3 (Draft Intelligence), Fase 4 (Post-Game Coach), Fase 5 (Growth Journey), a conexão do desktop às rotas reais e a Sub-fase 6a (Configurações + tema com skins) estão completas em `main`. O roadmap original de 5 épicos está encerrado. Próximo:
 
-1. **Fase de temas com skins** (pedida pelo usuário) — trocar `ChampionThemePicker.tsx`/`featured-champion-context.tsx` (12 campeões curados, 1 skin cada) por um fluxo de 2 passos (escolher campeão → escolher skin) com download real pro disco. Desenho de alto nível já registrado em "Fase futura: temas com skins" acima.
+1. **Sub-fase 6b** (configuração "quantas partidas analisar") e **Sub-fase 6c** (ordem de pick automática via LCU) — ambas desenhadas em detalhe em "Fase 6 (Configurações do app)" acima, ainda não implementadas.
 2. Catálogo de campeões pro desktop — resolver `championId` → nome/ícone no Pós-game (hoje mostra só `Campeão #<id>` na lista de partidas porque `RecentChampionMatch` não traz `championName` e não há rota de catálogo exposta ao desktop).
 3. Expandir `ChampionTag` além dos 2 campeões do seed (`data/seeds/champion-tags.json`) — sem bloqueio técnico desde a Fase 3 (o seed já lê o JSON de verdade), é só curadoria manual contínua; o motor de recomendação já tolera ausência, mas mais cobertura melhora a qualidade das recomendações (confirmado na validação desta sessão: o Champion Select real devolveu 0 recomendações pra Zekerus#117 justamente por causa disso, comportamento honesto, não bug).
 4. Tornar `/drafts/pre-game-analysis` real (hoje 100% estático) — usar `analyzeTeamComposition` (já existe em `packages/core`) com `championTags`/`matchups` reais; motor de geração de texto explicativo ainda por desenhar (a composição por fragmentos da Fase 4, em `packages/core/src/postgame/post-game-analysis.ts`, é um precedente reaproveitável).
@@ -579,6 +593,7 @@ Fase 1 (Riot Sync), o refinamento visual do desktop, Fase 2 (Player Intelligence
 9. Trocar o token HMAC caseiro por algo mais robusto (rotação de segredo, refresh token) se o produto for além do MVP local.
 10. Empacotamento do desktop (electron-builder/NSIS/ASAR) — hoje não existe nenhuma configuração de build de instalador, só `electron-vite build`.
 11. Mitigar a limitação conhecida da Fase 5 (`WeaknessTrend` derivado de um corte top-3 por partida, ver "O que a Fase 5 entregou") lendo razões brutas em vez de só `weaknesses[]`, se o ruído de entrada/saída na fronteira do corte incomodar na prática.
+12. **Documentado, não implementado** (pedido pelo usuário): revisão dos algoritmos de scoring de desempenho — `packages/core/src/scoring/champion-performance.ts` (pesos de `selectWeights` por role, `roleBaselines`, `normalizeRatio`) e `packages/core/src/scoring/dimension-signals.ts` (thresholds `RATIO_STRENGTH_THRESHOLD=1.1`, `RATIO_WEAKNESS_THRESHOLD=0.85`, etc.), agora que as Fases 1-5 + a Fase 6 acumularam uso real o suficiente pra avaliar se os pesos/thresholds fazem sentido na prática.
 
 ## Verificação conhecida
 

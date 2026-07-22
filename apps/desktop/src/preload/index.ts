@@ -12,5 +12,12 @@ contextBridge.exposeInMainWorld("sparta", {
     const listener = (_event: unknown, phase: LcuGameflowPhase | null) => callback(phase);
     ipcRenderer.on("sparta:gameflow-phase", listener);
     return () => ipcRenderer.removeListener("sparta:gameflow-phase", listener);
+  },
+  /**
+   * Baixa uma imagem pro disco local (userData/skins) e devolve o caminho
+   * do arquivo salvo - usado pra aplicar tema de skin offline.
+   */
+  downloadSkin(url: string, fileName: string): Promise<string> {
+    return ipcRenderer.invoke("sparta:download-skin", url, fileName);
   }
 });

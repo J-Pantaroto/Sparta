@@ -1,8 +1,31 @@
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, ipcMain } from "electron";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { LcuReadOnlyClient, type LcuGameflowPhase } from "@sparta/riot";
 
 const GAMEFLOW_POLL_INTERVAL_MS = 2500;
+
+/**
+ * Baixa a splash art de uma skin pro disco (userData/skins), pra aplicar o
+ * tema funcionar offline depois da primeira vez - unica escrita em disco do
+ * app hoje. Renderer nao tem acesso a `fs` (contextIsolation), entao pede
+ * via IPC request/response (ipcRenderer.invoke), diferente do padrao
+ * push-only ja usado pelo gameflow-phase.
+ */
+function registerSkinDownloadHandler() {
+  ipcMain.handle("sparta:download-skin", async (_event, url: string, fileName: string) => {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Falha ao baixar a imagem (${response.status}).`);
+    const buffer = Buffer.from(await response.arrayBuffer());
+
+    const skinsDir = join(app.getPath("userData"), "skins");
+    await mkdir(skinsDir, { recursive: true });
+    const filePath = join(skinsDir, fileName);
+    await writeFile(filePath, buffer);
+
+    return filePath;
+  });
+}
 
 function createWindow() {
   const window = new BrowserWindow({
@@ -51,6 +74,7 @@ function startGameflowWatcher() {
 void app.whenReady().then(() => {
   createWindow();
   startGameflowWatcher();
+  registerSkinDownloadHandler();
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
