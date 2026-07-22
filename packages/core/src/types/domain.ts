@@ -242,3 +242,17 @@ export interface ReplayImportJob {
   status: "queued" | "not_implemented" | "experimental" | "failed";
   createdAt: string;
 }
+
+export interface WeaknessTrend {
+  code: string;
+  label: string;
+  recentRate: number;
+  previousRate: number;
+  trend: "improving" | "worsening" | "stable" | "new" | "resolved";
+  confidence: Confidence;
+}
+
+export interface GrowthJourney {
+  weaknessTrends: WeaknessTrend[];
+  matchesAnalyzed: number;
+}

@@ -1,10 +1,11 @@
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { rankChampionPool, type RecentChampionMatch, type Role } from "@sparta/core";
+import { computeGrowthJourney, rankChampionPool, type RecentChampionMatch, type Role } from "@sparta/core";
 import { RiotApiError } from "@sparta/riot";
 import { prisma } from "../../db/prisma.js";
 import { getAuthenticatedUserId } from "../auth/routes.js";
 import { findParticipationHistory } from "../matches/match-repository.js";
+import { findPostgameReportsByPuuid } from "../postgame/postgame-repository.js";
 import { lookupRiotAccount } from "../riot-integration/account-lookup.js";
 import {
   derivePreferredRoles,
@@ -127,6 +128,18 @@ export const playersRoutes: FastifyPluginAsync = async (app) => {
     const params = z.object({ puuid: z.string() }).parse(request.params);
     const championStats = await findChampionStatsByPuuid(params.puuid);
     return { puuid: params.puuid, champions: rankChampionPool(championStats) };
+  });
+
+  /**
+   * Growth Journey (Fase 5): progressao dos pontos fracos identificados no
+   * Post-Game Coach ao longo das partidas ja analisadas. Deriva tudo dos
+   * PostgameReport ja persistidos - sem tabela nova. Sem historico de
+   * relatorios ainda, volta uma lista vazia (nunca inventa tendencia).
+   */
+  app.get("/players/:puuid/growth-journey", async (request) => {
+    const params = z.object({ puuid: z.string() }).parse(request.params);
+    const reports = await findPostgameReportsByPuuid(params.puuid);
+    return { puuid: params.puuid, ...computeGrowthJourney(reports) };
   });
 
   /**
