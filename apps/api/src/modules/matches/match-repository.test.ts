@@ -7,6 +7,7 @@ const {
   riotAccountFindManyMock,
   matchUpsertMock,
   matchFindManyMock,
+  matchFindUniqueMock,
   matchParticipantCreateManyMock,
   matchParticipantUpdateManyMock,
   matchTimelineUpsertMock
@@ -16,6 +17,7 @@ const {
   riotAccountFindManyMock: vi.fn(),
   matchUpsertMock: vi.fn(),
   matchFindManyMock: vi.fn(),
+  matchFindUniqueMock: vi.fn(),
   matchParticipantCreateManyMock: vi.fn(),
   matchParticipantUpdateManyMock: vi.fn(),
   matchTimelineUpsertMock: vi.fn()
@@ -24,12 +26,13 @@ const {
 vi.mock("../../db/prisma.js", () => ({
   prisma: {
     $transaction: (callback: (tx: unknown) => unknown) => transactionMock(callback),
-    match: { findMany: matchFindManyMock }
+    match: { findMany: matchFindManyMock, findUnique: matchFindUniqueMock }
   }
 }));
 
 import {
   backfillMatchParticipants,
+  findMatchDetail,
   findMatchesMissingParticipants,
   persistMatch,
   type ParticipantToPersist
@@ -254,6 +257,114 @@ describe("match-repository", () => {
       ]);
 
       expect(await findMatchesMissingParticipants()).toEqual([]);
+    });
+  });
+
+  describe("findMatchDetail", () => {
+    function participantRow(overrides: Record<string, unknown> = {}) {
+      return {
+        puuid: "puuid-tracked",
+        championId: 61,
+        role: "MID",
+        teamId: 100,
+        won: true,
+        kills: 6,
+        deaths: 3,
+        assists: 6,
+        csPerMinute: 7.7,
+        goldPerMinute: 430,
+        damagePerMinute: 760,
+        visionScorePerMinute: 0.85,
+        killParticipation: 0.56,
+        objectiveParticipation: 0.38,
+        champion: { name: "Orianna" },
+        ...overrides
+      };
+    }
+
+    it("retorna null quando a partida nao existe", async () => {
+      matchFindUniqueMock.mockResolvedValue(null);
+      expect(await findMatchDetail("riot-inexistente", "puuid-tracked")).toBeNull();
+    });
+
+    it("retorna null quando o puuid nao esta entre os participantes persistidos", async () => {
+      matchFindUniqueMock.mockResolvedValue({
+        id: "match-db-id",
+        matchId: "riot-m1",
+        durationSeconds: 1800,
+        timeline: null,
+        participants: [participantRow({ puuid: "outro-puuid" })]
+      });
+
+      expect(await findMatchDetail("riot-m1", "puuid-tracked")).toBeNull();
+    });
+
+    it("identifica o laner oposto (mesmo role, teamId diferente) e monta o detalhe completo", async () => {
+      matchFindUniqueMock.mockResolvedValue({
+        id: "match-db-id",
+        matchId: "riot-m1",
+        durationSeconds: 1800,
+        timeline: {
+          deathsBefore10: 1,
+          deathsBefore15: 2,
+          csAt10: 80,
+          csAt15: 120,
+          goldDiffAt15: 300,
+          eventsJson: ["DRAGON@14:32"]
+        },
+        participants: [
+          participantRow(),
+          participantRow({ puuid: "puuid-enemy", championId: 157, teamId: 200, won: false, champion: { name: "Yasuo" } }),
+          participantRow({ puuid: "puuid-jungle-aliado", role: "JUNGLE", teamId: 100, champion: { name: "Vi" } })
+        ]
+      });
+
+      const result = await findMatchDetail("riot-m1", "puuid-tracked");
+
+      expect(result).not.toBeNull();
+      expect(result!.ownParticipant.championName).toBe("Orianna");
+      expect(result!.enemyLaneChampionName).toBe("Yasuo");
+      expect(result!.timeline).toEqual({
+        matchId: "riot-m1",
+        deathsBefore10: 1,
+        deathsBefore15: 2,
+        csAt10: 80,
+        csAt15: 120,
+        goldDiffAt15: 300,
+        objectiveEvents: ["DRAGON@14:32"]
+      });
+    });
+
+    it("nao identifica laner oposto quando teamId ainda nao foi preenchido (partida pre-Fase-3 sem backfill)", async () => {
+      matchFindUniqueMock.mockResolvedValue({
+        id: "match-db-id",
+        matchId: "riot-m1",
+        durationSeconds: 1800,
+        timeline: null,
+        participants: [
+          participantRow({ teamId: null }),
+          participantRow({ puuid: "puuid-enemy", championId: 157, teamId: null, champion: { name: "Yasuo" } })
+        ]
+      });
+
+      const result = await findMatchDetail("riot-m1", "puuid-tracked");
+
+      expect(result!.enemyLaneChampionName).toBeUndefined();
+      expect(result!.timeline).toBeNull();
+    });
+
+    it("usa um default alto de duracao quando durationSeconds e nulo, em vez de disparar por engano a guarda de partida curta", async () => {
+      matchFindUniqueMock.mockResolvedValue({
+        id: "match-db-id",
+        matchId: "riot-m1",
+        durationSeconds: null,
+        timeline: null,
+        participants: [participantRow()]
+      });
+
+      const result = await findMatchDetail("riot-m1", "puuid-tracked");
+
+      expect(result!.durationSeconds).toBeGreaterThanOrEqual(300);
     });
   });
 });

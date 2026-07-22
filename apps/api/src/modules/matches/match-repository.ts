@@ -1,5 +1,5 @@
 import type { Prisma } from "@prisma/client";
-import type { MatchSummary, MatchTimelineSummary } from "@sparta/core";
+import type { MatchSummary, MatchTimelineSummary, Role } from "@sparta/core";
 import { prisma } from "../../db/prisma.js";
 
 export async function findExistingMatchIds(matchIds: string[]): Promise<Set<string>> {
@@ -200,6 +200,104 @@ export async function findMatchesMissingParticipants(): Promise<MatchNeedingBack
         (match._count.participants < 10 || match.participants.some((participant) => participant.teamId === null))
     )
     .map(({ id, matchId, rawJson }) => ({ id, matchId, rawJson }));
+}
+
+export interface MatchDetailParticipant {
+  championId: number;
+  championName: string;
+  role: Role;
+  won: boolean;
+  kills: number;
+  deaths: number;
+  assists: number;
+  csPerMinute: number;
+  goldPerMinute: number;
+  damagePerMinute: number;
+  visionScorePerMinute: number;
+  killParticipation: number | null;
+  objectiveParticipation: number | null;
+}
+
+export interface MatchDetail {
+  matchDbId: string;
+  matchId: string;
+  durationSeconds: number;
+  ownParticipant: MatchDetailParticipant;
+  enemyLaneChampionName?: string;
+  timeline: MatchTimelineSummary | null;
+}
+
+/**
+ * Detalhe completo de uma partida especifica (Match + MatchTimeline + os
+ * ate 10 MatchParticipant, com o nome do campeao via join), pra gerar o
+ * PostGameAnalysis (Fase 4). Diferente de `findParticipationHistory`, que
+ * agrega o historico inteiro do jogador sem timeline nem outros
+ * participantes - aqui e uma unica partida com todo o contexto.
+ *
+ * Retorna `null` se a partida nao existe OU se o puuid nao esta entre os
+ * participantes persistidos (nao sincronizada pra esse usuario, ou nao e
+ * dele) - o chamador trata isso como 404 honesto, nao inventa dado.
+ * `enemyLaneChampionName` e o laner do mesmo role em time oposto, se os
+ * dois tiverem `teamId` preenchido (partidas de antes da Fase 3/backfill
+ * podem nao ter).
+ */
+export async function findMatchDetail(matchId: string, puuid: string): Promise<MatchDetail | null> {
+  const match = await prisma.match.findUnique({
+    where: { matchId },
+    include: {
+      timeline: true,
+      participants: { include: { champion: true } }
+    }
+  });
+  if (!match) return null;
+
+  const own = match.participants.find((participant) => participant.puuid === puuid);
+  if (!own) return null;
+
+  const enemy = match.participants.find(
+    (participant) =>
+      participant.role === own.role &&
+      participant.teamId !== null &&
+      own.teamId !== null &&
+      participant.teamId !== own.teamId
+  );
+
+  return {
+    matchDbId: match.id,
+    matchId: match.matchId,
+    // durationSeconds e obrigatorio em MatchSummary e sempre gravado por
+    // persistMatch - nulo aqui seria uma anomalia de dado, nao um caso
+    // esperado; o default alto evita que uma anomalia dispare por engano a
+    // guarda de "partida curta/remake" do gerador de analise.
+    durationSeconds: match.durationSeconds ?? 9999,
+    ownParticipant: {
+      championId: own.championId,
+      championName: own.champion.name,
+      role: own.role as Role,
+      won: own.won,
+      kills: own.kills,
+      deaths: own.deaths,
+      assists: own.assists,
+      csPerMinute: own.csPerMinute,
+      goldPerMinute: own.goldPerMinute,
+      damagePerMinute: own.damagePerMinute,
+      visionScorePerMinute: own.visionScorePerMinute,
+      killParticipation: own.killParticipation,
+      objectiveParticipation: own.objectiveParticipation
+    },
+    enemyLaneChampionName: enemy?.champion.name,
+    timeline: match.timeline
+      ? {
+          matchId: match.matchId,
+          deathsBefore10: match.timeline.deathsBefore10,
+          deathsBefore15: match.timeline.deathsBefore15,
+          csAt10: match.timeline.csAt10 ?? 0,
+          csAt15: match.timeline.csAt15 ?? 0,
+          goldDiffAt15: match.timeline.goldDiffAt15 ?? undefined,
+          objectiveEvents: (match.timeline.eventsJson as unknown as string[] | null) ?? []
+        }
+      : null
+  };
 }
 
 export interface ParticipationRecord {
