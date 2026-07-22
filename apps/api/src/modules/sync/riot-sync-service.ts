@@ -9,7 +9,11 @@ import {
 } from "@sparta/riot";
 import { getRiotApiClient } from "../riot-integration/client-factory.js";
 import { findExistingMatchIds, persistMatch } from "../matches/match-repository.js";
-import { recomputeChampionStats, type ChampionRolePair } from "../players/player-stats-repository.js";
+import {
+  computeAndPersistPlayerInsights,
+  recomputeChampionStats,
+  type ChampionRolePair
+} from "../players/player-stats-repository.js";
 
 export interface SyncFailure {
   matchId: string;
@@ -43,7 +47,10 @@ export interface SyncablePlayer {
  * sincronizado) nao aborta o resto - so um 429 esgotado para o sync inteiro,
  * ja que continuar batendo na Riot so pioraria o rate limit.
  */
-export async function syncPlayerMatches(player: SyncablePlayer, opts?: { maxNewMatches?: number }): Promise<SyncResult> {
+export async function syncPlayerMatches(
+  player: SyncablePlayer,
+  opts?: { maxNewMatches?: number; onInsightsFailed?: (error: unknown) => void }
+): Promise<SyncResult> {
   const maxNewMatches = Math.min(opts?.maxNewMatches ?? DEFAULT_MAX_NEW_MATCHES, MAX_NEW_MATCHES_CEILING);
   const client = getRiotApiClient();
 
@@ -101,6 +108,19 @@ export async function syncPlayerMatches(player: SyncablePlayer, opts?: { maxNewM
   }
 
   await recomputeChampionStats(player.riotAccountId, player.puuid, touchedPairs);
+
+  // Strengths/weaknesses/recentForm dependem do historico inteiro do
+  // jogador (nao so das partidas novas) - so vale recalcular quando essa
+  // rodada de fato trouxe partida nova, senao seria reler/reescrever o
+  // historico inteiro em toda chamada repetida de sync sem ganho nenhum.
+  // Falha aqui nao deve derrubar um sync de partidas que ja funcionou.
+  if (touchedPairs.length > 0) {
+    try {
+      await computeAndPersistPlayerInsights(player.riotAccountId, player.puuid);
+    } catch (error) {
+      opts?.onInsightsFailed?.(error);
+    }
+  }
 
   return result;
 }

@@ -92,5 +92,5 @@ export const playerProfile: PlayerProfile = {
   championStats,
   strengths: [],
   weaknesses: [],
-  recentForm: { last10Score: 66, last20Score: 63, last50Score: 61, trend: "stable" }
+  recentForm: { last10Score: 66, last20Score: 63, last50Score: 61, trend: "stable", confidence: "medium" }
 };

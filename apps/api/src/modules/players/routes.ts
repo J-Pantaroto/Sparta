@@ -9,6 +9,7 @@ import { lookupRiotAccount } from "../riot-integration/account-lookup.js";
 import {
   derivePreferredRoles,
   findChampionStatsByPuuid,
+  findPlayerInsightsByPuuid,
   findRiotAccountByRiotId
 } from "./player-stats-repository.js";
 import { syncPlayerMatches } from "../sync/riot-sync-service.js";
@@ -30,19 +31,14 @@ export const playersRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const championStats = await findChampionStatsByPuuid(account.puuid);
+    const insights = await findPlayerInsightsByPuuid(account.puuid);
 
     return {
       id: account.puuid,
       account,
       preferredRoles: derivePreferredRoles(championStats),
       championStats,
-      // Pontos fortes/fracos e forma recente dependem de uma agregacao mais
-      // ampla entre partidas (Fase 2 - Player Intelligence); ainda nao ha
-      // funcao que os calcule, entao ficam vazios/neutros em vez de
-      // inventar uma avaliacao.
-      strengths: [],
-      weaknesses: [],
-      recentForm: { last10Score: 0, last20Score: 0, last50Score: 0, trend: "stable" as const }
+      ...insights
     };
   });
 
@@ -65,11 +61,22 @@ export const playersRoutes: FastifyPluginAsync = async (app) => {
       return { error: "Nenhuma conta Riot vinculada. Vincule uma conta antes de sincronizar." };
     }
 
-    const result = await syncPlayerMatches({
-      riotAccountId: riotAccount.id,
-      puuid: riotAccount.puuid,
-      platformRegion: riotAccount.platformRegion
-    });
+    const result = await syncPlayerMatches(
+      {
+        riotAccountId: riotAccount.id,
+        puuid: riotAccount.puuid,
+        platformRegion: riotAccount.platformRegion
+      },
+      {
+        onInsightsFailed: (error) => {
+          request.log.error({
+            event: "riot_sync_insights_failed",
+            puuid: riotAccount.puuid,
+            message: error instanceof Error ? error.message : String(error)
+          });
+        }
+      }
+    );
 
     for (const failure of result.failed) {
       request.log.error({
