@@ -1,22 +1,39 @@
-import { Activity, BarChart3, Crosshair, Gauge, Shield, Swords } from "lucide-react";
-import { recommendPicks, type DraftState, type PickRecommendation } from "@sparta/core";
+import { Activity, BarChart3, Crosshair, Gauge, Shield, Swords, TrendingUp } from "lucide-react";
+import { rankChampionPool, type DraftState, type PickRecommendation } from "@sparta/core";
 import { useEffect, useMemo, useState } from "react";
-import { championStats, championTags, compositionRules, playerProfile } from "./features/mock-data";
 import { championSplashUrl, championSquareUrl, fetchLatestDataDragonVersion } from "./features/datadragon";
-import { fetchSession, SESSION_TOKEN_KEY, type RiotAccountSummary, type SessionUser } from "./features/api-client";
+import {
+  fetchDraftRecommendations,
+  fetchPlayerProfile,
+  fetchSession,
+  SESSION_TOKEN_KEY,
+  type PlayerProfileResponse,
+  type RiotAccountSummary,
+  type SessionUser
+} from "./features/api-client";
+import { useAsyncData } from "./features/use-async-data";
 import { AuthScreen } from "./features/AuthScreen";
 import { LinkRiotAccountScreen } from "./features/LinkRiotAccountScreen";
+import { PostGameScreen } from "./features/PostGameScreen";
+import { GrowthJourneyScreen } from "./features/GrowthJourneyScreen";
 import { ChampionThemePicker } from "./features/ChampionThemePicker";
 import { FeaturedChampionProvider, useFeaturedChampion } from "./features/featured-champion-context";
 
-type Page = "dashboard" | "profile" | "select" | "pregame" | "postgame";
+type Page = "dashboard" | "profile" | "select" | "pregame" | "postgame" | "growth";
 
 const pageLabels: Record<Page, string> = {
   dashboard: "Dashboard",
   profile: "Perfil",
   select: "Champion Select",
   pregame: "Pré-game",
-  postgame: "Pós-game"
+  postgame: "Pós-game",
+  growth: "Evolução"
+};
+
+const trendLabels: Record<string, string> = {
+  improving: "melhorando",
+  declining: "piorando",
+  stable: "estável"
 };
 
 type SessionStatus = "checking" | "auth" | "link-account" | "ready";
@@ -46,17 +63,10 @@ function AppShell() {
   const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
   const [riotAccounts, setRiotAccounts] = useState<RiotAccountSummary[]>([]);
 
-  const recommendations = useMemo<PickRecommendation[]>(() => {
-    return recommendPicks({
-      draft,
-      player: playerProfile,
-      championStats,
-      championTags,
-      matchups: [],
-      compositionRules,
-      patchMeta: null
-    });
-  }, [draft]);
+  const recommendationsQuery = useAsyncData<PickRecommendation[]>(
+    () => (sessionToken ? fetchDraftRecommendations(sessionToken, draft).then((result) => result.recommendations) : undefined),
+    [sessionToken, draft]
+  );
 
   // Versao real do Data Dragon (com fallback silencioso se offline).
   useEffect(() => {
@@ -153,6 +163,7 @@ function AppShell() {
               {item === "select" && <Crosshair size={18} />}
               {item === "pregame" && <Shield size={18} />}
               {item === "postgame" && <BarChart3 size={18} />}
+              {item === "growth" && <TrendingUp size={18} />}
               {pageLabels[item]}
             </button>
           ))}
@@ -162,12 +173,20 @@ function AppShell() {
 
       <section className="content">
         {page === "dashboard" && <Dashboard riotAccounts={riotAccounts} />}
-        {page === "profile" && <Profile ddragonVersion={ddragonVersion} />}
+        {page === "profile" && <Profile riotAccounts={riotAccounts} ddragonVersion={ddragonVersion} />}
         {page === "select" && (
-          <ChampionSelect draft={draft} setDraft={setDraft} recommendations={recommendations} ddragonVersion={ddragonVersion} />
+          <ChampionSelect
+            draft={draft}
+            setDraft={setDraft}
+            recommendations={recommendationsQuery.data ?? []}
+            recommendationsStatus={recommendationsQuery.status}
+            noAccountLinked={riotAccounts.length === 0}
+            ddragonVersion={ddragonVersion}
+          />
         )}
         {page === "pregame" && <PreGame />}
-        {page === "postgame" && <PostGame />}
+        {page === "postgame" && <PostGameScreen riotAccounts={riotAccounts} sessionToken={sessionToken} />}
+        {page === "growth" && <GrowthJourneyScreen riotAccounts={riotAccounts} />}
       </section>
     </main>
   );
@@ -177,6 +196,15 @@ function Dashboard({ riotAccounts }: { riotAccounts: RiotAccountSummary[] }) {
   const account = riotAccounts[0];
   const { featuredChampion } = useFeaturedChampion();
   const heroSplash = championSplashUrl(featuredChampion.key, featuredChampion.skinIndex);
+
+  const profile = useAsyncData<PlayerProfileResponse>(
+    () => (account ? fetchPlayerProfile(account.gameName, account.tagLine) : undefined),
+    [account?.gameName, account?.tagLine]
+  );
+
+  const topChampion = profile.data && profile.data.championStats.length > 0 ? rankChampionPool(profile.data.championStats)[0] : undefined;
+  const topWeakness = profile.data?.weaknesses[0];
+
   return (
     <>
       <header className="page-header hero-splash" style={{ backgroundImage: `url(${heroSplash})` }}>
@@ -184,9 +212,17 @@ function Dashboard({ riotAccounts }: { riotAccounts: RiotAccountSummary[] }) {
         <h1>Escolhas melhores antes da partida. Revisões melhores depois.</h1>
       </header>
       <section className="metric-grid">
-        <Metric label="Forma 10 jogos" value="66" detail="estável" />
-        <Metric label="Melhor campeão" value="Orianna" detail="score 76.8" />
-        <Metric label="Risco atual" value="Mortes cedo" detail="médio" />
+        <Metric
+          label="Forma 10 jogos"
+          value={profile.data ? String(profile.data.recentForm.last10Score) : "—"}
+          detail={profile.data ? (trendLabels[profile.data.recentForm.trend] ?? profile.data.recentForm.trend) : "sem dado"}
+        />
+        <Metric
+          label="Melhor campeão"
+          value={topChampion?.championName ?? "—"}
+          detail={topChampion ? `score ${topChampion.score}` : "sem partidas suficientes"}
+        />
+        <Metric label="Risco atual" value={topWeakness?.label ?? "Sem dado"} detail={topWeakness?.severity ?? "—"} />
         <Metric label="Escopo" value="Pré e pós-game" detail="sem assistência in-game" />
       </section>
       <section className="panel wide">
@@ -200,31 +236,69 @@ function Dashboard({ riotAccounts }: { riotAccounts: RiotAccountSummary[] }) {
   );
 }
 
-function Profile({ ddragonVersion }: { ddragonVersion: string }) {
+function Profile({ riotAccounts, ddragonVersion }: { riotAccounts: RiotAccountSummary[]; ddragonVersion: string }) {
+  const account = riotAccounts[0];
+  const profile = useAsyncData<PlayerProfileResponse>(
+    () => (account ? fetchPlayerProfile(account.gameName, account.tagLine) : undefined),
+    [account?.gameName, account?.tagLine]
+  );
+
+  if (!account) {
+    return (
+      <section className="panel wide">
+        <h1>Perfil do jogador</h1>
+        <p>Vincule sua conta Riot para ver seu perfil real.</p>
+      </section>
+    );
+  }
+
   return (
     <>
       <header className="page-header compact">
         <span>Perfil do jogador</span>
-        <h1>{playerProfile.account.gameName}#{playerProfile.account.tagLine}</h1>
+        <h1>
+          {account.gameName}#{account.tagLine}
+        </h1>
       </header>
-      <section className="table-panel">
-        {championStats.map((champion) => (
-          <article className="champion-row" key={champion.championId}>
-            <div className="champion-identity">
-              <img
-                className="champion-icon"
-                src={championSquareUrl(champion.championName, ddragonVersion)}
-                alt={champion.championName}
-              />
-              <strong>{champion.championName}</strong>
-            </div>
-            <span>{champion.games} partidas</span>
-            <span>{Math.round((champion.wins / champion.games) * 100)}% WR</span>
-            <span>{champion.csPerMinute.toFixed(1)} CS/min</span>
-            <span>{champion.damagePerMinute} dano/min</span>
-          </article>
-        ))}
-      </section>
+      {profile.status === "loading" && <p>Carregando...</p>}
+      {profile.status === "error" && <p>{profile.error}</p>}
+      {profile.data && (
+        <>
+          <section className="table-panel">
+            {profile.data.championStats.map((champion) => (
+              <article className="champion-row" key={`${champion.championId}-${champion.role}`}>
+                <div className="champion-identity">
+                  <img
+                    className="champion-icon"
+                    src={championSquareUrl(champion.championName, ddragonVersion)}
+                    alt={champion.championName}
+                  />
+                  <strong>{champion.championName}</strong>
+                </div>
+                <span>{champion.games} partidas</span>
+                <span>{Math.round((champion.wins / champion.games) * 100)}% WR</span>
+                <span>{champion.csPerMinute.toFixed(1)} CS/min</span>
+                <span>{champion.damagePerMinute} dano/min</span>
+              </article>
+            ))}
+          </section>
+          <section className="panel wide">
+            <h2>Pontos fortes e fracos</h2>
+            {profile.data.strengths.length === 0 && profile.data.weaknesses.length === 0 ? (
+              <p>Ainda sem histórico suficiente pra apontar pontos fortes/fracos.</p>
+            ) : (
+              <>
+                {profile.data.strengths.map((strength) => (
+                  <p key={strength.code}>✓ {strength.detail}</p>
+                ))}
+                {profile.data.weaknesses.map((weakness) => (
+                  <p key={weakness.code}>⚠ {weakness.detail}</p>
+                ))}
+              </>
+            )}
+          </section>
+        </>
+      )}
     </>
   );
 }
@@ -233,11 +307,15 @@ function ChampionSelect({
   draft,
   setDraft,
   recommendations,
+  recommendationsStatus,
+  noAccountLinked,
   ddragonVersion
 }: {
   draft: DraftState;
   setDraft: (draft: DraftState) => void;
   recommendations: PickRecommendation[];
+  recommendationsStatus: string;
+  noAccountLinked: boolean;
   ddragonVersion: string;
 }) {
   return (
@@ -246,6 +324,9 @@ function ChampionSelect({
         <span>Modo manual</span>
         <h1>Champion Select</h1>
       </header>
+      {noAccountLinked && (
+        <p>Sem conta Riot vinculada - as recomendações abaixo usam só a referência geral do papel, não seu histórico.</p>
+      )}
       <section className="draft-controls">
         <label>
           Pick order
@@ -272,6 +353,8 @@ function ChampionSelect({
           Alternar inimigo revelado
         </button>
       </section>
+      {recommendationsStatus === "loading" && <p>Calculando recomendações...</p>}
+      {recommendationsStatus === "error" && <p>Não foi possível calcular recomendações agora.</p>}
       <section className="recommendation-list">
         {recommendations.map((recommendation) => (
           <article className="recommendation" key={recommendation.championId}>
@@ -303,18 +386,6 @@ function PreGame() {
       <p>
         Condição de vitória sugerida: jogar por prioridade no mid, preparar visão antes dos objetivos e usar janelas de
         ultimate para lutas agrupadas.
-      </p>
-    </section>
-  );
-}
-
-function PostGame() {
-  return (
-    <section className="panel wide">
-      <h1>Análise pós-game</h1>
-      <p>
-        A primeira versão compara plano esperado com execução usando mortes cedo, CS aos 10/15, dano, visão,
-        participação em abates e participação em objetivos.
       </p>
     </section>
   );

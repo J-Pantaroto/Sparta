@@ -4,7 +4,35 @@ Este arquivo é um handoff para outro agente de desenvolvimento continuar o proj
 
 ## Pendências desta sessão (ler primeiro)
 
-Uma sessão anterior fez uma auditoria completa do repositório (real vs mock vs so-tipo), aprovou um plano de evolução em 5 épicos (Riot Sync, Player Intelligence, Draft Intelligence, Post-Game Coach, Growth Journey) e implementou a **Fase 1 (Riot Sync)**, a **Fase 2 (Player Intelligence)**, a **Fase 3 (Draft Intelligence)** e a **Fase 4 (Post-Game Coach)**, além de um refinamento visual do desktop e correções de infra/segurança. Esta sessão implementou a **Fase 5 inteira (Growth Journey)**, a última do roadmap de 5 épicos: progressão dos pontos fracos do jogador ao longo das partidas já analisadas no Post-Game Coach. Tudo isso **já está mergeado em `main`** (7 PRs de fase/fix, mais o PR de Fase 5 abaixo).
+Uma sessão anterior fez uma auditoria completa do repositório (real vs mock vs so-tipo), aprovou um plano de evolução em 5 épicos (Riot Sync, Player Intelligence, Draft Intelligence, Post-Game Coach, Growth Journey) e implementou todas as 5 fases, além de um refinamento visual do desktop e correções de infra/segurança. Esta sessão fez duas coisas: (1) **conectou o desktop às rotas reais da API** (Dashboard/Perfil/Champion Select/Pós-game/nova tela Evolução, removendo `mock-data.ts`); (2) o usuário pediu uma **nova fase futura de temas com skins** (escolher qualquer campeão + qualquer skin como tema, "baixar" = salvar no disco) - só desenhada em linhas gerais, não implementada ainda (ver "Próximos passos recomendados"). Tudo isso **já está mergeado em `main`**.
+
+### Desktop conectado às rotas reais (sessão atual)
+
+Desde a Fase 1, só autenticação e `POST /players/link-riot-account` usavam a API real no desktop — as 5 telas principais rodavam 100% em cima de `apps/desktop/src/renderer/src/features/mock-data.ts` (2 campeões hardcoded) ou texto estático, mesmo com todo o backend real já entregue nas Fases 1-5.
+
+1. **`apps/desktop/src/renderer/src/features/api-client.ts`** ganhou `fetchPlayerProfile`, `fetchChampionPerformance`, `fetchRecentMatches`, `fetchGrowthJourney` (públicas, só precisam do `puuid`), `fetchDraftRecommendations`, `analyzePostgame`, `fetchPostgameReport` (autenticadas, resolvem a conta Riot no servidor - nunca recebem `puuid` do cliente). Nova classe `ApiError` (com `status`) substitui o `Error` genérico anterior, necessária pro fluxo de "GET primeiro, POST só se 404" do Pós-game.
+2. **Novo hook `features/use-async-data.ts`** (`useAsyncData<T>(fn, deps)` → `{data, status, error}`) — evita repetir boilerplate de loading/erro em cada tela.
+3. **`Dashboard`/`Profile`/`ChampionSelect`** (inline em `App.tsx`) trocaram dado mockado por `fetchPlayerProfile`/`fetchDraftRecommendations` reais. `Profile` agora também mostra `strengths`/`weaknesses` (reais desde a Fase 2, nunca renderizados no desktop até agora). `ChampionSelect` mostra um aviso leve quando não há conta Riot vinculada (o backend já degrada pra perfil neutro sozinho, nunca erro).
+4. **Nova tela `features/PostGameScreen.tsx`** — lista as últimas partidas (`fetchRecentMatches`), ao clicar tenta `fetchPostgameReport` (GET) primeiro e só cai pra `analyzePostgame` (POST) em 404; botão "Reanalisar" chama o POST direto. Lista de partidas mostra só `Campeão #<id>` (sem ícone/nome) porque `RecentChampionMatch` não traz `championName` e não há catálogo de campeões exposto ao desktop hoje - resolver isso é trabalho novo, não coberto aqui.
+5. **Nova tela `features/GrowthJourneyScreen.tsx`** — novo item de navegação "Evolução" (`Page` ganhou `"growth"`), mostra `weaknessTrends`/`matchesAnalyzed` reais da Fase 5.
+6. **`mock-data.ts` removido** — nada mais o importava.
+
+Validado manualmente contra a API real (Docker) e a conta Zekerus#117 via `electron-vite dev` + Browser tool: Dashboard/Perfil/Evolução com dado real, Champion Select gerando recomendações reais (lista vazia nesse teste específico - pool de `ChampionTag` ainda só tem 2 campeões curados, comportamento honesto esperado, não bug), Pós-game lendo relatório já persistido e reanalisando com sucesso.
+
+O que ficou deliberadamente fora de escopo:
+
+- **Catálogo de campeões pro desktop** (resolver `championId` → nome/ícone fora de `PlayerChampionStats`/`PickRecommendation`, que já trazem `championName`) — afeta só a lista de partidas do Pós-game hoje.
+- **Fase de temas com skins** (pedida pelo usuário nesta sessão, pra depois) — ver desenho de alto nível abaixo.
+
+### Fase futura: temas com skins (pedida pelo usuário, não implementada)
+
+Usuário quer trocar a tela de tema atual (`ChampionThemePicker.tsx`, 12 campeões curados com 1 skin cada, sem nenhuma UI de seleção de skin) por um fluxo de 2 passos: escolher qualquer campeão → escolher qualquer skin dele (base ou qualquer outra) → "baixar" o tema. Confirmado com o usuário: "baixar" significa salvar a imagem no disco (funciona offline), não só buscar ao vivo da CDN.
+
+Desenho de alto nível pra quando essa fase for iniciada:
+
+- **Dado de skins**: o endpoint de detalhe por campeão da Data Dragon (`cdn/{version}/data/{locale}/champion/{championId}.json`) já traz o array `skins` (`num`/`name`/`chromas`) — hoje não é usado em lugar nenhum do repo (só o `champion.json` resumido, sem skins, é buscado em `packages/riot/src/datadragon/client.ts` e no `datadragon.ts` do desktop). Não precisa de API nova, só envolver esse endpoint (paralelo ao `fetchDataDragonChampions` que já existe).
+- **Download real**: canal IPC novo (ex. `sparta:download-skin`) exposto via `apps/desktop/src/preload/index.ts`, handler no processo main (`apps/desktop/src/main/index.ts`, hoje sem nenhum uso de `fs`) que baixa a splash art e escreve em `app.getPath('userData')`.
+- **UI**: trocar `featured-champion-context.tsx`/`ChampionThemePicker.tsx` (lista curada fixa hoje) por um fluxo de 2 passos que lista todos os campeões/skins em vez da lista curada, e trocar `FEATURED_CHAMPIONS` pelo campeão mais jogado de verdade do jogador (destravado desde que o desktop passou a ler `champion-performance` real nesta sessão).
 
 ### O que a Fase 5 entregou (Growth Journey)
 
@@ -444,13 +472,14 @@ Telas existentes:
 
 - Login / cadastro (`features/AuthScreen.tsx`);
 - Vincular conta Riot (`features/LinkRiotAccountScreen.tsx`);
-- Dashboard;
-- Perfil;
-- Champion Select manual;
-- Pré-game;
-- Pós-game.
+- Dashboard (inline em `App.tsx`);
+- Perfil (inline em `App.tsx`);
+- Champion Select manual (inline em `App.tsx`);
+- Pré-game (inline em `App.tsx`, ainda estático);
+- Pós-game (`features/PostGameScreen.tsx`);
+- Evolução (`features/GrowthJourneyScreen.tsx`).
 
-O champion select manual usa o motor real de `@sparta/core` com dados mockados.
+Desde a sessão que conectou o desktop às rotas reais: Dashboard/Perfil/Champion Select/Pós-game/Evolução leem dado real via `features/api-client.ts` (`fetchPlayerProfile`/`fetchChampionPerformance`/`fetchRecentMatches`/`fetchGrowthJourney`/`fetchDraftRecommendations`/`analyzePostgame`/`fetchPostgameReport`), com loading/erro tratados pelo hook compartilhado `features/use-async-data.ts`. `mock-data.ts` foi removido. Pré-game continua estático — a rota `/drafts/pre-game-analysis` ainda é 100% mock no backend (ver "O que ficou fora de escopo" nas fases anteriores).
 
 Fluxo de sessao (`App.tsx`): ao abrir, restaura token de `localStorage` (`sparta:token`) e chama `GET /auth/me`; sem token ou token invalido cai na tela de login; logado mas sem conta Riot vinculada cai na tela de vinculo; ambas as telas tem botao "continuar sem conta / vincular depois" para nao travar o dev local sem a API rodando. Requer `apps/api` no ar (`VITE_API_URL`, default `http://localhost:3333`); sem API a tela de login mostra erro de conexao mas o skip sempre funciona.
 
@@ -537,18 +566,19 @@ Não usar force push sem pedido explícito.
 
 ## Próximos passos recomendados
 
-Fase 1 (Riot Sync), o refinamento visual do desktop, Fase 2 (Player Intelligence), Fase 3 (Draft Intelligence), Fase 4 (Post-Game Coach) e Fase 5 (Growth Journey) estão todas completas em `main` — ver "Pendências desta sessão" no topo. O roadmap original de 5 épicos está encerrado. Próximo:
+Fase 1 (Riot Sync), o refinamento visual do desktop, Fase 2 (Player Intelligence), Fase 3 (Draft Intelligence), Fase 4 (Post-Game Coach) e Fase 5 (Growth Journey) estão todas completas em `main`, e o desktop já foi conectado às rotas reais — ver "Pendências desta sessão" no topo. O roadmap original de 5 épicos está encerrado. Próximo:
 
-1. Conectar o desktop às rotas de perfil/drafts/pós-game/growth-journey (hoje só auth usa a API real; o resto ainda usa `features/mock-data.ts` local no renderer) — inclui `strengths`/`weaknesses`/`recentForm` reais (Fase 2), recomendações reais (Fase 3), `PostGameAnalysis` real (Fase 4) e `GrowthJourney` real (Fase 5). Isso também destrava trocar a lista curada de `FEATURED_CHAMPIONS` (tema visual, ver "Desktop atual") pelo campeão mais jogado de verdade do jogador.
-2. Expandir `ChampionTag` além dos 2 campeões do seed (`data/seeds/champion-tags.json`) — sem bloqueio técnico desde a Fase 3 (o seed já lê o JSON de verdade), é só curadoria manual contínua; o motor de recomendação já tolera ausência, mas mais cobertura melhora a qualidade das recomendações.
-3. Tornar `/drafts/pre-game-analysis` real (hoje 100% estático) — usar `analyzeTeamComposition` (já existe em `packages/core`) com `championTags`/`matchups` reais; motor de geração de texto explicativo ainda por desenhar (a composição por fragmentos da Fase 4, em `packages/core/src/postgame/post-game-analysis.ts`, é um precedente reaproveitável).
-4. Pré-computar/cachear matchups se a latência de `POST /drafts/recommendations` incomodar conforme o histórico crescer (hoje calculado na hora a cada chamada, ver "O que a Fase 3 entregou").
-5. Dicas de objetivos no `PostGameAnalysis` — `objectiveEvents` (Fase 1) não preserva atribuição de time no formato atual (`"LABEL@M:SS"`), precisaria de um `MatchTimelineSummary` mais rico pra saber quais objetivos foram do próprio time.
-6. Fila real (Redis/BullMQ) para o sync, se o padrão de uso mostrar que o teto de 20-50 partidas por chamada síncrona é pouco — o `docker-compose.yml` já provisiona Redis, só falta o worker.
-7. LCU read-only: já implementado o poll de `gameflow-phase` para trocar de aba (ver `docs/riot-compliance.md`); próximo passo é ler `/lol-champ-select/v1/session` (método já existe em `LcuReadOnlyClient.getChampionSelectSession`) para pré-carregar o draft real em vez do modo manual.
-8. Trocar o token HMAC caseiro por algo mais robusto (rotação de segredo, refresh token) se o produto for além do MVP local.
-9. Empacotamento do desktop (electron-builder/NSIS/ASAR) — hoje não existe nenhuma configuração de build de instalador, só `electron-vite build`.
-10. Mitigar a limitação conhecida da Fase 5 (`WeaknessTrend` derivado de um corte top-3 por partida, ver "O que a Fase 5 entregou") lendo razões brutas em vez de só `weaknesses[]`, se o ruído de entrada/saída na fronteira do corte incomodar na prática.
+1. **Fase de temas com skins** (pedida pelo usuário) — trocar `ChampionThemePicker.tsx`/`featured-champion-context.tsx` (12 campeões curados, 1 skin cada) por um fluxo de 2 passos (escolher campeão → escolher skin) com download real pro disco. Desenho de alto nível já registrado em "Fase futura: temas com skins" acima.
+2. Catálogo de campeões pro desktop — resolver `championId` → nome/ícone no Pós-game (hoje mostra só `Campeão #<id>` na lista de partidas porque `RecentChampionMatch` não traz `championName` e não há rota de catálogo exposta ao desktop).
+3. Expandir `ChampionTag` além dos 2 campeões do seed (`data/seeds/champion-tags.json`) — sem bloqueio técnico desde a Fase 3 (o seed já lê o JSON de verdade), é só curadoria manual contínua; o motor de recomendação já tolera ausência, mas mais cobertura melhora a qualidade das recomendações (confirmado na validação desta sessão: o Champion Select real devolveu 0 recomendações pra Zekerus#117 justamente por causa disso, comportamento honesto, não bug).
+4. Tornar `/drafts/pre-game-analysis` real (hoje 100% estático) — usar `analyzeTeamComposition` (já existe em `packages/core`) com `championTags`/`matchups` reais; motor de geração de texto explicativo ainda por desenhar (a composição por fragmentos da Fase 4, em `packages/core/src/postgame/post-game-analysis.ts`, é um precedente reaproveitável).
+5. Pré-computar/cachear matchups se a latência de `POST /drafts/recommendations` incomodar conforme o histórico crescer (hoje calculado na hora a cada chamada, ver "O que a Fase 3 entregou").
+6. Dicas de objetivos no `PostGameAnalysis` — `objectiveEvents` (Fase 1) não preserva atribuição de time no formato atual (`"LABEL@M:SS"`), precisaria de um `MatchTimelineSummary` mais rico pra saber quais objetivos foram do próprio time.
+7. Fila real (Redis/BullMQ) para o sync, se o padrão de uso mostrar que o teto de 20-50 partidas por chamada síncrona é pouco — o `docker-compose.yml` já provisiona Redis, só falta o worker.
+8. LCU read-only: já implementado o poll de `gameflow-phase` para trocar de aba (ver `docs/riot-compliance.md`); próximo passo é ler `/lol-champ-select/v1/session` (método já existe em `LcuReadOnlyClient.getChampionSelectSession`) para pré-carregar o draft real em vez do modo manual.
+9. Trocar o token HMAC caseiro por algo mais robusto (rotação de segredo, refresh token) se o produto for além do MVP local.
+10. Empacotamento do desktop (electron-builder/NSIS/ASAR) — hoje não existe nenhuma configuração de build de instalador, só `electron-vite build`.
+11. Mitigar a limitação conhecida da Fase 5 (`WeaknessTrend` derivado de um corte top-3 por partida, ver "O que a Fase 5 entregou") lendo razões brutas em vez de só `weaknesses[]`, se o ruído de entrada/saída na fronteira do corte incomodar na prática.
 
 ## Verificação conhecida
 
