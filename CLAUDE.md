@@ -4,9 +4,22 @@ Este arquivo é um handoff para outro agente de desenvolvimento continuar o proj
 
 ## Pendências desta sessão (ler primeiro)
 
-Uma sessão anterior fez uma auditoria completa do repositório (real vs mock vs so-tipo), aprovou um plano de evolução em 5 épicos (Riot Sync, Player Intelligence, Draft Intelligence, Post-Game Coach, Growth Journey) e implementou a **Fase 1 inteira (Riot Sync com dados reais)**, além de corrigir bugs de infra (Docker, CI, rate limit da API) e um hardening de segurança. Tudo isso **já está mergeado em `main`** (3 PRs: `fix/api-esm-nodenext-imports`, `fix/security-hardening`, `feat/riot-sync-phase1`). Esta sessão em seguida fez um refinamento visual do desktop (fonte, tema por campeão, animações, remoção de caixa alta — detalhes em "Desktop atual").
+Uma sessão anterior fez uma auditoria completa do repositório (real vs mock vs so-tipo), aprovou um plano de evolução em 5 épicos (Riot Sync, Player Intelligence, Draft Intelligence, Post-Game Coach, Growth Journey) e implementou a **Fase 1 inteira (Riot Sync com dados reais)**, além de corrigir bugs de infra (Docker, CI, rate limit da API) e um hardening de segurança. Em seguida fez um refinamento visual do desktop (fonte, tema por campeão, animações, remoção de caixa alta — detalhes em "Desktop atual") e, nesta sessão, a **Fase 2 inteira (Player Intelligence)**: `strengths`/`weaknesses`/`recentForm` do `PlayerProfile` deixaram de ser vazios/neutros e passaram a ser calculados de verdade a partir do histórico de partidas já persistido pela Fase 1. Tudo isso **já está mergeado em `main`** (4 PRs: `fix/api-esm-nodenext-imports`, `fix/security-hardening`, `feat/riot-sync-phase1`, `feat/desktop-visual-refresh`, mais o PR de Fase 2 abaixo).
 
-### O que a Fase 1 entregou
+### O que a Fase 2 entregou (Player Intelligence)
+
+1. **Novo módulo puro `packages/core/src/aggregation/player-insights.ts`** — `computeRecentForm(history)` (forma recente do jogador entre todos os campeões/roles, não por campeão; compara o bloco das últimas 10 partidas com o bloco imediatamente anterior pra decidir `trend`) e `derivePlayerStrengthsWeaknesses(championStats)` (deriva até 3 pontos fortes e até 3 pontos fracos a partir de 9 dimensões — kda, cs, dano, ouro, visão, kp, objetivos, winrate, mortes — agregadas por média ponderada por jogos entre os campeões elegíveis, com `kp`/`objective` excluindo campeões cujo valor é exatamente 0, já que isso significa "sem dado" (`challenges` ausente da Riot em patches antigos) e não "0% real"). Cada item de `strengths`/`weaknesses`/`recentForm` agora carrega `confidence: Confidence`, calculado com `confidenceFromGames` (movido de privada pra exportada em `champion-performance.ts`, junto com `roleBaselines`/`normalizeInverse`/`clamp`, reaproveitados pelo novo módulo em vez de duplicar a matemática).
+2. **Wiring na API** (`apps/api/src/modules/players/player-stats-repository.ts`): `computeAndPersistPlayerInsights(riotAccountId, puuid)` roda logo após `recomputeChampionStats` no fluxo de sync (`apps/api/src/modules/sync/riot-sync-service.ts`), só quando a rodada trouxe partida nova (`touchedPairs.length > 0` — evita reler o histórico inteiro em todo sync repetido sem partida nova), envolvida em try/catch (uma falha aqui não derruba um sync de partidas que já funcionou). `findPlayerInsightsByPuuid(puuid)` lê o resultado persistido (`PlayerProfile.strengthsJson`/`weaknessesJson`/`recentFormJson`, colunas que já existiam no schema mas nunca eram escritas/lidas) e cai num default neutro honesto se o profile ainda não existir.
+3. **`GET /players/:riotName/:tagLine/profile`** troca o bloco hardcoded (`strengths: []`, `weaknesses: []`, `recentForm` zerado) por dado real via `findPlayerInsightsByPuuid`.
+4. Testes novos em `packages/core/src/aggregation/player-insights.test.ts` (histórico vazio, fronteiras de confiança, detecção de tendência, cortes de sinal/severidade, corte top-3, jogador mono-role, exclusão de kp/objective ausente).
+
+O que ficou deliberadamente fora de escopo (é Fase 3 "Draft Intelligence"/"Post-Game Coach" ou além):
+
+- Persistir os 10 participantes por partida — `POST /drafts/recommendations` continua caindo no mock (`apps/api/src/routes/mock-data.ts`) quando o cliente não manda tudo; matchups reais exigem esse dado.
+- `PostGameAnalysis` continua sem nenhuma função geradora (mesmos tipos `PlayerStrength`/`PlayerWeakness` reaproveitados na Fase 2, mas a análise por partida é item futuro à parte).
+- Conectar o desktop a essas rotas reais de perfil — o renderer ainda usa `features/mock-data.ts` local (que já foi atualizado só o suficiente pra não quebrar o typecheck com o novo campo `confidence`).
+
+### O que a Fase 1 entregou (já em `main`)
 
 Todo mundo que antes retornava os mesmos 2 campeões mockados (Orianna/Ahri) agora usa dado real, sincronizado da Riot API e persistido no Postgres. Validado ponta a ponta contra a conta real Zekerus#117:
 
@@ -17,9 +30,8 @@ Todo mundo que antes retornava os mesmos 2 campeões mockados (Orianna/Ahri) ago
 5. **Agregação real de `PlayerChampionStats`** (`packages/core/src/aggregation/player-champion-stats.ts`) — `PlayerProfile` nunca era criado em lugar nenhum (bloqueador oculto corrigido: create-if-missing no `player-stats-repository.ts`). Média de `killParticipation`/`objectiveParticipation` só sobre partidas que têm o dado.
 6. **As 3 rotas GET de jogador** (`/profile`, `/recent-matches`, `/champion-performance`) trocaram o mock pelas queries reais.
 
-O que ficou deliberadamente fora de escopo (é Fase 2 "Player Intelligence" ou além):
+O que ficou deliberadamente fora de escopo na Fase 1 (o item de strengths/weaknesses/recentForm foi resolvido na Fase 2, ver acima):
 
-- `strengths`/`weaknesses`/`recentForm` do `PlayerProfile` — tipos existem, nenhuma função os calcula ainda.
 - `POST /drafts/recommendations` continua caindo no mock (`apps/api/src/routes/mock-data.ts`) quando o cliente não manda tudo — matchups reais exigiriam persistir os 10 participantes por partida.
 - Fila real (BullMQ/Redis) para o sync — hoje é síncrono, limitado por chamada; documentado como troca deliberada, não definitiva.
 - `PostGameAnalysis` continua sem nenhuma função geradora.
@@ -209,9 +221,9 @@ O arquivo `packages/core/src/types/domain.ts` define os principais contratos:
 - `PlayerStrength`
 - `ReplayImportJob`
 
-`MatchSummary` ganhou `startedAt` (epoch ms do `gameStartTimestamp` real da Riot) — necessário pra ordenar por recência corretamente (a forma recente pondera por índice, então importa saber qual partida é a mais nova). `MatchPerformanceMetrics.killParticipation`/`objectiveParticipation` viraram opcionais (ausentes quando a Riot não manda `challenges`).
+`MatchSummary` ganhou `startedAt` (epoch ms do `gameStartTimestamp` real da Riot) — necessário pra ordenar por recência corretamente (a forma recente pondera por índice, então importa saber qual partida é a mais nova). `MatchPerformanceMetrics.killParticipation`/`objectiveParticipation` viraram opcionais (ausentes quando a Riot não manda `challenges`). `RecentForm`, `PlayerStrength` e `PlayerWeakness` ganharam `confidence: Confidence` (Fase 2).
 
-Novo módulo: `packages/core/src/aggregation/player-champion-stats.ts` (`aggregatePlayerChampionStats`) — puro, agrega histórico de partidas em `PlayerChampionStats`.
+Módulos de agregação: `packages/core/src/aggregation/player-champion-stats.ts` (`aggregatePlayerChampionStats`) — puro, agrega histórico de partidas em `PlayerChampionStats`. `packages/core/src/aggregation/player-insights.ts` (Fase 2) — `computeRecentForm`/`derivePlayerStrengthsWeaknesses`, também puro; reaproveita `confidenceFromGames`/`roleBaselines`/`normalizeInverse`/`clamp` exportados de `champion-performance.ts`.
 
 Priorize evoluir esses tipos antes de duplicar estruturas em API ou desktop.
 
@@ -315,7 +327,7 @@ apps/api/src/modules/sync/            # orquestracao do sync incremental
 apps/api/src/db/api-cache.ts          # helper generico sobre ApiCacheEntry
 ```
 
-`GET /players/:riotName/:tagLine/profile`, `/recent-matches` e `/champion-performance` leem dado real agora (Fase 1, Tarefa 6). `strengths`/`weaknesses`/`recentForm` do perfil ficam vazios/neutros — ninguem calcula isso ainda (Fase 2).
+`GET /players/:riotName/:tagLine/profile`, `/recent-matches` e `/champion-performance` leem dado real (Fase 1, Tarefa 6). Desde a Fase 2, `strengths`/`weaknesses`/`recentForm` do perfil também são reais (`findPlayerInsightsByPuuid`, calculados e persistidos a cada sync via `computeAndPersistPlayerInsights`).
 
 Ainda há mock em:
 
@@ -351,11 +363,11 @@ Tabelas com uso real (Fase 1) vs ainda mock:
 | `Champion` | Real — sincronizado via Data Dragon (`catalog:sync`) |
 | `ChampionTag` | Manual (seed) — Data Dragon nao fornece os atributos de gameplay do Sparta |
 | `Match`, `MatchParticipant`, `MatchTimeline` | Real — persistidos pelo sync incremental |
-| `PlayerProfile`, `PlayerChampionStats` | Real — agregado apos cada sync |
+| `PlayerProfile`, `PlayerChampionStats` | Real — agregado apos cada sync; `strengthsJson`/`weaknessesJson`/`recentFormJson` tambem reais desde a Fase 2 |
 | `ApiCacheEntry` | Real — cache de Account-V1 (24h) e Data Dragon (7 dias) |
-| `DraftSession`, `PickRecommendation`, `PostgameReport`, `ReplayImportJob` | Ainda sem nenhum codigo que leia/escreva — fora do escopo da Fase 1 |
+| `DraftSession`, `PickRecommendation`, `PostgameReport`, `ReplayImportJob` | Ainda sem nenhum codigo que leia/escreva |
 
-Próximo passo natural: Fase 2 (Player Intelligence) precisa persistir `strengths`/`weaknesses`/`RecentForm` calculados, e eventualmente os 10 participantes por partida (hoje so o jogador rastreado é persistido) pra matchups reais.
+Próximo passo natural: persistir os 10 participantes por partida (hoje so o jogador rastreado é persistido) pra matchups reais em `/drafts/recommendations`.
 
 ## Desktop atual
 
@@ -462,17 +474,16 @@ Não usar force push sem pedido explícito.
 
 ## Próximos passos recomendados
 
-Fase 1 (Riot Sync com dados reais) e as 3 branches pendentes (`fix/api-esm-nodenext-imports`, `fix/security-hardening`, `feat/riot-sync-phase1`) já foram mergeadas em `main`. Um refinamento visual do desktop (fonte, tema por campeão, animações — ver "Desktop atual") também já foi feito. Próximo:
+Fase 1 (Riot Sync), o refinamento visual do desktop e Fase 2 (Player Intelligence) estão todos completos em `main` — ver "Pendências desta sessão" no topo. Próximo:
 
-1. **Fase 2 (Player Intelligence)**: calcular `strengths`/`weaknesses`/`RecentForm` de verdade a partir do histórico já persistido (hoje ficam vazios/neutros nas rotas de perfil). Reaproveitar/generalizar `confidenceFromGames` (hoje privada em `champion-performance.ts`) pra indicar confiança dessas novas análises também.
-2. Persistir os 10 participantes por partida (hoje só o jogador rastreado é gravado) — necessário pra matchups reais e composição de time real em `/drafts/recommendations` (que hoje cai no mock quando o cliente não manda tudo).
-3. Expandir `ChampionTag` além do seed manual de 2 campeões — o motor de recomendação já tolera ausência, mas mais cobertura melhora a qualidade das recomendações.
-4. Conectar o desktop às rotas de perfil/drafts/pós-game (hoje só auth usa a API real; o resto ainda usa `features/mock-data.ts` local no renderer). Isso também destrava trocar a lista curada de `FEATURED_CHAMPIONS` (tema visual, ver "Desktop atual") pelo campeão mais jogado de verdade do jogador.
-5. Implementar `PostGameAnalysis` de verdade (tipo existe, nenhuma função o preenche) — agora que `MatchTimeline` tem dado real (mortes antes de 10/15min, CS, gold diff, objetivos).
-6. Fila real (Redis/BullMQ) para o sync, se o padrão de uso mostrar que o teto de 20-50 partidas por chamada síncrona é pouco — o `docker-compose.yml` já provisiona Redis, só falta o worker.
-7. LCU read-only: já implementado o poll de `gameflow-phase` para trocar de aba (ver `docs/riot-compliance.md`); próximo passo é ler `/lol-champ-select/v1/session` (método já existe em `LcuReadOnlyClient.getChampionSelectSession`) para pré-carregar o draft real em vez do modo manual.
-8. Trocar o token HMAC caseiro por algo mais robusto (rotação de segredo, refresh token) se o produto for além do MVP local.
-9. Empacotamento do desktop (electron-builder/NSIS/ASAR) — hoje não existe nenhuma configuração de build de instalador, só `electron-vite build`.
+1. Persistir os 10 participantes por partida (hoje só o jogador rastreado é gravado) — necessário pra matchups reais e composição de time real em `/drafts/recommendations` (que hoje cai no mock quando o cliente não manda tudo).
+2. Expandir `ChampionTag` além do seed manual de 2 campeões — o motor de recomendação já tolera ausência, mas mais cobertura melhora a qualidade das recomendações.
+3. Conectar o desktop às rotas de perfil/drafts/pós-game (hoje só auth usa a API real; o resto ainda usa `features/mock-data.ts` local no renderer) — inclui os novos `strengths`/`weaknesses`/`recentForm` reais da Fase 2. Isso também destrava trocar a lista curada de `FEATURED_CHAMPIONS` (tema visual, ver "Desktop atual") pelo campeão mais jogado de verdade do jogador.
+4. Implementar `PostGameAnalysis` de verdade (tipo existe, nenhuma função o preenche) — agora que `MatchTimeline` tem dado real (mortes antes de 10/15min, CS, gold diff, objetivos).
+5. Fila real (Redis/BullMQ) para o sync, se o padrão de uso mostrar que o teto de 20-50 partidas por chamada síncrona é pouco — o `docker-compose.yml` já provisiona Redis, só falta o worker.
+6. LCU read-only: já implementado o poll de `gameflow-phase` para trocar de aba (ver `docs/riot-compliance.md`); próximo passo é ler `/lol-champ-select/v1/session` (método já existe em `LcuReadOnlyClient.getChampionSelectSession`) para pré-carregar o draft real em vez do modo manual.
+7. Trocar o token HMAC caseiro por algo mais robusto (rotação de segredo, refresh token) se o produto for além do MVP local.
+8. Empacotamento do desktop (electron-builder/NSIS/ASAR) — hoje não existe nenhuma configuração de build de instalador, só `electron-vite build`.
 
 ## Verificação conhecida
 

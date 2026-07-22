@@ -83,6 +83,7 @@ export interface RecentForm {
   last20Score: number;
   last50Score: number;
   trend: "improving" | "stable" | "declining";
+  confidence: Confidence;
 }
 
 export interface MatchSummary {
@@ -224,12 +225,14 @@ export interface PlayerWeakness {
   label: string;
   detail: string;
   severity: "low" | "medium" | "high";
+  confidence: Confidence;
 }
 
 export interface PlayerStrength {
   code: string;
   label: string;
   detail: string;
+  confidence: Confidence;
 }
 
 export interface ReplayImportJob {

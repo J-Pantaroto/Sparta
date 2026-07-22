@@ -1,5 +1,15 @@
 import type { Prisma } from "@prisma/client";
-import { aggregatePlayerChampionStats, type PlayerChampionStats, type RecentChampionMatch, type Role } from "@sparta/core";
+import {
+  aggregatePlayerChampionStats,
+  computeRecentForm,
+  derivePlayerStrengthsWeaknesses,
+  type PlayerChampionStats,
+  type PlayerStrength,
+  type PlayerWeakness,
+  type RecentChampionMatch,
+  type RecentForm,
+  type Role
+} from "@sparta/core";
 import { prisma } from "../../db/prisma.js";
 import { findParticipationHistory } from "../matches/match-repository.js";
 
@@ -8,7 +18,7 @@ import { findParticipationHistory } from "../matches/match-repository.js";
  * tarefa - a FK de PlayerChampionStats exige uma linha aqui, entao criamos
  * (se nao existir) sempre que formos recalcular stats.
  */
-async function ensurePlayerProfile(riotAccountId: string): Promise<string> {
+export async function ensurePlayerProfile(riotAccountId: string): Promise<string> {
   const profile = await prisma.playerProfile.upsert({
     where: { riotAccountId },
     update: {},
@@ -85,6 +95,66 @@ export async function recomputeChampionStats(
       }
     });
   }
+}
+
+const neutralRecentForm: RecentForm = {
+  last10Score: 50,
+  last20Score: 50,
+  last50Score: 50,
+  trend: "stable",
+  confidence: "low"
+};
+
+function isComputedRecentForm(value: unknown): value is RecentForm {
+  return typeof value === "object" && value !== null && "trend" in value;
+}
+
+/**
+ * Calcula e persiste strengths/weaknesses/recentForm reais do jogador
+ * (Fase 2 - Player Intelligence), a partir do historico e das
+ * PlayerChampionStats ja persistidos. Chamada logo apos
+ * recomputeChampionStats no fluxo de sync - ensurePlayerProfile e
+ * idempotente, entao esta funcao e segura de chamar independente da ordem.
+ */
+export async function computeAndPersistPlayerInsights(riotAccountId: string, puuid: string): Promise<void> {
+  await ensurePlayerProfile(riotAccountId);
+
+  const history = await findParticipationHistory(puuid);
+  const recentForm = computeRecentForm(history.map((entry) => ({ ...entry, role: entry.role as Role })));
+
+  const championStats = await findChampionStatsByPuuid(puuid);
+  const { strengths, weaknesses } = derivePlayerStrengthsWeaknesses(championStats);
+
+  await prisma.playerProfile.update({
+    where: { riotAccountId },
+    data: {
+      strengthsJson: strengths as unknown as Prisma.InputJsonValue,
+      weaknessesJson: weaknesses as unknown as Prisma.InputJsonValue,
+      recentFormJson: recentForm as unknown as Prisma.InputJsonValue
+    }
+  });
+}
+
+/**
+ * Le strengths/weaknesses/recentForm persistidos (Fase 2). Sem profile
+ * ainda, ou recentFormJson no valor-default "{}" (nunca calculado) -> volta
+ * um resultado neutro em vez de inventar uma avaliacao.
+ */
+export async function findPlayerInsightsByPuuid(
+  puuid: string
+): Promise<{ strengths: PlayerStrength[]; weaknesses: PlayerWeakness[]; recentForm: RecentForm }> {
+  const account = await prisma.riotAccount.findUnique({ where: { puuid }, include: { profile: true } });
+  if (!account?.profile) {
+    return { strengths: [], weaknesses: [], recentForm: neutralRecentForm };
+  }
+
+  return {
+    strengths: (account.profile.strengthsJson as unknown as PlayerStrength[] | null) ?? [],
+    weaknesses: (account.profile.weaknessesJson as unknown as PlayerWeakness[] | null) ?? [],
+    recentForm: isComputedRecentForm(account.profile.recentFormJson)
+      ? (account.profile.recentFormJson as unknown as RecentForm)
+      : neutralRecentForm
+  };
 }
 
 export interface RiotAccountLookup {

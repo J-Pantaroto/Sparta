@@ -54,7 +54,7 @@ const player: PlayerProfile = {
   championStats,
   strengths: [],
   weaknesses: [],
-  recentForm: { last10Score: 65, last20Score: 62, last50Score: 60, trend: "stable" }
+  recentForm: { last10Score: 65, last20Score: 62, last50Score: 60, trend: "stable", confidence: "medium" }
 };
 
 describe("recommendation engine", () => {

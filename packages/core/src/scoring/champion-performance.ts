@@ -11,7 +11,7 @@ export interface ChampionPerformanceScore {
   components: Record<string, number>;
 }
 
-const roleBaselines: Record<Role, Record<string, number>> = {
+export const roleBaselines: Record<Role, Record<string, number>> = {
   TOP: { kda: 3.2, cs: 7.5, damage: 700, gold: 420, vision: 0.8, kp: 0.5, objective: 0.35 },
   JUNGLE: { kda: 3.5, cs: 5.8, damage: 560, gold: 390, vision: 1.0, kp: 0.62, objective: 0.62 },
   MID: { kda: 3.4, cs: 7.7, damage: 760, gold: 430, vision: 0.85, kp: 0.56, objective: 0.38 },
@@ -106,7 +106,7 @@ export function rankChampionPool(stats: PlayerChampionStats[]): ChampionPerforma
     .sort((a, b) => b.score - a.score);
 }
 
-function confidenceFromGames(games: number): Confidence {
+export function confidenceFromGames(games: number): Confidence {
   if (games >= 20) return "high";
   if (games >= 8) return "medium";
   return "low";
@@ -117,11 +117,11 @@ function normalizeRatio(value: number, expected: number): number {
   return clamp((value / expected) * 75);
 }
 
-function normalizeInverse(value: number, badValue: number): number {
+export function normalizeInverse(value: number, badValue: number): number {
   return clamp(100 - (value / badValue) * 100);
 }
 
-function clamp(value: number, min = 0, max = 100): number {
+export function clamp(value: number, min = 0, max = 100): number {
   return Math.max(min, Math.min(max, value));
 }
 

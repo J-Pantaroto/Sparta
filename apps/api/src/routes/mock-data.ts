@@ -92,7 +92,17 @@ export const mockPlayerProfile: PlayerProfile = {
   },
   preferredRoles: ["MID"],
   championStats: mockChampionStats,
-  strengths: [{ code: "farm", label: "Bom controle de farm", detail: "CS/min acima da baseline em magos de controle." }],
-  weaknesses: [{ code: "early_deaths", label: "Mortes cedo", detail: "Acompanhar mortes antes de 10 minutos.", severity: "medium" }],
-  recentForm: { last10Score: 66, last20Score: 63, last50Score: 61, trend: "stable" }
+  strengths: [
+    { code: "farm", label: "Bom controle de farm", detail: "CS/min acima da baseline em magos de controle.", confidence: "medium" }
+  ],
+  weaknesses: [
+    {
+      code: "early_deaths",
+      label: "Mortes cedo",
+      detail: "Acompanhar mortes antes de 10 minutos.",
+      severity: "medium",
+      confidence: "medium"
+    }
+  ],
+  recentForm: { last10Score: 66, last20Score: 63, last50Score: 61, trend: "stable", confidence: "medium" }
 };

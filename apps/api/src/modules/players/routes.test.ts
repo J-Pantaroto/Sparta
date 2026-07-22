@@ -1,14 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { findRiotAccountByRiotIdMock, findChampionStatsByPuuidMock, findParticipationHistoryMock } = vi.hoisted(() => ({
+const {
+  findRiotAccountByRiotIdMock,
+  findChampionStatsByPuuidMock,
+  findPlayerInsightsByPuuidMock,
+  findParticipationHistoryMock
+} = vi.hoisted(() => ({
   findRiotAccountByRiotIdMock: vi.fn(),
   findChampionStatsByPuuidMock: vi.fn(),
+  findPlayerInsightsByPuuidMock: vi.fn(),
   findParticipationHistoryMock: vi.fn()
 }));
 
 vi.mock("./player-stats-repository.js", () => ({
   findRiotAccountByRiotId: findRiotAccountByRiotIdMock,
   findChampionStatsByPuuid: findChampionStatsByPuuidMock,
+  findPlayerInsightsByPuuid: findPlayerInsightsByPuuidMock,
   derivePreferredRoles: (stats: { role: string }[]) => Array.from(new Set(stats.map((entry) => entry.role)))
 }));
 
@@ -60,6 +67,11 @@ describe("players routes", () => {
         recentMatches: []
       }
     ]);
+    findPlayerInsightsByPuuidMock.mockResolvedValue({
+      strengths: [],
+      weaknesses: [],
+      recentForm: { last10Score: 50, last20Score: 50, last50Score: 50, trend: "stable", confidence: "low" }
+    });
     const app = await buildApp();
 
     const response = await app.inject({ method: "GET", url: "/players/Zekerus/117/profile" });
@@ -69,6 +81,7 @@ describe("players routes", () => {
     expect(body.id).toBe("puuid-1");
     expect(body.championStats).toHaveLength(1);
     expect(body.preferredRoles).toEqual(["MID"]);
+    expect(body.recentForm.confidence).toBe("low");
     await app.close();
   });
 
