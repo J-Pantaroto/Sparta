@@ -40,12 +40,13 @@ export interface ChampionRolePair {
 export async function recomputeChampionStats(
   riotAccountId: string,
   puuid: string,
-  touchedPairs: ChampionRolePair[]
+  touchedPairs: ChampionRolePair[],
+  matchAnalysisLimit?: number
 ): Promise<void> {
   if (touchedPairs.length === 0) return;
 
   const playerProfileId = await ensurePlayerProfile(riotAccountId);
-  const history = await findParticipationHistory(puuid);
+  const history = await findParticipationHistory(puuid, matchAnalysisLimit);
 
   const uniquePairs = Array.from(
     new Map(touchedPairs.map((pair) => [`${pair.championId}:${pair.role}`, pair])).values()
@@ -116,10 +117,14 @@ function isComputedRecentForm(value: unknown): value is RecentForm {
  * recomputeChampionStats no fluxo de sync - ensurePlayerProfile e
  * idempotente, entao esta funcao e segura de chamar independente da ordem.
  */
-export async function computeAndPersistPlayerInsights(riotAccountId: string, puuid: string): Promise<void> {
+export async function computeAndPersistPlayerInsights(
+  riotAccountId: string,
+  puuid: string,
+  matchAnalysisLimit?: number
+): Promise<void> {
   await ensurePlayerProfile(riotAccountId);
 
-  const history = await findParticipationHistory(puuid);
+  const history = await findParticipationHistory(puuid, matchAnalysisLimit);
   const recentForm = computeRecentForm(history.map((entry) => ({ ...entry, role: entry.role as Role })));
 
   const championStats = await findChampionStatsByPuuid(puuid);
@@ -155,6 +160,31 @@ export async function findPlayerInsightsByPuuid(
       ? (account.profile.recentFormJson as unknown as RecentForm)
       : neutralRecentForm
   };
+}
+
+const DEFAULT_MATCH_ANALYSIS_LIMIT = 50;
+export const MIN_MATCH_ANALYSIS_LIMIT = 1;
+export const MAX_MATCH_ANALYSIS_LIMIT = 200;
+
+/**
+ * Configuracao pessoal "quantas partidas o Sparta deve analisar" (Fase 6b).
+ * Sem profile ainda -> default honesto (50), mesmo padrao neutro de
+ * findPlayerInsightsByPuuid. Publica por puuid (sem auth) porque Growth
+ * Journey tambem e publica por puuid - nao precisa de userId aqui.
+ */
+export async function findMatchAnalysisLimitByPuuid(puuid: string): Promise<number> {
+  const account = await prisma.riotAccount.findUnique({ where: { puuid }, include: { profile: true } });
+  return account?.profile?.matchAnalysisLimit ?? DEFAULT_MATCH_ANALYSIS_LIMIT;
+}
+
+/**
+ * Atualiza a configuracao e garante que o profile exista (usuario pode
+ * ainda nao ter sincronizado nada). Clamping [1,200] e responsabilidade do
+ * chamador (validacao via zod na rota) - aqui so persiste o valor.
+ */
+export async function setMatchAnalysisLimit(riotAccountId: string, matchAnalysisLimit: number): Promise<void> {
+  await ensurePlayerProfile(riotAccountId);
+  await prisma.playerProfile.update({ where: { riotAccountId }, data: { matchAnalysisLimit } });
 }
 
 export interface RiotAccountLookup {

@@ -139,3 +139,17 @@ export function fetchPostgameReport(token: string, matchId: string) {
     headers: { Authorization: `Bearer ${token}` }
   });
 }
+
+export function fetchSettings(token: string) {
+  return request<{ matchAnalysisLimit: number }>("/players/settings", {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
+export function updateSettings(token: string, matchAnalysisLimit: number) {
+  return request<{ matchAnalysisLimit: number }>("/players/settings", {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ matchAnalysisLimit })
+  });
+}

@@ -34,4 +34,17 @@ describe("findPostgameReportsByPuuid", () => {
 
     expect(result).toEqual([reportA, reportB]);
   });
+
+  it("restringe aos N relatorios mais recentes quando limit e informado (Fase 6b)", async () => {
+    postgameReportFindManyMock.mockResolvedValue([]);
+
+    await findPostgameReportsByPuuid("puuid-1", 20);
+
+    expect(postgameReportFindManyMock).toHaveBeenCalledWith({
+      where: { puuid: "puuid-1", match: { startedAt: { not: null } } },
+      include: { match: true },
+      orderBy: { match: { startedAt: "desc" } },
+      take: 20
+    });
+  });
 });
