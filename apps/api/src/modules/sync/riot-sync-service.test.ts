@@ -114,7 +114,7 @@ describe("syncPlayerMatches", () => {
     findExistingMatchIdsMock.mockResolvedValue(new Set(["m1", "m2"]));
     getMatchMock.mockResolvedValue(rawMatch("m3"));
     getMatchTimelineMock.mockResolvedValue(rawTimeline("m3"));
-    persistMatchMock.mockResolvedValue(undefined);
+    persistMatchMock.mockResolvedValue({ skippedParticipantPuuids: [] });
 
     const result = await syncPlayerMatches(player);
 
@@ -131,7 +131,7 @@ describe("syncPlayerMatches", () => {
     findExistingMatchIdsMock.mockResolvedValue(new Set());
     getMatchMock.mockResolvedValue(rawMatch("m1"));
     getMatchTimelineMock.mockResolvedValue(rawTimeline("m1"));
-    persistMatchMock.mockResolvedValue(undefined);
+    persistMatchMock.mockResolvedValue({ skippedParticipantPuuids: [] });
 
     await syncPlayerMatches(player);
 
@@ -145,7 +145,9 @@ describe("syncPlayerMatches", () => {
     findExistingMatchIdsMock.mockResolvedValue(new Set());
     getMatchMock.mockResolvedValueOnce(rawMatch("m1")).mockResolvedValueOnce(rawMatch("m2"));
     getMatchTimelineMock.mockResolvedValue(rawTimeline("irrelevant"));
-    persistMatchMock.mockRejectedValueOnce(new Error("Foreign key violation: championId")).mockResolvedValueOnce(undefined);
+    persistMatchMock
+      .mockRejectedValueOnce(new Error("Foreign key violation: championId"))
+      .mockResolvedValueOnce({ skippedParticipantPuuids: [] });
 
     const result = await syncPlayerMatches(player);
 
@@ -167,12 +169,46 @@ describe("syncPlayerMatches", () => {
     expect(getMatchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("persiste todos os participantes da partida (zipados com o teamId), nao so o jogador rastreado", async () => {
+    getMatchIdsByPuuidMock.mockResolvedValue(["m1"]);
+    findExistingMatchIdsMock.mockResolvedValue(new Set());
+    getMatchMock.mockResolvedValue(rawMatch("m1"));
+    getMatchTimelineMock.mockResolvedValue(rawTimeline("m1"));
+    persistMatchMock.mockResolvedValue({ skippedParticipantPuuids: [] });
+
+    await syncPlayerMatches(player);
+
+    expect(persistMatchMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        trackedPuuid: PUUID,
+        participants: expect.arrayContaining([
+          expect.objectContaining({ teamId: 100, summary: expect.objectContaining({ puuid: PUUID, championId: 61 }) }),
+          expect.objectContaining({ teamId: 200, summary: expect.objectContaining({ puuid: "puuid-enemy", championId: 157 }) })
+        ])
+      })
+    );
+    const call = persistMatchMock.mock.calls[0][0];
+    expect(call.participants).toHaveLength(2);
+  });
+
+  it("propaga participantes pulados (campeao ainda fora do catalogo) no resultado do sync", async () => {
+    getMatchIdsByPuuidMock.mockResolvedValue(["m1"]);
+    findExistingMatchIdsMock.mockResolvedValue(new Set());
+    getMatchMock.mockResolvedValue(rawMatch("m1"));
+    getMatchTimelineMock.mockResolvedValue(rawTimeline("m1"));
+    persistMatchMock.mockResolvedValue({ skippedParticipantPuuids: ["puuid-enemy"] });
+
+    const result = await syncPlayerMatches(player);
+
+    expect(result.skippedParticipants).toEqual([{ matchId: "m1", puuid: "puuid-enemy" }]);
+  });
+
   it("marca stoppedEarly max_reached quando ha mais partidas novas do que o teto configurado", async () => {
     getMatchIdsByPuuidMock.mockResolvedValue(["m1", "m2", "m3"]);
     findExistingMatchIdsMock.mockResolvedValue(new Set());
     getMatchMock.mockImplementation((matchId: string) => Promise.resolve(rawMatch(matchId)));
     getMatchTimelineMock.mockImplementation((matchId: string) => Promise.resolve(rawTimeline(matchId)));
-    persistMatchMock.mockResolvedValue(undefined);
+    persistMatchMock.mockResolvedValue({ skippedParticipantPuuids: [] });
 
     const result = await syncPlayerMatches(player, { maxNewMatches: 2 });
 

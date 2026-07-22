@@ -8,7 +8,7 @@ import {
   type RiotMatchTimelineDto
 } from "@sparta/riot";
 import { getRiotApiClient } from "../riot-integration/client-factory.js";
-import { findExistingMatchIds, persistMatch } from "../matches/match-repository.js";
+import { findExistingMatchIds, persistMatch, type ParticipantToPersist } from "../matches/match-repository.js";
 import {
   computeAndPersistPlayerInsights,
   recomputeChampionStats,
@@ -20,11 +20,17 @@ export interface SyncFailure {
   reason: string;
 }
 
+export interface SkippedParticipant {
+  matchId: string;
+  puuid: string;
+}
+
 export interface SyncResult {
   requested: number;
   imported: number;
   skippedExisting: number;
   failed: SyncFailure[];
+  skippedParticipants: SkippedParticipant[];
   stoppedEarly?: "rate_limited" | "max_reached";
 }
 
@@ -63,7 +69,8 @@ export async function syncPlayerMatches(
     requested: matchIds.length,
     imported: 0,
     skippedExisting: existing.size,
-    failed: []
+    failed: [],
+    skippedParticipants: []
   };
   const touchedPairs: ChampionRolePair[] = [];
 
@@ -74,7 +81,8 @@ export async function syncPlayerMatches(
 
       const teams = extractParticipantTeams(rawMatch);
       const participantTeam = teams.find((team) => team.puuid === player.puuid);
-      const summary = mapMatchToSummaries(rawMatch).find((entry) => entry.puuid === player.puuid);
+      const summaries = mapMatchToSummaries(rawMatch);
+      const summary = summaries.find((entry) => entry.puuid === player.puuid);
 
       if (!participantTeam || !summary) {
         result.failed.push({ matchId, reason: "Puuid do jogador nao encontrado entre os participantes da partida." });
@@ -83,13 +91,26 @@ export async function syncPlayerMatches(
 
       const timeline = mapTimelineToSummary(rawTimeline, participantTeam.participantId, teams);
 
-      await persistMatch({
-        riotAccountId: player.riotAccountId,
+      // Zipa os 10 MatchSummary com o teamId correspondente (mesmo puuid) -
+      // participante sem par nos dois lados (nao deveria acontecer, mas a
+      // Riot as vezes tem inconsistencias) fica de fora em vez de gravar
+      // dado incompleto/inventado.
+      const participants: ParticipantToPersist[] = summaries.flatMap((entrySummary) => {
+        const team = teams.find((entry) => entry.puuid === entrySummary.puuid);
+        return team ? [{ summary: entrySummary, teamId: team.teamId }] : [];
+      });
+
+      const persistResult = await persistMatch({
         platform: player.platformRegion,
-        summary,
+        trackedPuuid: player.puuid,
+        participants,
         timeline,
         rawMatch: rawMatch as unknown as Prisma.InputJsonValue
       });
+
+      for (const puuid of persistResult.skippedParticipantPuuids) {
+        result.skippedParticipants.push({ matchId, puuid });
+      }
 
       touchedPairs.push({ championId: summary.championId, role: summary.role });
       result.imported += 1;

@@ -87,6 +87,15 @@ export const playersRoutes: FastifyPluginAsync = async (app) => {
       });
     }
 
+    for (const skipped of result.skippedParticipants) {
+      request.log.warn({
+        event: "riot_sync_participant_skipped",
+        matchId: skipped.matchId,
+        puuid: skipped.puuid,
+        reason: "Campeao ainda nao esta no catalogo (catalog:sync desatualizado)."
+      });
+    }
+
     return result;
   });
 
