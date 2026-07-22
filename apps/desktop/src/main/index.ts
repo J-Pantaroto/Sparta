@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain } from "electron";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { LcuReadOnlyClient, type LcuGameflowPhase } from "@sparta/riot";
+import { derivePickOrder, LcuReadOnlyClient, type LcuGameflowPhase } from "@sparta/riot";
 
 const GAMEFLOW_POLL_INTERVAL_MS = 2500;
 
@@ -51,21 +51,46 @@ function createWindow() {
 }
 
 /**
- * Poll local e somente leitura do gameflow do cliente League of Legends.
- * Usado apenas para avisar a renderer quando o jogador entra em champion
- * select, para trocar a aba automaticamente. Nao envia nenhuma acao ao
- * cliente (ver docs/riot-compliance.md e packages/riot/src/lcu).
+ * Poll local e somente leitura do gameflow e (quando em champion select) da
+ * ordem de pick do cliente League of Legends. Usado apenas para refletir
+ * estado na UI do Sparta (trocar de aba, mostrar a ordem de pick real em
+ * vez do input manual). Nao envia nenhuma acao ao cliente (ver
+ * docs/riot-compliance.md e packages/riot/src/lcu).
  */
 function startGameflowWatcher() {
   const client = new LcuReadOnlyClient();
   let lastPhase: LcuGameflowPhase | null = null;
+  let lastPickOrder: number | null = null;
+
+  function broadcast(channel: string, payload: unknown) {
+    for (const window of BrowserWindow.getAllWindows()) {
+      window.webContents.send(channel, payload);
+    }
+  }
 
   setInterval(() => {
-    void client.getGameflowPhase().then((phase) => {
-      if (phase === lastPhase) return;
-      lastPhase = phase;
-      for (const window of BrowserWindow.getAllWindows()) {
-        window.webContents.send("sparta:gameflow-phase", phase);
+    void client.getGameflowPhase().then(async (phase) => {
+      if (phase !== lastPhase) {
+        lastPhase = phase;
+        broadcast("sparta:gameflow-phase", phase);
+      }
+
+      if (phase !== "ChampSelect") {
+        if (lastPickOrder !== null) {
+          lastPickOrder = null;
+          broadcast("sparta:pick-order", null);
+        }
+        return;
+      }
+
+      const snapshot = await client.getChampionSelectSession();
+      // sessionExists pode piscar false momentaneamente durante a transicao
+      // pra ChampSelect - mantem o ultimo valor conhecido em vez de resetar
+      // pro manual a toa; derivePickOrder ja volta undefined nesse caso.
+      const pickOrder = derivePickOrder(snapshot) ?? lastPickOrder;
+      if (pickOrder !== lastPickOrder) {
+        lastPickOrder = pickOrder ?? null;
+        broadcast("sparta:pick-order", lastPickOrder);
       }
     });
   }, GAMEFLOW_POLL_INTERVAL_MS);

@@ -2,6 +2,7 @@ export * from "./clients/riot-api-client.js";
 export * from "./datadragon/client.js";
 export * from "./errors/riot-api-error.js";
 export * from "./lcu/read-only-client.js";
+export * from "./lcu/pick-order.js";
 export * from "./mappers/match-mapper.js";
 export * from "./mappers/timeline-mapper.js";
 export * from "./rate-limit/backoff.js";

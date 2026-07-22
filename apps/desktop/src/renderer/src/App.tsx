@@ -103,6 +103,21 @@ function AppShell() {
     return unsubscribe;
   }, [sessionStatus]);
 
+  // Ordem de pick real (derivada da sessao do LCU), quando disponivel -
+  // substitui o input manual. null fora do champion select ou sem cliente
+  // do League real (dev/testing) - o input manual continua funcionando.
+  const [autoPickOrder, setAutoPickOrder] = useState<number | null>(null);
+  useEffect(() => {
+    if (sessionStatus !== "ready" || !window.sparta?.onPickOrder) return;
+    const unsubscribe = window.sparta.onPickOrder(setAutoPickOrder);
+    return unsubscribe;
+  }, [sessionStatus]);
+
+  useEffect(() => {
+    if (autoPickOrder === null) return;
+    setDraft((current) => (current.pickOrder === autoPickOrder ? current : { ...current, pickOrder: autoPickOrder }));
+  }, [autoPickOrder]);
+
   function handleAuthenticated(token: string) {
     localStorage.setItem(SESSION_TOKEN_KEY, token);
     setSessionToken(token);
@@ -179,6 +194,7 @@ function AppShell() {
           <ChampionSelect
             draft={draft}
             setDraft={setDraft}
+            autoPickOrder={autoPickOrder}
             recommendations={recommendationsQuery.data ?? []}
             recommendationsStatus={recommendationsQuery.status}
             noAccountLinked={riotAccounts.length === 0}
@@ -308,6 +324,7 @@ function Profile({ riotAccounts, ddragonVersion }: { riotAccounts: RiotAccountSu
 function ChampionSelect({
   draft,
   setDraft,
+  autoPickOrder,
   recommendations,
   recommendationsStatus,
   noAccountLinked,
@@ -315,6 +332,7 @@ function ChampionSelect({
 }: {
   draft: DraftState;
   setDraft: (draft: DraftState) => void;
+  autoPickOrder: number | null;
   recommendations: PickRecommendation[];
   recommendationsStatus: string;
   noAccountLinked: boolean;
@@ -323,23 +341,30 @@ function ChampionSelect({
   return (
     <>
       <header className="page-header compact">
-        <span>Modo manual</span>
+        <span>{autoPickOrder !== null ? "Detectado via League Client" : "Modo manual"}</span>
         <h1>Champion Select</h1>
       </header>
       {noAccountLinked && (
         <p>Sem conta Riot vinculada - as recomendações abaixo usam só a referência geral do papel, não seu histórico.</p>
       )}
       <section className="draft-controls">
-        <label>
-          Pick order
-          <input
-            min={1}
-            max={5}
-            type="number"
-            value={draft.pickOrder}
-            onChange={(event) => setDraft({ ...draft, pickOrder: Number(event.target.value) })}
-          />
-        </label>
+        {autoPickOrder !== null ? (
+          <label>
+            Pick order
+            <strong style={{ display: "block" }}>{autoPickOrder}</strong>
+          </label>
+        ) : (
+          <label>
+            Pick order
+            <input
+              min={1}
+              max={5}
+              type="number"
+              value={draft.pickOrder}
+              onChange={(event) => setDraft({ ...draft, pickOrder: Number(event.target.value) })}
+            />
+          </label>
+        )}
         <button
           onClick={() =>
             setDraft({
