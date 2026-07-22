@@ -7,6 +7,7 @@ WORKDIR /app
 COPY package.json pnpm-workspace.yaml tsconfig.base.json tsconfig.node.json eslint.config.js ./
 COPY packages ./packages
 COPY apps/api ./apps/api
+COPY data ./data
 RUN pnpm install --frozen-lockfile=false
 RUN pnpm --filter @sparta/api prisma:generate
 RUN pnpm --filter "@sparta/api..." build

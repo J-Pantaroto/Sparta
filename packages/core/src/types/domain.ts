@@ -167,6 +167,7 @@ export interface MatchupData {
   role: Role;
   score: number;
   sampleSize?: number;
+  confidence: Confidence;
 }
 
 export interface CompositionRules {

@@ -1,4 +1,5 @@
 import { fetchDataDragonChampions, fetchDataDragonVersions, type DataDragonChampion } from "@sparta/riot";
+import type { ChampionTag, DamageProfile, Role } from "@sparta/core";
 import { prisma } from "../../db/prisma.js";
 import { getCached, setCached } from "../../db/api-cache.js";
 
@@ -57,4 +58,31 @@ export async function syncChampionCatalog(): Promise<{ version: string; count: n
   }
 
   return { version, count: champions.length };
+}
+
+/**
+ * Todos os ChampionTag persistidos (join com Champion pro nome/roles reais
+ * do catalogo). Hoje so cobre os campeoes do seed manual
+ * (data/seeds/champion-tags.json) - o motor de recomendacao ja tolera
+ * campeoes sem tag (fica com valores neutros).
+ */
+export async function findAllChampionTags(): Promise<ChampionTag[]> {
+  const rows = await prisma.championTag.findMany({ include: { champion: true } });
+
+  return rows.map((row) => ({
+    championId: row.championId,
+    championName: row.champion.name,
+    roles: row.champion.roles as Role[],
+    damageProfile: row.damageProfile as DamageProfile,
+    tags: row.tags,
+    blindSafety: row.blindSafety,
+    difficulty: row.difficulty,
+    engage: row.engage,
+    peel: row.peel,
+    frontline: row.frontline,
+    pickoff: row.pickoff,
+    waveclear: row.waveclear,
+    scaling: row.scaling,
+    earlyPressure: row.earlyPressure
+  }));
 }

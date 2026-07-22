@@ -98,6 +98,7 @@ model MatchParticipant {
   puuid                 String
   championId            Int
   role                  String
+  teamId                Int?
   won                   Boolean
   kills                 Int
   deaths                Int
@@ -112,6 +113,7 @@ model MatchParticipant {
   riotAccount           RiotAccount? @relation(fields: [riotAccountId], references: [id])
   champion              Champion @relation(fields: [championId], references: [id])
 
+  @@unique([matchId, puuid])
   @@index([puuid])
   @@index([championId])
 }

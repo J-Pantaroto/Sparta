@@ -13,7 +13,8 @@
     "prisma:generate": "prisma generate --schema prisma/schema.prisma",
     "prisma:migrate": "prisma migrate dev --schema prisma/schema.prisma",
     "prisma:seed": "tsx prisma/seed.ts",
-    "catalog:sync": "tsx src/modules/catalog/sync-catalog-cli.ts"
+    "catalog:sync": "tsx src/modules/catalog/sync-catalog-cli.ts",
+    "backfill:match-participants": "tsx src/modules/matches/backfill-participants-cli.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.0.1",
