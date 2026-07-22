@@ -40,6 +40,7 @@ model PlayerProfile {
   strengthsJson Json     @default("[]")
   weaknessesJson Json    @default("[]")
   recentFormJson Json    @default("{}")
+  matchAnalysisLimit Int @default(50)
   updatedAt     DateTime @updatedAt
   riotAccount   RiotAccount @relation(fields: [riotAccountId], references: [id])
   championStats PlayerChampionStats[]

@@ -318,16 +318,21 @@ export interface ParticipationRecord {
 }
 
 /**
- * Busca todo o historico persistido do jogador (todos os campeoes/roles),
- * do mais recente pro mais antigo - usado pra recalcular PlayerChampionStats
+ * Busca o historico persistido do jogador (todos os campeoes/roles), do
+ * mais recente pro mais antigo - usado pra recalcular PlayerChampionStats
  * agrupando por (championId, role). Partidas sem Match.startedAt (nao
  * deveria acontecer, mas o campo e opcional no schema) ficam por ultimo.
+ * `limit` (Fase 6b, configuracao "quantas partidas analisar") restringe as
+ * N partidas mais recentes - sem `limit`, retorna o historico completo
+ * (comportamento inalterado, usado por chamadores que ainda nao passam a
+ * configuracao).
  */
-export async function findParticipationHistory(puuid: string): Promise<ParticipationRecord[]> {
+export async function findParticipationHistory(puuid: string, limit?: number): Promise<ParticipationRecord[]> {
   const rows = await prisma.matchParticipant.findMany({
     where: { puuid },
     include: { match: true, champion: true },
-    orderBy: { match: { startedAt: "desc" } }
+    orderBy: { match: { startedAt: "desc" } },
+    ...(limit !== undefined ? { take: limit } : {})
   });
 
   return rows.map((row) => ({

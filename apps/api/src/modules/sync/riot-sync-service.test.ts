@@ -7,14 +7,16 @@ const {
   getMatchMock,
   getMatchTimelineMock,
   getMatchIdsByPuuidMock,
-  recomputeChampionStatsMock
+  recomputeChampionStatsMock,
+  findMatchAnalysisLimitByPuuidMock
 } = vi.hoisted(() => ({
   findExistingMatchIdsMock: vi.fn(),
   persistMatchMock: vi.fn(),
   getMatchMock: vi.fn(),
   getMatchTimelineMock: vi.fn(),
   getMatchIdsByPuuidMock: vi.fn(),
-  recomputeChampionStatsMock: vi.fn()
+  recomputeChampionStatsMock: vi.fn(),
+  findMatchAnalysisLimitByPuuidMock: vi.fn()
 }));
 
 vi.mock("../matches/match-repository.js", () => ({
@@ -31,7 +33,8 @@ vi.mock("../riot-integration/client-factory.js", () => ({
 }));
 
 vi.mock("../players/player-stats-repository.js", () => ({
-  recomputeChampionStats: recomputeChampionStatsMock
+  recomputeChampionStats: recomputeChampionStatsMock,
+  findMatchAnalysisLimitByPuuid: findMatchAnalysisLimitByPuuidMock
 }));
 
 import { syncPlayerMatches } from "./riot-sync-service.js";
@@ -107,6 +110,7 @@ describe("syncPlayerMatches", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     recomputeChampionStatsMock.mockResolvedValue(undefined);
+    findMatchAnalysisLimitByPuuidMock.mockResolvedValue(50);
   });
 
   it("pula partidas ja existentes e so processa as novas", async () => {
@@ -135,9 +139,12 @@ describe("syncPlayerMatches", () => {
 
     await syncPlayerMatches(player);
 
-    expect(recomputeChampionStatsMock).toHaveBeenCalledWith(player.riotAccountId, player.puuid, [
-      { championId: 61, role: "MID" }
-    ]);
+    expect(recomputeChampionStatsMock).toHaveBeenCalledWith(
+      player.riotAccountId,
+      player.puuid,
+      [{ championId: 61, role: "MID" }],
+      50
+    );
   });
 
   it("falha isolada em uma partida nao aborta as outras", async () => {

@@ -11,6 +11,7 @@ import { getRiotApiClient } from "../riot-integration/client-factory.js";
 import { findExistingMatchIds, persistMatch, type ParticipantToPersist } from "../matches/match-repository.js";
 import {
   computeAndPersistPlayerInsights,
+  findMatchAnalysisLimitByPuuid,
   recomputeChampionStats,
   type ChampionRolePair
 } from "../players/player-stats-repository.js";
@@ -128,7 +129,12 @@ export async function syncPlayerMatches(
     result.stoppedEarly = "max_reached";
   }
 
-  await recomputeChampionStats(player.riotAccountId, player.puuid, touchedPairs);
+  // Configuracao pessoal "quantas partidas analisar" (Fase 6b) - limita o
+  // historico usado pra recalcular stats/insights, nao o quanto e buscado
+  // da Riot (isso continua governado por maxNewMatches/rate limit acima).
+  const matchAnalysisLimit = await findMatchAnalysisLimitByPuuid(player.puuid);
+
+  await recomputeChampionStats(player.riotAccountId, player.puuid, touchedPairs, matchAnalysisLimit);
 
   // Strengths/weaknesses/recentForm dependem do historico inteiro do
   // jogador (nao so das partidas novas) - so vale recalcular quando essa
@@ -137,7 +143,7 @@ export async function syncPlayerMatches(
   // Falha aqui nao deve derrubar um sync de partidas que ja funcionou.
   if (touchedPairs.length > 0) {
     try {
-      await computeAndPersistPlayerInsights(player.riotAccountId, player.puuid);
+      await computeAndPersistPlayerInsights(player.riotAccountId, player.puuid, matchAnalysisLimit);
     } catch (error) {
       opts?.onInsightsFailed?.(error);
     }

@@ -9,13 +9,15 @@ import { prisma } from "../../db/prisma.js";
  * vez de deixar o Postgres jogar nulls pra frente na ordenacao desc, o que
  * corromperia a divisao dos blocos - guarda de anomalia de dado (o sync
  * real da Fase 1 sempre preenche startedAt a partir do gameStartTimestamp
- * real da Riot), nao caso esperado.
+ * real da Riot), nao caso esperado. `limit` (Fase 6b) restringe aos N
+ * relatorios mais recentes - sem `limit`, retorna todos.
  */
-export async function findPostgameReportsByPuuid(puuid: string): Promise<PostGameAnalysis[]> {
+export async function findPostgameReportsByPuuid(puuid: string, limit?: number): Promise<PostGameAnalysis[]> {
   const reports = await prisma.postgameReport.findMany({
     where: { puuid, match: { startedAt: { not: null } } },
     include: { match: true },
-    orderBy: { match: { startedAt: "desc" } }
+    orderBy: { match: { startedAt: "desc" } },
+    ...(limit !== undefined ? { take: limit } : {})
   });
 
   return reports.map((report) => report.reportJson as unknown as PostGameAnalysis);

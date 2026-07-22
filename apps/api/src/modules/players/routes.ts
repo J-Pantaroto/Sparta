@@ -10,8 +10,12 @@ import { lookupRiotAccount } from "../riot-integration/account-lookup.js";
 import {
   derivePreferredRoles,
   findChampionStatsByPuuid,
+  findMatchAnalysisLimitByPuuid,
   findPlayerInsightsByPuuid,
-  findRiotAccountByRiotId
+  findRiotAccountByRiotId,
+  MAX_MATCH_ANALYSIS_LIMIT,
+  MIN_MATCH_ANALYSIS_LIMIT,
+  setMatchAnalysisLimit
 } from "./player-stats-repository.js";
 import { syncPlayerMatches } from "../sync/riot-sync-service.js";
 
@@ -138,8 +142,87 @@ export const playersRoutes: FastifyPluginAsync = async (app) => {
    */
   app.get("/players/:puuid/growth-journey", async (request) => {
     const params = z.object({ puuid: z.string() }).parse(request.params);
-    const reports = await findPostgameReportsByPuuid(params.puuid);
+    const matchAnalysisLimit = await findMatchAnalysisLimitByPuuid(params.puuid);
+    const reports = await findPostgameReportsByPuuid(params.puuid, matchAnalysisLimit);
     return { puuid: params.puuid, ...computeGrowthJourney(reports) };
+  });
+
+  /**
+   * Configuracao pessoal "quantas partidas o Sparta deve analisar" (Fase
+   * 6b). Autenticadas, resolvem a conta Riot do usuario no servidor (mesmo
+   * padrao de /drafts/recommendations) - nunca recebem puuid do cliente.
+   */
+  app.get("/players/settings", async (request, reply) => {
+    const userId = await getAuthenticatedUserId(request);
+    if (!userId) {
+      reply.code(401);
+      return { error: "Nao autenticado." };
+    }
+
+    const riotAccount = await prisma.riotAccount.findFirst({ where: { userId } });
+    if (!riotAccount) {
+      reply.code(404);
+      return { error: "Nenhuma conta Riot vinculada." };
+    }
+
+    const matchAnalysisLimit = await findMatchAnalysisLimitByPuuid(riotAccount.puuid);
+    return { matchAnalysisLimit };
+  });
+
+  /**
+   * Atualiza a configuracao e dispara um sync na hora (mesma chamada de
+   * POST /players/sync) pra aplicar o novo limite imediatamente, em vez de
+   * so valer a partir do proximo sync espontaneo.
+   */
+  app.put("/players/settings", async (request, reply) => {
+    const userId = await getAuthenticatedUserId(request);
+    if (!userId) {
+      reply.code(401);
+      return { error: "Nao autenticado." };
+    }
+
+    const riotAccount = await prisma.riotAccount.findFirst({ where: { userId } });
+    if (!riotAccount) {
+      reply.code(404);
+      return { error: "Nenhuma conta Riot vinculada." };
+    }
+
+    const payload = z
+      .object({ matchAnalysisLimit: z.number().int().min(MIN_MATCH_ANALYSIS_LIMIT).max(MAX_MATCH_ANALYSIS_LIMIT) })
+      .parse(request.body);
+
+    await setMatchAnalysisLimit(riotAccount.id, payload.matchAnalysisLimit);
+
+    // O sync imediato e so pra nao deixar o usuario esperando o proximo sync
+    // espontaneo - a configuracao ja foi salva no passo acima, entao uma
+    // falha aqui (rate limit, chave da Riot expirada, etc.) nao pode derrubar
+    // a resposta de sucesso do que realmente importa nesta rota.
+    try {
+      await syncPlayerMatches(
+        {
+          riotAccountId: riotAccount.id,
+          puuid: riotAccount.puuid,
+          platformRegion: riotAccount.platformRegion
+        },
+        {
+          onInsightsFailed: (error) => {
+            request.log.error({
+              event: "riot_sync_insights_failed",
+              puuid: riotAccount.puuid,
+              message: error instanceof Error ? error.message : String(error)
+            });
+          }
+        }
+      );
+    } catch (error) {
+      request.log.error({
+        event: "riot_sync_after_settings_update_failed",
+        puuid: riotAccount.puuid,
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+
+    return { matchAnalysisLimit: payload.matchAnalysisLimit };
   });
 
   /**

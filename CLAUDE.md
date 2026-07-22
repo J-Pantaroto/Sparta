@@ -4,9 +4,24 @@ Este arquivo é um handoff para outro agente de desenvolvimento continuar o proj
 
 ## Pendências desta sessão (ler primeiro)
 
-Uma sessão anterior fez uma auditoria completa do repositório (real vs mock vs so-tipo), aprovou um plano de evolução em 5 épicos (Riot Sync, Player Intelligence, Draft Intelligence, Post-Game Coach, Growth Journey) e implementou todas as 5 fases, além de um refinamento visual do desktop e correções de infra/segurança. Uma sessão seguinte **conectou o desktop às rotas reais da API** (Dashboard/Perfil/Champion Select/Pós-game/nova tela Evolução, removendo `mock-data.ts`). Esta sessão implementou a **Sub-fase 6a (tela de Configurações + tema com campeão/skin real)**, a primeira de 3 sub-fases da "Fase 6" pedida pelo usuário (6b = configuração de partidas a analisar, 6c = ordem de pick automática via LCU — ambas ainda por implementar, ver "Próximos passos recomendados"). Tudo isso **já está mergeado em `main`**.
+Uma sessão anterior fez uma auditoria completa do repositório (real vs mock vs so-tipo), aprovou um plano de evolução em 5 épicos (Riot Sync, Player Intelligence, Draft Intelligence, Post-Game Coach, Growth Journey) e implementou todas as 5 fases, além de um refinamento visual do desktop e correções de infra/segurança. Uma sessão seguinte **conectou o desktop às rotas reais da API** (Dashboard/Perfil/Champion Select/Pós-game/nova tela Evolução, removendo `mock-data.ts`) e implementou a **Sub-fase 6a (tela de Configurações + tema com campeão/skin real)**. Esta sessão implementou a **Sub-fase 6b (configuração "quantas partidas analisar")**, a segunda de 3 sub-fases da "Fase 6" pedida pelo usuário (6c = ordem de pick automática via LCU, ainda por implementar, ver "Próximos passos recomendados"). Tudo isso **já está mergeado em `main`**.
 
-### Sub-fase 6a: tela de Configurações + tema com campeão/skin real (sessão atual)
+### Sub-fase 6b: configuração "quantas partidas analisar" + bug real de CORS corrigido (sessão atual)
+
+Nova configuração pessoal: quantas das últimas partidas do jogador o Sparta deve considerar nas análises (últimas 20/50/100, ou um valor personalizado até 200) — diferente do `limit` de `/players/:puuid/recent-matches` (que é só quantas partidas *listar* na UI, não quantas *analisar*).
+
+1. **Migração `PlayerProfile.matchAnalysisLimit Int @default(50)`**.
+2. **`findParticipationHistory`** (`matches/match-repository.ts`) e **`findPostgameReportsByPuuid`** (`postgame/postgame-repository.ts`) ganharam parâmetro opcional `limit?: number` (`take` do Prisma em cima do `orderBy: desc` já existente) — sem `limit`, comportamento inalterado.
+3. **`player-stats-repository.ts`** ganhou `findMatchAnalysisLimitByPuuid`/`setMatchAnalysisLimit` (default 50, mesmo padrão honesto-neutro de `findPlayerInsightsByPuuid`). `recomputeChampionStats`/`computeAndPersistPlayerInsights` passaram a aceitar o limite e repassar pra `findParticipationHistory` — `riot-sync-service.ts` resolve o limite salvo do jogador e passa pros dois **só no momento do sync** (mesma lógica de sempre: essas tabelas só recalculam no sync, nunca ao vivo a cada GET).
+4. **`GET /players/:puuid/growth-journey`** passou a resolver e repassar o limite pra `findPostgameReportsByPuuid` (computado ao vivo a cada chamada, já era assim).
+5. **Novas rotas autenticadas `GET`/`PUT /players/settings`** — `PUT` valida `[1,200]` via zod e dispara `syncPlayerMatches` na hora (pra não deixar o usuário esperando o próximo sync espontâneo); a chamada de sync é `try/catch` — se falhar (rate limit, chave da Riot expirada), a configuração já salva não é desfeita e a rota ainda retorna sucesso (achado real durante a validação: a primeira versão deixava a falha do sync derrubar a resposta inteira mesmo com o valor já persistido).
+6. **`SettingsScreen.tsx`** ganhou a seção "Análise" (atalhos 20/50/100 + campo personalizado clampado no cliente também).
+
+**Bug real de CORS encontrado e corrigido durante a validação manual**: `@fastify/cors` (`apps/api/src/app.ts`) usa `methods: "GET,HEAD,POST"` como default quando a opção não é configurada explicitamente — `PUT` nunca esteve liberado no preflight, só ninguém tinha notado porque nenhuma rota usava `PUT` antes desta sub-fase. O preflight `OPTIONS` retornava 204 normalmente, mas o navegador bloqueava a requisição `PUT` de verdade antes de sair (erro genérico "Failed to fetch", sem mensagem clara), com o backend nunca chegando a receber a chamada. Corrigido adicionando `methods: ["GET", "HEAD", "POST", "PUT"]` explicitamente no registro do `cors`.
+
+Validado manualmente contra a API real (Docker, imagem reconstruída) e a conta Zekerus#117 via `electron-vite dev` + Browser tool: `GET`/`PUT /players/settings` funcionando pela UI de verdade (não só via curl), persistência confirmada, `growth-journey` continuando a funcionar com o limite aplicado.
+
+### Sub-fase 6a: tela de Configurações + tema com campeão/skin real
 
 O seletor de tema visual era uma lista fixa de 12 campeões curados manualmente (`FEATURED_CHAMPIONS`), 1 skin cada, sem nenhuma UI de escolha de skin, morando na sidebar. O usuário pediu: mover isso pra uma tela de Configurações dedicada, deixar escolher **qualquer** campeão e **qualquer** skin dele, e permitir "baixar" a skin (salvar no disco, funcionar offline).
 
@@ -38,12 +53,12 @@ O que ficou deliberadamente fora de escopo:
 - **Catálogo de campeões pro desktop** (resolver `championId` → nome/ícone fora de `PlayerChampionStats`/`PickRecommendation`, que já trazem `championName`) — afeta só a lista de partidas do Pós-game hoje.
 - **Fase de temas com skins** (pedida pelo usuário nesta sessão, pra depois) — ver desenho de alto nível abaixo.
 
-### Fase 6 (Configurações do app) — 6a pronta, 6b/6c pendentes
+### Fase 6 (Configurações do app) — 6a e 6b prontas, 6c pendente
 
 Pedido do usuário, dividido em 3 sub-fases sequenciais (mesmo padrão de PR pequeno das Fases 1-5) porque tocam áreas quase disjuntas do código:
 
 - **6a (pronta, ver acima)**: tela de Configurações + tema com campeão/skin real + download pro disco.
-- **6b (não implementada)**: nova configuração pessoal "quantas partidas o Sparta deve analisar" (ex. últimas 20/50/100, teto 200). Desenho: migração `PlayerProfile.matchAnalysisLimit Int @default(50)`; `findParticipationHistory`/`findPostgameReportsByPuuid` ganham `limit?` opcional (`take` do Prisma); nova `findMatchAnalysisLimitByPuuid` em `player-stats-repository.ts`; `recomputeChampionStats`/`computeAndPersistPlayerInsights` passam a receber o limite (efeito só no próximo sync, mesma lógica de hoje); rotas novas `GET`/`PUT /players/settings` (autenticadas, valida `[1,200]`, dispara `syncPlayerMatches` na hora); seção nova no `SettingsScreen.tsx`.
+- **6b (pronta, ver acima)**: configuração pessoal "quantas partidas o Sparta deve analisar".
 - **6c (não implementada)**: ordem de pick automática via LCU, substituindo o input manual 1-5 do Champion Select. Desenho: tipar de verdade `LcuChampionSelectSnapshot.actions`/`myTeam`/`theirTeam` (hoje `unknown[]`) em `packages/riot/src/lcu/read-only-client.ts`; nova `derivePickOrder(snapshot)` pura (conta picks `completed` de companheiros de time antes do próprio, +1 — `DraftState.pickOrder<=1` já significa "blind pick" no `recommendation-engine.ts`); segundo poll no `apps/desktop/src/main/index.ts` (mesmo intervalo de 2500ms do `gameflow-phase`) + novo canal IPC `sparta:pick-order`; `ChampionSelect` mostra o valor automático quando disponível, mantém o input manual como fallback (sem cliente do League aberto).
 - Plano completo com a crítica de design em `C:\Users\jhona\.claude\plans\bright-drifting-melody.md` (se ainda existir na máquina).
 
@@ -404,6 +419,8 @@ Endpoints iniciais:
 - `GET /players/:puuid/recent-matches?limit=10`
 - `GET /players/:puuid/champion-performance`
 - `GET /players/:puuid/growth-journey`
+- `GET /players/settings` (autenticado)
+- `PUT /players/settings` (autenticado)
 - `POST /drafts/recommendations`
 - `POST /drafts/pre-game-analysis`
 - `POST /postgame/analyze`
@@ -413,7 +430,7 @@ Endpoints iniciais:
 
 Auth (`apps/api/src/modules/auth`): senha com `scrypt` (nativo do `node:crypto`) e token de sessao assinado com HMAC-SHA256 (`node:crypto`, sem `jsonwebtoken`/`bcrypt` como dependencia). Segredo em `AUTH_TOKEN_SECRET` (ver `src/config/env.ts`; `loadEnv()` recusa subir se `NODE_ENV=production` e o segredo ainda for o default de dev). Token vai no header `Authorization: Bearer <token>`.
 
-CORS restrito a uma allowlist (`localhost:5173` em dev + origem `null` do app empacotado via `file://`) e rate limit de 5/min em `/auth/login` e `/auth/register` (`@fastify/rate-limit`) — ver `app.ts`.
+CORS restrito a uma allowlist (`localhost:5173` em dev + origem `null` do app empacotado via `file://`) e rate limit de 5/min em `/auth/login` e `/auth/register` (`@fastify/rate-limit`) — ver `app.ts`. `methods` do `@fastify/cors` é configurado explicitamente como `["GET","HEAD","POST","PUT"]` (Fase 6b) — o default do plugin quando `methods` não é informado é `"GET,HEAD,POST"`, o que bloqueava silenciosamente qualquer `PUT` no preflight (erro genérico "Failed to fetch" no navegador, sem a requisição real chegar a sair) até essa correção.
 
 `POST /players/link-riot-account` chama Account-V1 de verdade (`apps/api/src/modules/riot-integration/account-lookup.ts`, cache de 24h via `ApiCacheEntry`) e grava o puuid real. `POST /players/sync` é autenticado, resolve a conta Riot do proprio usuario e sincroniza partidas novas de verdade (`apps/api/src/modules/sync/riot-sync-service.ts`) — ver "Pendências desta sessão" pra mais detalhes de como isso funciona.
 
@@ -426,7 +443,7 @@ apps/api/src/modules/matches/         # persistencia/consulta de Match/MatchPart
                                        # backfill de participantes (Fase 3), findMatchDetail (Fase 4)
 apps/api/src/modules/sync/            # orquestracao do sync incremental
 apps/api/src/modules/postgame/        # POST /postgame/analyze + GET /postgame/:matchId reais (Fase 4),
-                                       # findPostgameReportsByPuuid (Fase 5)
+                                       # findPostgameReportsByPuuid (Fase 5), limit opcional (Fase 6b)
 apps/api/src/config/composition-rules.ts  # constantes reais de produto pro recommendation engine (Fase 3)
 apps/api/src/db/api-cache.ts          # helper generico sobre ApiCacheEntry
 ```
@@ -450,6 +467,7 @@ Migrations aplicadas e validadas contra Postgres real:
 - `20260721220000_matchparticipant_team_and_unique` (Fase 3) — `MatchParticipant.teamId` (nullable) e `@@unique([matchId, puuid])`, necessários pra persistir os 10 participantes por partida e parear laners opostos.
 - `20260722020000_postgame_report_unique` (Fase 4) — `PostgameReport.updatedAt` e `@@unique([matchId, puuid])`, necessários pro upsert idempotente de relatórios pós-game (tabela estava vazia, sem backfill necessário).
 - Fase 5 (Growth Journey) não precisou de nenhuma migração — primeira fase do projeto sem uma, já que tudo é derivado do `PostgameReport.reportJson` já persistido pela Fase 4.
+- `20260722180000_player_profile_match_analysis_limit` (Fase 6b) — `PlayerProfile.matchAnalysisLimit Int @default(50)`.
 
 ```bash
 npx pnpm@10.34.4 --filter @sparta/api prisma:generate
@@ -466,7 +484,7 @@ Tabelas com uso real vs ainda sem código:
 | `Champion` | Real — sincronizado via Data Dragon (`catalog:sync`) |
 | `ChampionTag` | Real — seed corrigido na Fase 3 (`prisma:seed` lê `data/seeds/champion-tags.json` de verdade agora, cobre Orianna+Ahri); Data Dragon não fornece os atributos de gameplay do Sparta, então continua manual/curado |
 | `Match`, `MatchParticipant`, `MatchTimeline` | Real — persistidos pelo sync incremental; desde a Fase 3, os 10 participantes por partida (não só o rastreado), com `teamId` |
-| `PlayerProfile`, `PlayerChampionStats` | Real — agregado apos cada sync; `strengthsJson`/`weaknessesJson`/`recentFormJson` tambem reais desde a Fase 2 |
+| `PlayerProfile`, `PlayerChampionStats` | Real — agregado apos cada sync; `strengthsJson`/`weaknessesJson`/`recentFormJson` tambem reais desde a Fase 2; `matchAnalysisLimit` desde a Fase 6b |
 | `ApiCacheEntry` | Real — cache de Account-V1 (24h) e Data Dragon (7 dias) |
 | `PostgameReport` | Real — upsert por (matchId, puuid) a cada `POST /postgame/analyze` (Fase 4); lido pela Fase 5 pra Growth Journey (sem tabela nova) |
 | `DraftSession`, `PickRecommendation`, `ReplayImportJob` | Ainda sem nenhum codigo que leia/escreva |
@@ -580,9 +598,9 @@ Não usar force push sem pedido explícito.
 
 ## Próximos passos recomendados
 
-Fase 1 (Riot Sync), o refinamento visual do desktop, Fase 2 (Player Intelligence), Fase 3 (Draft Intelligence), Fase 4 (Post-Game Coach), Fase 5 (Growth Journey), a conexão do desktop às rotas reais e a Sub-fase 6a (Configurações + tema com skins) estão completas em `main`. O roadmap original de 5 épicos está encerrado. Próximo:
+Fase 1 (Riot Sync), o refinamento visual do desktop, Fase 2 (Player Intelligence), Fase 3 (Draft Intelligence), Fase 4 (Post-Game Coach), Fase 5 (Growth Journey), a conexão do desktop às rotas reais e as Sub-fases 6a e 6b (Configurações + tema com skins + "quantas partidas analisar") estão completas em `main`. O roadmap original de 5 épicos está encerrado. Próximo:
 
-1. **Sub-fase 6b** (configuração "quantas partidas analisar") e **Sub-fase 6c** (ordem de pick automática via LCU) — ambas desenhadas em detalhe em "Fase 6 (Configurações do app)" acima, ainda não implementadas.
+1. **Sub-fase 6c** (ordem de pick automática via LCU) — desenhada em detalhe em "Fase 6 (Configurações do app)" acima, ainda não implementada.
 2. Catálogo de campeões pro desktop — resolver `championId` → nome/ícone no Pós-game (hoje mostra só `Campeão #<id>` na lista de partidas porque `RecentChampionMatch` não traz `championName` e não há rota de catálogo exposta ao desktop).
 3. Expandir `ChampionTag` além dos 2 campeões do seed (`data/seeds/champion-tags.json`) — sem bloqueio técnico desde a Fase 3 (o seed já lê o JSON de verdade), é só curadoria manual contínua; o motor de recomendação já tolera ausência, mas mais cobertura melhora a qualidade das recomendações (confirmado na validação desta sessão: o Champion Select real devolveu 0 recomendações pra Zekerus#117 justamente por causa disso, comportamento honesto, não bug).
 4. Tornar `/drafts/pre-game-analysis` real (hoje 100% estático) — usar `analyzeTeamComposition` (já existe em `packages/core`) com `championTags`/`matchups` reais; motor de geração de texto explicativo ainda por desenhar (a composição por fragmentos da Fase 4, em `packages/core/src/postgame/post-game-analysis.ts`, é um precedente reaproveitável).

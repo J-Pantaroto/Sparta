@@ -10,6 +10,7 @@ const {
   matchFindUniqueMock,
   matchParticipantCreateManyMock,
   matchParticipantUpdateManyMock,
+  matchParticipantFindManyMock,
   matchTimelineUpsertMock
 } = vi.hoisted(() => ({
   transactionMock: vi.fn(),
@@ -20,13 +21,15 @@ const {
   matchFindUniqueMock: vi.fn(),
   matchParticipantCreateManyMock: vi.fn(),
   matchParticipantUpdateManyMock: vi.fn(),
+  matchParticipantFindManyMock: vi.fn(),
   matchTimelineUpsertMock: vi.fn()
 }));
 
 vi.mock("../../db/prisma.js", () => ({
   prisma: {
     $transaction: (callback: (tx: unknown) => unknown) => transactionMock(callback),
-    match: { findMany: matchFindManyMock, findUnique: matchFindUniqueMock }
+    match: { findMany: matchFindManyMock, findUnique: matchFindUniqueMock },
+    matchParticipant: { findMany: matchParticipantFindManyMock }
   }
 }));
 
@@ -34,6 +37,7 @@ import {
   backfillMatchParticipants,
   findMatchDetail,
   findMatchesMissingParticipants,
+  findParticipationHistory,
   persistMatch,
   type ParticipantToPersist
 } from "./match-repository.js";
@@ -365,6 +369,52 @@ describe("match-repository", () => {
       const result = await findMatchDetail("riot-m1", "puuid-tracked");
 
       expect(result!.durationSeconds).toBeGreaterThanOrEqual(300);
+    });
+  });
+
+  describe("findParticipationHistory", () => {
+    function participationRow() {
+      return {
+        match: { matchId: "riot-m1" },
+        championId: 61,
+        champion: { name: "Orianna" },
+        role: "MID",
+        won: true,
+        kills: 5,
+        deaths: 2,
+        assists: 8,
+        csPerMinute: 7,
+        goldPerMinute: 400,
+        damagePerMinute: 600,
+        visionScorePerMinute: 1,
+        killParticipation: 0.5,
+        objectiveParticipation: 0.4
+      };
+    }
+
+    it("busca o historico completo quando limit nao e informado (comportamento inalterado)", async () => {
+      matchParticipantFindManyMock.mockResolvedValue([participationRow()]);
+
+      await findParticipationHistory("puuid-1");
+
+      expect(matchParticipantFindManyMock).toHaveBeenCalledWith({
+        where: { puuid: "puuid-1" },
+        include: { match: true, champion: true },
+        orderBy: { match: { startedAt: "desc" } }
+      });
+    });
+
+    it("restringe as N partidas mais recentes quando limit e informado (Fase 6b)", async () => {
+      matchParticipantFindManyMock.mockResolvedValue([participationRow()]);
+
+      await findParticipationHistory("puuid-1", 50);
+
+      expect(matchParticipantFindManyMock).toHaveBeenCalledWith({
+        where: { puuid: "puuid-1" },
+        include: { match: true, champion: true },
+        orderBy: { match: { startedAt: "desc" } },
+        take: 50
+      });
     });
   });
 });

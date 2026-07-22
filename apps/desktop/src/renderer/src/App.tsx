@@ -188,7 +188,7 @@ function AppShell() {
         {page === "pregame" && <PreGame />}
         {page === "postgame" && <PostGameScreen riotAccounts={riotAccounts} sessionToken={sessionToken} />}
         {page === "growth" && <GrowthJourneyScreen riotAccounts={riotAccounts} />}
-        {page === "settings" && <SettingsScreen ddragonVersion={ddragonVersion} />}
+        {page === "settings" && <SettingsScreen ddragonVersion={ddragonVersion} sessionToken={sessionToken} />}
       </section>
     </main>
   );
