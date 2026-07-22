@@ -8,6 +8,7 @@ declare global {
       version: string;
       realtimeAssistance: boolean;
       onGameflowPhase: (callback: (phase: LcuGameflowPhase | null) => void) => () => void;
+      downloadSkin: (url: string, fileName: string) => Promise<string>;
     };
   }
 }
