@@ -4,12 +4,14 @@ const {
   findRiotAccountByRiotIdMock,
   findChampionStatsByPuuidMock,
   findPlayerInsightsByPuuidMock,
-  findParticipationHistoryMock
+  findParticipationHistoryMock,
+  findPostgameReportsByPuuidMock
 } = vi.hoisted(() => ({
   findRiotAccountByRiotIdMock: vi.fn(),
   findChampionStatsByPuuidMock: vi.fn(),
   findPlayerInsightsByPuuidMock: vi.fn(),
-  findParticipationHistoryMock: vi.fn()
+  findParticipationHistoryMock: vi.fn(),
+  findPostgameReportsByPuuidMock: vi.fn()
 }));
 
 vi.mock("./player-stats-repository.js", () => ({
@@ -21,6 +23,10 @@ vi.mock("./player-stats-repository.js", () => ({
 
 vi.mock("../matches/match-repository.js", () => ({
   findParticipationHistory: findParticipationHistoryMock
+}));
+
+vi.mock("../postgame/postgame-repository.js", () => ({
+  findPostgameReportsByPuuid: findPostgameReportsByPuuidMock
 }));
 
 import { buildApp } from "../../app.js";
@@ -104,6 +110,44 @@ describe("players routes", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json().champions).toEqual([]);
+    await app.close();
+  });
+
+  it("growth-journey devolve vazio quando o jogador nunca analisou uma partida", async () => {
+    findPostgameReportsByPuuidMock.mockResolvedValue([]);
+    const app = await buildApp();
+
+    const response = await app.inject({ method: "GET", url: "/players/puuid-x/growth-journey" });
+    const body = response.json();
+
+    expect(response.statusCode).toBe(200);
+    expect(body.puuid).toBe("puuid-x");
+    expect(body.matchesAnalyzed).toBe(0);
+    expect(body.weaknessTrends).toEqual([]);
+    await app.close();
+  });
+
+  it("growth-journey deriva tendencias reais a partir dos relatorios persistidos", async () => {
+    const weakness = { code: "morre_demais", label: "Morre com frequencia", detail: "d", severity: "medium", confidence: "low" };
+    const reportWith = { matchId: "m", expectedPlan: "p", executionSummary: "e", pickAssessment: "a", strengths: [], weaknesses: [weakness], tips: [], metrics: {} };
+    const reportWithout = { ...reportWith, weaknesses: [] };
+    findPostgameReportsByPuuidMock.mockResolvedValue([
+      reportWithout,
+      reportWithout,
+      reportWithout,
+      reportWith,
+      reportWith,
+      reportWith
+    ]);
+    const app = await buildApp();
+
+    const response = await app.inject({ method: "GET", url: "/players/puuid-x/growth-journey" });
+    const body = response.json();
+
+    expect(response.statusCode).toBe(200);
+    expect(body.matchesAnalyzed).toBe(6);
+    expect(body.weaknessTrends).toHaveLength(1);
+    expect(body.weaknessTrends[0].code).toBe("morre_demais");
     await app.close();
   });
 });
