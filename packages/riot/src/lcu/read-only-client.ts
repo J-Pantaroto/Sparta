@@ -30,12 +30,27 @@ export type LcuGameflowPhase =
   | "EndOfGame"
   | (string & {});
 
+/** Uma acao dentro de uma rodada de champion select (pick ou ban). */
+export interface LcuChampSelectAction {
+  actorCellId: number;
+  type: string;
+  completed: boolean;
+}
+
+/** Um jogador (aliado ou inimigo) na sessao de champion select. */
+export interface LcuChampSelectTeamMember {
+  cellId: number;
+  championId: number;
+  assignedPosition?: string;
+}
+
 export interface LcuChampionSelectSnapshot {
   sessionExists: boolean;
   localPlayerCellId?: number;
-  actions?: unknown[];
-  myTeam?: unknown[];
-  theirTeam?: unknown[];
+  /** Array de rodadas - cada rodada e um array de acoes (pick/ban). */
+  actions?: LcuChampSelectAction[][];
+  myTeam?: LcuChampSelectTeamMember[];
+  theirTeam?: LcuChampSelectTeamMember[];
 }
 
 const DEFAULT_LOCKFILE_PATHS = [
@@ -137,9 +152,9 @@ export class LcuReadOnlyClient {
     return {
       sessionExists: true,
       localPlayerCellId: session.localPlayerCellId as number | undefined,
-      actions: session.actions as unknown[] | undefined,
-      myTeam: session.myTeam as unknown[] | undefined,
-      theirTeam: session.theirTeam as unknown[] | undefined
+      actions: session.actions as LcuChampSelectAction[][] | undefined,
+      myTeam: session.myTeam as LcuChampSelectTeamMember[] | undefined,
+      theirTeam: session.theirTeam as LcuChampSelectTeamMember[] | undefined
     };
   }
 }

@@ -19,5 +19,15 @@ contextBridge.exposeInMainWorld("sparta", {
    */
   downloadSkin(url: string, fileName: string): Promise<string> {
     return ipcRenderer.invoke("sparta:download-skin", url, fileName);
+  },
+  /**
+   * Assina a ordem de pick real do jogador durante champion select
+   * (somente leitura, derivada da sessao do LCU) - null quando fora do
+   * champion select ou quando a ordem ainda nao pode ser determinada.
+   */
+  onPickOrder(callback: (pickOrder: number | null) => void) {
+    const listener = (_event: unknown, pickOrder: number | null) => callback(pickOrder);
+    ipcRenderer.on("sparta:pick-order", listener);
+    return () => ipcRenderer.removeListener("sparta:pick-order", listener);
   }
 });

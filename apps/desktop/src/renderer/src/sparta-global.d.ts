@@ -9,6 +9,7 @@ declare global {
       realtimeAssistance: boolean;
       onGameflowPhase: (callback: (phase: LcuGameflowPhase | null) => void) => () => void;
       downloadSkin: (url: string, fileName: string) => Promise<string>;
+      onPickOrder: (callback: (pickOrder: number | null) => void) => () => void;
     };
   }
 }
