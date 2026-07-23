@@ -15,6 +15,9 @@
      destaque do tema (que continua fixa em vermelho) - mesmo padrao de
      leitura rapida de KDA/stats comum em apps de LoL. */
   --color-green: #4ade80;
+  /* Faixa neutra dos badges/barras de score (Fase 9) - nem forte nem fraco
+     pelos limiares de dimension-signals.ts. */
+  --color-yellow: #fbbf24;
   --font-sans: "Manrope", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --transition-fast: 0.18s ease;
   --transition-medium: 0.32s ease;
@@ -395,6 +398,17 @@ p {
   font-size: 28px;
 }
 
+.metric-value-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0 8px;
+}
+
+.metric-value-row strong {
+  margin: 0;
+}
+
 .metric small,
 .recommendation small {
   color: var(--color-text-secondary);
@@ -474,21 +488,22 @@ p {
 }
 
 .recommendation {
-  display: grid;
-  grid-template-columns: 1fr auto;
+  display: flex;
+  flex-direction: column;
   gap: 12px;
   padding: 18px;
 }
 
-.recommendation strong {
-  color: var(--color-red);
-  font-size: 32px;
+.recommendation-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
-.recommendation p,
-.recommendation small {
-  grid-column: 1 / -1;
-  margin: 0;
+.recommendation-bars {
+  display: grid;
+  gap: 8px;
 }
 
 .champion-icon {
@@ -532,6 +547,101 @@ p {
   color: var(--color-error);
 }
 
+/* Anel de score (Fase 9) - conic-gradient puro, sem lib de grafico */
+.score-badge {
+  position: relative;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  flex-shrink: 0;
+  font-weight: 800;
+  color: var(--color-text-primary);
+}
+
+.score-badge::before {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  background: var(--color-bg);
+}
+
+.score-badge span {
+  position: relative;
+}
+
+/* Barra de estatistica (Fase 9) - div com width% simples, sem lib */
+.stat-bar {
+  display: grid;
+  gap: 4px;
+}
+
+.stat-bar-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.stat-bar-header small {
+  color: var(--color-text-muted);
+}
+
+.stat-bar-track {
+  position: relative;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--color-border);
+  overflow: hidden;
+}
+
+.stat-bar-track.centered::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  background: var(--color-text-muted);
+}
+
+.stat-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width var(--transition-medium);
+}
+
+/* Chip de reason/warning/strength/weakness (Fase 9) - substitui os
+   paragrafos soltos de texto por pills curtas com icone. */
+.signal-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.signal-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-elevated);
+  color: var(--color-text-secondary);
+}
+
+.signal-chip.positive {
+  border-color: var(--color-green);
+  color: var(--color-green);
+}
+
+.signal-chip.negative {
+  border-color: var(--color-red-soft);
+  color: var(--color-error);
+}
+
 .recommendation .recommendation-title {
   display: flex;
   align-items: center;
@@ -539,8 +649,7 @@ p {
 }
 
 .recommendation button {
-  grid-column: 1 / -1;
-  justify-self: start;
+  align-self: flex-start;
   height: 36px;
   padding: 0 14px;
   border: 1px solid var(--color-red-soft);
