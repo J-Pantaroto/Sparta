@@ -5,15 +5,16 @@ import {
   scoreChampionPerformance,
   summarizeEnemyDamageLean,
   type ChampionClassProfile,
+  type Confidence,
   type DraftState,
   type ItemSummary,
   type PickRecommendation,
+  type PlayerWeakness,
   type RecommendedItem
 } from "@sparta/core";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   championSplashUrl,
-  championSquareUrl,
   fetchAllChampions,
   fetchChampionClassProfiles,
   fetchItemCatalog,
@@ -33,6 +34,7 @@ import {
 import { useAsyncData } from "./features/use-async-data";
 import { AuthScreen } from "./features/AuthScreen";
 import { ChampionGridPicker } from "./features/ChampionGridPicker";
+import { ChampionIcon } from "./features/ChampionIcon";
 import { Loading } from "./features/Loading";
 import { LinkRiotAccountScreen } from "./features/LinkRiotAccountScreen";
 import { PostGameScreen } from "./features/PostGameScreen";
@@ -58,7 +60,22 @@ const pageLabels: Record<Page, string> = {
 const trendLabels: Record<string, string> = {
   improving: "melhorando",
   declining: "piorando",
-  stable: "estável"
+  // "estável" sozinho soa como um veredito sem contexto (feedback real de
+  // usuário) - descreve o que de fato significa aqui: as ultimas partidas
+  // nao mudaram o score o suficiente pra contar como tendencia.
+  stable: "sem variação recente"
+};
+
+const severityLabels: Record<PlayerWeakness["severity"], string> = {
+  low: "baixa",
+  medium: "média",
+  high: "alta"
+};
+
+const confidenceLabels: Record<Confidence, string> = {
+  low: "baixa",
+  medium: "média",
+  high: "alta"
 };
 
 // Rotulos legiveis pras chaves de PickRecommendation.metrics (@sparta/core) -
@@ -225,7 +242,7 @@ function AppShell() {
       </aside>
 
       <section className="content">
-        {page === "dashboard" && <Dashboard riotAccounts={riotAccounts} />}
+        {page === "dashboard" && <Dashboard riotAccounts={riotAccounts} ddragonVersion={ddragonVersion} />}
         {page === "profile" && <Profile riotAccounts={riotAccounts} ddragonVersion={ddragonVersion} />}
         {page === "select" && (
           <ChampionSelect
@@ -249,7 +266,7 @@ function AppShell() {
   );
 }
 
-function Dashboard({ riotAccounts }: { riotAccounts: RiotAccountSummary[] }) {
+function Dashboard({ riotAccounts, ddragonVersion }: { riotAccounts: RiotAccountSummary[]; ddragonVersion: string }) {
   const account = riotAccounts[0];
   const { featuredChampion } = useFeaturedChampion();
   const heroSplash = featuredChampion.localSplashPath ?? championSplashUrl(featuredChampion.key, featuredChampion.skinIndex);
@@ -261,6 +278,7 @@ function Dashboard({ riotAccounts }: { riotAccounts: RiotAccountSummary[] }) {
 
   const topChampion = profile.data && profile.data.championStats.length > 0 ? rankChampionPool(profile.data.championStats)[0] : undefined;
   const topWeakness = profile.data?.weaknesses[0];
+  const topStrength = profile.data?.strengths[0];
 
   return (
     <>
@@ -279,10 +297,19 @@ function Dashboard({ riotAccounts }: { riotAccounts: RiotAccountSummary[] }) {
           label="Melhor campeão"
           value={topChampion?.championName ?? "—"}
           detail={topChampion ? "score de desempenho" : "sem partidas suficientes"}
+          icon={
+            topChampion && (
+              <ChampionIcon championId={topChampion.championId} ddragonVersion={ddragonVersion} size="sm" alt={topChampion.championName} />
+            )
+          }
           badge={topChampion && <ScoreBadge score={topChampion.score} size="sm" />}
         />
-        <Metric label="Risco atual" value={topWeakness?.label ?? "Sem dado"} detail={topWeakness?.severity ?? "—"} />
-        <Metric label="Escopo" value="Pré e pós-game" detail="sem assistência in-game" />
+        <Metric
+          label="Ponto forte"
+          value={topStrength?.label ?? "Sem dado"}
+          detail={topStrength ? confidenceLabels[topStrength.confidence] : "—"}
+        />
+        <Metric label="Risco atual" value={topWeakness?.label ?? "Sem dado"} detail={topWeakness ? severityLabels[topWeakness.severity] : "—"} />
       </section>
     </>
   );
@@ -322,11 +349,7 @@ function Profile({ riotAccounts, ddragonVersion }: { riotAccounts: RiotAccountSu
               return (
                 <article className="champion-row" key={`${champion.championId}-${champion.role}`}>
                   <div className="champion-identity">
-                    <img
-                      className="champion-icon"
-                      src={championSquareUrl(champion.championName, ddragonVersion)}
-                      alt={champion.championName}
-                    />
+                    <ChampionIcon championId={champion.championId} ddragonVersion={ddragonVersion} alt={champion.championName} />
                     <strong>{champion.championName}</strong>
                     {performance.eligible && <ScoreBadge score={performance.score} size="sm" />}
                   </div>
@@ -446,9 +469,10 @@ function ChampionSelect({
                 <div>
                   <span>{recommendation.category}</span>
                   <div className="recommendation-title">
-                    <img
-                      className="champion-icon sm"
-                      src={championSquareUrl(recommendation.championName, ddragonVersion)}
+                    <ChampionIcon
+                      championId={recommendation.championId}
+                      ddragonVersion={ddragonVersion}
+                      size="sm"
                       alt={recommendation.championName}
                     />
                     <h2>{recommendation.championName}</h2>
@@ -608,7 +632,13 @@ function PreGame({ draft, ddragonVersion }: { draft: DraftState; ddragonVersion:
         <section className="panel wide">
           <h2>Seu campeão</h2>
           <div className="build-item">
-            <img className="champion-icon sm" src={championSquareUrl(ownChampion.key, ddragonVersion)} alt={ownChampion.name} />
+            <ChampionIcon
+              championId={ownChampion.id}
+              slug={ownChampion.key}
+              ddragonVersion={ddragonVersion}
+              size="sm"
+              alt={ownChampion.name}
+            />
             <span>{ownChampion.name}</span>
           </div>
         </section>
@@ -620,7 +650,7 @@ function PreGame({ draft, ddragonVersion }: { draft: DraftState; ddragonVersion:
           <div className="build-item-row">
             {enemyChampions.map((champion) => (
               <div className="build-item" key={champion.id}>
-                <img className="champion-icon sm" src={championSquareUrl(champion.key, ddragonVersion)} alt={champion.name} />
+                <ChampionIcon championId={champion.id} slug={champion.key} ddragonVersion={ddragonVersion} size="sm" alt={champion.name} />
                 <span>{champion.name}</span>
               </div>
             ))}
@@ -649,17 +679,20 @@ function Metric({
   label,
   value,
   detail,
+  icon,
   badge
 }: {
   label: string;
   value: string;
   detail: string;
+  icon?: ReactNode;
   badge?: ReactNode;
 }) {
   return (
     <article className="metric">
       <span>{label}</span>
       <div className="metric-value-row">
+        {icon}
         <strong>{value}</strong>
         {badge}
       </div>

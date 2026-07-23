@@ -250,6 +250,13 @@ export interface WeaknessTrend {
   previousRate: number;
   trend: "improving" | "worsening" | "stable" | "new" | "resolved";
   confidence: Confidence;
+  // false quando ainda nao existe um segundo bloco de partidas antigas
+  // suficiente pra comparar (blockB abaixo do piso minimo) - nesse caso
+  // `trend` fica forcado em "stable" mas isso significa "ainda nao da pra
+  // saber", nao "sem mudanca" - o consumidor deve tratar esses dois casos
+  // de forma diferente em vez de mostrar "estavel" como se fosse um
+  // veredito real.
+  hasComparison: boolean;
 }
 
 export interface GrowthJourney {

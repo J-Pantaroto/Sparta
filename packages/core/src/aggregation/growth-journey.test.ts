@@ -42,6 +42,7 @@ describe("computeWeaknessTrends", () => {
     expect(trends).toHaveLength(1);
     expect(trends[0].trend).toBe("stable");
     expect(trends[0].confidence).toBe("low");
+    expect(trends[0].hasComparison).toBe(false);
   });
 
   it("marca stable quando blockB nao atinge o piso minimo, mesmo com confidence mais alta", () => {
@@ -49,6 +50,7 @@ describe("computeWeaknessTrends", () => {
     const trends = computeWeaknessTrends(history);
     expect(trends[0].trend).toBe("stable");
     expect(trends[0].confidence).toBe("medium");
+    expect(trends[0].hasComparison).toBe(false);
   });
 
   it("marca resolved quando o codigo sai completamente do bloco recente", () => {
@@ -98,6 +100,7 @@ describe("computeWeaknessTrends", () => {
     const blockB = reports(10, ["morre_demais"]);
     const trends = computeWeaknessTrends([...blockA, ...blockB]);
     expect(trends[0].confidence).toBe("high");
+    expect(trends[0].hasComparison).toBe(true);
   });
 
   it("ordena por magnitude de mudanca decrescente", () => {

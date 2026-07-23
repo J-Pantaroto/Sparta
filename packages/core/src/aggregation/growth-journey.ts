@@ -69,7 +69,7 @@ export function computeWeaknessTrends(reports: PostGameAnalysis[]): WeaknessTren
       trend = diff >= RATE_TREND_THRESHOLD_POINTS ? "improving" : diff <= -RATE_TREND_THRESHOLD_POINTS ? "worsening" : "stable";
     }
 
-    return { code, label, recentRate, previousRate, trend, confidence };
+    return { code, label, recentRate, previousRate, trend, confidence, hasComparison: !insufficientData };
   });
 
   return trends.sort((a, b) => Math.abs(b.previousRate - b.recentRate) - Math.abs(a.previousRate - a.recentRate));

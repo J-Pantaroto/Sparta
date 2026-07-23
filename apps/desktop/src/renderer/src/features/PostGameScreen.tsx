@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { calculateKda, roleBaselines, type PostGameAnalysis, type RecentChampionMatch } from "@sparta/core";
 import { analyzePostgame, ApiError, fetchPostgameReport, fetchRecentMatches, type RiotAccountSummary } from "./api-client";
-import { championSquareUrl, fetchAllChampions, type DataDragonChampionSummary } from "./datadragon";
+import { ChampionIcon } from "./ChampionIcon";
+import { fetchAllChampions, type DataDragonChampionSummary } from "./datadragon";
 import { Loading } from "./Loading";
 import { SignalChip } from "./SignalChip";
 import { StatBar } from "./StatBar";
@@ -128,7 +129,7 @@ export function PostGameScreen({ riotAccounts, sessionToken, ddragonVersion }: P
             >
               <div className="champion-identity">
                 {champion && (
-                  <img className="champion-icon sm" src={championSquareUrl(champion.key, ddragonVersion)} alt={champion.name} />
+                  <ChampionIcon championId={champion.id} slug={champion.key} ddragonVersion={ddragonVersion} size="sm" alt={champion.name} />
                 )}
                 <strong>{champion?.name ?? `Campeão #${match.championId}`}</strong>
               </div>
