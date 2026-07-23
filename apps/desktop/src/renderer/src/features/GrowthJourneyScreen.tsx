@@ -1,5 +1,7 @@
-import type { GrowthJourney } from "@sparta/core";
+import type { GrowthJourney, WeaknessTrend } from "@sparta/core";
+import { Minus, TrendingDown, TrendingUp } from "lucide-react";
 import { fetchGrowthJourney, type RiotAccountSummary } from "./api-client";
+import { Loading } from "./Loading";
 import { useAsyncData } from "./use-async-data";
 
 interface GrowthJourneyScreenProps {
@@ -42,7 +44,7 @@ export function GrowthJourneyScreen({ riotAccounts }: GrowthJourneyScreenProps) 
         <h1>Progressão dos pontos fracos</h1>
       </header>
 
-      {journey.status === "loading" && <p>Carregando...</p>}
+      {journey.status === "loading" && <Loading />}
       {journey.status === "error" && <p>{journey.error}</p>}
 
       {journey.data && (
@@ -55,7 +57,7 @@ export function GrowthJourneyScreen({ riotAccounts }: GrowthJourneyScreenProps) 
               {journey.data.weaknessTrends.map((trend) => (
                 <article className="champion-row" key={trend.code}>
                   <strong>{trend.label}</strong>
-                  <span>{trendLabels[trend.trend] ?? trend.trend}</span>
+                  <TrendCell trend={trend.trend} />
                   <span>{trend.recentRate}% recente</span>
                   <span>{trend.previousRate}% anterior</span>
                 </article>
@@ -65,5 +67,22 @@ export function GrowthJourneyScreen({ riotAccounts }: GrowthJourneyScreenProps) 
         </>
       )}
     </>
+  );
+}
+
+function TrendCell({ trend }: { trend: WeaknessTrend["trend"] }) {
+  // "resolved" tambem e uma boa noticia (o ponto fraco sumiu), "new" e uma
+  // ma noticia nova (apareceu um ponto fraco que nao existia) - tratados
+  // com a mesma cor semantica de improving/worsening.
+  const isGood = trend === "improving" || trend === "resolved";
+  const isBad = trend === "worsening" || trend === "new";
+  const className = `trend-cell${isGood ? " improving" : isBad ? " worsening" : ""}`;
+  const Icon = isGood ? TrendingUp : isBad ? TrendingDown : Minus;
+
+  return (
+    <span className={className}>
+      <Icon size={14} />
+      {trendLabels[trend] ?? trend}
+    </span>
   );
 }

@@ -7,6 +7,7 @@ import {
   type DataDragonSkin
 } from "./datadragon";
 import { useFeaturedChampion } from "./featured-champion-context";
+import { GridSkeleton } from "./GridSkeleton";
 import { useAsyncData } from "./use-async-data";
 
 interface ChampionSkinPickerProps {
@@ -74,8 +75,8 @@ export function ChampionSkinPicker({ ddragonVersion }: ChampionSkinPickerProps) 
             ← Voltar pra lista de campeões
           </button>
           <h3>{selectedChampion.name}</h3>
-          {skins.status === "loading" && <p>Carregando skins...</p>}
           {downloadError && <p>{downloadError}</p>}
+          {skins.status === "loading" && <GridSkeleton count={6} />}
           <div className="theme-picker-grid">
             {(skins.data ?? []).map((skin) => {
               const isActive = featuredChampion.key === selectedChampion.key && featuredChampion.skinIndex === skin.num;
