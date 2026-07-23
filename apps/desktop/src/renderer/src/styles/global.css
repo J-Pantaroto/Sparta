@@ -251,6 +251,62 @@ nav button.active {
   border-color: var(--color-red);
 }
 
+/*
+ * Passo 2 do seletor de skin (icone + nome + botao Baixar) - card proprio,
+ * nao reusa .theme-picker-option porque aquela classe tem line-height:0
+ * (pensada pro grid so-de-icone do passo 1 e do seletor de inimigos) que
+ * colapsava o texto do nome/botao um em cima do outro aqui (bug real
+ * encontrado nesta sessao).
+ */
+.skin-picker-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 160px;
+  padding: 10px;
+  border: 2px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface-elevated);
+  transition: border-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.skin-picker-card:hover {
+  transform: translateY(-2px);
+}
+
+.skin-picker-card.active {
+  border-color: var(--color-red);
+}
+
+.skin-picker-card img {
+  width: 100%;
+  height: 90px;
+  border-radius: 6px;
+  object-fit: cover;
+  cursor: pointer;
+}
+
+.skin-picker-card span {
+  font-size: 13px;
+  text-align: center;
+}
+
+.skin-picker-card button {
+  width: 100%;
+  height: 32px;
+  border: 1px solid var(--color-red-soft);
+  border-radius: 6px;
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.skin-picker-card button:hover {
+  background: #1a0d0d;
+}
+
 .content {
   padding: 40px;
   overflow: auto;

@@ -81,13 +81,11 @@ export function ChampionSkinPicker({ ddragonVersion }: ChampionSkinPickerProps) 
             {(skins.data ?? []).map((skin) => {
               const isActive = featuredChampion.key === selectedChampion.key && featuredChampion.skinIndex === skin.num;
               return (
-                <div key={skin.num} className={`theme-picker-option${isActive ? " active" : ""}`}>
+                <div key={skin.num} className={`skin-picker-card${isActive ? " active" : ""}`}>
                   <img
-                    className="champion-icon"
                     src={championSplashUrl(selectedChampion.key, skin.num)}
                     alt={skin.name}
                     onClick={() => applySkin(selectedChampion, skin)}
-                    style={{ cursor: "pointer" }}
                   />
                   <span>{skin.num === 0 ? selectedChampion.name : skin.name}</span>
                   <button
