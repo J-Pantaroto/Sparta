@@ -9,7 +9,7 @@ import {
   type PickRecommendation,
   type RecommendedItem
 } from "@sparta/core";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   championSplashUrl,
   championSquareUrl,
@@ -36,7 +36,10 @@ import { Loading } from "./features/Loading";
 import { LinkRiotAccountScreen } from "./features/LinkRiotAccountScreen";
 import { PostGameScreen } from "./features/PostGameScreen";
 import { GrowthJourneyScreen } from "./features/GrowthJourneyScreen";
+import { ScoreBadge } from "./features/ScoreBadge";
 import { SettingsScreen } from "./features/SettingsScreen";
+import { SignalChip } from "./features/SignalChip";
+import { StatBar } from "./features/StatBar";
 import { FeaturedChampionProvider, useFeaturedChampion } from "./features/featured-champion-context";
 
 type Page = "dashboard" | "profile" | "select" | "pregame" | "postgame" | "growth" | "settings";
@@ -55,6 +58,19 @@ const trendLabels: Record<string, string> = {
   improving: "melhorando",
   declining: "piorando",
   stable: "estável"
+};
+
+// Rotulos legiveis pras chaves de PickRecommendation.metrics (@sparta/core) -
+// usados nas barras dos cards de recomendacao do Champion Select.
+const metricLabels: Record<string, string> = {
+  personalPerformance: "Desempenho pessoal",
+  recentForm: "Forma recente",
+  matchup: "Matchup",
+  blindSafety: "Segurança em blind",
+  allySynergy: "Sinergia com o time",
+  enemyDraftAnswer: "Resposta ao draft inimigo",
+  compositionFit: "Encaixe de composição",
+  meta: "Meta do patch"
 };
 
 type SessionStatus = "checking" | "auth" | "link-account" | "ready";
@@ -254,23 +270,18 @@ function Dashboard({ riotAccounts }: { riotAccounts: RiotAccountSummary[] }) {
       <section className="metric-grid">
         <Metric
           label="Forma 10 jogos"
-          value={profile.data ? String(profile.data.recentForm.last10Score) : "—"}
+          value=""
           detail={profile.data ? (trendLabels[profile.data.recentForm.trend] ?? profile.data.recentForm.trend) : "sem dado"}
+          badge={profile.data && <ScoreBadge score={profile.data.recentForm.last10Score} />}
         />
         <Metric
           label="Melhor campeão"
           value={topChampion?.championName ?? "—"}
-          detail={topChampion ? `score ${topChampion.score}` : "sem partidas suficientes"}
+          detail={topChampion ? "score de desempenho" : "sem partidas suficientes"}
+          badge={topChampion && <ScoreBadge score={topChampion.score} size="sm" />}
         />
         <Metric label="Risco atual" value={topWeakness?.label ?? "Sem dado"} detail={topWeakness?.severity ?? "—"} />
         <Metric label="Escopo" value="Pré e pós-game" detail="sem assistência in-game" />
-      </section>
-      <section className="panel wide">
-        <h2>Princípio do produto</h2>
-        <p>
-          O Sparta recomenda campeões com base em desempenho, forma recente e draft. Ele não executa ações no cliente,
-          não automatiza pick/ban e não oferece orientação em tempo real durante a partida.
-        </p>
       </section>
     </>
   );
@@ -413,27 +424,49 @@ function ChampionSelect({
       {recommendationsStatus === "loading" && <Loading label="Calculando recomendações..." />}
       {recommendationsStatus === "error" && <p>Não foi possível calcular recomendações agora.</p>}
       <section className="recommendation-list">
-        {recommendations.map((recommendation) => (
-          <article className="recommendation" key={recommendation.championId}>
-            <div>
-              <span>{recommendation.category}</span>
-              <div className="recommendation-title">
-                <img
-                  className="champion-icon sm"
-                  src={championSquareUrl(recommendation.championName, ddragonVersion)}
-                  alt={recommendation.championName}
-                />
-                <h2>{recommendation.championName}</h2>
+        {recommendations.map((recommendation) => {
+          const topMetrics = Object.entries(recommendation.metrics)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 4);
+          return (
+            <article className="recommendation" key={recommendation.championId}>
+              <div className="recommendation-header">
+                <div>
+                  <span>{recommendation.category}</span>
+                  <div className="recommendation-title">
+                    <img
+                      className="champion-icon sm"
+                      src={championSquareUrl(recommendation.championName, ddragonVersion)}
+                      alt={recommendation.championName}
+                    />
+                    <h2>{recommendation.championName}</h2>
+                  </div>
+                </div>
+                <ScoreBadge score={recommendation.totalScore} />
               </div>
-            </div>
-            <strong>{recommendation.totalScore}</strong>
-            <p>{recommendation.reasons[0]?.detail}</p>
-            {recommendation.warnings.length > 0 ? <small>{recommendation.warnings[0].detail}</small> : null}
-            <button type="button" onClick={() => confirmChampion(recommendation)}>
-              {confirmedChampion?.championId === recommendation.championId ? "Campeão confirmado ✓" : "Confirmar campeão"}
-            </button>
-          </article>
-        ))}
+              <div className="recommendation-bars">
+                {topMetrics.map(([key, value]) => (
+                  <StatBar key={key} label={metricLabels[key] ?? key} value={value} />
+                ))}
+              </div>
+              <div className="signal-chip-list">
+                {recommendation.reasons.map((reason) => (
+                  <SignalChip key={reason.code} tone="positive" title={reason.detail}>
+                    {reason.label}
+                  </SignalChip>
+                ))}
+                {recommendation.warnings.map((warning) => (
+                  <SignalChip key={warning.code} tone="negative" title={warning.detail}>
+                    {warning.label}
+                  </SignalChip>
+                ))}
+              </div>
+              <button type="button" onClick={() => confirmChampion(recommendation)}>
+                {confirmedChampion?.championId === recommendation.championId ? "Campeão confirmado ✓" : "Confirmar campeão"}
+              </button>
+            </article>
+          );
+        })}
       </section>
 
       <section className="panel wide">
@@ -600,11 +633,24 @@ function PreGame({ draft, ddragonVersion }: { draft: DraftState; ddragonVersion:
   );
 }
 
-function Metric({ label, value, detail }: { label: string; value: string; detail: string }) {
+function Metric({
+  label,
+  value,
+  detail,
+  badge
+}: {
+  label: string;
+  value: string;
+  detail: string;
+  badge?: ReactNode;
+}) {
   return (
     <article className="metric">
       <span>{label}</span>
-      <strong>{value}</strong>
+      <div className="metric-value-row">
+        <strong>{value}</strong>
+        {badge}
+      </div>
       <small>{detail}</small>
     </article>
   );
