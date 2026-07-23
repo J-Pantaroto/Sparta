@@ -7,6 +7,8 @@
  * pacote compartilhado mudar.
  */
 
+import type { ChampionClassProfile, ItemSummary } from "@sparta/core";
+
 export const FALLBACK_DATA_DRAGON_VERSION = "14.14.1";
 
 export async function fetchLatestDataDragonVersion(): Promise<string> {
@@ -50,6 +52,69 @@ export async function fetchAllChampions(version = FALLBACK_DATA_DRAGON_VERSION):
     id: Number(champion.key),
     name: champion.name
   }));
+}
+
+/**
+ * Perfil de classe direto da Data Dragon (tags/info do champion.json) -
+ * usado pelo motor de build (`@sparta/core`, `recommendBuild`) em vez da
+ * tabela curada `ChampionTag` (so 2 campeoes seedados hoje). Real, publico,
+ * cobre os ~170 campeoes.
+ */
+export async function fetchChampionClassProfiles(version = FALLBACK_DATA_DRAGON_VERSION): Promise<ChampionClassProfile[]> {
+  const response = await fetch(`https://ddragon.leagueoflegends.com/cdn/${version}/data/pt_BR/champion.json`);
+  if (!response.ok) return [];
+  const payload = (await response.json()) as {
+    data: Record<string, { key: string; name: string; tags: string[]; info: { attack: number; defense: number; magic: number; difficulty: number } }>;
+  };
+  return Object.values(payload.data).map((champion) => ({
+    championId: Number(champion.key),
+    championName: champion.name,
+    tags: champion.tags,
+    attack: champion.info.attack,
+    defense: champion.info.defense,
+    magic: champion.info.magic,
+    difficulty: champion.info.difficulty
+  }));
+}
+
+const ITEM_MAP_SUMMONERS_RIFT = "11";
+
+/**
+ * Catalogo de itens compraveis na Summoner's Rift, direto do item.json da
+ * Data Dragon - mesmo padrao client-side sem rota nova no backend usado
+ * pelos campeoes/skins (Fase 6a). Descarta consumiveis/trinkets/itens de
+ * outros modos de jogo.
+ */
+export async function fetchItemCatalog(version = FALLBACK_DATA_DRAGON_VERSION): Promise<ItemSummary[]> {
+  const response = await fetch(`https://ddragon.leagueoflegends.com/cdn/${version}/data/pt_BR/item.json`);
+  if (!response.ok) return [];
+  const payload = (await response.json()) as {
+    data: Record<
+      string,
+      {
+        name: string;
+        tags?: string[];
+        gold: { total: number; purchasable: boolean };
+        maps: Record<string, boolean>;
+        depth?: number;
+        into?: string[];
+      }
+    >;
+  };
+  return Object.entries(payload.data)
+    .filter(([, item]) => item.gold.purchasable && item.maps[ITEM_MAP_SUMMONERS_RIFT])
+    .map(([itemId, item]) => ({
+      itemId: Number(itemId),
+      name: item.name,
+      tags: item.tags ?? [],
+      goldTotal: item.gold.total,
+      depth: item.depth,
+      into: item.into
+    }));
+}
+
+export function itemIconUrl(itemId: number, version = FALLBACK_DATA_DRAGON_VERSION): string {
+  return `https://ddragon.leagueoflegends.com/cdn/${version}/img/item/${itemId}.png`;
 }
 
 export interface DataDragonSkin {
