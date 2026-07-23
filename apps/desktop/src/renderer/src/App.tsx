@@ -10,7 +10,8 @@ import {
   type ItemSummary,
   type PickRecommendation,
   type PlayerWeakness,
-  type RecommendedItem
+  type RecommendedItem,
+  type Role
 } from "@sparta/core";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
@@ -76,6 +77,16 @@ const confidenceLabels: Record<Confidence, string> = {
   low: "baixa",
   medium: "média",
   high: "alta"
+};
+
+const ROLES: Role[] = ["TOP", "JUNGLE", "MID", "ADC", "SUPPORT"];
+
+const roleLabels: Record<Role, string> = {
+  TOP: "Top",
+  JUNGLE: "Jungle",
+  MID: "Mid",
+  ADC: "ADC",
+  SUPPORT: "Suporte"
 };
 
 // Rotulos legiveis pras chaves de PickRecommendation.metrics (@sparta/core) -
@@ -149,10 +160,15 @@ function AppShell() {
   }, []);
 
   // Deteccao automatica de champion select via LCU (somente leitura).
+  // `champSelectActive` libera a tela de Champion Select (fora dele, a aba
+  // mostra uma tela de espera + botao de simulacao manual).
+  const [champSelectActive, setChampSelectActive] = useState(false);
   useEffect(() => {
     if (sessionStatus !== "ready" || !window.sparta?.onGameflowPhase) return;
     const unsubscribe = window.sparta.onGameflowPhase((phase) => {
-      if (phase === "ChampSelect") setPage("select");
+      const active = phase === "ChampSelect";
+      setChampSelectActive(active);
+      if (active) setPage("select");
     });
     return unsubscribe;
   }, [sessionStatus]);
@@ -171,6 +187,21 @@ function AppShell() {
     if (autoPickOrder === null) return;
     setDraft((current) => (current.pickOrder === autoPickOrder ? current : { ...current, pickOrder: autoPickOrder }));
   }, [autoPickOrder]);
+
+  // Papel real do jogador (derivado do assignedPosition do LCU), quando
+  // disponivel - reflete troca de lane ao vivo. null sem cliente do League
+  // (dev/testing) - o seletor manual continua disponivel.
+  const [autoPlayerRole, setAutoPlayerRole] = useState<Role | null>(null);
+  useEffect(() => {
+    if (sessionStatus !== "ready" || !window.sparta?.onPlayerRole) return;
+    const unsubscribe = window.sparta.onPlayerRole(setAutoPlayerRole);
+    return unsubscribe;
+  }, [sessionStatus]);
+
+  useEffect(() => {
+    if (autoPlayerRole === null) return;
+    setDraft((current) => (current.playerRole === autoPlayerRole ? current : { ...current, playerRole: autoPlayerRole }));
+  }, [autoPlayerRole]);
 
   function handleAuthenticated(token: string) {
     localStorage.setItem(SESSION_TOKEN_KEY, token);
@@ -249,6 +280,8 @@ function AppShell() {
             draft={draft}
             setDraft={setDraft}
             autoPickOrder={autoPickOrder}
+            autoPlayerRole={autoPlayerRole}
+            champSelectActive={champSelectActive}
             recommendations={recommendationsQuery.data ?? []}
             recommendationsStatus={recommendationsQuery.status}
             noAccountLinked={riotAccounts.length === 0}
@@ -276,9 +309,12 @@ function Dashboard({ riotAccounts, ddragonVersion }: { riotAccounts: RiotAccount
     [account?.gameName, account?.tagLine]
   );
 
-  const topChampion = profile.data && profile.data.championStats.length > 0 ? rankChampionPool(profile.data.championStats)[0] : undefined;
-  const topWeakness = profile.data?.weaknesses[0];
-  const topStrength = profile.data?.strengths[0];
+  const rankedChampions = profile.data ? rankChampionPool(profile.data.championStats) : [];
+  const topChampions = rankedChampions.slice(0, 3);
+  const topChampion = topChampions[0];
+  const recentForm = profile.data?.recentForm;
+  const strengths = profile.data?.strengths ?? [];
+  const weaknesses = profile.data?.weaknesses ?? [];
 
   return (
     <>
@@ -286,12 +322,15 @@ function Dashboard({ riotAccounts, ddragonVersion }: { riotAccounts: RiotAccount
         <span>{account ? `${account.gameName}#${account.tagLine}` : "Sparta MVP"}</span>
         <h1>Escolhas melhores antes da partida. Revisões melhores depois.</h1>
       </header>
+
+      {profile.status === "loading" && <Loading label="Carregando seu perfil..." />}
+
       <section className="metric-grid">
         <Metric
-          label="Forma 10 jogos"
+          label="Forma recente"
           value=""
-          detail={profile.data ? (trendLabels[profile.data.recentForm.trend] ?? profile.data.recentForm.trend) : "sem dado"}
-          badge={profile.data && <ScoreBadge score={profile.data.recentForm.last10Score} />}
+          detail={recentForm ? (trendLabels[recentForm.trend] ?? recentForm.trend) : "sem dado"}
+          badge={recentForm && <ScoreBadge score={recentForm.last10Score} />}
         />
         <Metric
           label="Melhor campeão"
@@ -306,11 +345,68 @@ function Dashboard({ riotAccounts, ddragonVersion }: { riotAccounts: RiotAccount
         />
         <Metric
           label="Ponto forte"
-          value={topStrength?.label ?? "Sem dado"}
-          detail={topStrength ? confidenceLabels[topStrength.confidence] : "—"}
+          value={strengths[0]?.label ?? "Sem dado"}
+          detail={strengths[0] ? confidenceLabels[strengths[0].confidence] : "—"}
         />
-        <Metric label="Risco atual" value={topWeakness?.label ?? "Sem dado"} detail={topWeakness ? severityLabels[topWeakness.severity] : "—"} />
+        <Metric label="Risco atual" value={weaknesses[0]?.label ?? "Sem dado"} detail={weaknesses[0] ? severityLabels[weaknesses[0].severity] : "—"} />
       </section>
+
+      {recentForm && (
+        <section className="panel wide">
+          <h2>Forma recente</h2>
+          <p>Score de desempenho ponderado por recência - quanto mais recente a partida, mais peso ela tem.</p>
+          <div className="form-scores">
+            <div className="form-score">
+              <ScoreBadge score={recentForm.last10Score} size="sm" />
+              <span>Últimas 10</span>
+            </div>
+            <div className="form-score">
+              <ScoreBadge score={recentForm.last20Score} size="sm" />
+              <span>Últimas 20</span>
+            </div>
+            <div className="form-score">
+              <ScoreBadge score={recentForm.last50Score} size="sm" />
+              <span>Últimas 50</span>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {topChampions.length > 0 && (
+        <section className="panel wide">
+          <h2>Seus melhores campeões</h2>
+          <div className="leaderboard">
+            {topChampions.map((champion, index) => (
+              <div className="leaderboard-row" key={`${champion.championId}-${champion.role}`}>
+                <span className="leaderboard-rank">#{index + 1}</span>
+                <ChampionIcon championId={champion.championId} ddragonVersion={ddragonVersion} size="sm" alt={champion.championName} />
+                <strong>{champion.championName}</strong>
+                <span className="leaderboard-role">{roleLabels[champion.role]}</span>
+                <span className="leaderboard-games">{champion.games} partidas</span>
+                <ScoreBadge score={champion.score} size="sm" />
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {(strengths.length > 0 || weaknesses.length > 0) && (
+        <section className="panel wide">
+          <h2>Pontos fortes e fracos</h2>
+          <div className="signal-chip-list">
+            {strengths.map((strength) => (
+              <SignalChip key={strength.code} tone="positive">
+                {strength.detail}
+              </SignalChip>
+            ))}
+            {weaknesses.map((weakness) => (
+              <SignalChip key={weakness.code} tone="negative">
+                {weakness.detail}
+              </SignalChip>
+            ))}
+          </div>
+        </section>
+      )}
     </>
   );
 }
@@ -395,6 +491,8 @@ function ChampionSelect({
   draft,
   setDraft,
   autoPickOrder,
+  autoPlayerRole,
+  champSelectActive,
   recommendations,
   recommendationsStatus,
   noAccountLinked,
@@ -403,12 +501,18 @@ function ChampionSelect({
   draft: DraftState;
   setDraft: (draft: DraftState) => void;
   autoPickOrder: number | null;
+  autoPlayerRole: Role | null;
+  champSelectActive: boolean;
   recommendations: PickRecommendation[];
   recommendationsStatus: string;
   noAccountLinked: boolean;
   ddragonVersion: string;
 }) {
   const [confirmedChampion, setConfirmedChampion] = useState<{ championId: number; championName: string } | null>(null);
+  // Modo de simulacao manual: liberado so quando NAO ha sessao real de
+  // champion select detectada (senao a tela abre direto). Deixa testar a
+  // tela sem o cliente do League aberto.
+  const [devOverride, setDevOverride] = useState(false);
 
   function toggleEnemy(champion: DataDragonChampionSummary) {
     const alreadyPicked = draft.enemies.some((enemy) => enemy.championId === champion.id);
@@ -428,16 +532,56 @@ function ChampionSelect({
     setDraft({ ...draft, selectedChampionId: recommendation.championId });
   }
 
+  // Sem sessao real do LCU e sem o usuario ter pedido simulacao: tela de
+  // espera. Champion Select nao e um modulo de uso livre (feedback do
+  // usuario) - so faz sentido dentro de uma selecao de campeoes de verdade.
+  if (!champSelectActive && !devOverride) {
+    return (
+      <>
+        <header className="page-header compact">
+          <span>Champion Select</span>
+          <h1>Aguardando sua seleção de campeões</h1>
+        </header>
+        <section className="panel wide">
+          <p>
+            Esta tela é liberada automaticamente quando o cliente do League detectar que você entrou em uma seleção de
+            campeões - a posição, a ordem de pick e o time inimigo passam a ser preenchidos sozinhos.
+          </p>
+          <button type="button" className="btn-secondary" onClick={() => setDevOverride(true)}>
+            Simular manualmente
+          </button>
+        </section>
+      </>
+    );
+  }
+
   return (
     <>
       <header className="page-header compact">
-        <span>{autoPickOrder !== null ? "Detectado via League Client" : "Modo manual"}</span>
+        <span>{champSelectActive ? "Detectado via League Client" : "Modo manual (simulação)"}</span>
         <h1>Champion Select</h1>
       </header>
       {noAccountLinked && (
         <p>Sem conta Riot vinculada - as recomendações abaixo usam só a referência geral do papel, não seu histórico.</p>
       )}
       <section className="draft-controls">
+        {autoPlayerRole !== null ? (
+          <label>
+            Posição
+            <strong style={{ display: "block" }}>{roleLabels[autoPlayerRole]}</strong>
+          </label>
+        ) : (
+          <label>
+            Posição
+            <select value={draft.playerRole} onChange={(event) => setDraft({ ...draft, playerRole: event.target.value as Role })}>
+              {ROLES.map((role) => (
+                <option key={role} value={role}>
+                  {roleLabels[role]}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         {autoPickOrder !== null ? (
           <label>
             Pick order
