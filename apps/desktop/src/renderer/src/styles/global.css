@@ -410,6 +410,90 @@ p {
   gap: 10px;
 }
 
+.recommendation button {
+  grid-column: 1 / -1;
+  justify-self: start;
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--color-red-soft);
+  border-radius: 8px;
+  background: var(--color-surface-elevated);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.recommendation button:hover {
+  background: #1a0d0d;
+}
+
+/* Seletor de campeao reusavel (time inimigo, seletor de skin) */
+.champion-grid-picker input {
+  width: 100%;
+  max-width: 320px;
+  height: 40px;
+  margin-bottom: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+  padding: 0 12px;
+  transition: border-color var(--transition-fast);
+}
+
+.champion-grid-picker input:focus {
+  outline: none;
+  border-color: var(--color-red-soft);
+}
+
+.champion-grid-picker .theme-picker-option:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.build-panel h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.build-slots {
+  display: grid;
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.build-slot span {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.build-item-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.build-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px 6px 6px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface-elevated);
+  transition: border-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.build-item:hover {
+  border-color: var(--color-red-soft);
+  transform: translateY(-2px);
+}
+
 .hero-splash {
   position: relative;
   border-radius: 8px;

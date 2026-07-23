@@ -1,8 +1,7 @@
 import { useState } from "react";
+import { ChampionGridPicker } from "./ChampionGridPicker";
 import {
   championSplashUrl,
-  championSquareUrl,
-  fetchAllChampions,
   fetchChampionSkins,
   type DataDragonChampionSummary,
   type DataDragonSkin
@@ -23,19 +22,13 @@ interface ChampionSkinPickerProps {
  */
 export function ChampionSkinPicker({ ddragonVersion }: ChampionSkinPickerProps) {
   const { featuredChampion, setFeaturedChampion } = useFeaturedChampion();
-  const [search, setSearch] = useState("");
   const [selectedChampion, setSelectedChampion] = useState<DataDragonChampionSummary | null>(null);
   const [downloadingSkin, setDownloadingSkin] = useState<number | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
 
-  const champions = useAsyncData<DataDragonChampionSummary[]>(() => fetchAllChampions(ddragonVersion), [ddragonVersion]);
   const skins = useAsyncData<DataDragonSkin[]>(
     () => (selectedChampion ? fetchChampionSkins(selectedChampion.key, ddragonVersion) : undefined),
     [selectedChampion?.key, ddragonVersion]
-  );
-
-  const filteredChampions = (champions.data ?? []).filter((champion) =>
-    champion.name.toLowerCase().includes(search.toLowerCase())
   );
 
   function applySkin(champion: DataDragonChampionSummary, skin: DataDragonSkin) {
@@ -72,29 +65,7 @@ export function ChampionSkinPicker({ ddragonVersion }: ChampionSkinPickerProps) 
       </p>
 
       {!selectedChampion && (
-        <>
-          <input
-            type="text"
-            placeholder="Buscar campeão..."
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-          />
-          {champions.status === "loading" && <p>Carregando campeões...</p>}
-          {champions.status === "error" && <p>{champions.error}</p>}
-          <div className="theme-picker-grid">
-            {filteredChampions.map((champion) => (
-              <button
-                key={champion.key}
-                type="button"
-                className="theme-picker-option"
-                onClick={() => setSelectedChampion(champion)}
-                title={champion.name}
-              >
-                <img className="champion-icon sm" src={championSquareUrl(champion.key, ddragonVersion)} alt={champion.name} />
-              </button>
-            ))}
-          </div>
-        </>
+        <ChampionGridPicker ddragonVersion={ddragonVersion} onSelect={setSelectedChampion} />
       )}
 
       {selectedChampion && (

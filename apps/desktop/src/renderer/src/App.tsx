@@ -1,7 +1,15 @@
 import { Activity, BarChart3, Crosshair, Gauge, Settings as SettingsIcon, Shield, Swords, TrendingUp } from "lucide-react";
-import { rankChampionPool, type DraftState, type PickRecommendation } from "@sparta/core";
+import { rankChampionPool, recommendBuild, type ChampionClassProfile, type DraftState, type ItemSummary, type PickRecommendation, type RecommendedItem } from "@sparta/core";
 import { useEffect, useMemo, useState } from "react";
-import { championSplashUrl, championSquareUrl, fetchLatestDataDragonVersion } from "./features/datadragon";
+import {
+  championSplashUrl,
+  championSquareUrl,
+  fetchChampionClassProfiles,
+  fetchItemCatalog,
+  fetchLatestDataDragonVersion,
+  itemIconUrl,
+  type DataDragonChampionSummary
+} from "./features/datadragon";
 import {
   fetchDraftRecommendations,
   fetchPlayerProfile,
@@ -13,6 +21,7 @@ import {
 } from "./features/api-client";
 import { useAsyncData } from "./features/use-async-data";
 import { AuthScreen } from "./features/AuthScreen";
+import { ChampionGridPicker } from "./features/ChampionGridPicker";
 import { LinkRiotAccountScreen } from "./features/LinkRiotAccountScreen";
 import { PostGameScreen } from "./features/PostGameScreen";
 import { GrowthJourneyScreen } from "./features/GrowthJourneyScreen";
@@ -321,6 +330,8 @@ function Profile({ riotAccounts, ddragonVersion }: { riotAccounts: RiotAccountSu
   );
 }
 
+const MAX_ENEMIES = 5;
+
 function ChampionSelect({
   draft,
   setDraft,
@@ -338,6 +349,26 @@ function ChampionSelect({
   noAccountLinked: boolean;
   ddragonVersion: string;
 }) {
+  const [confirmedChampion, setConfirmedChampion] = useState<{ championId: number; championName: string } | null>(null);
+
+  function toggleEnemy(champion: DataDragonChampionSummary) {
+    const alreadyPicked = draft.enemies.some((enemy) => enemy.championId === champion.id);
+    if (alreadyPicked) {
+      setDraft({ ...draft, enemies: draft.enemies.filter((enemy) => enemy.championId !== champion.id) });
+      return;
+    }
+    if (draft.enemies.length >= MAX_ENEMIES) return;
+    // "role" e obrigatorio no tipo DraftPick mas nao e usado pelo motor de
+    // build (so championId importa aqui) - mantido como placeholder, mesmo
+    // padrao do antigo botao-demo que hardcodava "MID" pro Yasuo.
+    setDraft({ ...draft, enemies: [...draft.enemies, { championId: champion.id, championName: champion.name, role: "MID", team: "enemy" }] });
+  }
+
+  function confirmChampion(recommendation: PickRecommendation) {
+    setConfirmedChampion({ championId: recommendation.championId, championName: recommendation.championName });
+    setDraft({ ...draft, selectedChampionId: recommendation.championId });
+  }
+
   return (
     <>
       <header className="page-header compact">
@@ -365,20 +396,6 @@ function ChampionSelect({
             />
           </label>
         )}
-        <button
-          onClick={() =>
-            setDraft({
-              ...draft,
-              enemyLaneChampionId: draft.enemyLaneChampionId ? undefined : 157,
-              enemies: draft.enemyLaneChampionId
-                ? []
-                : [{ championId: 157, championName: "Yasuo", role: "MID", team: "enemy" }]
-            })
-          }
-        >
-          <Swords size={16} />
-          Alternar inimigo revelado
-        </button>
       </section>
       {recommendationsStatus === "loading" && <p>Calculando recomendações...</p>}
       {recommendationsStatus === "error" && <p>Não foi possível calcular recomendações agora.</p>}
@@ -399,10 +416,108 @@ function ChampionSelect({
             <strong>{recommendation.totalScore}</strong>
             <p>{recommendation.reasons[0]?.detail}</p>
             {recommendation.warnings.length > 0 ? <small>{recommendation.warnings[0].detail}</small> : null}
+            <button type="button" onClick={() => confirmChampion(recommendation)}>
+              {confirmedChampion?.championId === recommendation.championId ? "Campeão confirmado ✓" : "Confirmar campeão"}
+            </button>
           </article>
         ))}
       </section>
+
+      <section className="panel wide">
+        <h2>
+          <Swords size={16} /> Time inimigo ({draft.enemies.length}/{MAX_ENEMIES})
+        </h2>
+        <p>Selecione os campeões inimigos conhecidos - a build sugerida abaixo se ajusta ao que já foi revelado.</p>
+        <ChampionGridPicker
+          ddragonVersion={ddragonVersion}
+          onSelect={toggleEnemy}
+          isSelected={(champion) => draft.enemies.some((enemy) => enemy.championId === champion.id)}
+          isDisabled={() => draft.enemies.length >= MAX_ENEMIES}
+        />
+      </section>
+
+      {confirmedChampion && (
+        <BuildPanel confirmedChampion={confirmedChampion} enemies={draft.enemies} ddragonVersion={ddragonVersion} />
+      )}
     </>
+  );
+}
+
+function BuildPanel({
+  confirmedChampion,
+  enemies,
+  ddragonVersion
+}: {
+  confirmedChampion: { championId: number; championName: string };
+  enemies: DraftState["enemies"];
+  ddragonVersion: string;
+}) {
+  const classProfiles = useAsyncData<ChampionClassProfile[]>(() => fetchChampionClassProfiles(ddragonVersion), [ddragonVersion]);
+  const itemCatalog = useAsyncData<ItemSummary[]>(() => fetchItemCatalog(ddragonVersion), [ddragonVersion]);
+
+  const build = useMemo(() => {
+    if (!classProfiles.data || !itemCatalog.data) return undefined;
+    const ownChampion = classProfiles.data.find((champion) => champion.championId === confirmedChampion.championId);
+    const enemyChampions = enemies
+      .map((enemy) => classProfiles.data?.find((champion) => champion.championId === enemy.championId))
+      .filter((champion): champion is ChampionClassProfile => champion !== undefined);
+    return recommendBuild({ ownChampion, enemyChampions, items: itemCatalog.data });
+  }, [classProfiles.data, itemCatalog.data, confirmedChampion.championId, enemies]);
+
+  const loading = classProfiles.status === "loading" || itemCatalog.status === "loading";
+
+  return (
+    <section className="panel wide build-panel">
+      <h2>Build sugerida - {confirmedChampion.championName}</h2>
+      {loading && <p>Carregando build...</p>}
+      {build && (
+        <>
+          <div className="build-slots">
+            {build.boots && (
+              <div className="build-slot">
+                <span>Botas</span>
+                <BuildItemIcon item={build.boots} ddragonVersion={ddragonVersion} />
+              </div>
+            )}
+            <div className="build-slot">
+              <span>Itens core</span>
+              <div className="build-item-row">
+                {build.coreItems.map((item) => (
+                  <BuildItemIcon key={item.itemId} item={item} ddragonVersion={ddragonVersion} />
+                ))}
+              </div>
+            </div>
+            {build.situationalItems.length > 0 && (
+              <div className="build-slot">
+                <span>Situacional</span>
+                <div className="build-item-row">
+                  {build.situationalItems.map((item) => (
+                    <BuildItemIcon key={item.itemId} item={item} ddragonVersion={ddragonVersion} />
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          {build.reasons.map((reason) => (
+            <p key={reason.code}>✓ {reason.detail}</p>
+          ))}
+          {build.warnings.map((warning) => (
+            <p key={warning.code}>
+              <small>⚠ {warning.detail}</small>
+            </p>
+          ))}
+        </>
+      )}
+    </section>
+  );
+}
+
+function BuildItemIcon({ item, ddragonVersion }: { item: RecommendedItem; ddragonVersion: string }) {
+  return (
+    <div className="build-item" title={item.reason}>
+      <img className="champion-icon sm" src={itemIconUrl(item.itemId, ddragonVersion)} alt={item.name} />
+      <span>{item.name}</span>
+    </div>
   );
 }
 

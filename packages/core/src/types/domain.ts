@@ -256,3 +256,44 @@ export interface GrowthJourney {
   weaknessTrends: WeaknessTrend[];
   matchesAnalyzed: number;
 }
+
+/**
+ * Perfil de classe de um campeao vindo direto da Data Dragon (`tags`/`info`
+ * do `champion.json`) - dado real da Riot, disponivel pros ~170 campeoes,
+ * usado pelo motor de build (Fase 8) em vez da tabela curada `ChampionTag`
+ * (que so tem 2 campeoes seedados hoje e nao cobriria um time inimigo
+ * inteiro de campeoes quaisquer).
+ */
+export interface ChampionClassProfile {
+  championId: number;
+  championName: string;
+  tags: string[];
+  attack: number;
+  defense: number;
+  magic: number;
+  difficulty: number;
+}
+
+export interface ItemSummary {
+  itemId: number;
+  name: string;
+  tags: string[];
+  goldTotal: number;
+  depth?: number;
+  /** IDs dos itens em que este evolui - ausente/vazio significa "item final", sinal usado pra priorizar itens completos na build. */
+  into?: string[];
+}
+
+export interface RecommendedItem {
+  itemId: number;
+  name: string;
+  reason: string;
+}
+
+export interface BuildRecommendation {
+  boots: RecommendedItem | undefined;
+  coreItems: RecommendedItem[];
+  situationalItems: RecommendedItem[];
+  reasons: RecommendationReason[];
+  warnings: RecommendationReason[];
+}
