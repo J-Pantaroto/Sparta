@@ -5,6 +5,7 @@ interface StatBarProps {
   value: number;
   variant?: "score" | "ratio";
   detail?: string;
+  invert?: boolean;
 }
 
 /**
@@ -17,8 +18,11 @@ interface StatBarProps {
  *   (50%) marcando a baseline; cor pelos limiares RATIO_STRENGTH_THRESHOLD/
  *   RATIO_WEAKNESS_THRESHOLD. Ambos os pares de limiar ja existem em
  *   dimension-signals.ts, nao inventados aqui.
+ * `invert` so se aplica a variante "score": pra valores onde numero alto e
+ * ruim (ex. taxa de presenca de um ponto fraco na Evolucao) - largura
+ * continua = valor (o numero exibido nao muda), so a cor troca de lado.
  */
-export function StatBar({ label, value, variant = "score", detail }: StatBarProps) {
+export function StatBar({ label, value, variant = "score", detail, invert = false }: StatBarProps) {
   const isRatio = variant === "ratio";
   const widthPercent = isRatio ? Math.max(0, Math.min(100, (value / 2) * 100)) : Math.max(0, Math.min(100, value));
   const color = isRatio
@@ -27,9 +31,9 @@ export function StatBar({ label, value, variant = "score", detail }: StatBarProp
       : value <= RATIO_WEAKNESS_THRESHOLD
         ? "var(--color-red)"
         : "var(--color-yellow)"
-    : value >= SCORE_STRENGTH_THRESHOLD
+    : (invert ? value <= SCORE_WEAKNESS_THRESHOLD : value >= SCORE_STRENGTH_THRESHOLD)
       ? "var(--color-green)"
-      : value <= SCORE_WEAKNESS_THRESHOLD
+      : (invert ? value >= SCORE_STRENGTH_THRESHOLD : value <= SCORE_WEAKNESS_THRESHOLD)
         ? "var(--color-red)"
         : "var(--color-yellow)";
 

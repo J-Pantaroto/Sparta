@@ -2,6 +2,7 @@ import { Activity, BarChart3, Crosshair, Gauge, Settings as SettingsIcon, Shield
 import {
   rankChampionPool,
   recommendBuild,
+  scoreChampionPerformance,
   summarizeEnemyDamageLean,
   type ChampionClassProfile,
   type DraftState,
@@ -316,36 +317,47 @@ function Profile({ riotAccounts, ddragonVersion }: { riotAccounts: RiotAccountSu
       {profile.data && (
         <>
           <section className="table-panel">
-            {profile.data.championStats.map((champion) => (
-              <article className="champion-row" key={`${champion.championId}-${champion.role}`}>
-                <div className="champion-identity">
-                  <img
-                    className="champion-icon"
-                    src={championSquareUrl(champion.championName, ddragonVersion)}
-                    alt={champion.championName}
-                  />
-                  <strong>{champion.championName}</strong>
-                </div>
-                <span>{champion.games} partidas</span>
-                <span>{Math.round((champion.wins / champion.games) * 100)}% WR</span>
-                <span>{champion.csPerMinute.toFixed(1)} CS/min</span>
-                <span>{champion.damagePerMinute} dano/min</span>
-              </article>
-            ))}
+            {profile.data.championStats.map((champion) => {
+              const performance = scoreChampionPerformance(champion);
+              return (
+                <article className="champion-row" key={`${champion.championId}-${champion.role}`}>
+                  <div className="champion-identity">
+                    <img
+                      className="champion-icon"
+                      src={championSquareUrl(champion.championName, ddragonVersion)}
+                      alt={champion.championName}
+                    />
+                    <strong>{champion.championName}</strong>
+                    {performance.eligible && <ScoreBadge score={performance.score} size="sm" />}
+                  </div>
+                  <span>{champion.games} partidas</span>
+                  <span>{Math.round((champion.wins / champion.games) * 100)}% WR</span>
+                  <div className="champion-row-bars">
+                    <StatBar label="KDA" value={performance.components.kda} />
+                    <StatBar label="CS/min" value={performance.components.cs} />
+                    <StatBar label="Dano/min" value={performance.components.damage} />
+                  </div>
+                </article>
+              );
+            })}
           </section>
           <section className="panel wide">
             <h2>Pontos fortes e fracos</h2>
             {profile.data.strengths.length === 0 && profile.data.weaknesses.length === 0 ? (
               <p>Ainda sem histórico suficiente pra apontar pontos fortes/fracos.</p>
             ) : (
-              <>
+              <div className="signal-chip-list">
                 {profile.data.strengths.map((strength) => (
-                  <p key={strength.code}>✓ {strength.detail}</p>
+                  <SignalChip key={strength.code} tone="positive">
+                    {strength.detail}
+                  </SignalChip>
                 ))}
                 {profile.data.weaknesses.map((weakness) => (
-                  <p key={weakness.code}>⚠ {weakness.detail}</p>
+                  <SignalChip key={weakness.code} tone="negative">
+                    {weakness.detail}
+                  </SignalChip>
                 ))}
-              </>
+              </div>
             )}
           </section>
         </>

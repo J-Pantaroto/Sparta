@@ -430,11 +430,16 @@ p {
 
 .champion-row {
   display: grid;
-  grid-template-columns: 1.2fr repeat(4, 1fr);
+  grid-template-columns: 1.3fr 0.7fr 0.7fr 1.8fr;
   gap: 12px;
   padding: 16px 18px;
   border-bottom: 1px solid var(--color-border);
   transition: background-color var(--transition-fast);
+}
+
+.champion-row-bars {
+  display: grid;
+  gap: 6px;
 }
 
 .champion-row:hover {
@@ -567,7 +572,13 @@ p {
 }
 
 .score-badge span {
+  /* Sobrescreve `color` de regras genericas mais antigas de mesma
+     especificidade (`.metric span`, `.recommendation span`,
+     `.champion-row span` - todas coloriam o numero do badge de
+     vermelho/cinza sem querer, ja que span descendente casa em qualquer
+     profundidade) - bug real encontrado na validacao visual da Fase 9b. */
   position: relative;
+  color: var(--color-text-primary);
 }
 
 /* Barra de estatistica (Fase 9) - div com width% simples, sem lib */

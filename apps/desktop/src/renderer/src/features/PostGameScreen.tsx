@@ -1,8 +1,10 @@
 import { useState } from "react";
-import type { PostGameAnalysis, RecentChampionMatch } from "@sparta/core";
+import { calculateKda, roleBaselines, type PostGameAnalysis, type RecentChampionMatch } from "@sparta/core";
 import { analyzePostgame, ApiError, fetchPostgameReport, fetchRecentMatches, type RiotAccountSummary } from "./api-client";
 import { championSquareUrl, fetchAllChampions, type DataDragonChampionSummary } from "./datadragon";
 import { Loading } from "./Loading";
+import { SignalChip } from "./SignalChip";
+import { StatBar } from "./StatBar";
 import { useAsyncData } from "./use-async-data";
 
 interface PostGameScreenProps {
@@ -83,6 +85,27 @@ export function PostGameScreen({ riotAccounts, sessionToken, ddragonVersion }: P
     );
   }
 
+  const selectedMatch = matches.data?.matches.find((match) => match.matchId === selectedMatchId);
+  // Barras "ratio" (valor da partida / baseline do role) - mesmo padrao
+  // client-side ja usado pelo motor de build/Pre-game (Fase 8): sem rota
+  // nova, so combina PostGameAnalysis.metrics (ja real) com roleBaselines
+  // (ja exportado) usando o role da partida (RecentChampionMatch, ja
+  // carregado na lista acima, casado por matchId).
+  const ratioBars =
+    report && selectedMatch
+      ? (() => {
+          const baseline = roleBaselines[selectedMatch.role];
+          const kda = calculateKda(report.metrics.kills, report.metrics.deaths, report.metrics.assists);
+          return [
+            { label: "KDA", value: kda / baseline.kda },
+            { label: "CS/min", value: report.metrics.csPerMinute / baseline.cs },
+            { label: "Dano/min", value: report.metrics.damagePerMinute / baseline.damage },
+            { label: "Visão/min", value: report.metrics.visionScorePerMinute / baseline.vision },
+            { label: "Ouro/min", value: report.metrics.goldPerMinute / baseline.gold }
+          ];
+        })()
+      : [];
+
   return (
     <>
       <header className="page-header compact">
@@ -134,12 +157,25 @@ export function PostGameScreen({ riotAccounts, sessionToken, ddragonVersion }: P
                 <strong>Execução: </strong>
                 {report.executionSummary}
               </p>
-              {report.strengths.map((strength) => (
-                <p key={strength.code}>✓ {strength.detail}</p>
-              ))}
-              {report.weaknesses.map((weakness) => (
-                <p key={weakness.code}>⚠ {weakness.detail}</p>
-              ))}
+              {ratioBars.length > 0 && (
+                <div className="recommendation-bars">
+                  {ratioBars.map((bar) => (
+                    <StatBar key={bar.label} label={bar.label} value={bar.value} variant="ratio" />
+                  ))}
+                </div>
+              )}
+              <div className="signal-chip-list">
+                {report.strengths.map((strength) => (
+                  <SignalChip key={strength.code} tone="positive">
+                    {strength.detail}
+                  </SignalChip>
+                ))}
+                {report.weaknesses.map((weakness) => (
+                  <SignalChip key={weakness.code} tone="negative">
+                    {weakness.detail}
+                  </SignalChip>
+                ))}
+              </div>
               {report.tips.map((tip) => (
                 <p key={tip}>💡 {tip}</p>
               ))}

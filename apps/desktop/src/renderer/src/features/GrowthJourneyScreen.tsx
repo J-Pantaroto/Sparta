@@ -2,6 +2,7 @@ import type { GrowthJourney, WeaknessTrend } from "@sparta/core";
 import { Minus, TrendingDown, TrendingUp } from "lucide-react";
 import { fetchGrowthJourney, type RiotAccountSummary } from "./api-client";
 import { Loading } from "./Loading";
+import { StatBar } from "./StatBar";
 import { useAsyncData } from "./use-async-data";
 
 interface GrowthJourneyScreenProps {
@@ -58,8 +59,10 @@ export function GrowthJourneyScreen({ riotAccounts }: GrowthJourneyScreenProps) 
                 <article className="champion-row" key={trend.code}>
                   <strong>{trend.label}</strong>
                   <TrendCell trend={trend.trend} />
-                  <span>{trend.recentRate}% recente</span>
-                  <span>{trend.previousRate}% anterior</span>
+                  <div className="champion-row-bars" style={{ gridColumn: "3 / span 2" }}>
+                    <StatBar label="Recente" value={trend.recentRate} invert detail={`${trend.recentRate}%`} />
+                    <StatBar label="Anterior" value={trend.previousRate} invert detail={`${trend.previousRate}%`} />
+                  </div>
                 </article>
               ))}
             </section>
