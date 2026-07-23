@@ -12,7 +12,16 @@ export default defineConfig({
   preload: {
     build: {
       rollupOptions: {
-        input: "src/preload/index.ts"
+        input: "src/preload/index.ts",
+        output: {
+          // Sandboxed renderers carregam o preload via um loader que nao
+          // entende `import`/ESM (erro real: "Cannot use import statement
+          // outside a module") mesmo com extensao .mjs - forca CJS
+          // (.cjs, ignora o "type":"module" do package.json) pra carregar
+          // de verdade dentro do processo renderer sandboxed.
+          format: "cjs",
+          entryFileNames: "[name].cjs"
+        }
       }
     }
   },
