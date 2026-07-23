@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { LcuGameflowPhase } from "@sparta/riot";
+import type { Role } from "@sparta/core";
 
 contextBridge.exposeInMainWorld("sparta", {
   version: "0.1.0",
@@ -29,5 +30,16 @@ contextBridge.exposeInMainWorld("sparta", {
     const listener = (_event: unknown, pickOrder: number | null) => callback(pickOrder);
     ipcRenderer.on("sparta:pick-order", listener);
     return () => ipcRenderer.removeListener("sparta:pick-order", listener);
+  },
+  /**
+   * Assina o papel real do jogador (Top/Jungle/Mid/ADC/Support) durante
+   * champion select, derivado do assignedPosition do LCU - reflete troca de
+   * lane ao vivo. null fora do champion select ou quando a posicao ainda nao
+   * pode ser determinada (blind pick, ARAM, sessao carregando).
+   */
+  onPlayerRole(callback: (role: Role | null) => void) {
+    const listener = (_event: unknown, role: Role | null) => callback(role);
+    ipcRenderer.on("sparta:player-role", listener);
+    return () => ipcRenderer.removeListener("sparta:player-role", listener);
   }
 });

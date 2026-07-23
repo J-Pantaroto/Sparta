@@ -1,7 +1,8 @@
 import { app, BrowserWindow, ipcMain } from "electron";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { derivePickOrder, LcuReadOnlyClient, type LcuGameflowPhase } from "@sparta/riot";
+import { derivePickOrder, derivePlayerRole, LcuReadOnlyClient, type LcuGameflowPhase } from "@sparta/riot";
+import type { Role } from "@sparta/core";
 
 const GAMEFLOW_POLL_INTERVAL_MS = 2500;
 
@@ -14,7 +15,13 @@ const GAMEFLOW_POLL_INTERVAL_MS = 2500;
  */
 function registerSkinDownloadHandler() {
   ipcMain.handle("sparta:download-skin", async (_event, url: string, fileName: string) => {
-    const response = await fetch(url);
+    // A CDN da Data Dragon (Akamai) responde 403 pra requisicoes sem
+    // User-Agent - o fetch do processo main (Node/Electron) nao manda um por
+    // padrao, entao o download quebrava (bug real reportado). Um UA de
+    // navegador resolve.
+    const response = await fetch(url, {
+      headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Sparta-Desktop" }
+    });
     if (!response.ok) throw new Error(`Falha ao baixar a imagem (${response.status}).`);
     const buffer = Buffer.from(await response.arrayBuffer());
 
@@ -61,6 +68,7 @@ function startGameflowWatcher() {
   const client = new LcuReadOnlyClient();
   let lastPhase: LcuGameflowPhase | null = null;
   let lastPickOrder: number | null = null;
+  let lastPlayerRole: Role | null = null;
 
   function broadcast(channel: string, payload: unknown) {
     for (const window of BrowserWindow.getAllWindows()) {
@@ -80,17 +88,30 @@ function startGameflowWatcher() {
           lastPickOrder = null;
           broadcast("sparta:pick-order", null);
         }
+        if (lastPlayerRole !== null) {
+          lastPlayerRole = null;
+          broadcast("sparta:player-role", null);
+        }
         return;
       }
 
       const snapshot = await client.getChampionSelectSession();
       // sessionExists pode piscar false momentaneamente durante a transicao
       // pra ChampSelect - mantem o ultimo valor conhecido em vez de resetar
-      // pro manual a toa; derivePickOrder ja volta undefined nesse caso.
+      // pro manual a toa; derivePickOrder/derivePlayerRole ja voltam
+      // undefined nesse caso.
       const pickOrder = derivePickOrder(snapshot) ?? lastPickOrder;
       if (pickOrder !== lastPickOrder) {
         lastPickOrder = pickOrder ?? null;
         broadcast("sparta:pick-order", lastPickOrder);
+      }
+
+      // Papel real do jogador - reler a cada tick ja reflete troca de lane
+      // pela ferramenta do cliente (assignedPosition muda), sem estado extra.
+      const playerRole = derivePlayerRole(snapshot) ?? lastPlayerRole;
+      if (playerRole !== lastPlayerRole) {
+        lastPlayerRole = playerRole ?? null;
+        broadcast("sparta:player-role", lastPlayerRole);
       }
     });
   }, GAMEFLOW_POLL_INTERVAL_MS);

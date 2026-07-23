@@ -180,7 +180,7 @@ export function PostGameScreen({ riotAccounts, sessionToken, ddragonVersion }: P
               {report.tips.map((tip) => (
                 <p key={tip}>💡 {tip}</p>
               ))}
-              <button type="button" onClick={() => void reanalyze()}>
+              <button type="button" className="btn-secondary" onClick={() => void reanalyze()}>
                 Reanalisar
               </button>
             </>

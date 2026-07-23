@@ -17,6 +17,12 @@ const trendLabels: Record<string, string> = {
   resolved: "Resolvido"
 };
 
+const confidenceLabels: Record<WeaknessTrend["confidence"], string> = {
+  low: "baixa",
+  medium: "média",
+  high: "alta"
+};
+
 /**
  * Progressao dos pontos fracos identificados no Post-Game Coach ao longo
  * das partidas ja analisadas (Fase 5) - deriva tudo de PostgameReport ja
@@ -57,7 +63,10 @@ export function GrowthJourneyScreen({ riotAccounts }: GrowthJourneyScreenProps) 
             <section className="table-panel">
               {journey.data.weaknessTrends.map((trend) => (
                 <article className="champion-row" key={trend.code}>
-                  <strong>{trend.label}</strong>
+                  <div className="trend-label">
+                    <strong>{trend.label}</strong>
+                    <small>confiança {confidenceLabels[trend.confidence]}</small>
+                  </div>
                   {trend.hasComparison ? (
                     <TrendCell trend={trend.trend} />
                   ) : (

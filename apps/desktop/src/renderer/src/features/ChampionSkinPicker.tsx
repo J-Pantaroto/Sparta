@@ -72,7 +72,7 @@ export function ChampionSkinPicker({ ddragonVersion }: ChampionSkinPickerProps) 
 
       {selectedChampion && (
         <>
-          <button type="button" onClick={() => setSelectedChampion(null)}>
+          <button type="button" className="btn-secondary" onClick={() => setSelectedChampion(null)}>
             ← Voltar pra lista de campeões
           </button>
           <h3>{selectedChampion.name}</h3>
