@@ -2,6 +2,7 @@ import {
   calculateKda,
   calculateRecentForm,
   confidenceFromGames,
+  DEATHS_BAD_VALUE,
   normalizeInverse,
   roleBaselines,
   scoreChampionPerformance
@@ -16,7 +17,22 @@ import type {
 } from "../types/domain.js";
 import type { MatchParticipationRecord } from "./player-champion-stats.js";
 
+/**
+ * Piso de partidas no bloco anterior pra calcular tendencia - com menos que
+ * isso, uma unica partida oscilaria o bloco inteiro demais pra confiar
+ * numa direcao (mesmo raciocinio do piso analogo em growth-journey.ts,
+ * MIN_BLOCK_REPORTS, que documenta essa mecanica com mais detalhe).
+ */
 const PREVIOUS_BLOCK_MIN_GAMES = 3;
+
+/**
+ * Diferenca minima (em pontos de score 0-100) entre bloco recente e
+ * anterior pra considerar "melhorando"/"piorando" em vez de "estavel" -
+ * calibra a mesma granularidade usada por RATE_TREND_THRESHOLD_POINTS em
+ * growth-journey.ts (20 pontos percentuais num bloco de 10 ~= essa mesma
+ * ordem de grandeza de oscilacao, so que em unidade de score em vez de
+ * taxa de presenca).
+ */
 const TREND_THRESHOLD_POINTS = 5;
 
 function toRecentChampionMatch(record: MatchParticipationRecord): RecentChampionMatch {
@@ -80,6 +96,11 @@ function weightedAverage(items: WeightedItem[]): number | undefined {
   return items.reduce((sum, item) => sum + item.value * item.weight, 0) / totalWeight;
 }
 
+/**
+ * Corte de top-N pontos fortes/fracos mostrados - mais que isso deixa de
+ * ser um resumo acionavel e vira lista exaustiva. Mesmo corte de 3 usado
+ * em post-game-analysis.ts (Fase 4) pro mesmo conceito numa unica partida.
+ */
 const MAX_STRENGTHS = 3;
 const MAX_WEAKNESSES = 3;
 
@@ -139,7 +160,7 @@ export function derivePlayerStrengthsWeaknesses(
   const deathsPerGame = weightedAverage(eligible.map((stats) => ({ value: stats.deaths / stats.games, weight: stats.games })));
   const scoreValues: Record<string, number | undefined> = {
     winrate: weightedAverage(eligible.map((stats) => ({ value: (stats.wins / stats.games) * 100, weight: stats.games }))),
-    deaths: deathsPerGame === undefined ? undefined : normalizeInverse(deathsPerGame, 7)
+    deaths: deathsPerGame === undefined ? undefined : normalizeInverse(deathsPerGame, DEATHS_BAD_VALUE)
   };
 
   const signals: DimensionSignal[] = [

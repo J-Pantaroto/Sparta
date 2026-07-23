@@ -4,9 +4,29 @@ Este arquivo é um handoff para outro agente de desenvolvimento continuar o proj
 
 ## Pendências desta sessão (ler primeiro)
 
-Uma sessão anterior fez uma auditoria completa do repositório (real vs mock vs so-tipo), aprovou um plano de evolução em 5 épicos (Riot Sync, Player Intelligence, Draft Intelligence, Post-Game Coach, Growth Journey) e implementou todas as 5 fases, além de um refinamento visual do desktop e correções de infra/segurança. Uma sessão seguinte **conectou o desktop às rotas reais da API** (Dashboard/Perfil/Champion Select/Pós-game/nova tela Evolução, removendo `mock-data.ts`) e implementou as **Sub-fases 6a e 6b** (tela de Configurações + tema com campeão/skin real + configuração "quantas partidas analisar"). Esta sessão implementou a **Sub-fase 6c (ordem de pick automática via LCU)**, a última das 3 sub-fases da "Fase 6" pedida pelo usuário — a Fase 6 está encerrada. Tudo isso **já está mergeado em `main`**.
+Uma sessão anterior fez uma auditoria completa do repositório (real vs mock vs so-tipo), aprovou um plano de evolução em 5 épicos (Riot Sync, Player Intelligence, Draft Intelligence, Post-Game Coach, Growth Journey) e implementou todas as 5 fases, além de um refinamento visual do desktop e correções de infra/segurança. Uma sessão seguinte **conectou o desktop às rotas reais da API** (Dashboard/Perfil/Champion Select/Pós-game/nova tela Evolução, removendo `mock-data.ts`) e implementou as **Sub-fases 6a e 6b** (tela de Configurações + tema com campeão/skin real + configuração "quantas partidas analisar"). Uma sessão seguinte implementou a **Sub-fase 6c (ordem de pick automática via LCU)**, encerrando a Fase 6. Esta sessão implementou a **Fase 7 (auditoria e documentação dos algoritmos de scoring)**, pedida pelo usuário ao fim da Fase 6. Tudo isso **já está mergeado em `main`**.
 
-### Sub-fase 6c: ordem de pick automática via LCU (sessão atual)
+### Fase 7: auditoria e documentação dos algoritmos de scoring (sessão atual)
+
+O usuário pediu uma "revisão dos algoritmos de avaliação de desempenho". Auditoria completa (`champion-performance.ts`, `dimension-signals.ts`, `player-insights.ts`, `growth-journey.ts`, `recommendation-engine.ts`, `docs/scoring-model.md`, `docs/draft-recommendation.md`) confirmou com o usuário que **não há dado real suficiente pra recalibrar estatisticamente** (só ~20-25 partidas da conta Zekerus#117) — escopo aprovado foi **auditar, documentar e corrigir inconsistências reais, sem recalibrar nenhum peso/baseline/threshold que já funciona**.
+
+Duas inconsistências reais corrigidas (únicas mudanças de comportamento desta fase):
+
+1. **`DEATHS_BAD_VALUE` (7 vs 8)**: o "valor ruim" de mortes usado em `normalizeInverse` era `7` em três lugares (`champion-performance.ts`, `player-insights.ts`, `post-game-analysis.ts`) mas `8` num quarto (`calculateRecentForm`, dentro do próprio `champion-performance.ts`), sem motivo pra divergir. Nova constante exportada `DEATHS_BAD_VALUE = 7` (`packages/core/src/scoring/champion-performance.ts`), reusada nos 4 call sites.
+2. **Literal `8` duplicado em `recommendation-engine.ts`**: o threshold de "amostra pequena" em `buildWarnings` (`stats.games < 8`) era um número solto independente de `confidenceFromGames`, que já define esse mesmo `8` como piso de confiança média. Passou a reusar a constante exportada `MEDIUM_CONFIDENCE_GAMES`.
+
+Fora essas duas correções, o resto da fase foi **só documentação** (comentários de raciocínio de design em `champion-performance.ts`, `dimension-signals.ts`, `player-insights.ts` e `recommendation-engine.ts` — thresholds, pesos por role/cenário, baselines, decaimento de forma recente, etc. — todos com o "porquê" agora explícito, não só o "o quê") e **reescrita de `docs/scoring-model.md`/`docs/draft-recommendation.md`** (antes prosa qualitativa sem nenhum número; agora documentam os valores reais e o raciocínio, com uma nota explícita de que são julgamento de design, não calibração estatística).
+
+Testes novos de invariante estrutural (não recalibração): pesos de `weights` (`champion-performance.ts`) somam 1.0 por role; `recencyWeight(8) ≈ 1/e`; `DEATHS_BAD_VALUE` usado de forma consistente entre `scoreChampionPerformance` e `calculateRecentForm`; as 3 tabelas de `selectWeights` (`recommendation-engine.ts`) somam 1.0 cada. `weights` e `selectWeights` passaram a ser exportados (antes privados) pra permitir esses testes sem duplicar as tabelas.
+
+`pnpm typecheck && pnpm lint && pnpm test && pnpm build` completos no monorepo — sem mudança de comportamento observável do produto além das duas correções acima (nenhuma migração, nenhuma mudança de rota).
+
+O que ficou deliberadamente fora de escopo (confirmado com o usuário antes de implementar):
+
+- Recalibrar qualquer peso, baseline ou threshold com base em dado estatístico — não há partidas reais suficientes acumuladas ainda.
+- Construir ferramenta de validação/relatório contra o histórico real — ideia registrada pro futuro, quando houver mais dado de uso.
+
+### Sub-fase 6c: ordem de pick automática via LCU
 
 Substitui o input manual 1-5 de "Pick order" no Champion Select por detecção automática via LCU (League Client Update), quando o cliente real do League está aberto e em champion select — o usuário pediu isso explicitamente ("não faria tanto sentido" ficar trocando manualmente).
 
@@ -17,17 +37,6 @@ Substitui o input manual 1-5 de "Pick order" no Champion Select por detecção a
 5. **`App.tsx`**: novo estado `autoPickOrder` (assina `onPickOrder`, sincroniza em `draft.pickOrder` quando não-null). `ChampionSelect` mostra o valor automático como texto somente-leitura quando disponível ("Detectado via League Client"); sem sessão real (dev, sem League aberto, browser comum), mantém o input manual de sempre ("Modo manual") — fallback nunca removido.
 
 **Não validado nesta sessão**: a detecção automática de verdade dentro de uma sessão real de champion select — precisa do cliente do League aberto e em champion select, indisponível neste ambiente. Validado o que dava pra validar: o fallback manual continua funcionando sem regressão (testado via `electron-vite dev` + Browser tool, `window.sparta` inexistente numa aba de navegador comum reproduz honestamente o caso "sem LCU", e o modo manual respondeu normalmente).
-
-### Fase futura: revisão dos algoritmos de scoring de desempenho (pedida pelo usuário, não implementada)
-
-Documentar, não implementar: revisar os algoritmos que avaliam o desempenho do jogador, agora que as Fases 1-5 + a Fase 6 acumularam uso real o suficiente pra avaliar se os pesos/thresholds fazem sentido na prática (nenhum deles foi tocado desde que foram escritos, no início do projeto, sem dado real de uso pra validar contra).
-
-Arquivos/constantes específicos a revisitar:
-- `packages/core/src/scoring/champion-performance.ts` — pesos de `selectWeights` por role (blind pick vs pick tardio), `roleBaselines` (valores de referência por role/dimensão), `normalizeRatio`/`normalizeInverse` (curvas de normalização).
-- `packages/core/src/scoring/dimension-signals.ts` — thresholds de força/fraqueza (`RATIO_STRENGTH_THRESHOLD=1.1`, `RATIO_WEAKNESS_THRESHOLD=0.85`, `RATIO_HIGH_SEVERITY=0.7`, `RATIO_MEDIUM_SEVERITY=0.8`, `SCORE_STRENGTH_THRESHOLD=65`, `SCORE_WEAKNESS_THRESHOLD=35`).
-- `packages/core/src/aggregation/player-insights.ts`/`growth-journey.ts` — thresholds de tendência (`TREND_THRESHOLD_POINTS=5`, `RATE_TREND_THRESHOLD_POINTS=20`) e tamanho de bloco (`BLOCK_SIZE=10`).
-
-Perguntas em aberto pra quando essa fase for iniciada: os pesos por role em `selectWeights` refletem a importância real de cada dimensão pro meta atual? Os thresholds de severidade produzem "pontos fracos" que o jogador reconhece como reais, ou ruído estatístico? `BLOCK_SIZE=10` é grande o suficiente pra não ser ruidoso, mas pequeno o suficiente pra refletir mudança recente de verdade?
 
 ### Sub-fase 6b: configuração "quantas partidas analisar" + bug real de CORS corrigido
 
@@ -621,20 +630,19 @@ Não usar force push sem pedido explícito.
 
 ## Próximos passos recomendados
 
-Fase 1 (Riot Sync), o refinamento visual do desktop, Fase 2 (Player Intelligence), Fase 3 (Draft Intelligence), Fase 4 (Post-Game Coach), Fase 5 (Growth Journey), a conexão do desktop às rotas reais e a Fase 6 inteira (Configurações + tema com skins + "quantas partidas analisar" + ordem de pick automática via LCU) estão completas em `main`. O roadmap original de 5 épicos está encerrado, e a Fase 6 pedida pelo usuário também. Próximo:
+Fase 1 (Riot Sync), o refinamento visual do desktop, Fase 2 (Player Intelligence), Fase 3 (Draft Intelligence), Fase 4 (Post-Game Coach), Fase 5 (Growth Journey), a conexão do desktop às rotas reais, a Fase 6 inteira (Configurações + tema com skins + "quantas partidas analisar" + ordem de pick automática via LCU) e a Fase 7 (auditoria e documentação dos algoritmos de scoring) estão completas em `main`. Próximo:
 
-1. **Fase futura de revisão dos algoritmos de scoring** (item 12 abaixo) — a única coisa desta sessão que ficou deliberadamente só documentada, não implementada.
-2. Catálogo de campeões pro desktop — resolver `championId` → nome/ícone no Pós-game (hoje mostra só `Campeão #<id>` na lista de partidas porque `RecentChampionMatch` não traz `championName` e não há rota de catálogo exposta ao desktop).
-3. Expandir `ChampionTag` além dos 2 campeões do seed (`data/seeds/champion-tags.json`) — sem bloqueio técnico desde a Fase 3 (o seed já lê o JSON de verdade), é só curadoria manual contínua; o motor de recomendação já tolera ausência, mas mais cobertura melhora a qualidade das recomendações (confirmado na validação desta sessão: o Champion Select real devolveu 0 recomendações pra Zekerus#117 justamente por causa disso, comportamento honesto, não bug).
-4. Tornar `/drafts/pre-game-analysis` real (hoje 100% estático) — usar `analyzeTeamComposition` (já existe em `packages/core`) com `championTags`/`matchups` reais; motor de geração de texto explicativo ainda por desenhar (a composição por fragmentos da Fase 4, em `packages/core/src/postgame/post-game-analysis.ts`, é um precedente reaproveitável).
-5. Pré-computar/cachear matchups se a latência de `POST /drafts/recommendations` incomodar conforme o histórico crescer (hoje calculado na hora a cada chamada, ver "O que a Fase 3 entregou").
-6. Dicas de objetivos no `PostGameAnalysis` — `objectiveEvents` (Fase 1) não preserva atribuição de time no formato atual (`"LABEL@M:SS"`), precisaria de um `MatchTimelineSummary` mais rico pra saber quais objetivos foram do próprio time.
-7. Fila real (Redis/BullMQ) para o sync, se o padrão de uso mostrar que o teto de 20-50 partidas por chamada síncrona é pouco — o `docker-compose.yml` já provisiona Redis, só falta o worker.
-8. LCU read-only: já implementado o poll de `gameflow-phase` (trocar de aba) e, desde a Fase 6c, de `champ-select-session` pra ordem de pick automática. Próximo passo natural: usar o resto da sessão (`myTeam`/`theirTeam`/`actions`, já tipados em `read-only-client.ts`) pra pré-carregar aliados/inimigos/banimentos reais no `DraftState`, em vez de só a ordem de pick — o Champion Select continua manual pro resto dos campos.
-9. Trocar o token HMAC caseiro por algo mais robusto (rotação de segredo, refresh token) se o produto for além do MVP local.
-10. Empacotamento do desktop (electron-builder/NSIS/ASAR) — hoje não existe nenhuma configuração de build de instalador, só `electron-vite build`.
-11. Mitigar a limitação conhecida da Fase 5 (`WeaknessTrend` derivado de um corte top-3 por partida, ver "O que a Fase 5 entregou") lendo razões brutas em vez de só `weaknesses[]`, se o ruído de entrada/saída na fronteira do corte incomodar na prática.
-12. **Documentado, não implementado** (pedido pelo usuário): revisão dos algoritmos de scoring de desempenho — ver "Fase futura: revisão dos algoritmos de scoring de desempenho" no topo do arquivo pra a lista completa de arquivos/constantes e perguntas em aberto.
+1. Catálogo de campeões pro desktop — resolver `championId` → nome/ícone no Pós-game (hoje mostra só `Campeão #<id>` na lista de partidas porque `RecentChampionMatch` não traz `championName` e não há rota de catálogo exposta ao desktop).
+2. Expandir `ChampionTag` além dos 2 campeões do seed (`data/seeds/champion-tags.json`) — sem bloqueio técnico desde a Fase 3 (o seed já lê o JSON de verdade), é só curadoria manual contínua; o motor de recomendação já tolera ausência, mas mais cobertura melhora a qualidade das recomendações (confirmado na validação desta sessão: o Champion Select real devolveu 0 recomendações pra Zekerus#117 justamente por causa disso, comportamento honesto, não bug).
+3. Tornar `/drafts/pre-game-analysis` real (hoje 100% estático) — usar `analyzeTeamComposition` (já existe em `packages/core`) com `championTags`/`matchups` reais; motor de geração de texto explicativo ainda por desenhar (a composição por fragmentos da Fase 4, em `packages/core/src/postgame/post-game-analysis.ts`, é um precedente reaproveitável).
+4. Pré-computar/cachear matchups se a latência de `POST /drafts/recommendations` incomodar conforme o histórico crescer (hoje calculado na hora a cada chamada, ver "O que a Fase 3 entregou").
+5. Dicas de objetivos no `PostGameAnalysis` — `objectiveEvents` (Fase 1) não preserva atribuição de time no formato atual (`"LABEL@M:SS"`), precisaria de um `MatchTimelineSummary` mais rico pra saber quais objetivos foram do próprio time.
+6. Fila real (Redis/BullMQ) para o sync, se o padrão de uso mostrar que o teto de 20-50 partidas por chamada síncrona é pouco — o `docker-compose.yml` já provisiona Redis, só falta o worker.
+7. LCU read-only: já implementado o poll de `gameflow-phase` (trocar de aba) e, desde a Fase 6c, de `champ-select-session` pra ordem de pick automática. Próximo passo natural: usar o resto da sessão (`myTeam`/`theirTeam`/`actions`, já tipados em `read-only-client.ts`) pra pré-carregar aliados/inimigos/banimentos reais no `DraftState`, em vez de só a ordem de pick — o Champion Select continua manual pro resto dos campos.
+8. Trocar o token HMAC caseiro por algo mais robusto (rotação de segredo, refresh token) se o produto for além do MVP local.
+9. Empacotamento do desktop (electron-builder/NSIS/ASAR) — hoje não existe nenhuma configuração de build de instalador, só `electron-vite build`.
+10. Mitigar a limitação conhecida da Fase 5 (`WeaknessTrend` derivado de um corte top-3 por partida, ver "O que a Fase 5 entregou") lendo razões brutas em vez de só `weaknesses[]`, se o ruído de entrada/saída na fronteira do corte incomodar na prática.
+11. Recalibrar estatisticamente os pesos/baselines/thresholds de scoring (`docs/scoring-model.md`/`docs/draft-recommendation.md`) quando houver volume real de uso acumulado — a Fase 7 documentou o raciocínio de design atual mas deliberadamente não recalibrou nada por falta de dado suficiente.
 
 ## Verificação conhecida
 

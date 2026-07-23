@@ -1,5 +1,6 @@
 import {
   calculateKda,
+  DEATHS_BAD_VALUE,
   normalizeInverse,
   roleBaselines,
   scoreChampionPerformance
@@ -23,6 +24,8 @@ import type {
  */
 const SHORT_MATCH_DURATION_SECONDS = 300;
 
+// Mesmo corte de top-3 usado em player-insights.ts (Fase 2) pro mesmo
+// conceito agregado entre partidas - resumo acionavel, nao lista exaustiva.
 const MAX_STRENGTHS = 3;
 const MAX_WEAKNESSES = 3;
 
@@ -59,7 +62,7 @@ function buildRatioSignals(role: Role, metrics: MatchPerformanceMetrics): Dimens
   };
 
   const scores: Record<string, number | undefined> = {
-    deaths: normalizeInverse(metrics.deaths, 7)
+    deaths: normalizeInverse(metrics.deaths, DEATHS_BAD_VALUE)
   };
 
   return [

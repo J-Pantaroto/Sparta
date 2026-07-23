@@ -1,4 +1,4 @@
-import { scoreChampionPerformance } from "../scoring/champion-performance.js";
+import { MEDIUM_CONFIDENCE_GAMES, scoreChampionPerformance } from "../scoring/champion-performance.js";
 import type {
   ChampionTag,
   CompositionRules,
@@ -127,8 +127,19 @@ export function analyzeTeamComposition(
   return composition;
 }
 
-function selectWeights(draft: DraftState): Record<string, number> {
+/**
+ * 3 tabelas de peso por cenario de draft, cada uma somando 1.0 (testado em
+ * recommendation-engine.test.ts) - nao calibradas estatisticamente ainda,
+ * julgamento de design sobre o que mais importa em cada situacao (mesma
+ * ressalva de `roleBaselines`/`weights` em champion-performance.ts).
+ */
+export function selectWeights(draft: DraftState): Record<string, number> {
   if (draft.pickOrder <= 1) {
+    // Blind pick / first pick: nao ha lane inimiga revelada nem composicao
+    // aliada formada ainda, entao matchup/enemyDraftAnswer nao fazem sentido
+    // (peso 0). personalPerformance domina (0.45) e blindSafety (0.2) ganha
+    // peso alto porque "funciona sem depender do que o inimigo faz" e
+    // literalmente a definicao de seguranca em blind.
     return {
       personalPerformance: 0.45,
       blindSafety: 0.2,
@@ -142,6 +153,11 @@ function selectWeights(draft: DraftState): Record<string, number> {
   }
 
   if (draft.enemyLaneChampionId) {
+    // Lane inimiga ja revelada: matchup passa a valer (0.25, a segunda maior
+    // fatia) porque agora ha dado concreto de "essa campeao vs aquele
+    // campeao" pra usar. blindSafety/compositionFit zeram - a composicao
+    // ainda pode nao estar formada o suficiente, e "seguranca as cegas" nao
+    // e mais o problema relevante quando ja se sabe contra quem se joga.
     return {
       personalPerformance: 0.35,
       matchup: 0.25,
@@ -154,6 +170,11 @@ function selectWeights(draft: DraftState): Record<string, number> {
     };
   }
 
+  // Nem blind pick nem lane inimiga revelada (ex.: pick do meio do draft sem
+  // matchup direto conhecido): enemyDraftAnswer/allySynergy ganham peso
+  // (0.2 cada) porque a composicao de ambos os times ja tem mais picks pra
+  // reagir/encaixar: o que da pra avaliar aqui e resposta ao draft inimigo
+  // como um todo e sinergia com o time aliado, nao mais so seguranca solo.
   return {
     personalPerformance: 0.3,
     enemyDraftAnswer: 0.2,
@@ -171,11 +192,23 @@ function findMatchupScore(championId: number, enemyChampionId: number | undefine
   return matchups.find((matchup) => matchup.championId === championId && matchup.enemyChampionId === enemyChampionId)?.score ?? 50;
 }
 
+// Media simples (pesos iguais 1/3) de engage/peel/waveclear - as 3 tags mais
+// diretamente ligadas a "encaixar bem com o time aliado formado ate agora"
+// (recommendPicks nao distingue qual delas importa mais em qual composicao).
 function calculateAllySynergy(tag: ChampionTag | undefined, composition: TeamComposition): number {
   if (!tag) return 50;
   return round((tag.engage * composition.engage + tag.peel * composition.peel + tag.waveclear * composition.waveclear) / 3);
 }
 
+/**
+ * pickoff (45) pesa mais que engage (30) e scaling (25) porque "conseguir
+ * isolar/eliminar um alvo" e o jeito mais direto de responder a um draft
+ * inimigo fragil, enquanto engage/scaling ajudam mas dependem mais do resto
+ * do time. O piso `Math.max(0.8, enemyFragility)` evita que o enemyAnswer
+ * despenque a quase 0 quando o time inimigo esta bem formado (frontline
+ * alto) - mesmo contra um time solido, um pick de resposta ainda tem algum
+ * valor, so nao o valor maximo.
+ */
 function calculateEnemyAnswer(tag: ChampionTag | undefined, draft: DraftState, championTags: ChampionTag[]): number {
   if (!tag || draft.enemies.length === 0) return 50;
   const enemyNames = draft.enemies.map((pick) => pick.championName);
@@ -184,6 +217,17 @@ function calculateEnemyAnswer(tag: ChampionTag | undefined, draft: DraftState, c
   return round((tag.pickoff * 45 + tag.engage * 30 + tag.scaling * 25) * Math.max(0.8, enemyFragility));
 }
 
+/**
+ * Base 55 (levemente acima do neutro 50) representa "nenhum problema de
+ * composicao a resolver" - ja e um encaixe ok por padrao. Os bonus so se
+ * aplicam quando a composicao aliada esta abaixo do minimo de uma regra
+ * (`CompositionRules`), e a ordem dos bonus (+25 frontline > +20 engage >
+ * +15 waveclear) reflete que frontline ausente e o risco mais critico de
+ * composicao (time inteiro fica vulneravel), seguido de engage (sem isso,
+ * dificil forcar teamfight) e so depois waveclear (perde-se pra push, mas
+ * raramente perde-se o jogo so por isso). +10 fixo de dano balanceado é o
+ * bonus mais fraco por ser preferencia de time, nao ausencia critica.
+ */
 function calculateCompositionFit(
   tag: ChampionTag | undefined,
   composition: TeamComposition,
@@ -211,6 +255,9 @@ function buildReasons(
       impact: metrics.personalPerformance
     }
   ];
+  // 70/60: thresholds "bem acima do neutro 50" pra virar reason exibida ao
+  // jogador - texto positivo so aparece quando o sinal e forte o bastante
+  // pra valer a pena destacar, nao em qualquer valor acima da media.
   if (metrics.blindSafety >= 70) {
     reasons.push({
       code: "blind_safety",
@@ -244,7 +291,11 @@ function buildWarnings(
   composition: TeamComposition
 ): RecommendationReason[] {
   const warnings: RecommendationReason[] = [];
-  if (stats.games < 8) {
+  // Reusa o mesmo piso de "confianca media" de confidenceFromGames (antes
+  // desta revisao era um `8` solto duplicado aqui, sem ligacao com a
+  // constante - se confidenceFromGames mudasse, esse literal ficaria
+  // desalinhado silenciosamente).
+  if (stats.games < MEDIUM_CONFIDENCE_GAMES) {
     warnings.push({
       code: "sample_size",
       label: "Amostra pequena",
@@ -252,6 +303,9 @@ function buildWarnings(
       impact: 40
     });
   }
+  // 45: abaixo do neutro 50 mas nao tao extremo quanto os cortes de fraqueza
+  // de dimension-signals.ts (35) - aqui e so um aviso brando de "forma
+  // recente fraca", nao uma fraqueza estrutural do jogador no campeao.
   if (metrics.recentForm < 45) {
     warnings.push({
       code: "recent_form",
@@ -271,6 +325,10 @@ function buildWarnings(
   return warnings;
 }
 
+// Mesmos cortes 70/60 de buildReasons pra best_blind/best_matchup/
+// best_teamfit (consistencia: a categoria so reflete um sinal forte o
+// bastante pra ja ter virado reason). safe_pick usa um corte mais brando
+// (65) porque e a categoria "resultado padrao aceitavel", nao um destaque.
 function selectCategory(
   draft: DraftState,
   metrics: PickRecommendation["metrics"]

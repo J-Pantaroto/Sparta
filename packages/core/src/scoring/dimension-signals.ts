@@ -26,11 +26,30 @@ export interface DimensionLabels {
   detail: (percentOrScore: number, isStrength: boolean) => string;
 }
 
+/**
+ * Bandas de força/fraqueza deliberadamente assimetricas em torno do centro
+ * neutro (1.0 pra razao, 50 pra score): a banda de fraqueza comeca mais
+ * perto do centro (0.85, so 15% abaixo) que a de força (1.1, 10% acima) -
+ * ficar abaixo do esperado e mais acionavel/notavel de sinalizar pro
+ * jogador do que superar a expectativa, entao o corte pra "isso e uma
+ * fraqueza" e mais sensivel. Julgamento de design, nao calibrado
+ * estatisticamente ainda contra dado real acumulado (ver "Fase futura:
+ * revisao dos algoritmos de scoring" no CLAUDE.md).
+ */
 export const RATIO_STRENGTH_THRESHOLD = 1.1;
 export const RATIO_WEAKNESS_THRESHOLD = 0.85;
+/** Sub-tiers de severidade dentro da banda de fraqueza (ratio <= 0.85). */
 export const RATIO_HIGH_SEVERITY = 0.7;
 export const RATIO_MEDIUM_SEVERITY = 0.8;
 
+/**
+ * Equivalente em "espaco de score" (centro 50, escala 0-100) das bandas
+ * acima - aqui simetrico (65/35, ambos 15 pontos do centro), diferente da
+ * assimetria deliberada em espaco de razao (RATIO_STRENGTH_THRESHOLD/
+ * RATIO_WEAKNESS_THRESHOLD) porque um score ja e uma escala absoluta
+ * calculada pelo chamador (ex.: winrate 0-100), nao uma razao onde
+ * "acima"/"abaixo" tem grandezas naturalmente diferentes.
+ */
 export const SCORE_STRENGTH_THRESHOLD = 65;
 export const SCORE_WEAKNESS_THRESHOLD = 35;
 export const SCORE_HIGH_SEVERITY = 20;

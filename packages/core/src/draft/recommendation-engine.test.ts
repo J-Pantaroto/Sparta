@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { analyzeTeamComposition, recommendPicks } from "./recommendation-engine.js";
-import type { ChampionTag, PlayerChampionStats, PlayerProfile } from "../types/domain.js";
+import { analyzeTeamComposition, recommendPicks, selectWeights } from "./recommendation-engine.js";
+import type { ChampionTag, DraftState, PlayerChampionStats, PlayerProfile } from "../types/domain.js";
 
 const championStats: PlayerChampionStats[] = [
   {
@@ -86,5 +86,20 @@ describe("recommendation engine", () => {
       tags[0]
     );
     expect(composition.risks).toContain("Pouca linha de frente");
+  });
+
+  it("has each selectWeights scenario table summing to 1.0 (invariante estrutural)", () => {
+    const baseDraft: DraftState = { playerRole: "MID", pickOrder: 1, allies: [], enemies: [], bannedChampionIds: [] };
+
+    const scenarios: DraftState[] = [
+      { ...baseDraft, pickOrder: 1 },
+      { ...baseDraft, pickOrder: 3, enemyLaneChampionId: 61 },
+      { ...baseDraft, pickOrder: 5 }
+    ];
+
+    for (const scenario of scenarios) {
+      const total = Object.values(selectWeights(scenario)).reduce((sum, weight) => sum + weight, 0);
+      expect(total).toBeCloseTo(1.0, 5);
+    }
   });
 });
