@@ -486,6 +486,20 @@ p {
   border-color: var(--color-red-soft);
 }
 
+/* Esconde as setinhas nativas de incrementar/decrementar dos inputs
+   numericos (pick order manual, "quantas partidas analisar" em
+   Configuracoes) - destoavam do resto do app (Fase 10). */
+input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
 .recommendation-list {
   display: grid;
   max-width: 920px;
@@ -526,6 +540,15 @@ p {
   width: 26px;
   height: 26px;
   border-radius: 5px;
+}
+
+/* Ultimo estagio de fallback do ChampionIcon (Fase 10) - nunca mostra o
+   icone nativo de imagem quebrada do navegador quando Data Dragon e
+   Community Dragon falham os dois. */
+.champion-icon-fallback {
+  display: grid;
+  place-items: center;
+  color: var(--color-text-muted);
 }
 
 .champion-row {

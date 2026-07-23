@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ChampionGridPicker } from "./ChampionGridPicker";
 import {
   championSplashUrl,
+  championSquareUrl,
   fetchChampionSkins,
   type DataDragonChampionSummary,
   type DataDragonSkin
@@ -86,6 +87,16 @@ export function ChampionSkinPicker({ ddragonVersion }: ChampionSkinPickerProps) 
                     src={championSplashUrl(selectedChampion.key, skin.num)}
                     alt={skin.name}
                     onClick={() => applySkin(selectedChampion, skin)}
+                    onError={(event) => {
+                      // Splash art de skin especifica pode 404 (chroma sem
+                      // arte propria, skin muito nova) - cai pro icone do
+                      // campeao (sempre confiavel, mesmo catalogo) em vez de
+                      // deixar o icone nativo de imagem quebrada do navegador.
+                      const img = event.currentTarget;
+                      if (img.dataset.fallbackApplied) return;
+                      img.dataset.fallbackApplied = "true";
+                      img.src = championSquareUrl(selectedChampion.key, ddragonVersion);
+                    }}
                   />
                   <span>{skin.num === 0 ? selectedChampion.name : skin.name}</span>
                   <button

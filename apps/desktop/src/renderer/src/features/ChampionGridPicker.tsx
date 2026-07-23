@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { championSquareUrl, fetchAllChampions, type DataDragonChampionSummary } from "./datadragon";
+import { ChampionIcon } from "./ChampionIcon";
+import { fetchAllChampions, type DataDragonChampionSummary } from "./datadragon";
 import { GridSkeleton } from "./GridSkeleton";
 import { useAsyncData } from "./use-async-data";
 
@@ -50,7 +51,7 @@ export function ChampionGridPicker({ ddragonVersion, onSelect, isSelected, isDis
               disabled={disabled}
               title={champion.name}
             >
-              <img className="champion-icon sm" src={championSquareUrl(champion.key, ddragonVersion)} alt={champion.name} />
+              <ChampionIcon championId={champion.id} slug={champion.key} ddragonVersion={ddragonVersion} size="sm" alt={champion.name} />
             </button>
           );
         })}

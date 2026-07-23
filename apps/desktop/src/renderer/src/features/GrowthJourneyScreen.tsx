@@ -58,10 +58,19 @@ export function GrowthJourneyScreen({ riotAccounts }: GrowthJourneyScreenProps) 
               {journey.data.weaknessTrends.map((trend) => (
                 <article className="champion-row" key={trend.code}>
                   <strong>{trend.label}</strong>
-                  <TrendCell trend={trend.trend} />
+                  {trend.hasComparison ? (
+                    <TrendCell trend={trend.trend} />
+                  ) : (
+                    <span className="trend-cell" title="Ainda não existe um bloco de partidas antigas suficiente pra comparar - volte depois de analisar mais partidas no Pós-game.">
+                      <Minus size={14} />
+                      Ainda sem histórico pra comparar
+                    </span>
+                  )}
                   <div className="champion-row-bars" style={{ gridColumn: "3 / span 2" }}>
                     <StatBar label="Recente" value={trend.recentRate} invert detail={`${trend.recentRate}%`} />
-                    <StatBar label="Anterior" value={trend.previousRate} invert detail={`${trend.previousRate}%`} />
+                    {trend.hasComparison && (
+                      <StatBar label="Anterior" value={trend.previousRate} invert detail={`${trend.previousRate}%`} />
+                    )}
                   </div>
                 </article>
               ))}
