@@ -1,9 +1,19 @@
 import { Activity, BarChart3, Crosshair, Gauge, Settings as SettingsIcon, Shield, Swords, TrendingUp } from "lucide-react";
-import { rankChampionPool, recommendBuild, type ChampionClassProfile, type DraftState, type ItemSummary, type PickRecommendation, type RecommendedItem } from "@sparta/core";
+import {
+  rankChampionPool,
+  recommendBuild,
+  summarizeEnemyDamageLean,
+  type ChampionClassProfile,
+  type DraftState,
+  type ItemSummary,
+  type PickRecommendation,
+  type RecommendedItem
+} from "@sparta/core";
 import { useEffect, useMemo, useState } from "react";
 import {
   championSplashUrl,
   championSquareUrl,
+  fetchAllChampions,
   fetchChampionClassProfiles,
   fetchItemCatalog,
   fetchLatestDataDragonVersion,
@@ -22,6 +32,7 @@ import {
 import { useAsyncData } from "./features/use-async-data";
 import { AuthScreen } from "./features/AuthScreen";
 import { ChampionGridPicker } from "./features/ChampionGridPicker";
+import { Loading } from "./features/Loading";
 import { LinkRiotAccountScreen } from "./features/LinkRiotAccountScreen";
 import { PostGameScreen } from "./features/PostGameScreen";
 import { GrowthJourneyScreen } from "./features/GrowthJourneyScreen";
@@ -210,8 +221,10 @@ function AppShell() {
             ddragonVersion={ddragonVersion}
           />
         )}
-        {page === "pregame" && <PreGame />}
-        {page === "postgame" && <PostGameScreen riotAccounts={riotAccounts} sessionToken={sessionToken} />}
+        {page === "pregame" && <PreGame draft={draft} ddragonVersion={ddragonVersion} />}
+        {page === "postgame" && (
+          <PostGameScreen riotAccounts={riotAccounts} sessionToken={sessionToken} ddragonVersion={ddragonVersion} />
+        )}
         {page === "growth" && <GrowthJourneyScreen riotAccounts={riotAccounts} />}
         {page === "settings" && <SettingsScreen ddragonVersion={ddragonVersion} sessionToken={sessionToken} />}
       </section>
@@ -287,7 +300,7 @@ function Profile({ riotAccounts, ddragonVersion }: { riotAccounts: RiotAccountSu
           {account.gameName}#{account.tagLine}
         </h1>
       </header>
-      {profile.status === "loading" && <p>Carregando...</p>}
+      {profile.status === "loading" && <Loading />}
       {profile.status === "error" && <p>{profile.error}</p>}
       {profile.data && (
         <>
@@ -397,7 +410,7 @@ function ChampionSelect({
           </label>
         )}
       </section>
-      {recommendationsStatus === "loading" && <p>Calculando recomendações...</p>}
+      {recommendationsStatus === "loading" && <Loading label="Calculando recomendações..." />}
       {recommendationsStatus === "error" && <p>Não foi possível calcular recomendações agora.</p>}
       <section className="recommendation-list">
         {recommendations.map((recommendation) => (
@@ -469,7 +482,7 @@ function BuildPanel({
   return (
     <section className="panel wide build-panel">
       <h2>Build sugerida - {confirmedChampion.championName}</h2>
-      {loading && <p>Carregando build...</p>}
+      {loading && <Loading label="Carregando build..." />}
       {build && (
         <>
           <div className="build-slots">
@@ -521,15 +534,69 @@ function BuildItemIcon({ item, ddragonVersion }: { item: RecommendedItem; ddrago
   );
 }
 
-function PreGame() {
+function PreGame({ draft, ddragonVersion }: { draft: DraftState; ddragonVersion: string }) {
+  const catalog = useAsyncData<DataDragonChampionSummary[]>(() => fetchAllChampions(ddragonVersion), [ddragonVersion]);
+  const classProfiles = useAsyncData<ChampionClassProfile[]>(() => fetchChampionClassProfiles(ddragonVersion), [ddragonVersion]);
+
+  const ownChampion = catalog.data?.find((champion) => champion.id === draft.selectedChampionId);
+  const enemyChampions = draft.enemies
+    .map((enemy) => catalog.data?.find((champion) => champion.id === enemy.championId))
+    .filter((champion): champion is DataDragonChampionSummary => champion !== undefined);
+  const enemyProfiles = draft.enemies
+    .map((enemy) => classProfiles.data?.find((profile) => profile.championId === enemy.championId))
+    .filter((profile): profile is ChampionClassProfile => profile !== undefined);
+  const enemyLean = classProfiles.data ? summarizeEnemyDamageLean(enemyProfiles) : undefined;
+  const heroSplash = ownChampion ? championSplashUrl(ownChampion.key, 0) : undefined;
+
   return (
-    <section className="panel wide">
-      <h1>Análise pré-game</h1>
-      <p>
-        Condição de vitória sugerida: jogar por prioridade no mid, preparar visão antes dos objetivos e usar janelas de
-        ultimate para lutas agrupadas.
-      </p>
-    </section>
+    <>
+      <header className="page-header hero-splash" style={heroSplash ? { backgroundImage: `url(${heroSplash})` } : undefined}>
+        <span>Pré-game</span>
+        <h1>Análise pré-game</h1>
+      </header>
+
+      {!ownChampion && (
+        <p>Confirme seu campeão no Champion Select pra ver o resumo do confronto aqui.</p>
+      )}
+
+      {ownChampion && (
+        <section className="panel wide">
+          <h2>Seu campeão</h2>
+          <div className="build-item">
+            <img className="champion-icon sm" src={championSquareUrl(ownChampion.key, ddragonVersion)} alt={ownChampion.name} />
+            <span>{ownChampion.name}</span>
+          </div>
+        </section>
+      )}
+
+      {enemyChampions.length > 0 && (
+        <section className="panel wide">
+          <h2>Time inimigo</h2>
+          <div className="build-item-row">
+            {enemyChampions.map((champion) => (
+              <div className="build-item" key={champion.id}>
+                <img className="champion-icon sm" src={championSquareUrl(champion.key, ddragonVersion)} alt={champion.name} />
+                <span>{champion.name}</span>
+              </div>
+            ))}
+          </div>
+          {enemyLean && enemyLean.lean !== "BALANCED" && (
+            <p>
+              {enemyLean.lean === "MAGIC"
+                ? `Time inimigo com foco mágico (méd. ${enemyLean.magicAvg}/10 vs ${enemyLean.attackAvg}/10 físico).`
+                : `Time inimigo com foco físico (méd. ${enemyLean.attackAvg}/10 vs ${enemyLean.magicAvg}/10 mágico).`}
+            </p>
+          )}
+        </section>
+      )}
+
+      <section className="panel wide">
+        <h2>Condição de vitória</h2>
+        <p>
+          Jogar por prioridade no mid, preparar visão antes dos objetivos e usar janelas de ultimate para lutas agrupadas.
+        </p>
+      </section>
+    </>
   );
 }
 

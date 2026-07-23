@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ChampionSkinPicker } from "./ChampionSkinPicker";
 import { fetchSettings, updateSettings } from "./api-client";
+import { Loading } from "./Loading";
 import { useAsyncData } from "./use-async-data";
 
 interface SettingsScreenProps {
@@ -71,7 +72,7 @@ function AnalysisSettings({ sessionToken }: { sessionToken: string | null }) {
     <section className="panel wide">
       <h2>Análise</h2>
       <p>Quantas das suas últimas partidas o Sparta deve considerar (mínimo {MIN_LIMIT}, máximo {MAX_LIMIT}).</p>
-      {settings.status === "loading" && <p>Carregando...</p>}
+      {settings.status === "loading" && <Loading />}
       <div className="draft-controls">
         {QUICK_LIMITS.map((limit) => (
           <button key={limit} type="button" className={currentLimit === limit ? "active" : ""} onClick={() => void save(limit)}>

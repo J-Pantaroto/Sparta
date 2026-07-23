@@ -1,11 +1,14 @@
 import { useState } from "react";
 import type { PostGameAnalysis, RecentChampionMatch } from "@sparta/core";
 import { analyzePostgame, ApiError, fetchPostgameReport, fetchRecentMatches, type RiotAccountSummary } from "./api-client";
+import { championSquareUrl, fetchAllChampions, type DataDragonChampionSummary } from "./datadragon";
+import { Loading } from "./Loading";
 import { useAsyncData } from "./use-async-data";
 
 interface PostGameScreenProps {
   riotAccounts: RiotAccountSummary[];
   sessionToken: string | null;
+  ddragonVersion: string;
 }
 
 /**
@@ -13,12 +16,8 @@ interface PostGameScreenProps {
  * (GET) e so cai pro POST /postgame/analyze se ainda nao foi analisada
  * (404) - nao reanalisa a toa a cada clique. O botao "Reanalisar" chama o
  * POST direto, pro caso de querer atualizar o relatorio depois de mais sync.
- *
- * Lista de partidas mostra so o championId (RecentChampionMatch nao traz
- * championName) - sem catalogo de campeoes exposto ao desktop hoje, nao da
- * pra resolver id -> nome/icone sem uma rota nova (fora de escopo aqui).
  */
-export function PostGameScreen({ riotAccounts, sessionToken }: PostGameScreenProps) {
+export function PostGameScreen({ riotAccounts, sessionToken, ddragonVersion }: PostGameScreenProps) {
   const account = riotAccounts[0];
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
   const [report, setReport] = useState<PostGameAnalysis | null>(null);
@@ -29,6 +28,11 @@ export function PostGameScreen({ riotAccounts, sessionToken }: PostGameScreenPro
     () => (account ? fetchRecentMatches(account.puuid, 10) : undefined),
     [account?.puuid]
   );
+  // Catalogo de campeoes (Fase 8a, ja buscado pro seletor de time inimigo)
+  // reaproveitado aqui pra resolver championId -> nome/icone na lista de
+  // partidas - antes mostrava so "Campeao #<id>", gap documentado no
+  // CLAUDE.md ("Catalogo de campeoes pro desktop").
+  const catalog = useAsyncData<DataDragonChampionSummary[]>(() => fetchAllChampions(ddragonVersion), [ddragonVersion]);
 
   async function openMatch(matchId: string) {
     if (!sessionToken) return;
@@ -86,32 +90,38 @@ export function PostGameScreen({ riotAccounts, sessionToken }: PostGameScreenPro
         <h1>Partidas recentes</h1>
       </header>
 
-      {matches.status === "loading" && <p>Carregando partidas...</p>}
+      {matches.status === "loading" && <Loading label="Carregando partidas..." />}
       {matches.status === "error" && <p>{matches.error}</p>}
 
       <section className="table-panel">
-        {(matches.data?.matches ?? []).map((match) => (
-          <article
-            className="champion-row"
-            key={match.matchId}
-            onClick={() => void openMatch(match.matchId)}
-            style={{ cursor: "pointer" }}
-          >
-            <div className="champion-identity">
-              <strong>Campeão #{match.championId}</strong>
-            </div>
-            <span>{match.role}</span>
-            <span>{match.won ? "Vitória" : "Derrota"}</span>
-            <span>
-              {match.kills}/{match.deaths}/{match.assists}
-            </span>
-          </article>
-        ))}
+        {(matches.data?.matches ?? []).map((match) => {
+          const champion = catalog.data?.find((candidate) => candidate.id === match.championId);
+          return (
+            <article
+              className="champion-row"
+              key={match.matchId}
+              onClick={() => void openMatch(match.matchId)}
+              style={{ cursor: "pointer" }}
+            >
+              <div className="champion-identity">
+                {champion && (
+                  <img className="champion-icon sm" src={championSquareUrl(champion.key, ddragonVersion)} alt={champion.name} />
+                )}
+                <strong>{champion?.name ?? `Campeão #${match.championId}`}</strong>
+              </div>
+              <span>{match.role}</span>
+              <span>{match.won ? "Vitória" : "Derrota"}</span>
+              <span>
+                {match.kills}/{match.deaths}/{match.assists}
+              </span>
+            </article>
+          );
+        })}
       </section>
 
       {selectedMatchId && (
         <section className="panel wide">
-          {reportStatus === "loading" && <p>Analisando...</p>}
+          {reportStatus === "loading" && <Loading label="Analisando..." />}
           {reportStatus === "error" && <p>{reportError}</p>}
           {report && reportStatus !== "loading" && (
             <>

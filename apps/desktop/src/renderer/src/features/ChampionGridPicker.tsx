@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { championSquareUrl, fetchAllChampions, type DataDragonChampionSummary } from "./datadragon";
+import { GridSkeleton } from "./GridSkeleton";
 import { useAsyncData } from "./use-async-data";
 
 interface ChampionGridPickerProps {
@@ -34,8 +35,8 @@ export function ChampionGridPicker({ ddragonVersion, onSelect, isSelected, isDis
         value={search}
         onChange={(event) => setSearch(event.target.value)}
       />
-      {champions.status === "loading" && <p>Carregando campeões...</p>}
       {champions.status === "error" && <p>{champions.error}</p>}
+      {champions.status === "loading" && <GridSkeleton />}
       <div className="theme-picker-grid">
         {filteredChampions.map((champion) => {
           const active = isSelected?.(champion) ?? false;

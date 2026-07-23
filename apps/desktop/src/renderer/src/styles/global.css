@@ -11,6 +11,10 @@
   --color-red-soft: #7f1d1d;
   --color-red-glow: rgba(220, 38, 38, 0.32);
   --color-error: #f87171;
+  /* Cor semantica de tendencia (melhorando/piorando), ortogonal a cor de
+     destaque do tema (que continua fixa em vermelho) - mesmo padrao de
+     leitura rapida de KDA/stats comum em apps de LoL. */
+  --color-green: #4ade80;
   --font-sans: "Manrope", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --transition-fast: 0.18s ease;
   --transition-medium: 0.32s ease;
@@ -63,6 +67,54 @@ input {
   to {
     opacity: 1;
   }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200px 0;
+  }
+  100% {
+    background-position: 200px 0;
+  }
+}
+
+.loading-indicator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  animation: fadeInSoft var(--transition-fast);
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-red);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+.grid-skeleton {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.grid-skeleton-tile {
+  width: 34px;
+  height: 34px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--color-surface-elevated) 25%, var(--color-surface-panel) 37%, var(--color-surface-elevated) 63%);
+  background-size: 400px 100%;
+  animation: shimmer 1.4s ease infinite;
 }
 
 .app-shell {
@@ -152,6 +204,12 @@ nav button:hover,
 
 nav button.active {
   transform: none;
+}
+
+.draft-controls button.active {
+  border-color: var(--color-red-soft);
+  background: var(--color-surface-elevated);
+  color: var(--color-text-primary);
 }
 
 /* Seletor de campeao em destaque (tema) */
@@ -402,6 +460,20 @@ p {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.trend-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.trend-cell.improving {
+  color: var(--color-green);
+}
+
+.trend-cell.worsening {
+  color: var(--color-error);
 }
 
 .recommendation .recommendation-title {
