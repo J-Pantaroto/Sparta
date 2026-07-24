@@ -2,13 +2,14 @@ import { useState } from "react";
 import { ChampionGridPicker } from "./ChampionGridPicker";
 import {
   championSplashUrl,
-  championSquareUrl,
+  communityDragonSplashUrl,
   fetchChampionSkins,
   type DataDragonChampionSummary,
   type DataDragonSkin
 } from "./datadragon";
 import { useFeaturedChampion } from "./featured-champion-context";
 import { GridSkeleton } from "./GridSkeleton";
+import { SkinSplash } from "./SkinSplash";
 import { useAsyncData } from "./use-async-data";
 
 interface ChampionSkinPickerProps {
@@ -17,10 +18,9 @@ interface ChampionSkinPickerProps {
 
 /**
  * Fluxo de 2 passos pra escolher o tema visual: qualquer campeao -> qualquer
- * skin dele (base ou nao). Substitui a lista curada fixa de 12 campeoes que
- * existia antes. Lista de campeoes/skins vem direto da CDN publica da Data
- * Dragon (mesmo padrao de championSquareUrl/championSplashUrl), sem
- * nenhuma rota nova no backend Sparta.
+ * skin dele (base ou nao). Splash art vem da Data Dragon, com Community
+ * Dragon como fallback quando aquela skin especifica nao existe la (skins
+ * muito novas, chromas) ou a CDN esta indisponivel.
  */
 export function ChampionSkinPicker({ ddragonVersion }: ChampionSkinPickerProps) {
   const { featuredChampion, setFeaturedChampion } = useFeaturedChampion();
@@ -34,22 +34,38 @@ export function ChampionSkinPicker({ ddragonVersion }: ChampionSkinPickerProps) 
   );
 
   function applySkin(champion: DataDragonChampionSummary, skin: DataDragonSkin) {
+    // Aplicar sem baixar volta pra CDN (localSplashPath undefined) - o tema
+    // funciona online; "Baixar" e o que garante funcionar offline depois.
     setFeaturedChampion({ key: champion.key, name: champion.name, skinIndex: skin.num, skinName: skin.name });
   }
 
   async function downloadSkin(champion: DataDragonChampionSummary, skin: DataDragonSkin) {
-    if (!window.sparta?.downloadSkin) return;
+    if (!window.sparta?.downloadSkin) {
+      setDownloadError("Download disponível apenas no aplicativo desktop.");
+      return;
+    }
     setDownloadingSkin(skin.num);
     setDownloadError(null);
+    const fileName = `${champion.key}_${skin.num}.jpg`;
     try {
-      const url = championSplashUrl(champion.key, skin.num);
-      const localPath = await window.sparta.downloadSkin(url, `${champion.key}_${skin.num}.jpg`);
+      let localUrl: string;
+      try {
+        localUrl = await window.sparta.downloadSkin(championSplashUrl(champion.key, skin.num), fileName);
+      } catch (primaryError) {
+        // Data Dragon nao tem essa arte (ou caiu) - tenta a Community Dragon
+        // antes de reportar erro pro usuario.
+        const fallbackUrl = await communityDragonSplashUrl(champion.id, skin.num);
+        if (!fallbackUrl) throw primaryError;
+        localUrl = await window.sparta.downloadSkin(fallbackUrl, fileName);
+      }
       setFeaturedChampion({
         key: champion.key,
         name: champion.name,
         skinIndex: skin.num,
         skinName: skin.name,
-        localSplashPath: `file://${localPath}`
+        // Data URL devolvido pelo main - `file://` nao carrega no renderer
+        // por seguranca do Electron.
+        localSplashPath: localUrl
       });
     } catch (error) {
       setDownloadError(error instanceof Error ? error.message : "Não foi possível baixar a skin.");
@@ -76,31 +92,25 @@ export function ChampionSkinPicker({ ddragonVersion }: ChampionSkinPickerProps) 
             ← Voltar pra lista de campeões
           </button>
           <h3>{selectedChampion.name}</h3>
-          {downloadError && <p>{downloadError}</p>}
+          {downloadError && <p className="auth-error">{downloadError}</p>}
           {skins.status === "loading" && <GridSkeleton count={6} />}
           <div className="theme-picker-grid">
             {(skins.data ?? []).map((skin) => {
               const isActive = featuredChampion.key === selectedChampion.key && featuredChampion.skinIndex === skin.num;
               return (
                 <div key={skin.num} className={`skin-picker-card${isActive ? " active" : ""}`}>
-                  <img
-                    src={championSplashUrl(selectedChampion.key, skin.num)}
+                  <SkinSplash
+                    championKey={selectedChampion.key}
+                    championId={selectedChampion.id}
+                    skinNum={skin.num}
+                    ddragonVersion={ddragonVersion}
                     alt={skin.name}
                     onClick={() => applySkin(selectedChampion, skin)}
-                    onError={(event) => {
-                      // Splash art de skin especifica pode 404 (chroma sem
-                      // arte propria, skin muito nova) - cai pro icone do
-                      // campeao (sempre confiavel, mesmo catalogo) em vez de
-                      // deixar o icone nativo de imagem quebrada do navegador.
-                      const img = event.currentTarget;
-                      if (img.dataset.fallbackApplied) return;
-                      img.dataset.fallbackApplied = "true";
-                      img.src = championSquareUrl(selectedChampion.key, ddragonVersion);
-                    }}
                   />
                   <span>{skin.num === 0 ? selectedChampion.name : skin.name}</span>
                   <button
                     type="button"
+                    className="btn-secondary"
                     disabled={downloadingSkin === skin.num}
                     onClick={() => void downloadSkin(selectedChampion, skin)}
                   >

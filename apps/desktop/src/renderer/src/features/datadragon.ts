@@ -26,8 +26,53 @@ export function championSquareUrl(championKey: string, version = FALLBACK_DATA_D
   return `https://ddragon.leagueoflegends.com/cdn/${version}/img/champion/${championKey}.png`;
 }
 
+/**
+ * Splash art oficial da Data Dragon. A extensao e `.jpg` - a CDN devolve
+ * 403 (nao 404) pra `.png`, entao usar a extensao errada quebra tanto a
+ * previa quanto o download de tema pra TODO campeao/skin (bug real, achado
+ * testando as duas extensoes contra a CDN).
+ */
 export function championSplashUrl(championKey: string, skinIndex = 0): string {
-  return `https://ddragon.leagueoflegends.com/cdn/img/champion/splash/${championKey}_${skinIndex}.png`;
+  return `https://ddragon.leagueoflegends.com/cdn/img/champion/splash/${championKey}_${skinIndex}.jpg`;
+}
+
+const COMMUNITY_DRAGON_BASE =
+  "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default";
+
+interface CommunityDragonChampion {
+  skins?: { id: number; splashPath?: string }[];
+}
+
+// Cache por championId - o JSON de um campeao lista todas as skins dele,
+// entao uma busca serve pra qualquer skin do mesmo campeao.
+const communityDragonCache = new Map<number, Promise<CommunityDragonChampion | null>>();
+
+function loadCommunityDragonChampion(championId: number): Promise<CommunityDragonChampion | null> {
+  let cached = communityDragonCache.get(championId);
+  if (!cached) {
+    cached = fetch(`${COMMUNITY_DRAGON_BASE}/v1/champions/${championId}.json`)
+      .then((response) => (response.ok ? (response.json() as Promise<CommunityDragonChampion>) : null))
+      .catch(() => null);
+    communityDragonCache.set(championId, cached);
+  }
+  return cached;
+}
+
+/**
+ * Fallback de splash art pela Community Dragon (espelho publico dos assets
+ * da Riot), usado quando a Data Dragon nao tem a arte daquela skin ou esta
+ * indisponivel. Indexa por championId numerico + numero da skin, nunca por
+ * nome - o `splashPath` vem no JSON do campeao como um caminho absoluto do
+ * jogo (`/lol-game-data/assets/...`) que vira URL da CDN removendo esse
+ * prefixo e passando pra minuscula. Retorna `undefined` (nunca chuta uma
+ * URL) quando o campeao/skin nao existe la ou a requisicao falha.
+ */
+export async function communityDragonSplashUrl(championId: number, skinNum: number): Promise<string | undefined> {
+  const champion = await loadCommunityDragonChampion(championId);
+  const skin = champion?.skins?.find((candidate) => candidate.id === championId * 1000 + skinNum);
+  if (!skin?.splashPath) return undefined;
+  const assetPath = skin.splashPath.replace(/^\/lol-game-data\/assets/, "").toLowerCase();
+  return `${COMMUNITY_DRAGON_BASE}${assetPath}`;
 }
 
 export interface DataDragonChampionSummary {
