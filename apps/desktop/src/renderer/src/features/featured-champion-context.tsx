@@ -29,7 +29,11 @@ function loadStoredChampion(): FeaturedChampionOption {
       name: parsed.name ?? parsed.key,
       skinIndex: parsed.skinIndex,
       skinName: parsed.skinName ?? parsed.name ?? parsed.key,
-      localSplashPath: parsed.localSplashPath
+      // Versoes antigas gravavam um `file://` aqui, que o renderer nunca
+      // conseguiu carregar (bloqueio de seguranca do Electron) - descarta e
+      // volta pra CDN em vez de deixar o tema quebrado pra sempre. Hoje o
+      // main devolve um data URL, que carrega em qualquer origem.
+      localSplashPath: parsed.localSplashPath?.startsWith("data:") ? parsed.localSplashPath : undefined
     };
   } catch {
     return DEFAULT_CHAMPION;

@@ -1,6 +1,6 @@
 import { app, BrowserWindow, ipcMain } from "electron";
 import { mkdir, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { derivePickOrder, derivePlayerRole, LcuReadOnlyClient, type LcuGameflowPhase } from "@sparta/riot";
 import type { Role } from "@sparta/core";
 
@@ -12,6 +12,13 @@ const GAMEFLOW_POLL_INTERVAL_MS = 2500;
  * app hoje. Renderer nao tem acesso a `fs` (contextIsolation), entao pede
  * via IPC request/response (ipcRenderer.invoke), diferente do padrao
  * push-only ja usado pelo gameflow-phase.
+ *
+ * Devolve um **data URL** (nao um caminho de disco). `file://` nao carrega
+ * no renderer - a pagina roda em `http://localhost` (dev) ou no bundle, e o
+ * Chromium bloqueia `file://` cross-origin; um esquema proprio registrado
+ * via `protocol.handle` tambem nao e roteado a partir de uma origem http
+ * (testado: o handler nunca era chamado). O data URL funciona em qualquer
+ * origem, e o arquivo em disco continua sendo a copia offline.
  */
 function registerSkinDownloadHandler() {
   ipcMain.handle("sparta:download-skin", async (_event, url: string, fileName: string) => {
@@ -25,12 +32,13 @@ function registerSkinDownloadHandler() {
     if (!response.ok) throw new Error(`Falha ao baixar a imagem (${response.status}).`);
     const buffer = Buffer.from(await response.arrayBuffer());
 
+    const safeName = basename(fileName);
     const skinsDir = join(app.getPath("userData"), "skins");
     await mkdir(skinsDir, { recursive: true });
-    const filePath = join(skinsDir, fileName);
-    await writeFile(filePath, buffer);
+    await writeFile(join(skinsDir, safeName), buffer);
 
-    return filePath;
+    const contentType = response.headers.get("content-type") ?? "image/jpeg";
+    return `data:${contentType};base64,${buffer.toString("base64")}`;
   });
 }
 

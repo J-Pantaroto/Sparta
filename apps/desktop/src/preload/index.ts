@@ -15,8 +15,9 @@ contextBridge.exposeInMainWorld("sparta", {
     return () => ipcRenderer.removeListener("sparta:gameflow-phase", listener);
   },
   /**
-   * Baixa uma imagem pro disco local (userData/skins) e devolve o caminho
-   * do arquivo salvo - usado pra aplicar tema de skin offline.
+   * Baixa uma imagem pro disco local (userData/skins) e devolve um data URL
+   * (nao um caminho de disco) - usado pra aplicar tema de skin offline.
+   * `file://` nao carrega no renderer por seguranca do Electron.
    */
   downloadSkin(url: string, fileName: string): Promise<string> {
     return ipcRenderer.invoke("sparta:download-skin", url, fileName);
