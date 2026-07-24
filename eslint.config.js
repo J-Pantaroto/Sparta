@@ -23,6 +23,8 @@ export default [
         clearInterval: "readonly",
         window: "readonly",
         localStorage: "readonly",
+        Image: "readonly",
+        HTMLImageElement: "readonly",
         RequestInit: "readonly",
         Response: "readonly",
         __dirname: "readonly"

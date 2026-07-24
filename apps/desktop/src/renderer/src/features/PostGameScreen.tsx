@@ -6,6 +6,7 @@ import { fetchAllChampions, type DataDragonChampionSummary } from "./datadragon"
 import { Loading } from "./Loading";
 import { SignalChip } from "./SignalChip";
 import { StatBar } from "./StatBar";
+import { ThemedHeader } from "./ThemedHeader";
 import { useAsyncData } from "./use-async-data";
 
 interface PostGameScreenProps {
@@ -109,10 +110,7 @@ export function PostGameScreen({ riotAccounts, sessionToken, ddragonVersion }: P
 
   return (
     <>
-      <header className="page-header compact">
-        <span>Análise pós-game</span>
-        <h1>Partidas recentes</h1>
-      </header>
+      <ThemedHeader label="Análise pós-game" title="Partidas recentes" />
 
       {matches.status === "loading" && <Loading label="Carregando partidas..." />}
       {matches.status === "error" && <p>{matches.error}</p>}

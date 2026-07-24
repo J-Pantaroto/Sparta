@@ -7,17 +7,22 @@
   --color-text-primary: #f5f5f6;
   --color-text-secondary: #a1a1aa;
   --color-text-muted: #71717a;
-  --color-red: #dc2626;
-  --color-red-soft: #7f1d1d;
-  --color-red-glow: rgba(220, 38, 38, 0.32);
+  /* Cor de DESTAQUE do app (bordas ativas, hovers, rotulos de secao). O
+     vermelho aqui e so o padrao - quando ha um tema de skin aplicado, o
+     FeaturedChampionProvider sobrescreve estes 3 tokens em runtime com a
+     cor extraida da splash art (ver features/accent-color.ts). Todos os
+     usos de destaque no arquivo passam por estas variaveis, entao trocar
+     as 3 re-tematiza o app inteiro. */
+  --color-accent: #dc2626;
+  --color-accent-soft: #7f1d1d;
+  --color-accent-glow: rgba(220, 38, 38, 0.32);
   --color-error: #f87171;
-  /* Cor semantica de tendencia (melhorando/piorando), ortogonal a cor de
-     destaque do tema (que continua fixa em vermelho) - mesmo padrao de
-     leitura rapida de KDA/stats comum em apps de LoL. */
+  /* Trio SEMANTICO de leitura de performance (bom / neutro / ruim). Fixo de
+     proposito: se seguisse o tema, "bom" e "ruim" mudariam de cor a cada
+     skin e perderiam o significado. Ortogonal a cor de destaque acima. */
   --color-green: #4ade80;
-  /* Faixa neutra dos badges/barras de score (Fase 9) - nem forte nem fraco
-     pelos limiares de dimension-signals.ts. */
   --color-yellow: #fbbf24;
+  --color-red: #dc2626;
   --font-sans: "Manrope", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --transition-fast: 0.18s ease;
   --transition-medium: 0.32s ease;
@@ -42,9 +47,13 @@ body {
   margin: 0;
   min-width: 1000px;
   min-height: 720px;
+  /* O brilho ambiente segue a cor do tema (antes era um vermelho fixo
+     hardcoded), entao a skin escolhida tinge o app inteiro, nao so os
+     cabecalhos. */
   background:
-    radial-gradient(circle at 65% 10%, rgba(127, 29, 29, 0.2), transparent 34%),
+    radial-gradient(circle at 65% 10%, var(--color-accent-glow), transparent 38%),
     linear-gradient(135deg, #050505 0%, #0b0b0d 48%, #111113 100%);
+  background-attachment: fixed;
 }
 
 button,
@@ -100,7 +109,7 @@ input {
   width: 16px;
   height: 16px;
   border: 2px solid var(--color-border);
-  border-top-color: var(--color-red);
+  border-top-color: var(--color-accent);
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
 }
@@ -146,10 +155,10 @@ input {
   width: 42px;
   height: 42px;
   place-items: center;
-  border: 1px solid var(--color-red-soft);
+  border: 1px solid var(--color-accent-soft);
   border-radius: 8px;
   background: var(--color-surface-elevated);
-  color: var(--color-red);
+  color: var(--color-accent);
   font-weight: 800;
 }
 
@@ -207,10 +216,14 @@ nav button:hover,
 
 nav button.active {
   transform: none;
+  /* Barra lateral na cor do tema marcando o item ativo - mesmo padrao de
+     navegacao de Blitz/Mobalytics/iTero. */
+  box-shadow: inset 3px 0 0 var(--color-accent);
+  border-color: var(--color-accent-soft);
 }
 
 .draft-controls button.active {
-  border-color: var(--color-red-soft);
+  border-color: var(--color-accent-soft);
   background: var(--color-surface-elevated);
   color: var(--color-text-primary);
 }
@@ -251,7 +264,7 @@ nav button.active {
 }
 
 .theme-picker-option.active {
-  border-color: var(--color-red);
+  border-color: var(--color-accent);
 }
 
 /*
@@ -279,7 +292,7 @@ nav button.active {
 }
 
 .skin-picker-card.active {
-  border-color: var(--color-red);
+  border-color: var(--color-accent);
 }
 
 .skin-picker-card img {
@@ -298,7 +311,7 @@ nav button.active {
 .skin-picker-card button {
   width: 100%;
   height: 32px;
-  border: 1px solid var(--color-red-soft);
+  border: 1px solid var(--color-accent-soft);
   border-radius: 6px;
   background: var(--color-surface);
   color: var(--color-text-primary);
@@ -328,10 +341,71 @@ nav button.active {
   margin-bottom: 22px;
 }
 
+/*
+ * Cabecalho de tela com a splash art do tema ao fundo (linguagem visual de
+ * Blitz/Mobalytics/iTero: toda tela carrega a identidade do campeao, nao so
+ * a home). Mais baixo que o `.hero-splash` do Dashboard - aqui a arte e
+ * ambientacao, nao o assunto principal da tela.
+ */
+.page-header.themed {
+  position: relative;
+  max-width: none;
+  padding: 22px 26px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  overflow: hidden;
+  background-color: var(--color-surface);
+  background-size: cover;
+  background-position: center 22%;
+  animation: fadeInSoft 0.5s ease;
+}
+
+/* Duas camadas: um scrim escuro que garante a legibilidade do texto e uma
+   lavagem na cor do tema, que e o que da o "ar" colorido dos apps de
+   referencia sem comprometer o contraste. */
+.page-header.themed::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(100deg, rgba(5, 5, 5, 0.95) 30%, rgba(5, 5, 5, 0.75) 65%, rgba(5, 5, 5, 0.45) 100%),
+    linear-gradient(0deg, var(--color-accent-glow), transparent 70%);
+}
+
+.page-header.themed > * {
+  position: relative;
+}
+
+.themed-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+/* O titulo do cabecalho tematizado e menor que o `h1` gigante do Dashboard -
+   aqui e um rotulo de tela, nao a chamada principal do app. */
+.page-header.themed h1 {
+  font-size: 27px;
+  margin-top: 2px;
+}
+
+/* Faixa de destaque na cor do tema marcando a tela ativa (padrao dos tres
+   apps de referencia). */
+.page-header.themed::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--color-accent);
+}
+
 .page-header span,
 .recommendation span,
 .metric span {
-  color: var(--color-red);
+  color: var(--color-accent);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.01em;
@@ -382,9 +456,9 @@ p {
 
 .metric:hover,
 .recommendation:hover {
-  border-color: var(--color-red-soft);
+  border-color: var(--color-accent-soft);
   transform: translateY(-2px);
-  box-shadow: 0 12px 24px -16px var(--color-red-glow);
+  box-shadow: 0 12px 24px -16px var(--color-accent-glow);
 }
 
 .metric {
@@ -460,7 +534,7 @@ p {
 }
 
 .leaderboard-rank {
-  color: var(--color-red);
+  color: var(--color-accent);
   font-weight: 800;
 }
 
@@ -549,7 +623,7 @@ p {
 .draft-controls input:focus,
 .draft-controls select:focus {
   outline: none;
-  border-color: var(--color-red-soft);
+  border-color: var(--color-accent-soft);
 }
 
 /* Esconde as setinhas nativas de incrementar/decrementar dos inputs
@@ -738,7 +812,7 @@ input[type="number"]::-webkit-inner-spin-button {
 }
 
 .signal-chip.negative {
-  border-color: var(--color-red-soft);
+  border-color: var(--color-accent-soft);
   color: var(--color-error);
 }
 
@@ -757,7 +831,7 @@ input[type="number"]::-webkit-inner-spin-button {
   align-self: flex-start;
   height: 36px;
   padding: 0 14px;
-  border: 1px solid var(--color-red-soft);
+  border: 1px solid var(--color-accent-soft);
   border-radius: 8px;
   background: var(--color-surface-elevated);
   color: var(--color-text-primary);
@@ -786,7 +860,7 @@ input[type="number"]::-webkit-inner-spin-button {
 
 .champion-grid-picker input:focus {
   outline: none;
-  border-color: var(--color-red-soft);
+  border-color: var(--color-accent-soft);
 }
 
 .champion-grid-picker .theme-picker-option:disabled {
@@ -833,7 +907,7 @@ input[type="number"]::-webkit-inner-spin-button {
 }
 
 .build-item:hover {
-  border-color: var(--color-red-soft);
+  border-color: var(--color-accent-soft);
   transform: translateY(-2px);
 }
 
@@ -955,14 +1029,14 @@ input[type="number"]::-webkit-inner-spin-button {
 
 .auth-field input:focus {
   outline: none;
-  border-color: var(--color-red-soft);
+  border-color: var(--color-accent-soft);
 }
 
 .auth-submit {
   width: 100%;
   height: 44px;
   margin-top: 6px;
-  border: 1px solid var(--color-red-soft);
+  border: 1px solid var(--color-accent-soft);
   border-radius: 8px;
   background: #1a0d0d;
   color: var(--color-text-primary);
@@ -995,7 +1069,7 @@ input[type="number"]::-webkit-inner-spin-button {
 .auth-switch button {
   background: none;
   border: none;
-  color: var(--color-red);
+  color: var(--color-accent);
   cursor: pointer;
   font-size: 13px;
   padding: 0;
