@@ -29,7 +29,7 @@ export function ChampionSkinPicker({ ddragonVersion }: ChampionSkinPickerProps) 
   const [downloadError, setDownloadError] = useState<string | null>(null);
 
   const skins = useAsyncData<DataDragonSkin[]>(
-    () => (selectedChampion ? fetchChampionSkins(selectedChampion.key, ddragonVersion) : undefined),
+    () => (selectedChampion ? fetchChampionSkins(selectedChampion.key, ddragonVersion, selectedChampion.id) : undefined),
     [selectedChampion?.key, ddragonVersion]
   );
 

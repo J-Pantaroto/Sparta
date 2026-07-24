@@ -3,6 +3,7 @@ import { Minus, TrendingDown, TrendingUp } from "lucide-react";
 import { fetchGrowthJourney, type RiotAccountSummary } from "./api-client";
 import { Loading } from "./Loading";
 import { StatBar } from "./StatBar";
+import { ThemedHeader } from "./ThemedHeader";
 import { useAsyncData } from "./use-async-data";
 
 interface GrowthJourneyScreenProps {
@@ -46,10 +47,7 @@ export function GrowthJourneyScreen({ riotAccounts }: GrowthJourneyScreenProps) 
 
   return (
     <>
-      <header className="page-header compact">
-        <span>Evolução</span>
-        <h1>Progressão dos pontos fracos</h1>
-      </header>
+      <ThemedHeader label="Evolução" title="Progressão dos pontos fracos" />
 
       {journey.status === "loading" && <Loading />}
       {journey.status === "error" && <p>{journey.error}</p>}

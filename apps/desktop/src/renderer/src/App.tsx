@@ -37,6 +37,7 @@ import { AuthScreen } from "./features/AuthScreen";
 import { ChampionGridPicker } from "./features/ChampionGridPicker";
 import { ChampionIcon } from "./features/ChampionIcon";
 import { Loading } from "./features/Loading";
+import { ThemedHeader } from "./features/ThemedHeader";
 import { LinkRiotAccountScreen } from "./features/LinkRiotAccountScreen";
 import { PostGameScreen } from "./features/PostGameScreen";
 import { GrowthJourneyScreen } from "./features/GrowthJourneyScreen";
@@ -113,7 +114,7 @@ export function App() {
 }
 
 function AppShell() {
-  const { featuredChampion } = useFeaturedChampion();
+  const { splashUrl } = useFeaturedChampion();
   const [page, setPage] = useState<Page>("dashboard");
   const [draft, setDraft] = useState<DraftState>({
     playerRole: "MID",
@@ -220,18 +221,13 @@ function AppShell() {
     setSessionStatus("ready");
   }
 
-  const loginSplash = useMemo(
-    () => featuredChampion.localSplashPath ?? championSplashUrl(featuredChampion.key, featuredChampion.skinIndex),
-    [featuredChampion]
-  );
-
   if (sessionStatus === "checking") {
-    return <div className="auth-shell" style={{ backgroundImage: `url(${loginSplash})` }} />;
+    return <div className="auth-shell" style={{ backgroundImage: `url(${splashUrl})` }} />;
   }
 
   if (sessionStatus === "auth") {
     return (
-      <AuthScreen splashUrl={loginSplash} onAuthenticated={handleAuthenticated} onSkip={() => setSessionStatus("ready")} />
+      <AuthScreen splashUrl={splashUrl} onAuthenticated={handleAuthenticated} onSkip={() => setSessionStatus("ready")} />
     );
   }
 
@@ -239,7 +235,7 @@ function AppShell() {
     return (
       <LinkRiotAccountScreen
         token={sessionToken}
-        splashUrl={loginSplash}
+        splashUrl={splashUrl}
         onLinked={handleLinked}
         onSkip={() => setSessionStatus("ready")}
       />
@@ -301,8 +297,7 @@ function AppShell() {
 
 function Dashboard({ riotAccounts, ddragonVersion }: { riotAccounts: RiotAccountSummary[]; ddragonVersion: string }) {
   const account = riotAccounts[0];
-  const { featuredChampion } = useFeaturedChampion();
-  const heroSplash = featuredChampion.localSplashPath ?? championSplashUrl(featuredChampion.key, featuredChampion.skinIndex);
+  const { splashUrl: heroSplash } = useFeaturedChampion();
 
   const profile = useAsyncData<PlayerProfileResponse>(
     () => (account ? fetchPlayerProfile(account.gameName, account.tagLine) : undefined),
@@ -429,12 +424,7 @@ function Profile({ riotAccounts, ddragonVersion }: { riotAccounts: RiotAccountSu
 
   return (
     <>
-      <header className="page-header compact">
-        <span>Perfil do jogador</span>
-        <h1>
-          {account.gameName}#{account.tagLine}
-        </h1>
-      </header>
+      <ThemedHeader label="Perfil do jogador" title={`${account.gameName}#${account.tagLine}`} />
       {profile.status === "loading" && <Loading />}
       {profile.status === "error" && <p>{profile.error}</p>}
       {profile.data && (
@@ -538,10 +528,7 @@ function ChampionSelect({
   if (!champSelectActive && !devOverride) {
     return (
       <>
-        <header className="page-header compact">
-          <span>Champion Select</span>
-          <h1>Aguardando sua seleção de campeões</h1>
-        </header>
+        <ThemedHeader label="Champion Select" title="Aguardando sua seleção de campeões" />
         <section className="panel wide">
           <p>
             Esta tela é liberada automaticamente quando o cliente do League detectar que você entrou em uma seleção de
@@ -557,10 +544,10 @@ function ChampionSelect({
 
   return (
     <>
-      <header className="page-header compact">
-        <span>{champSelectActive ? "Detectado via League Client" : "Modo manual (simulação)"}</span>
-        <h1>Champion Select</h1>
-      </header>
+      <ThemedHeader
+        label={champSelectActive ? "Detectado via League Client" : "Modo manual (simulação)"}
+        title="Champion Select"
+      />
       {noAccountLinked && (
         <p>Sem conta Riot vinculada - as recomendações abaixo usam só a referência geral do papel, não seu histórico.</p>
       )}

@@ -75,6 +75,29 @@ export async function communityDragonSplashUrl(championId: number, skinNum: numb
   return `${COMMUNITY_DRAGON_BASE}${assetPath}`;
 }
 
+/**
+ * Conjunto dos numeros de skin "de verdade" de um campeao, pra separar skins
+ * de chromas.
+ *
+ * O campo `chromas` da Data Dragon NAO serve pra isso: ele significa "esta
+ * skin *tem* chromas", nao "isto e um chroma". Os chromas vem como entradas
+ * irmas, com `chromas: false` e o nome entre parenteses - filtrar por aquele
+ * campo nao separaria nada (medido no Zed: 71 entradas na Data Dragon vs 15
+ * skins reais).
+ *
+ * A Community Dragon ja separa isso na estrutura: `skins[]` no topo tem so
+ * as skins reais, com os chromas aninhados dentro de cada uma. O `id` de
+ * cada skin e `championId * 1000 + num`, entao da pra derivar os `num`
+ * validos. Retorna `undefined` (nao um Set vazio) quando a Community Dragon
+ * falha - o chamador precisa distinguir "nao deu pra saber" de "nenhuma
+ * skin" pra nao esconder skins de verdade por causa de uma CDN fora do ar.
+ */
+export async function fetchRealSkinNums(championId: number): Promise<Set<number> | undefined> {
+  const champion = await loadCommunityDragonChampion(championId);
+  if (!champion?.skins?.length) return undefined;
+  return new Set(champion.skins.map((skin) => skin.id % 1000));
+}
+
 export interface DataDragonChampionSummary {
   key: string;
   id: number;
@@ -173,9 +196,22 @@ export interface DataDragonSkin {
  * Dragon, nao usado em lugar nenhum do desktop ate agora (so o resumo
  * champion.json, sem skins). `num: 0` e sempre a skin padrao/base.
  */
-export async function fetchChampionSkins(championKey: string, version = FALLBACK_DATA_DRAGON_VERSION): Promise<DataDragonSkin[]> {
+export async function fetchChampionSkins(
+  championKey: string,
+  version = FALLBACK_DATA_DRAGON_VERSION,
+  championId?: number
+): Promise<DataDragonSkin[]> {
   const response = await fetch(`https://ddragon.leagueoflegends.com/cdn/${version}/data/pt_BR/champion/${championKey}.json`);
   if (!response.ok) return [];
   const payload = (await response.json()) as { data: Record<string, { skins: DataDragonSkin[] }> };
-  return payload.data[championKey]?.skins ?? [];
+  const skins = payload.data[championKey]?.skins ?? [];
+  if (championId === undefined) return skins;
+
+  // Mantem os nomes em pt_BR da Data Dragon, mas usa a Community Dragon so
+  // pra saber quais entradas sao skins de verdade (o resto e chroma). Sem
+  // esse conjunto (CDragon fora do ar), devolve a lista inteira - melhor
+  // mostrar chroma a mais do que esconder skin de verdade.
+  const realSkinNums = await fetchRealSkinNums(championId);
+  if (!realSkinNums) return skins;
+  return skins.filter((skin) => realSkinNums.has(skin.num));
 }
