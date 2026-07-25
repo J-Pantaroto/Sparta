@@ -7,7 +7,7 @@ Entradas:
 - `DraftState`;
 - `PlayerProfile`;
 - `PlayerChampionStats[]`;
-- `ChampionTag[]`;
+- `ChampionTag[]` (ver "Origem dos ChampionTag" no fim);
 - `MatchupData[]`;
 - `CompositionRules`;
 - `PatchMetaData | null`.
@@ -44,3 +44,29 @@ Três tabelas de peso, cada uma somando 1.0 (invariante testada em `recommendati
 ## Fora de escopo desta revisão
 
 Recalibrar qualquer peso ou threshold com base em dado estatístico real — não há partidas suficientes acumuladas ainda.
+
+## Origem dos ChampionTag
+
+`data/seeds/champion-tags.json` cobre o roster inteiro e e **gerado**:
+
+```bash
+pnpm --filter @sparta/api champion-tags:generate
+```
+
+O gerador le `tags` (classe) e `info` (attack/defense/magic/difficulty, 0-10) do
+`champion.json` da Data Dragon e passa por `deriveChampionTag`
+(`packages/core/src/draft/champion-tag-derivation.ts`), que mapeia isso pras dimensoes do
+Sparta. O arquivo continua versionado de proposito: o resultado da derivacao fica revisavel
+num diff, e nao vira efeito colateral invisivel de rodar o seed.
+
+**O que a derivacao nao e**: nao e calibracao estatistica nem conhecimento de campeao
+individual. Duas Marksman recebem exatamente o mesmo perfil, e campeao que foge do arquetipo
+da classe fica generico demais. E uma leitura de CLASSE - menos precisa que curadoria, muito
+mais informativa que o neutro 50 que valia pra quase todo mundo antes.
+
+Entradas com `"source": "manual"` sobrevivem a regeneracao: a curadoria cresce por cima da
+base automatica em vez de competir com ela.
+
+`roles` sai vazio nas entradas derivadas porque a Data Dragon **nao publica rota**. Chutar
+(Marksman -> ADC, Mage -> MID) erraria em todo campeao flex, e nenhum motor consome
+`tag.roles` hoje - inventar o campo so criaria dado falso.

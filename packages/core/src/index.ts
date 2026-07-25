@@ -7,4 +7,5 @@ export * from "./scoring/champion-performance.js";
 export * from "./scoring/dimension-signals.js";
 export * from "./draft/recommendation-engine.js";
 export * from "./draft/build-recommendation.js";
+export * from "./draft/champion-tag-derivation.js";
 export * from "./postgame/post-game-analysis.js";

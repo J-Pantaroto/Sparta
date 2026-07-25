@@ -227,6 +227,7 @@ function SpartaApp() {
           recommendationsStatus={recommendationsQuery.status}
           noAccountLinked={riotAccounts.length === 0}
           ddragonVersion={ddragonVersion}
+          riotAccounts={riotAccounts}
         />
       )}
       {page === "pregame" && <PreGameScreen draft={draft} ddragonVersion={ddragonVersion} />}

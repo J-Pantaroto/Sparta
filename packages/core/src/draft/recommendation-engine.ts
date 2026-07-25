@@ -37,7 +37,7 @@ export function recommendPicks(input: {
       );
       const matchup = findMatchupScore(stats.championId, enemyLaneChampionId, input.matchups);
       const composition = analyzeTeamComposition(input.draft, input.championTags, tag);
-      const allySynergy = calculateAllySynergy(tag, composition);
+      const allySynergy = calculateAllySynergy(tag, composition, input.draft);
       const enemyAnswer = calculateEnemyAnswer(tag, input.draft, input.championTags);
       const meta = input.patchMeta?.championScores[stats.championId] ?? 50;
       const blindSafety = (tag?.blindSafety ?? 0.5) * 100;
@@ -116,13 +116,20 @@ export function analyzeTeamComposition(
     strengths: []
   };
 
-  if (composition.frontline < 35) composition.risks.push("Pouca linha de frente");
-  if (composition.engage < 35) composition.risks.push("Engage limitado");
-  if (composition.waveclear < 35) composition.risks.push("Wave clear baixo");
-  if (composition.damageBalance !== "BALANCED") composition.risks.push("Dano pouco balanceado");
-  if (composition.scaling >= 65) composition.strengths.push("Bom scaling");
-  if (composition.earlyPressure >= 60) composition.strengths.push("Boa pressão inicial");
-  if (composition.peel >= 60) composition.strengths.push("Boa proteção para carregadores");
+  // Rotulos de risco/forca sao afirmacoes sobre o TIME. Sem nenhum aliado
+  // escolhido, `tags` tem so o proprio candidato - dizer "pouca linha de
+  // frente" ali seria descrever o campeao e apresentar como leitura de
+  // composicao. Os numeros continuam calculados (compositionFit usa), mas
+  // as frases so aparecem quando existe composicao pra ler.
+  if (draft.allies.length > 0) {
+    if (composition.frontline < 35) composition.risks.push("Pouca linha de frente");
+    if (composition.engage < 35) composition.risks.push("Engage limitado");
+    if (composition.waveclear < 35) composition.risks.push("Wave clear baixo");
+    if (composition.damageBalance !== "BALANCED") composition.risks.push("Dano pouco balanceado");
+    if (composition.scaling >= 65) composition.strengths.push("Bom scaling");
+    if (composition.earlyPressure >= 60) composition.strengths.push("Boa pressão inicial");
+    if (composition.peel >= 60) composition.strengths.push("Boa proteção para carregadores");
+  }
 
   return composition;
 }
@@ -192,11 +199,25 @@ function findMatchupScore(championId: number, enemyChampionId: number | undefine
   return matchups.find((matchup) => matchup.championId === championId && matchup.enemyChampionId === enemyChampionId)?.score ?? 50;
 }
 
-// Media simples (pesos iguais 1/3) de engage/peel/waveclear - as 3 tags mais
-// diretamente ligadas a "encaixar bem com o time aliado formado ate agora"
-// (recommendPicks nao distingue qual delas importa mais em qual composicao).
-function calculateAllySynergy(tag: ChampionTag | undefined, composition: TeamComposition): number {
-  if (!tag) return 50;
+/**
+ * Encaixe do campeao COM OS ALIADOS ja escolhidos: media simples (pesos
+ * iguais 1/3) de engage/peel/waveclear contra os mesmos eixos do time.
+ *
+ * Sem nenhum aliado conhecido devolve o neutro 50, mesma convencao de
+ * `calculateEnemyAnswer` com o time inimigo vazio. Sem essa guarda o
+ * calculo degenera: `analyzeTeamComposition` passa a descrever so o
+ * proprio candidato, e a formula vira `100*(e² + p² + w²)/3`, que nunca
+ * passa de 33 - ou seja, TODO first pick levaria uma penalidade que nao
+ * diz nada sobre o campeao. Isso ficou invisivel enquanto quase nenhum
+ * campeao tinha `ChampionTag` (sem tag a funcao ja retornava 50); passou a
+ * valer pra todo mundo quando a tabela cobriu o roster inteiro.
+ */
+function calculateAllySynergy(
+  tag: ChampionTag | undefined,
+  composition: TeamComposition,
+  draft: DraftState
+): number {
+  if (!tag || draft.allies.length === 0) return 50;
   return round((tag.engage * composition.engage + tag.peel * composition.peel + tag.waveclear * composition.waveclear) / 3);
 }
 
