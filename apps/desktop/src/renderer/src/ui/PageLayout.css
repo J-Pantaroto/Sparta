@@ -170,7 +170,16 @@
   top: 0;
 }
 
-@media (max-width: 1280px) {
+/*
+ * Ponto de quebra medido, nao chutado: a area de conteudo e a largura da
+ * janela menos a sidebar (232px) e o padding (~2x28px). Em 1180px sobram
+ * ~890px, o que ainda deixa a coluna principal com ~530px ao lado de um
+ * painel de 340px. Abaixo disso a principal fica estreita demais e vira
+ * uma coluna so. (O valor anterior, 1280px, colapsava o layout ja no
+ * tamanho PADRAO da janela do Electron - o app nunca mostrava duas
+ * colunas na pratica.)
+ */
+@media (max-width: 1180px) {
   .sp-columns,
   .sp-columns--aside-first {
     grid-template-columns: minmax(0, 1fr);

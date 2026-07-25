@@ -37,6 +37,24 @@ export const formTrendLabels: Record<string, string> = {
   stable: "sem variação recente"
 };
 
+/**
+ * Rotulos das chaves de `ChampionPerformanceScore.components`
+ * (`scoreChampionPerformance`). A ordem aqui e a ordem de exibicao: os
+ * sinais mais diretos de desempenho primeiro.
+ */
+export const componentLabels: Record<string, string> = {
+  kda: "KDA",
+  winrate: "Vitórias",
+  cs: "CS por minuto",
+  damage: "Dano por minuto",
+  gold: "Ouro por minuto",
+  deaths: "Sobrevivência",
+  kp: "Participação em abates",
+  objective: "Participação em objetivos",
+  vision: "Controle de visão",
+  recent: "Forma recente"
+};
+
 /** Rotulos das chaves de `PickRecommendation.metrics` (@sparta/core). */
 export const metricLabels: Record<string, string> = {
   personalPerformance: "Desempenho pessoal",

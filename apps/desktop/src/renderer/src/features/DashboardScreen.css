@@ -1,0 +1,107 @@
+/*
+ * Faixa das ultimas partidas: um quadrado por partida, verde/vermelho, do
+ * mais recente pro mais antigo. E a leitura mais rapida possivel de "como
+ * estao indo os jogos" - o Dashboard antes so mostrava um score agregado,
+ * sem nenhuma nocao de sequencia.
+ */
+.sp-streak {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+}
+
+.sp-streak__match {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  padding: 0;
+  overflow: hidden;
+  cursor: default;
+  background: var(--surface-3);
+}
+
+.sp-streak__match img,
+.sp-streak__match > div {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+}
+
+/* Faixa inferior colorida em vez de tingir o retrato inteiro: o campeao
+   continua reconhecivel e o resultado continua legivel de relance. */
+.sp-streak__match::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: var(--color-red);
+}
+
+.sp-streak__match--won::after {
+  background: var(--color-green);
+}
+
+.sp-streak__legend {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  margin-left: var(--space-2);
+}
+
+/* Linha do pool de campeoes no Dashboard (versao curta da tabela do Perfil) */
+.sp-pool {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.sp-pool__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 60px 56px 40px;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  transition: background-color var(--duration-fast) var(--ease-out);
+}
+
+.sp-pool__row:hover {
+  background: var(--surface-hover);
+}
+
+.sp-pool__rank {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Cartao de insight (ponto forte / risco): rotulo pequeno, frase forte. */
+.sp-insight__label {
+  display: block;
+  margin-bottom: var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+}
+
+.sp-insight__headline {
+  display: block;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-snug);
+}
+
+.sp-insight__detail {
+  display: block;
+  margin-top: var(--space-2);
+  color: var(--text-secondary);
+  font-size: var(--text-md);
+  line-height: var(--leading-snug);
+}

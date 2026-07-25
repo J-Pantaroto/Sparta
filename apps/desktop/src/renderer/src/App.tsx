@@ -199,7 +199,14 @@ function SpartaApp() {
         </Sidebar>
       }
     >
-      {page === "dashboard" && <DashboardScreen riotAccounts={riotAccounts} ddragonVersion={ddragonVersion} />}
+      {page === "dashboard" && (
+        <DashboardScreen
+          riotAccounts={riotAccounts}
+          ddragonVersion={ddragonVersion}
+          champSelectActive={champSelectActive}
+          onNavigate={setPage}
+        />
+      )}
       {page === "profile" && <ProfileScreen riotAccounts={riotAccounts} ddragonVersion={ddragonVersion} />}
       {page === "select" && (
         <ChampionSelectScreen
