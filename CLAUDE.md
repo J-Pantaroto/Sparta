@@ -84,6 +84,48 @@ nos campeões elegíveis), as 7 telas renderizando com **0 imagens quebradas** e
 Chromium): `focusVisible: true`, `outlineWidth: 2px` na cor do tema.
 `pnpm typecheck && pnpm lint && pnpm test && pnpm build` completos.
 
+#### Subfase 14B - Dashboard e Perfil
+
+O Dashboard tinha 4 cards idênticos em grid 4x1 (exatamente o anti-padrão que o usuário pediu
+pra evitar), com um `h1` de 40px que era slogan de marketing, não informação; o Perfil listava
+todos os campeões sem busca, filtro nem ordenação, e **nunca exibia** `preferredRoles`,
+`recentForm`, `killParticipation`, `objectiveParticipation`, `goldPerMinute` nem
+`visionScorePerMinute` - todos já vinham da API desde a Fase 1/2.
+
+1. **Dashboard** (`features/DashboardScreen.tsx` + `.css`) - herói com o nome real da conta e
+   uma linha de números agregados (partidas analisadas, winrate geral, tamanho do pool,
+   tendência), calculados sobre `championStats` inteiro (não só os elegíveis pro ranking, pra
+   "partidas analisadas" bater com o histórico real). Layout em duas colunas: à esquerda forma
+   recente (10/20/50) + **faixa das últimas 10 partidas** (`fetchRecentMatches`, um retrato por
+   partida com barra verde/vermelha embaixo - o retrato continua reconhecível e o resultado
+   legível de relance) e o pool de campeões com winrate real por campeão; à direita ponto forte
+   (card `feature`), risco atual e um resumo da Evolução (`fetchGrowthJourney`), com atalhos que
+   navegam pras telas cheias. **Atalho contextual**: quando o LCU detecta champion select, o
+   herói troca o rótulo por um `StatusBadge` ao vivo e mostra um botão primário "Abrir Champion
+   Select".
+2. **Perfil** (`features/ProfileScreen.tsx`) - barra de ferramentas com filtro por posição
+   (`SegmentedControl` com contagem real por role, desabilitando as vazias), busca por nome e
+   ordenação (desempenho / partidas / winrate / nome). A tabela virou resumo e ganhou um
+   **painel de detalhe fixo** (`stickyAside`) que abre o que nunca era mostrado: as 8 médias
+   reais do campeão comparadas com `roleBaselines[role]` e os **10 componentes** de
+   `scoreChampionPerformance` como barras. Campeão sem amostra suficiente não ganha score
+   inventado - mostra "—" na tabela e um chip explicando que faltam partidas, com as médias
+   continuando reais.
+
+**Bug de layout encontrado na validação real**: o breakpoint de `.sp-columns` era
+`max-width: 1280px`, mas a janela padrão do Electron tem **1264px de viewport** - ou seja, o
+layout de duas colunas **nunca aparecia** no tamanho em que o app abre. Corrigido pra 1180px,
+valor medido a partir da conta real (viewport − sidebar 232px − padding), o que deixa a coluna
+principal com ~610px ao lado do painel de 340px. Confirmado no app real:
+`gridTemplateColumns: "610.406px 340px"` com `innerWidth: 1264`.
+
+Validado no Electron real via CDP com Zekerus#117: Dashboard com 22 partidas / 41% / 11
+campeões / faixa "2V — 8D nas últimas 10" reais; Perfil com filtro por role mostrando as
+contagens certas (Jungle 6, Mid 1, Suporte 4, Top e ADC desabilitados em 0), busca reduzindo a
+tabela de 11 pra 1 linha ("thre" → Thresh), clique numa linha trocando o painel de detalhe
+(Vel'Koz) com os 10 componentes renderizados. `pnpm typecheck && pnpm lint && pnpm test &&
+pnpm build` completos (164 testes).
+
 ### Fase 13: o tema veste o app (sem chromas + cor dinâmica + splash nas telas)
 
 Pedido do usuário depois da Fase 12: tirar os **chromas** do seletor de skins (poluíam a lista como se fossem temas) e fazer o tema **refletir muito mais no app** - cores derivadas da skin e splash art de fundo, com a linguagem visual de **Mobalytics, Blitz e iTero**.
