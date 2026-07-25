@@ -168,6 +168,38 @@ da Trindade) e o aviso honesto "só 2 de 5 campeões inimigos informados"; Pré-
 de Viego, composição 2/5 e as duas barras de dano em 5.5/10. 0 imagens quebradas.
 `pnpm typecheck && pnpm lint && pnpm test && pnpm build` completos.
 
+#### Subfase 14D - Pós-game e Evolução
+
+O Pós-game apresentava o relatório como duas frases com `<strong>` na frente, cinco barras de
+mesmo peso visual e dicas prefixadas com emoji - não dava pra saber, olhando, qual foi o maior
+erro da partida. A lista de partidas reusava a classe da tabela do Perfil, com
+`style={{cursor:"pointer"}}` inline e sem indicar a linha selecionada nem o resultado. A
+Evolução repetia "Estável" em quase toda linha, sem separar o que melhorou do que piorou.
+
+1. **Pós-game** (`features/PostGameScreen.tsx` + `.css`) - lista de partidas virou um rail de
+   cards selecionáveis com o resultado numa faixa colorida (na borda **direita** de propósito:
+   a esquerda é onde `.sp-card--selected` desenha a marca de seleção, e as duas no mesmo lugar
+   se sobreporiam). O relatório ganhou hierarquia real: card `feature` com o veredito, o que
+   era esperado e o que aconteceu; card separado de **"Prioridade de melhoria"** com o ponto
+   fraco de maior peso (`weaknesses[0]`, já ordenado por magnitude pelo motor da Fase 4); as
+   razões vs. referência agora mostram **o valor absoluto ao lado da razão** (só a razão
+   escondia o número que o jogador reconhece da partida); dicas numeradas por ordem de impacto
+   em vez de parágrafos com 💡. Estados de carregando/erro/vazio resolvidos por card.
+2. **Evolução** (`features/GrowthJourneyScreen.tsx`) - as linhas passaram a ser **agrupadas por
+   direção** (Piorando / Melhorando / Sem mudança relevante / Ainda sem comparação). O grupo
+   "ainda sem comparação" mostra só a taxa recente e explica o porquê, em vez de exibir um
+   "Estável" que na verdade significa "ainda não dá pra saber". Novo card **"Foco sugerido"**,
+   que não é cálculo novo: é o ponto fraco de maior `recentRate`, ou seja, o que mais se repete
+   nas partidas recentes.
+
+Validado no Electron real via CDP com Zekerus#117: relatório real de uma derrota de Vel'Koz
+SUPPORT contra Lulu (veredito, "8 partidas anteriores com score histórico 45.7", prioridade
+"Controle de visão abaixo do esperado" com severidade alta, 5 barras com valor absoluto e
+razão - ex. KDA 3.00 (97%), CS/min 3.0 (251%) -, 4 chips e 2 dicas numeradas); Evolução com 8
+partidas analisadas, 4 pontos acompanhados, 0 com comparação, foco sugerido "KDA abaixo do
+esperado" em 62.5% das partidas recentes. 0 imagens quebradas.
+`pnpm typecheck && pnpm lint && pnpm test && pnpm build` completos.
+
 ### Fase 13: o tema veste o app (sem chromas + cor dinâmica + splash nas telas)
 
 Pedido do usuário depois da Fase 12: tirar os **chromas** do seletor de skins (poluíam a lista como se fossem temas) e fazer o tema **refletir muito mais no app** - cores derivadas da skin e splash art de fundo, com a linguagem visual de **Mobalytics, Blitz e iTero**.
