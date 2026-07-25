@@ -1,0 +1,31 @@
+# Specs (espelho de `docs/`)
+
+Esta pasta é uma cópia espelhada de `docs/` (specs técnicas do projeto), mantida dentro de
+`.ai/` para consulta rápida por agentes de IA (Claude/Codex/Agents, via symlink) sem precisar
+navegar pra fora de `.ai/`.
+
+**`docs/` continua sendo a fonte de verdade.** Se `docs/` mudar de forma relevante (nova spec,
+edição significativa numa existente), atualize este espelho copiando o(s) arquivo(s) de novo.
+Não edite os arquivos aqui diretamente esperando que isso reflita em `docs/` — é uma via de
+mão única (`docs/` → `.ai/specs/`).
+
+Snapshot gerado em: 2026-07-25.
+
+## Índice
+
+- `architecture.md` — visão geral da arquitetura.
+- `api.md` — endpoints da API.
+- `database.md` — schema inicial do banco.
+- `design-system.md` — design system do desktop (tokens, componentes).
+- `docker.md` — infraestrutura via Docker Compose.
+- `draft-recommendation.md` — motor de recomendação de draft.
+- `github.md` — configuração de repositório/CI.
+- `postgame-analysis.md` — análise pós-game.
+- `replay-analysis.md` — análise de replay (experimental).
+- `riot-compliance.md` — limites de produto e compliance com a Riot.
+- `scoring-model.md` — modelo de scoring de desempenho.
+- `setup.md` — setup do ambiente local.
+- `adr/` — Architecture Decision Records.
+
+Spec de produto original (histórico completo do pedido inicial): `.ai/SPARTA_CODEX_INSTRUCTIONS.md`.
+Contexto de continuidade fase a fase (histórico vivo, sempre o mais atualizado): `.ai/CLAUDE.md`.

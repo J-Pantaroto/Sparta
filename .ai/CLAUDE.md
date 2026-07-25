@@ -2,6 +2,26 @@
 
 Este arquivo é um handoff para outro agente de desenvolvimento continuar o projeto Sparta sem precisar redescobrir a base inteira.
 
+## Convenções deste repositório (ler antes de qualquer feature nova)
+
+Desde 2026-07-25, `.ai/` segue uma estrutura fixa pra rastrear pedidos de feature — vale pra
+qualquer agente de IA que trabalhe neste repositório (Claude/Codex/Agents, todos apontando pra
+`.ai/` via symlink):
+
+- **`.ai/prompts/features/`** — um arquivo por feature solicitada (`NNNN-slug.md`), com
+  cabeçalho de status (`PENDENTE`/`EM_ANDAMENTO`/`IMPLEMENTADA`/`BLOQUEADA`/`IGNORADA`/`CANCELADA`).
+  Formato exato em `.ai/prompts/features/README.md`. Criar o arquivo com `status: PENDENTE`
+  **ao receber** o pedido, antes de implementar.
+- **`.ai/CHANGELOG.md`** — todas as features, mais recente primeiro. **Ao concluir** uma
+  feature: atualizar o status do arquivo de prompt pra `IMPLEMENTADA` (com `implementado_em`
+  real) e adicionar uma entrada nova no topo do changelog com a data/hora real da execução.
+- **`.ai/specs/`** — espelho de `docs/*.md` (specs técnicas), só leitura rápida pra agentes de
+  IA; `docs/` continua sendo a fonte de verdade — atualize o espelho se `docs/` mudar de forma
+  relevante.
+- **Testes automatizados por feature/bug-fix**: ver regra 11 em "Regras de implementação"
+  abaixo — sempre que necessário/possível, cada feature nova ou correção ganha teste
+  automatizado cobrindo o comportamento (não só rodar a suíte existente).
+
 ## Pendências desta sessão (ler primeiro)
 
 Uma sessão anterior fez uma auditoria completa do repositório (real vs mock vs so-tipo), aprovou um plano de evolução em 5 épicos (Riot Sync, Player Intelligence, Draft Intelligence, Post-Game Coach, Growth Journey) e implementou todas as 5 fases, além de um refinamento visual do desktop e correções de infra/segurança. Uma sessão seguinte **conectou o desktop às rotas reais da API** (Dashboard/Perfil/Champion Select/Pós-game/nova tela Evolução, removendo `mock-data.ts`) e implementou as **Sub-fases 6a e 6b** (tela de Configurações + tema com campeão/skin real + configuração "quantas partidas analisar"). Uma sessão seguinte implementou a **Sub-fase 6c (ordem de pick automática via LCU)**, encerrando a Fase 6. Uma sessão seguinte implementou a **Fase 7 (auditoria e documentação dos algoritmos de scoring)**. Uma sessão seguinte implementou a **Fase 8 inteira** (Sub-fase 8a: motor de build de campeão + seletor de time inimigo; Sub-fase 8b: polimento visual do desktop) e validou tudo contra a conta real Zekerus#117. Essa validação real encontrou um bug real (corrigido, ver abaixo) e motivou o pedido desta sessão: **Fase 9 (linguagem visual real - badges/barras nas telas de análise)**, implementada em duas sub-fases (9a: componentes compartilhados + Dashboard + Champion Select; 9b: Perfil + Pós-game + Evolução), encerrando a Fase 9. A validação real da 9b encontrou mais um bug real (corrigido, ver abaixo). **Depois do merge da 9b, o usuário pediu explicitamente validação contra o app Electron real empacotado (não só o dev server aberto numa aba de navegador comum)** — essa validação descobriu e corrigiu um bug real grave e pré-existente (ver "Bug real corrigido: preload nunca carregava de verdade" abaixo), presente desde o início do projeto. Depois de abrir o app real pro usuário avaliar, ele deu **feedback de UX ao vivo** (capturas do próprio Sparta + referências de apps reais de LoL) que motivou a **Fase 10 (polimento de UX + robustez de ícones de campeão)**, com liberdade explícita do usuário pra usar outras fontes/APIs como fallback e não se limitar ao escopo inicial ("não é mais protótipo, é programa real"). Uma sessão seguinte configurou o **`gh` CLI autenticado** (instalado via winget, device flow) - PRs/merges/CI agora são feitos pelo terminal, não mais pelo navegador. Uma nova rodada de feedback do usuário (as mudanças visuais ainda pareciam pequenas, botões sem estilo, download de skin quebrado, Champion Select acessível livremente sem sessão real, falta de detecção de posição/lane, telas resumidas demais) motivou a **Fase 11 (detecção real de posição/lane via LCU + gating do Champion Select + correções de polimento)**. Depois do merge da 11, o usuário reportou que **o módulo de temas continuava instável, sem baixar nem aplicar o tema** - a investigação achou dois bugs reais e independentes (ver "Bug real corrigido: módulo de temas" logo abaixo), ambos corrigidos na **Fase 12**. Depois veio a **Fase 13** (o tema veste o app). A partir daí o usuário pediu uma **modernização completa de UI/UX** tendo Mobalytics, Blitz e iTero como referência de princípios - isso virou a **Fase 14**, implementada em seis subfases (A a F), uma por PR. Tudo isso **já está mergeado em `main`**.
@@ -1165,6 +1185,11 @@ Não usar force push sem pedido explícito.
 8. Não automatize ações no client.
 9. Para integrações Riot/LCU, documente endpoints e finalidade.
 10. Rode typecheck, lint e testes antes de concluir alterações relevantes.
+11. Pra cada feature nova ou bug-fix, crie e rode testes automatizados sempre que necessário/possível
+    (unitário em `packages/core`, integração na API, etc.) cobrindo o comportamento introduzido —
+    não só reexecutar a suíte já existente. Quando não for possível (ex.: depende do League Client
+    real aberto, sem forma de simular no CI), documente explicitamente por que, tanto nas notas do
+    arquivo de prompt (`.ai/prompts/features/`) quanto na entrada do `.ai/CHANGELOG.md`.
 
 ## Próximos passos recomendados
 

@@ -4,6 +4,16 @@ Sparta é um aplicativo desktop para jogadores de League of Legends focado em an
 
 O produto não implementa overlay, tracking durante a partida, automação de pick/ban ou qualquer assistência em tempo real. Toda análise do MVP acontece antes ou depois da partida.
 
+## Convenções pra agentes de IA (`.ai/`)
+
+- `.ai/prompts/features/` — um arquivo por feature solicitada, com cabeçalho de status
+  (`PENDENTE`/`IMPLEMENTADA`/etc). Ver `.ai/prompts/features/README.md`.
+- `.ai/CHANGELOG.md` — histórico de todas as features, mais recente primeiro, com data/hora
+  real de execução.
+- `.ai/specs/` — espelho de `docs/*.md` pra consulta rápida (fonte de verdade continua em `docs/`).
+- `.ai/CLAUDE.md` — contexto de continuidade completo (histórico fase a fase, convenções,
+  regras de implementação).
+
 ## Stack
 
 - Desktop: Electron, React, Vite e TypeScript.
