@@ -1,4 +1,11 @@
-import type { Confidence, PickRecommendation, PlayerWeakness, Role } from "@sparta/core";
+import type {
+  Confidence,
+  PickRecommendation,
+  PlayerWeakness,
+  ProvenanceSourceType,
+  RecommendationMetricKey,
+  Role
+} from "@sparta/core";
 
 /**
  * Rotulos em portugues pros valores crus do dominio. Ficam num modulo so
@@ -55,16 +62,41 @@ export const componentLabels: Record<string, string> = {
   recent: "Forma recente"
 };
 
-/** Rotulos das chaves de `PickRecommendation.metrics` (@sparta/core). */
-export const metricLabels: Record<string, string> = {
-  personalPerformance: "Desempenho pessoal",
-  recentForm: "Forma recente",
-  matchup: "Matchup",
-  blindSafety: "Segurança em blind",
-  allySynergy: "Sinergia com o time",
-  enemyDraftAnswer: "Resposta ao draft inimigo",
-  compositionFit: "Encaixe de composição",
-  meta: "Meta do patch"
+/**
+ * Rotulos das metricas estruturadas (`RecommendationMetricKey`). Cobre
+ * tambem as chaves ainda nao produzidas pelo motor - o contrato ja separa
+ * os conceitos, entao o rotulo existe junto e nao vira um `?? key` cru na
+ * tela quando a metrica passar a ser calculada.
+ */
+export const metricKeyLabels: Record<RecommendationMetricKey, string> = {
+  PERSONAL_PERFORMANCE: "Desempenho pessoal",
+  PERSONAL_EXPERIENCE: "Experiência com o campeão",
+  RECENT_FORM: "Forma recente",
+  PERSONAL_MATCHUP: "Seu histórico no confronto",
+  GLOBAL_MATCHUP: "Confronto no meta",
+  LANE_MATCHUP: "Confronto de rota",
+  BLIND_SAFETY: "Segurança em blind",
+  ALLY_SYNERGY: "Sinergia com o time",
+  TEAM_COMPOSITION: "Encaixe de composição",
+  ENEMY_COMPOSITION_ANSWER: "Resposta ao draft inimigo",
+  CHAMPION_DIFFICULTY: "Dificuldade do campeão",
+  EXECUTION_RISK: "Risco de execução",
+  PATCH_OFFICIAL_CHANGE: "Alteração no patch",
+  PATCH_IMPACT: "Impacto do patch",
+  META_STRENGTH: "Força no meta"
+};
+
+/**
+ * Origem resumida, pra exibir junto da metrica quando ajuda a interpretar o
+ * numero. Deliberadamente curto: o detalhe completo vive na proveniencia.
+ */
+export const sourceTypeLabels: Record<ProvenanceSourceType, string> = {
+  OFFICIAL: "dado oficial da Riot",
+  OBSERVED: "observado",
+  CALCULATED: "calculado do seu histórico",
+  DERIVED: "derivado por algoritmo",
+  INFERRED: "estimado",
+  CACHE: "de cache local"
 };
 
 /**

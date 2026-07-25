@@ -1,0 +1,77 @@
+/*
+ * Uma métrica de recomendação com o estado dela visível.
+ *
+ * O ponto do componente: barra só existe quando há número. Ausência de dado
+ * NÃO é desenhada como uma barra no meio da escala - era exatamente isso que
+ * fazia "não temos esse dado" parecer "calculamos e deu neutro".
+ */
+
+.sp-metric {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+/* ─── Indisponível ──────────────────────────────────────────────────── */
+
+.sp-metric__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.sp-metric__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sp-metric__absent {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-weight: var(--weight-semibold);
+  font-style: italic;
+}
+
+/* Trilho vazio e tracejado no lugar da barra: ocupa o mesmo espaço (a lista
+   não "pula" quando uma métrica falta) sem sugerir posição na escala. */
+.sp-metric__empty-track {
+  height: 6px;
+  border: 1px dashed var(--border-default);
+  border-radius: var(--radius-full);
+}
+
+.sp-metric__reason {
+  color: var(--text-muted);
+  font-size: var(--text-2xs);
+  line-height: var(--leading-snug);
+}
+
+/* ─── Desatualizado / parcial ───────────────────────────────────────── */
+
+/* Valor antigo continua legível, mas dessaturado - não pode se apresentar
+   como informação atual. */
+.sp-metric--stale .sp-statbar__fill {
+  filter: grayscale(0.7);
+  opacity: 0.65;
+}
+
+.sp-metric__flag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-shrink: 0;
+  color: var(--color-yellow);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.sp-metric__source {
+  color: var(--text-muted);
+  font-size: var(--text-2xs);
+}

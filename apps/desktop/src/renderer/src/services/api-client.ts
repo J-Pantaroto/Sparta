@@ -1,3 +1,4 @@
+import { ensureRecommendationMetrics } from "@sparta/core";
 import type {
   ChampionPerformanceScore,
   DraftState,
@@ -118,12 +119,26 @@ export function fetchGrowthJourney(puuid: string) {
   return request<{ puuid: string } & GrowthJourney>(`/players/${encodeURIComponent(puuid)}/growth-journey`);
 }
 
-export function fetchDraftRecommendations(token: string, draft: DraftState) {
-  return request<{ recommendations: PickRecommendation[] }>("/drafts/recommendations", {
+/**
+ * Normaliza a resposta num unico lugar: desktop e API sao implantados
+ * separadamente, entao um backend mais antigo pode devolver recomendacao sem
+ * `metricDetails`. Sem esta normalizacao a tela quebra (medido durante a
+ * Etapa 2). Nenhum componente precisa se defender disso por conta propria.
+ */
+export async function fetchDraftRecommendations(token: string, draft: DraftState) {
+  const result = await request<{ recommendations: PickRecommendation[] }>("/drafts/recommendations", {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify({ draft })
   });
+
+  return {
+    ...result,
+    recommendations: (result.recommendations ?? []).map((recommendation) => ({
+      ...recommendation,
+      metricDetails: ensureRecommendationMetrics(recommendation)
+    }))
+  };
 }
 
 export function analyzePostgame(token: string, matchId: string) {

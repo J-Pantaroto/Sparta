@@ -26,6 +26,47 @@ qualquer agente de IA que trabalhe neste repositório (Claude/Codex/Agents, todo
 
 Uma sessão anterior fez uma auditoria completa do repositório (real vs mock vs so-tipo), aprovou um plano de evolução em 5 épicos (Riot Sync, Player Intelligence, Draft Intelligence, Post-Game Coach, Growth Journey) e implementou todas as 5 fases, além de um refinamento visual do desktop e correções de infra/segurança. Uma sessão seguinte **conectou o desktop às rotas reais da API** (Dashboard/Perfil/Champion Select/Pós-game/nova tela Evolução, removendo `mock-data.ts`) e implementou as **Sub-fases 6a e 6b** (tela de Configurações + tema com campeão/skin real + configuração "quantas partidas analisar"). Uma sessão seguinte implementou a **Sub-fase 6c (ordem de pick automática via LCU)**, encerrando a Fase 6. Uma sessão seguinte implementou a **Fase 7 (auditoria e documentação dos algoritmos de scoring)**. Uma sessão seguinte implementou a **Fase 8 inteira** (Sub-fase 8a: motor de build de campeão + seletor de time inimigo; Sub-fase 8b: polimento visual do desktop) e validou tudo contra a conta real Zekerus#117. Essa validação real encontrou um bug real (corrigido, ver abaixo) e motivou o pedido desta sessão: **Fase 9 (linguagem visual real - badges/barras nas telas de análise)**, implementada em duas sub-fases (9a: componentes compartilhados + Dashboard + Champion Select; 9b: Perfil + Pós-game + Evolução), encerrando a Fase 9. A validação real da 9b encontrou mais um bug real (corrigido, ver abaixo). **Depois do merge da 9b, o usuário pediu explicitamente validação contra o app Electron real empacotado (não só o dev server aberto numa aba de navegador comum)** — essa validação descobriu e corrigiu um bug real grave e pré-existente (ver "Bug real corrigido: preload nunca carregava de verdade" abaixo), presente desde o início do projeto. Depois de abrir o app real pro usuário avaliar, ele deu **feedback de UX ao vivo** (capturas do próprio Sparta + referências de apps reais de LoL) que motivou a **Fase 10 (polimento de UX + robustez de ícones de campeão)**, com liberdade explícita do usuário pra usar outras fontes/APIs como fallback e não se limitar ao escopo inicial ("não é mais protótipo, é programa real"). Uma sessão seguinte configurou o **`gh` CLI autenticado** (instalado via winget, device flow) - PRs/merges/CI agora são feitos pelo terminal, não mais pelo navegador. Uma nova rodada de feedback do usuário (as mudanças visuais ainda pareciam pequenas, botões sem estilo, download de skin quebrado, Champion Select acessível livremente sem sessão real, falta de detecção de posição/lane, telas resumidas demais) motivou a **Fase 11 (detecção real de posição/lane via LCU + gating do Champion Select + correções de polimento)**. Depois do merge da 11, o usuário reportou que **o módulo de temas continuava instável, sem baixar nem aplicar o tema** - a investigação achou dois bugs reais e independentes (ver "Bug real corrigido: módulo de temas" logo abaixo), ambos corrigidos na **Fase 12**. Depois veio a **Fase 13** (o tema veste o app). A partir daí o usuário pediu uma **modernização completa de UI/UX** tendo Mobalytics, Blitz e iTero como referência de princípios - isso virou a **Fase 14**, implementada em seis subfases (A a F), uma por PR. Tudo isso **já está mergeado em `main`**.
 
+### Etapa 2: contrato de origem, disponibilidade e confiança
+
+Pedido do usuário depois da auditoria (Etapa 1). O problema medido: o valor `50` aparecia na
+tela em quatro situações diferentes — cálculo neutro de verdade, ausência de dado, fallback
+artificial, e componente não implementado (`patchMeta` é `null`, então `meta` é sempre 50). As
+quatro viravam a mesma barra amarela.
+
+1. **`packages/core/src/types/provenance.ts`** (novo) — `DataProvenance` com dois eixos
+   independentes: origem (`OFFICIAL`/`OBSERVED`/`CALCULATED`/`DERIVED`/`INFERRED`/`CACHE`) e
+   disponibilidade (`AVAILABLE`/`PARTIAL`/`STALE`/`UNAVAILABLE`). Todo campo opcional de
+   propósito: o que não se aplica fica ausente, nunca placeholder. `ConfidenceScore` numérico
+   (0-1) coexiste com o `Confidence` categórico da Fase 2; a conversão é lossy e documentada.
+2. **`packages/core/src/types/recommendation-metric.ts`** (novo) — `RecommendationMetric` com
+   `value: number | null`. `unavailableMetric` **não aceita valor**: o invariante "indisponível
+   nunca tem número" é garantido pelo tipo. 15 chaves (7 ainda não produzidas pelo motor), pra
+   travar desde já os conceitos que não podem ser fundidos — matchup pessoal vs global,
+   dificuldade do campeão vs risco de execução, etc.
+3. **`packages/core/src/draft/recommendation-metrics.ts`** (novo) — adaptador **único** entre o
+   bloco numérico atual e o contrato. `PickRecommendation` carrega os dois por enquanto:
+   `metrics` (entrada do `totalScore`) e `metricDetails` (o que a UI consome). Ponto de término
+   definido: quando o motor produzir métricas ausentes, este módulo vira o produtor.
+4. **`ui/MetricRow.tsx`** (novo) — indisponível renderiza **sem barra** (trilho tracejado +
+   motivo), desatualizado dessatura e marca. `apps/desktop/vitest.config.ts` é a primeira
+   configuração de teste do renderer (jsdom + testing-library).
+
+**Nenhum cálculo mudou.** As 8 métricas continuam `AVAILABLE`, inclusive `LANE_MATCHUP` e
+`META_STRENGTH`, cujo 50 na verdade significa "não temos" — converter isso é a etapa seguinte.
+A diferença é que essas duas saem **sem `provenance`**: declarar origem seria inventar.
+
+**Bug real achado na validação**: rodando contra a API em execução (build anterior ao
+contrato), o Champion Select quebrou inteiro em `metricDetails is not iterable`. Desktop e API
+são implantados separadamente — isso não é hipotético. Corrigido com
+`ensureRecommendationMetrics` aplicado uma vez em `services/api-client.ts`; sem `metricDetails`
+e sem `metrics`, devolve lista vazia, nunca valores inventados.
+
+Validado no Electron real (CDP, Zekerus#117): contra a API antiga, 8 métricas pelo caminho de
+compatibilidade; contra a reconstruída, `metricDetails` nativo com proveniência correta por
+métrica. Os estados PARTIAL/STALE/UNAVAILABLE **não** foram vistos no app real — nenhuma
+métrica os produz ainda; estão cobertos por teste de componente. Ver `docs/data-provenance.md`.
+24 testes novos (230 no total).
+
 ### Fase 16: o draft real vem do League Client
 
 Até aqui o Sparta lia da sessão de champion select **só** a posição do jogador e a ordem de

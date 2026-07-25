@@ -1,7 +1,7 @@
 import { MIN_GAMES_FOR_RANKING, type DraftState, type PickRecommendation, type Role } from "@sparta/core";
 import { Check, Crosshair, Pencil, X } from "lucide-react";
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
-import { ROLES, categoryLabels, confidenceLabels, metricLabels, roleLabels } from "../app/labels";
+import { ROLES, categoryLabels, confidenceLabels, metricKeyLabels, roleLabels } from "../app/labels";
 import { useAsyncData } from "../hooks/use-async-data";
 import { fetchPlayerProfile, type PlayerProfileResponse, type RiotAccountSummary } from "../services/api-client";
 import type { DataDragonChampionSummary } from "../services/datadragon";
@@ -20,6 +20,7 @@ import {
   IconButton,
   InteractiveCard,
   Loading,
+  MetricRow,
   NumberField,
   PageLayout,
   ReadOnlyValue,
@@ -28,7 +29,6 @@ import {
   Select,
   SignalChip,
   SignalChipList,
-  StatBar,
   StatusBadge
 } from "../ui";
 import { BuildPanel } from "./BuildPanel";
@@ -382,15 +382,13 @@ export function ChampionSelectScreen({
                       description="Cada dimensão vale 0 a 100 e entra no score com o peso do cenário de draft atual."
                     />
                     <div className="sp-recdetail__metrics">
-                      {Object.entries(selected.metrics)
-                        .sort((a, b) => b[1] - a[1])
-                        .map(([key, value]) => (
-                          <StatBar
-                            key={key}
-                            label={metricLabels[key] ?? key}
-                            value={value}
-                            value_label={Math.round(value).toString()}
-                          />
+                      {/* Ordena por valor, mas empurra o que nao tem valor
+                          pro fim: metrica ausente nao disputa posicao com
+                          metrica calculada. */}
+                      {[...selected.metricDetails]
+                        .sort((a, b) => (b.value ?? -1) - (a.value ?? -1))
+                        .map((metric) => (
+                          <MetricRow key={metric.key} metric={metric} label={metricKeyLabels[metric.key]} />
                         ))}
                     </div>
 

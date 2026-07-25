@@ -45,6 +45,15 @@ Três tabelas de peso, cada uma somando 1.0 (invariante testada em `recommendati
 
 Recalibrar qualquer peso ou threshold com base em dado estatístico real — não há partidas suficientes acumuladas ainda.
 
+## Origem e disponibilidade das métricas
+
+Cada `PickRecommendation` carrega `metricDetails`: as métricas estruturadas do candidato, cada
+uma com disponibilidade, confiança e proveniência próprias. É o que a interface consome — o
+bloco numérico `metrics` continua existindo apenas como entrada do `totalScore`.
+
+Ver `docs/data-provenance.md` pro contrato completo, incluindo por que `50` calculado e `50`
+por ausência de dado deixaram de ser a mesma coisa.
+
 ## Origem dos ChampionTag
 
 `data/seeds/champion-tags.json` cobre o roster inteiro e e **gerado**:

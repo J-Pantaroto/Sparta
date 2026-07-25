@@ -41,6 +41,7 @@ export {
 export { ScoreBadge, ScoreBlock, scoreColor } from "./ScoreBadge";
 export { SegmentedControl, Tabs, type SegmentOption } from "./SegmentedControl";
 export { SignalChip, SignalChipList } from "./SignalChip";
+export { MetricRow } from "./MetricRow";
 export { EmptyState, ErrorState, Loading, Skeleton, SkeletonGrid, SkeletonRows } from "./States";
 export { StatBar } from "./StatBar";
 export { InfoHint, Tooltip } from "./Tooltip";

@@ -1,4 +1,5 @@
 import { MEDIUM_CONFIDENCE_GAMES, scoreChampionPerformance } from "../scoring/champion-performance.js";
+import { toRecommendationMetrics } from "./recommendation-metrics.js";
 import type {
   ChampionTag,
   CompositionRules,
@@ -78,7 +79,8 @@ export function recommendPicks(input: {
         category: selectCategory(input.draft, metrics),
         reasons,
         warnings,
-        metrics
+        metrics,
+        metricDetails: toRecommendationMetrics(metrics, personal.confidence)
       } satisfies PickRecommendation;
     })
     .filter((recommendation) => recommendation.metrics.personalPerformance > 0)

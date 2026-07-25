@@ -15,6 +15,7 @@ Snapshot gerado em: 2026-07-25.
 
 - `architecture.md` — visão geral da arquitetura.
 - `api.md` — endpoints da API.
+- `data-provenance.md` — origem, disponibilidade e confiança dos dados.
 - `database.md` — schema inicial do banco.
 - `design-system.md` — design system do desktop (tokens, componentes).
 - `docker.md` — infraestrutura via Docker Compose.

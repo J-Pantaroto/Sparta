@@ -21,6 +21,16 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-07-25 15:52 — Contrato de origem, disponibilidade e confiança dos dados
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0002-contrato-origem-disponibilidade.md`
+
+Cria o contrato central (`DataProvenance`, `AvailabilityStatus`, `RecommendationMetric` com
+`value: number | null`) que permite distinguir um 50 calculado de verdade de um 50 que na
+verdade é ausência de dado. `PickRecommendation` ganha `metricDetails`, e a interface passa a
+exibir métrica indisponível **sem barra**. Nenhum cálculo mudou nesta etapa. Corrige de quebra
+um defeito achado na validação real: o desktop quebrava contra uma API anterior ao contrato.
+24 testes novos, incluindo a primeira suíte de componente do renderer (jsdom).
+
 ## 2026-07-25 12:05 — Estrutura de prompts/features, changelog e specs em `.ai/`
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0001-estrutura-prompts-changelog-specs.md`
 

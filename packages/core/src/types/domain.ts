@@ -1,3 +1,5 @@
+import type { RecommendationMetric } from "./recommendation-metric.js";
+
 export type Role = "TOP" | "JUNGLE" | "MID" | "ADC" | "SUPPORT";
 export type Confidence = "low" | "medium" | "high";
 export type DamageProfile = "AD" | "AP" | "MIXED" | "UTILITY";
@@ -198,6 +200,12 @@ export interface PickRecommendation {
   category: "best_blind" | "best_matchup" | "best_teamfit" | "safe_pick" | "comfort_pick";
   reasons: RecommendationReason[];
   warnings: RecommendationReason[];
+  /**
+   * Entrada numérica do `totalScore`. Continua sendo o que os pesos
+   * multiplicam - **não** é o que a interface deve exibir, porque um número
+   * aqui não distingue "calculou neutro" de "não temos o dado". Use
+   * `metricDetails` pra apresentar.
+   */
   metrics: {
     personalPerformance: number;
     recentForm: number;
@@ -208,6 +216,13 @@ export interface PickRecommendation {
     compositionFit: number;
     meta: number;
   };
+  /**
+   * Métricas estruturadas **deste candidato**: cada uma com a própria
+   * disponibilidade, confiança e proveniência. É o contrato que a interface
+   * consome, e é por candidato de propósito - dois campeões podem ter
+   * disponibilidades diferentes pra mesma métrica.
+   */
+  metricDetails: RecommendationMetric[];
 }
 
 export interface PostGameAnalysis {
