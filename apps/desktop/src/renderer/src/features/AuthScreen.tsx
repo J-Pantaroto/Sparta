@@ -1,5 +1,6 @@
-import { useState, type FormEvent } from "react";
+import { useId, useState, type FormEvent } from "react";
 import { login, register } from "../services/api-client";
+import { AuthForm, AuthLayout, Button, Field, SignalChip, TextField } from "../ui";
 
 interface AuthScreenProps {
   splashUrl: string;
@@ -16,6 +17,7 @@ export function AuthScreen({ splashUrl, onAuthenticated, onSkip }: AuthScreenPro
   const [displayName, setDisplayName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const ids = { name: useId(), email: useId(), password: useId() };
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -28,95 +30,86 @@ export function AuthScreen({ splashUrl, onAuthenticated, onSkip }: AuthScreenPro
           : await register({ email, password, displayName: displayName || undefined });
       onAuthenticated(result.token);
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "Nao foi possivel conectar a API.");
+      setError(submitError instanceof Error ? submitError.message : "Não foi possível conectar à API.");
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="auth-shell" style={{ backgroundImage: `url(${splashUrl})` }}>
-      <div className="auth-card">
-        <div className="auth-brand">
-          <div className="brand-mark">S</div>
-          <div>
-            <strong>Sparta</strong>
-            <span>Draft intelligence</span>
-          </div>
-        </div>
-
-        <h1 className="auth-title">{mode === "login" ? "Entrar" : "Criar conta"}</h1>
-        <p className="auth-subtitle">
-          {mode === "login" ? "Acesse sua conta para continuar." : "Crie sua conta para vincular seu perfil Riot."}
-        </p>
-
-        <form onSubmit={handleSubmit}>
-          {mode === "register" && (
-            <div className="auth-field">
-              <label htmlFor="displayName">Nome de exibicao</label>
-              <input
-                id="displayName"
-                value={displayName}
-                onChange={(event) => setDisplayName(event.target.value)}
-                placeholder="Como devemos te chamar"
-              />
-            </div>
-          )}
-          <div className="auth-field">
-            <label htmlFor="email">Email</label>
-            <input
-              id="email"
-              type="email"
-              required
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="voce@email.com"
+    <AuthLayout
+      splashUrl={splashUrl}
+      title={mode === "login" ? "Entrar" : "Criar conta"}
+      subtitle={
+        mode === "login"
+          ? "Acesse sua conta pra continuar."
+          : "Crie sua conta pra vincular seu perfil da Riot."
+      }
+      footer={
+        mode === "login" ? (
+          <>
+            Ainda não tem conta?{" "}
+            <button type="button" className="sp-auth__link" onClick={() => setMode("register")}>
+              Criar conta
+            </button>
+          </>
+        ) : (
+          <>
+            Já tem conta?{" "}
+            <button type="button" className="sp-auth__link" onClick={() => setMode("login")}>
+              Entrar
+            </button>
+          </>
+        )
+      }
+      skip={
+        <button type="button" onClick={onSkip}>
+          Continuar sem conta (modo local)
+        </button>
+      }
+    >
+      <AuthForm onSubmit={handleSubmit}>
+        {mode === "register" && (
+          <Field label="Nome de exibição" htmlFor={ids.name}>
+            <TextField
+              id={ids.name}
+              value={displayName}
+              onChange={setDisplayName}
+              placeholder="Como devemos te chamar"
+              autoComplete="nickname"
             />
-          </div>
-          <div className="auth-field">
-            <label htmlFor="password">Senha</label>
-            <input
-              id="password"
-              type="password"
-              required
-              minLength={8}
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              placeholder="Minimo de 8 caracteres"
-            />
-          </div>
+          </Field>
+        )}
+        <Field label="Email" htmlFor={ids.email}>
+          <TextField
+            id={ids.email}
+            type="email"
+            required
+            value={email}
+            onChange={setEmail}
+            placeholder="voce@email.com"
+            autoComplete="email"
+          />
+        </Field>
+        <Field label="Senha" htmlFor={ids.password} hint={mode === "register" ? "Mínimo de 8 caracteres." : undefined}>
+          <TextField
+            id={ids.password}
+            type="password"
+            required
+            minLength={8}
+            value={password}
+            onChange={setPassword}
+            placeholder="••••••••"
+            autoComplete={mode === "login" ? "current-password" : "new-password"}
+          />
+        </Field>
 
-          {error ? <p className="auth-error">{error}</p> : null}
+        {error && <SignalChip tone="negative">{error}</SignalChip>}
 
-          <button className="auth-submit" type="submit" disabled={loading}>
-            {loading ? "Aguarde..." : mode === "login" ? "Entrar" : "Criar conta"}
-          </button>
-        </form>
-
-        <p className="auth-switch">
-          {mode === "login" ? (
-            <>
-              Ainda nao tem conta?{" "}
-              <button type="button" onClick={() => setMode("register")}>
-                Criar conta
-              </button>
-            </>
-          ) : (
-            <>
-              Ja tem conta?{" "}
-              <button type="button" onClick={() => setMode("login")}>
-                Entrar
-              </button>
-            </>
-          )}
-        </p>
-
-        <div className="auth-skip">
-          <button type="button" onClick={onSkip}>
-            Continuar sem conta (modo local)
-          </button>
-        </div>
-      </div>
-    </div>
+        <Button type="submit" variant="primary" size="lg" block loading={loading}>
+          {mode === "login" ? "Entrar" : "Criar conta"}
+        </Button>
+      </AuthForm>
+    </AuthLayout>
   );
 }

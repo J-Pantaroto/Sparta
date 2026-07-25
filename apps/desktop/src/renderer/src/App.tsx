@@ -20,7 +20,7 @@ import { PreGameScreen } from "./features/PreGameScreen";
 import { ProfileScreen } from "./features/ProfileScreen";
 import { SettingsScreen } from "./features/SettingsScreen";
 import { FeaturedChampionProvider, useFeaturedChampion } from "./theme/featured-champion-context";
-import { AppShell, PlayerSummary, Sidebar, SidebarGroup, SidebarNavItem } from "./ui";
+import { AppShell, AuthLayout, Loading, PlayerSummary, Sidebar, SidebarGroup, SidebarNavItem } from "./ui";
 
 type SessionStatus = "checking" | "auth" | "link-account" | "ready";
 
@@ -148,7 +148,15 @@ function SpartaApp() {
   }
 
   if (sessionStatus === "checking") {
-    return <div className="auth-shell" style={{ backgroundImage: `url(${splashUrl})` }} />;
+    // Mesma casca das telas de login, pra a transição pro app (ou pro
+    // formulário) não trocar o fundo debaixo do usuário.
+    return (
+      <AuthLayout splashUrl={splashUrl} title="Sparta" subtitle="Restaurando sua sessão...">
+        <div style={{ marginTop: "var(--space-5)" }}>
+          <Loading label="Verificando credenciais" />
+        </div>
+      </AuthLayout>
+    );
   }
 
   if (sessionStatus === "auth") {
