@@ -1,0 +1,62 @@
+.sp-champgrid {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.sp-champgrid__toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.sp-champgrid__search {
+  flex: 1;
+  max-width: 300px;
+}
+
+.sp-champgrid__count {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+
+/*
+ * Grade de largura automatica: preenche o espaco disponivel em vez de
+ * quebrar num numero fixo de colunas. Altura limitada com scroll proprio -
+ * ~170 campeoes empurravam todo o resto da tela pra baixo.
+ */
+.sp-champgrid__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+  gap: var(--space-2);
+  max-height: var(--sp-champgrid-height, 260px);
+  overflow-y: auto;
+  padding: var(--space-1) var(--space-1) var(--space-1) 0;
+}
+
+.sp-champgrid__option {
+  display: block;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  line-height: 0;
+  cursor: pointer;
+  transition: var(--transition-transform);
+}
+
+.sp-champgrid__option:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+
+.sp-champgrid__option:disabled {
+  cursor: not-allowed;
+}
+
+.sp-champgrid__option img,
+.sp-champgrid__option > div {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+}

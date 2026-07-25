@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { linkRiotAccount, type RiotAccountSummary } from "./api-client";
+import { linkRiotAccount, type RiotAccountSummary } from "../services/api-client";
 
 interface LinkRiotAccountScreenProps {
   token: string;

@@ -6,6 +6,84 @@ Este arquivo é um handoff para outro agente de desenvolvimento continuar o proj
 
 Uma sessão anterior fez uma auditoria completa do repositório (real vs mock vs so-tipo), aprovou um plano de evolução em 5 épicos (Riot Sync, Player Intelligence, Draft Intelligence, Post-Game Coach, Growth Journey) e implementou todas as 5 fases, além de um refinamento visual do desktop e correções de infra/segurança. Uma sessão seguinte **conectou o desktop às rotas reais da API** (Dashboard/Perfil/Champion Select/Pós-game/nova tela Evolução, removendo `mock-data.ts`) e implementou as **Sub-fases 6a e 6b** (tela de Configurações + tema com campeão/skin real + configuração "quantas partidas analisar"). Uma sessão seguinte implementou a **Sub-fase 6c (ordem de pick automática via LCU)**, encerrando a Fase 6. Uma sessão seguinte implementou a **Fase 7 (auditoria e documentação dos algoritmos de scoring)**. Uma sessão seguinte implementou a **Fase 8 inteira** (Sub-fase 8a: motor de build de campeão + seletor de time inimigo; Sub-fase 8b: polimento visual do desktop) e validou tudo contra a conta real Zekerus#117. Essa validação real encontrou um bug real (corrigido, ver abaixo) e motivou o pedido desta sessão: **Fase 9 (linguagem visual real - badges/barras nas telas de análise)**, implementada em duas sub-fases (9a: componentes compartilhados + Dashboard + Champion Select; 9b: Perfil + Pós-game + Evolução), encerrando a Fase 9. A validação real da 9b encontrou mais um bug real (corrigido, ver abaixo). **Depois do merge da 9b, o usuário pediu explicitamente validação contra o app Electron real empacotado (não só o dev server aberto numa aba de navegador comum)** — essa validação descobriu e corrigiu um bug real grave e pré-existente (ver "Bug real corrigido: preload nunca carregava de verdade" abaixo), presente desde o início do projeto. Depois de abrir o app real pro usuário avaliar, ele deu **feedback de UX ao vivo** (capturas do próprio Sparta + referências de apps reais de LoL) que motivou a **Fase 10 (polimento de UX + robustez de ícones de campeão)**, com liberdade explícita do usuário pra usar outras fontes/APIs como fallback e não se limitar ao escopo inicial ("não é mais protótipo, é programa real"). Uma sessão seguinte configurou o **`gh` CLI autenticado** (instalado via winget, device flow) - PRs/merges/CI agora são feitos pelo terminal, não mais pelo navegador. Uma nova rodada de feedback do usuário (as mudanças visuais ainda pareciam pequenas, botões sem estilo, download de skin quebrado, Champion Select acessível livremente sem sessão real, falta de detecção de posição/lane, telas resumidas demais) motivou a **Fase 11 (detecção real de posição/lane via LCU + gating do Champion Select + correções de polimento)**. Depois do merge da 11, o usuário reportou que **o módulo de temas continuava instável, sem baixar nem aplicar o tema** - a investigação achou dois bugs reais e independentes (ver "Bug real corrigido: módulo de temas" logo abaixo), ambos corrigidos na **Fase 12**. Tudo isso **já está mergeado em `main`**.
 
+### Fase 14: modernização completa de UI/UX (em andamento)
+
+Pedido do usuário depois da Fase 13: transformar o Sparta num app desktop com aparência e
+experiência comparáveis a produtos consolidados de LoL (Mobalytics, Blitz, iTero como
+referência de princípios, não de cópia), mantendo o sistema de temas por skin como
+diferencial. Dividida em subfases pequenas e validáveis (A a F), uma por PR.
+
+**Auditoria que motivou o desenho** (feita antes de tocar código):
+
+- `global.css` tinha 1102 linhas num arquivo só, sem camadas (tokens, base, componentes e
+  telas misturados).
+- Seletores descendentes genéricos (`.page-header span, .recommendation span, .metric span`,
+  `.champion-row span`) casavam **qualquer** `<span>` aninhado - foi exatamente a causa do bug
+  de cor do `ScoreBadge` na Fase 9b. O fix de lá foi pontual; a causa continuava.
+- Reuso por empréstimo de classe: `.champion-row` (linha do Perfil) era reusada como linha de
+  partida no Pós-game **e** linha de tendência na Evolução, com `style={{gridColumn}}` inline
+  pra consertar o encaixe. `.recommendation button` estilizava botão por posição no DOM.
+- `App.tsx` tinha 834 linhas com 7 responsabilidades (shell, sessão, 3 efeitos de IPC e 5
+  telas inline).
+- **`@sparta/ui` era 100% código morto**: declarado em `apps/desktop/package.json`, zero
+  imports em qualquer arquivo do repositório; seu `tokens.ts` duplicava (desatualizado) os
+  valores do `:root`.
+- Sem `:focus-visible` em lugar nenhum (navegação por Tab literalmente invisível), sem
+  `prefers-reduced-motion`, sem estados `disabled` consistentes.
+- `min-width: 1000px` no body, sidebar fixa em 260px e `max-width` hardcoded (860-980px): em
+  1920px metade da tela ficava vazia, em 1000px a navegação comia 26% da largura.
+
+#### Subfase 14A - fundação (design system, shell, navegação)
+
+**Decisão de arquitetura**: o design system mora em `apps/desktop/src/renderer/src/ui/`, com
+**um CSS colocado por componente**, e `packages/ui` foi **removido** do repositório. Aquele
+pacote não tem pipeline de CSS (build é `tsc` puro) e não tem segundo consumidor possível (API
+e analyzer não renderizam UI) - manter os componentes lá separaria o CSS do TSX e dividiria a
+fonte de verdade em vez de unificá-la. Registrado em `docs/design-system.md` e no ADR 0001.
+
+1. **`ui/tokens.css`** - tokens organizados por função (superfície, borda, texto, destaque,
+   semântico, sombra, raio, espaço, tipografia, transição, z-index, layout). Mantém aliases
+   dos nomes antigos (`--color-bg`, `--color-surface`...) só enquanto as telas migram, pra a
+   migração ser incremental em vez de big-bang; os aliases caem na subfase F. Os três
+   `--color-accent*` mantêm o nome exato - `featured-champion-context.tsx` os sobrescreve em
+   runtime **por nome**, e renomear quebraria o tema dinâmico da Fase 13.
+2. **`ui/base.css`** - reset, tipografia do documento, `::selection`, scrollbar, e as duas
+   peças de acessibilidade que faltavam: `:focus-visible` (anel de 2px na cor do tema) e
+   `@media (prefers-reduced-motion: reduce)`.
+3. **16 componentes novos em `ui/`**: `AppShell`/`Sidebar`/`SidebarGroup`/`SidebarNavItem`/
+   `PlayerSummary`, `PageLayout`/`PageHero`/`PageSection`/`Grid`/`Columns`/`Toolbar`/
+   `InlineStats`, `Card`/`InteractiveCard`/`SectionHeader`, `Button`/`IconButton`, `Badge`/
+   `StatusBadge`, `Field`/`Select`/`NumberField`/`SearchInput`/`ReadOnlyValue`,
+   `SegmentedControl`/`Tabs`, `Tooltip`/`InfoHint`, `Loading`/`Skeleton`/`SkeletonGrid`/
+   `SkeletonRows`/`EmptyState`/`ErrorState`, `DataTable`/`DataRow`/`IdentityCell`/`NumCell`,
+   `ChampionAvatar`/`EmptyAvatarSlot`, `ChampionGrid`, e os três da Fase 9 migrados
+   (`ScoreBadge`+`ScoreBlock`, `StatBar`, `SignalChip`+`SignalChipList`).
+4. **Reorganização de pastas** (parte do "App.tsx concentra responsabilidades demais"):
+   `services/` (api-client, datadragon), `hooks/` (use-async-data), `theme/`
+   (featured-champion-context, accent-color, SkinSplash, ChampionSkinPicker, novo
+   `ThemedPageHero`), `app/` (navigation, labels), `ui/` (design system), `features/` (telas).
+   `App.tsx` caiu de 834 pra ~215 linhas e passou a cuidar só de sessão, IPC e roteamento;
+   Dashboard/Perfil/Champion Select/Pré-game viraram arquivos próprios.
+5. **Navegação agrupada por momento de uso** - Análise (Dashboard/Perfil/Evolução), Partida
+   (Champion Select/Pré-game/Pós-game), App (Configurações), em vez de uma lista única de 7
+   itens. Sidebar de 232px (era 260px, encolhe pra 196px abaixo de 1160px), com resumo da
+   conta no rodapé e ponto verde pulsante no Champion Select quando o LCU detecta a sessão.
+6. **Correções estruturais de CSS**: as regras de `span` descendente foram **removidas**
+   (causa raiz do bug da Fase 9b, não só o sintoma); `.champion-row` deu lugar ao `DataTable`
+   com template de colunas parametrizado, eliminando o `gridColumn` inline da Evolução; linha
+   clicável virou `<button>` de verdade (recebe foco e responde ao teclado - antes era um
+   `<article style={{cursor:"pointer"}}>`); `global.css` caiu de 1102 pra ~330 linhas, só com
+   telas de autenticação e restos ainda não migrados.
+
+**Validado no app Electron real via CDP** (não no dev server aberto como aba comum), conta
+Zekerus#117: `window.sparta` presente, shell novo com 7 itens em 3 grupos, sidebar medindo
+232px, herói com splash + score real, Perfil com tabela real (11 linhas, avatares, badge só
+nos campeões elegíveis), as 7 telas renderizando com **0 imagens quebradas** e nenhum
+`.panel` legado fora de Configurações. Foco por teclado confirmado com um **Tab de verdade**
+(`Input.dispatchKeyEvent`, já que `element.focus()` via JS não dispara `:focus-visible` no
+Chromium): `focusVisible: true`, `outlineWidth: 2px` na cor do tema.
+`pnpm typecheck && pnpm lint && pnpm test && pnpm build` completos.
+
 ### Fase 13: o tema veste o app (sem chromas + cor dinâmica + splash nas telas)
 
 Pedido do usuário depois da Fase 12: tirar os **chromas** do seletor de skins (poluíam a lista como se fossem temas) e fazer o tema **refletir muito mais no app** - cores derivadas da skin e splash art de fundo, com a linguagem visual de **Mobalytics, Blitz e iTero**.

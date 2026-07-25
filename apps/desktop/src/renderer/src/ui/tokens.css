@@ -1,0 +1,154 @@
+/*
+ * Fonte unica dos tokens visuais do Sparta.
+ *
+ * Organizados por FUNCAO (superficie, borda, texto, destaque, semantico,
+ * sombra, raio, espaco, tipografia, transicao, z-index) - nao por valor.
+ * Nenhum componente do design system deve escrever um hex, um px de raio
+ * ou uma duracao literal: se falta um token, o token e que deve nascer.
+ *
+ * Dois eixos de cor, deliberadamente separados:
+ *
+ * 1. DESTAQUE (--color-accent*) - identidade. Muda com a skin escolhida:
+ *    o FeaturedChampionProvider sobrescreve estes 3 tokens em runtime com
+ *    a cor extraida da splash art (features/accent-color.ts). Os nomes
+ *    NAO podem mudar - ha codigo em runtime que os escreve por nome.
+ *
+ * 2. SEMANTICO (--color-green/-yellow/-red) - significado. Fixo de
+ *    proposito: se seguisse a skin, "bom" e "ruim" trocariam de cor a cada
+ *    tema e perderiam o sentido.
+ */
+
+:root {
+  /* ─── Background & superficies ─────────────────────────────────────── */
+  --bg-base: #050506;
+  --bg-sunken: #030304;
+  /* Escala de elevacao: quanto maior o numero, mais "perto" do usuario. */
+  --surface-1: #0a0a0c;
+  --surface-2: #0f0f13;
+  --surface-3: #16161b;
+  --surface-4: #1d1d23;
+  /* Superficies translucidas, pra deixar o brilho ambiente do tema passar. */
+  --surface-veil: rgba(15, 15, 19, 0.72);
+  --surface-veil-strong: rgba(10, 10, 12, 0.92);
+  /* Realce sutil no hover, independente da cor do tema. */
+  --surface-hover: rgba(255, 255, 255, 0.035);
+  --surface-active: rgba(255, 255, 255, 0.06);
+
+  /* ─── Bordas ───────────────────────────────────────────────────────── */
+  --border-subtle: #1a1a20;
+  --border-default: #26262e;
+  --border-strong: #35353f;
+
+  /* ─── Texto ────────────────────────────────────────────────────────── */
+  --text-primary: #f4f4f6;
+  --text-secondary: #a5a5b0;
+  --text-muted: #6f6f7b;
+  /* Texto sobre um preenchimento na cor do tema. A luminosidade do accent
+     e travada entre 45% e 62% (accent-color.ts), faixa em que tinta escura
+     tem contraste melhor e mais estavel que branco pra qualquer matiz. */
+  --text-on-accent: #08080a;
+
+  /* ─── Destaque (dinamico por skin - ver nota no topo) ──────────────── */
+  --color-accent: #dc2626;
+  --color-accent-soft: #7f1d1d;
+  --color-accent-glow: rgba(220, 38, 38, 0.32);
+
+  /* ─── Semantico (fixo - ver nota no topo) ──────────────────────────── */
+  --color-green: #4ade80;
+  --color-green-dim: rgba(74, 222, 128, 0.14);
+  --color-yellow: #fbbf24;
+  --color-yellow-dim: rgba(251, 191, 36, 0.14);
+  --color-red: #f0555b;
+  --color-red-dim: rgba(240, 85, 91, 0.14);
+  --color-error: #f0555b;
+
+  /* ─── Sombras ──────────────────────────────────────────────────────── */
+  /* Baixas e largas: profundidade sem o "card flutuando" de sombra forte. */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 8px 20px -12px rgba(0, 0, 0, 0.8);
+  --shadow-lg: 0 20px 48px -24px rgba(0, 0, 0, 0.9);
+  --shadow-accent: 0 12px 28px -18px var(--color-accent-glow);
+
+  /* ─── Raio ─────────────────────────────────────────────────────────── */
+  /* Escala real: elementos pequenos NAO usam o mesmo raio dos paineis
+     (um dos pontos do feedback: tudo tinha a mesma aparencia). */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-full: 999px;
+
+  /* ─── Espaco (escala de 4) ─────────────────────────────────────────── */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --space-8: 40px;
+  --space-9: 48px;
+  --space-10: 64px;
+
+  /* ─── Tipografia ───────────────────────────────────────────────────── */
+  --font-sans: "Manrope", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-numeric: "Manrope", ui-monospace, monospace;
+  --text-2xs: 10px;
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-md: 13px;
+  --text-base: 14px;
+  --text-lg: 16px;
+  --text-xl: 19px;
+  --text-2xl: 23px;
+  --text-3xl: 28px;
+  --text-4xl: 34px;
+  --leading-tight: 1.2;
+  --leading-snug: 1.4;
+  --leading-normal: 1.6;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+  --weight-black: 800;
+
+  /* ─── Transicoes ───────────────────────────────────────────────────── */
+  /* Curtas e funcionais (120-250ms). Duracoes maiores sao percebidas como
+     lentidao num app que o usuario abre entre partidas. */
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --duration-fast: 120ms;
+  --duration-base: 180ms;
+  --duration-slow: 240ms;
+  --transition-colors: color var(--duration-fast) var(--ease-out),
+    background-color var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);
+  --transition-transform: transform var(--duration-fast) var(--ease-out);
+
+  /* ─── z-index ──────────────────────────────────────────────────────── */
+  --z-base: 0;
+  --z-raised: 1;
+  --z-sticky: 10;
+  --z-nav: 20;
+  --z-tooltip: 100;
+
+  /* ─── Layout ───────────────────────────────────────────────────────── */
+  --sidebar-width: 232px;
+  --content-max: 1560px;
+
+  /*
+   * ALIASES LEGADOS - os nomes que `styles/global.css` ainda usa enquanto
+   * as telas migram (uma subfase por vez). Existem so pra a migracao ser
+   * incremental em vez de big-bang; devem sumir quando nada mais os
+   * referenciar.
+   */
+  --color-bg: var(--bg-base);
+  --color-surface: var(--surface-1);
+  --color-surface-elevated: var(--surface-3);
+  --color-surface-panel: var(--surface-veil);
+  --color-border: var(--border-default);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --transition-fast: var(--duration-fast) var(--ease-out);
+  --transition-medium: var(--duration-slow) var(--ease-out);
+}

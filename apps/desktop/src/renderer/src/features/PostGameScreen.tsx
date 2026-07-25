@@ -1,13 +1,10 @@
 import { useState } from "react";
 import { calculateKda, roleBaselines, type PostGameAnalysis, type RecentChampionMatch } from "@sparta/core";
-import { analyzePostgame, ApiError, fetchPostgameReport, fetchRecentMatches, type RiotAccountSummary } from "./api-client";
-import { ChampionIcon } from "./ChampionIcon";
-import { fetchAllChampions, type DataDragonChampionSummary } from "./datadragon";
-import { Loading } from "./Loading";
-import { SignalChip } from "./SignalChip";
-import { StatBar } from "./StatBar";
-import { ThemedHeader } from "./ThemedHeader";
-import { useAsyncData } from "./use-async-data";
+import { analyzePostgame, ApiError, fetchPostgameReport, fetchRecentMatches, type RiotAccountSummary } from "../services/api-client";
+import { fetchAllChampions, type DataDragonChampionSummary } from "../services/datadragon";
+import { ThemedPageHero } from "../theme/ThemedPageHero";
+import { Button, ChampionAvatar, Loading, SignalChip, SignalChipList, StatBar } from "../ui";
+import { useAsyncData } from "../hooks/use-async-data";
 
 interface PostGameScreenProps {
   riotAccounts: RiotAccountSummary[];
@@ -110,7 +107,7 @@ export function PostGameScreen({ riotAccounts, sessionToken, ddragonVersion }: P
 
   return (
     <>
-      <ThemedHeader label="Análise pós-game" title="Partidas recentes" />
+      <ThemedPageHero eyebrow="Análise pós-game" title="Partidas recentes" />
 
       {matches.status === "loading" && <Loading label="Carregando partidas..." />}
       {matches.status === "error" && <p>{matches.error}</p>}
@@ -127,7 +124,7 @@ export function PostGameScreen({ riotAccounts, sessionToken, ddragonVersion }: P
             >
               <div className="champion-identity">
                 {champion && (
-                  <ChampionIcon championId={champion.id} slug={champion.key} ddragonVersion={ddragonVersion} size="sm" alt={champion.name} />
+                  <ChampionAvatar championId={champion.id} slug={champion.key} ddragonVersion={ddragonVersion} size="sm" alt={champion.name} />
                 )}
                 <strong>{champion?.name ?? `Campeão #${match.championId}`}</strong>
               </div>
@@ -163,7 +160,7 @@ export function PostGameScreen({ riotAccounts, sessionToken, ddragonVersion }: P
                   ))}
                 </div>
               )}
-              <div className="signal-chip-list">
+              <SignalChipList>
                 {report.strengths.map((strength) => (
                   <SignalChip key={strength.code} tone="positive">
                     {strength.detail}
@@ -174,13 +171,13 @@ export function PostGameScreen({ riotAccounts, sessionToken, ddragonVersion }: P
                     {weakness.detail}
                   </SignalChip>
                 ))}
-              </div>
+              </SignalChipList>
               {report.tips.map((tip) => (
                 <p key={tip}>💡 {tip}</p>
               ))}
-              <button type="button" className="btn-secondary" onClick={() => void reanalyze()}>
+              <Button variant="secondary" size="sm" onClick={() => void reanalyze()}>
                 Reanalisar
-              </button>
+              </Button>
             </>
           )}
         </section>

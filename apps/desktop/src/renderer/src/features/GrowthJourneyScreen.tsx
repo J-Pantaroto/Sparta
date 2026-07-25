@@ -1,10 +1,9 @@
 import type { GrowthJourney, WeaknessTrend } from "@sparta/core";
 import { Minus, TrendingDown, TrendingUp } from "lucide-react";
-import { fetchGrowthJourney, type RiotAccountSummary } from "./api-client";
-import { Loading } from "./Loading";
-import { StatBar } from "./StatBar";
-import { ThemedHeader } from "./ThemedHeader";
-import { useAsyncData } from "./use-async-data";
+import { fetchGrowthJourney, type RiotAccountSummary } from "../services/api-client";
+import { ThemedPageHero } from "../theme/ThemedPageHero";
+import { Loading, StatBar } from "../ui";
+import { useAsyncData } from "../hooks/use-async-data";
 
 interface GrowthJourneyScreenProps {
   riotAccounts: RiotAccountSummary[];
@@ -47,7 +46,7 @@ export function GrowthJourneyScreen({ riotAccounts }: GrowthJourneyScreenProps) 
 
   return (
     <>
-      <ThemedHeader label="Evolução" title="Progressão dos pontos fracos" />
+      <ThemedPageHero eyebrow="Evolução" title="Progressão dos pontos fracos" />
 
       {journey.status === "loading" && <Loading />}
       {journey.status === "error" && <p>{journey.error}</p>}
@@ -74,9 +73,9 @@ export function GrowthJourneyScreen({ riotAccounts }: GrowthJourneyScreenProps) 
                     </span>
                   )}
                   <div className="champion-row-bars" style={{ gridColumn: "3 / span 2" }}>
-                    <StatBar label="Recente" value={trend.recentRate} invert detail={`${trend.recentRate}%`} />
+                    <StatBar label="Recente" value={trend.recentRate} invert value_label={`${trend.recentRate}%`} />
                     {trend.hasComparison && (
-                      <StatBar label="Anterior" value={trend.previousRate} invert detail={`${trend.previousRate}%`} />
+                      <StatBar label="Anterior" value={trend.previousRate} invert value_label={`${trend.previousRate}%`} />
                     )}
                   </div>
                 </article>

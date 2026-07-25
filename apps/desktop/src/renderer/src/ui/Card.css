@@ -1,0 +1,142 @@
+/*
+ * Superficie de conteudo. Diferente do `.panel` antigo (que era um unico
+ * estilo pra tudo, fazendo cada bloco da tela ter exatamente o mesmo peso
+ * visual), aqui os niveis de importancia sao explicitos:
+ *
+ *   default   - bloco comum
+ *   flat      - agrupa sem competir (so borda, sem superficie)
+ *   feature   - o bloco principal da tela (borda e brilho no tema)
+ *   inset     - conteudo "afundado" dentro de outro card
+ */
+
+.sp-card {
+  position: relative;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-veil);
+  transition: var(--transition-colors), var(--transition-transform), box-shadow var(--duration-fast) var(--ease-out);
+}
+
+.sp-card--flat {
+  background: transparent;
+  border-color: var(--border-subtle);
+}
+
+.sp-card--inset {
+  border-color: transparent;
+  border-radius: var(--radius-md);
+  background: var(--bg-sunken);
+}
+
+.sp-card--feature {
+  border-color: var(--color-accent-soft);
+  background:
+    linear-gradient(150deg, var(--color-accent-glow), transparent 42%),
+    var(--surface-veil-strong);
+  box-shadow: var(--shadow-md);
+}
+
+/* Marca a borda esquerda no tema - usado quando o card representa o item
+   ativo/selecionado de uma lista. */
+.sp-card--selected {
+  border-color: var(--color-accent);
+}
+
+.sp-card--selected::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: var(--space-4);
+  bottom: var(--space-4);
+  width: 3px;
+  border-radius: 0 var(--radius-full) var(--radius-full) 0;
+  background: var(--color-accent);
+}
+
+/* ─── Padding ───────────────────────────────────────────────────────── */
+
+.sp-card--pad-none {
+  padding: 0;
+}
+
+.sp-card--pad-sm {
+  padding: var(--space-3);
+}
+
+.sp-card--pad-md {
+  padding: var(--space-5);
+}
+
+.sp-card--pad-lg {
+  padding: var(--space-6);
+}
+
+/* ─── Interativo ────────────────────────────────────────────────────── */
+
+.sp-card--interactive {
+  display: block;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.sp-card--interactive:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-2);
+  transform: translateY(-1px);
+}
+
+.sp-card--interactive.sp-card--selected:hover {
+  border-color: var(--color-accent);
+}
+
+/* ─── Cabecalho de card / secao ─────────────────────────────────────── */
+
+.sp-section-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.sp-section-header__text {
+  min-width: 0;
+}
+
+.sp-section-header__eyebrow {
+  display: block;
+  margin-bottom: var(--space-1);
+  color: var(--color-accent);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sp-section-header__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-tight);
+  color: var(--text-primary);
+}
+
+.sp-section-header__description {
+  margin-top: var(--space-2);
+  max-width: 68ch;
+  color: var(--text-secondary);
+  font-size: var(--text-md);
+  line-height: var(--leading-snug);
+}
+
+.sp-section-header__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}

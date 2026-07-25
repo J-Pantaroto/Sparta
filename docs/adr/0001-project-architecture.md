@@ -16,7 +16,7 @@ Usar pnpm workspaces com:
 - `apps/api` para Fastify + Prisma;
 - `packages/core` para domínio puro e algoritmos;
 - `packages/riot` para adaptadores externos;
-- `packages/ui` para tokens/componentes;
+- `packages/ui` para tokens/componentes (removido na Fase 14: o design system passou a viver em `apps/desktop/src/renderer/src/ui`, junto do seu CSS, por não haver segundo consumidor e o pacote não ter pipeline de estilo — ver `docs/design-system.md`);
 - `services/analyzer` para Python opcional.
 
 ## Consequências

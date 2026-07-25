@@ -1,0 +1,190 @@
+/*
+ * Camada base: reset minimo, tipografia do documento, ambiente e as regras
+ * de acessibilidade que valem pro app inteiro.
+ *
+ * Nada aqui deve estilizar um componente especifico - regra generica de
+ * elemento (`.painel span`, `.card strong`) foi a causa raiz de um bug real
+ * de cor na Fase 9b, e o que esta camada existe pra evitar.
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  min-width: 1000px;
+  min-height: 720px;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  /* Brilho ambiente na cor do tema + base escura. Ancorado no viewport
+     (`fixed`) pra o gradiente nao "descer" junto com o scroll da tela. */
+  background:
+    radial-gradient(ellipse 80% 55% at 72% -8%, var(--color-accent-glow), transparent 62%),
+    linear-gradient(168deg, var(--bg-base) 0%, var(--surface-1) 55%, var(--bg-sunken) 100%);
+  background-attachment: fixed;
+  background-color: var(--bg-base);
+}
+
+h1,
+h2,
+h3,
+h4,
+p,
+figure {
+  margin: 0;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+/*
+ * Foco visivel so pra navegacao por teclado (`:focus-visible`, nao
+ * `:focus`) - o app nao tinha nenhum indicador antes, o que tornava a
+ * navegacao por Tab literalmente invisivel. Anel na cor do tema, com um
+ * halo escuro por tras pra continuar legivel sobre splash art.
+ */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-xs);
+}
+
+::selection {
+  background: var(--color-accent);
+  color: var(--text-on-accent);
+}
+
+/* Scrollbar discreta, coerente com as superficies do app. */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: var(--radius-full);
+  background: var(--border-strong);
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+  background-clip: content-box;
+}
+
+/* Inputs numericos sem as setinhas nativas (destoavam do resto do app). */
+input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* ─── Animacoes compartilhadas ──────────────────────────────────────── */
+
+@keyframes sp-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes sp-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes sp-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes sp-shimmer {
+  from {
+    background-position: -320px 0;
+  }
+  to {
+    background-position: 320px 0;
+  }
+}
+
+@keyframes sp-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+/*
+ * Respeita quem pediu menos movimento no sistema operacional: corta
+ * animacoes e transicoes em vez de so encurtar. Elementos que dependem de
+ * animacao pra comunicar estado (spinner, shimmer) continuam existindo -
+ * a informacao vem do texto que os acompanha.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Utilitario: acessivel a leitores de tela, invisivel na tela. */
+.sp-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Utilitario: corta em 1 linha (use junto com `title` pro texto completo). */
+.sp-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}

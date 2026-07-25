@@ -1,710 +1,82 @@
-:root {
-  --color-bg: #050505;
-  --color-surface: #0b0b0d;
-  --color-surface-elevated: #121216;
-  --color-surface-panel: rgba(18, 18, 22, 0.82);
-  --color-border: #24242a;
-  --color-text-primary: #f5f5f6;
-  --color-text-secondary: #a1a1aa;
-  --color-text-muted: #71717a;
-  /* Cor de DESTAQUE do app (bordas ativas, hovers, rotulos de secao). O
-     vermelho aqui e so o padrao - quando ha um tema de skin aplicado, o
-     FeaturedChampionProvider sobrescreve estes 3 tokens em runtime com a
-     cor extraida da splash art (ver features/accent-color.ts). Todos os
-     usos de destaque no arquivo passam por estas variaveis, entao trocar
-     as 3 re-tematiza o app inteiro. */
-  --color-accent: #dc2626;
-  --color-accent-soft: #7f1d1d;
-  --color-accent-glow: rgba(220, 38, 38, 0.32);
-  --color-error: #f87171;
-  /* Trio SEMANTICO de leitura de performance (bom / neutro / ruim). Fixo de
-     proposito: se seguisse o tema, "bom" e "ruim" mudariam de cor a cada
-     skin e perderiam o significado. Ortogonal a cor de destaque acima. */
-  --color-green: #4ade80;
-  --color-yellow: #fbbf24;
-  --color-red: #dc2626;
-  --font-sans: "Manrope", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --transition-fast: 0.18s ease;
-  --transition-medium: 0.32s ease;
-
-  color: var(--color-text-primary);
-  background: var(--color-bg);
-  font-family: var(--font-sans);
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-}
-
-.font-display {
-  font-family: var(--font-sans);
-  font-weight: 800;
-}
-
-* {
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-  min-width: 1000px;
-  min-height: 720px;
-  /* O brilho ambiente segue a cor do tema (antes era um vermelho fixo
-     hardcoded), entao a skin escolhida tinge o app inteiro, nao so os
-     cabecalhos. */
-  background:
-    radial-gradient(circle at 65% 10%, var(--color-accent-glow), transparent 38%),
-    linear-gradient(135deg, #050505 0%, #0b0b0d 48%, #111113 100%);
-  background-attachment: fixed;
-}
-
-button,
-input {
-  font: inherit;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes fadeInSoft {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes shimmer {
-  0% {
-    background-position: -200px 0;
-  }
-  100% {
-    background-position: 200px 0;
-  }
-}
-
-.loading-indicator {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: var(--color-text-secondary);
-  font-size: 13px;
-  animation: fadeInSoft var(--transition-fast);
-}
-
-.spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid var(--color-border);
-  border-top-color: var(--color-accent);
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
-}
-
-.grid-skeleton {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.grid-skeleton-tile {
-  width: 34px;
-  height: 34px;
-  border-radius: 6px;
-  background: linear-gradient(90deg, var(--color-surface-elevated) 25%, var(--color-surface-panel) 37%, var(--color-surface-elevated) 63%);
-  background-size: 400px 100%;
-  animation: shimmer 1.4s ease infinite;
-}
-
-.app-shell {
-  display: grid;
-  grid-template-columns: 260px 1fr;
-  min-height: 100vh;
-}
-
-.sidebar {
-  display: flex;
-  flex-direction: column;
-  border-right: 1px solid var(--color-border);
-  background: rgba(5, 5, 5, 0.82);
-  padding: 28px 18px;
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 36px;
-}
-
-.brand-mark {
-  display: grid;
-  width: 42px;
-  height: 42px;
-  place-items: center;
-  border: 1px solid var(--color-accent-soft);
-  border-radius: 8px;
-  background: var(--color-surface-elevated);
-  color: var(--color-accent);
-  font-weight: 800;
-}
-
-.brand strong,
-.brand span {
-  display: block;
-}
-
-.brand strong {
-  font-family: var(--font-sans);
-  font-weight: 800;
-  font-size: 17px;
-  letter-spacing: 0.01em;
-}
-
-.brand span {
-  color: var(--color-text-secondary);
-  font-size: 12px;
-}
-
-nav {
-  display: grid;
-  gap: 8px;
-}
-
-nav button,
-.draft-controls button {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 42px;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  padding: 0 12px;
-  text-align: left;
-  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast),
-    transform var(--transition-fast);
-}
-
-nav button.active,
-nav button:hover,
-.draft-controls button:hover {
-  border-color: var(--color-border);
-  background: var(--color-surface-elevated);
-  color: var(--color-text-primary);
-}
-
-nav button:hover,
-.draft-controls button:hover {
-  transform: translateX(2px);
-}
-
-nav button.active {
-  transform: none;
-  /* Barra lateral na cor do tema marcando o item ativo - mesmo padrao de
-     navegacao de Blitz/Mobalytics/iTero. */
-  box-shadow: inset 3px 0 0 var(--color-accent);
-  border-color: var(--color-accent-soft);
-}
-
-.draft-controls button.active {
-  border-color: var(--color-accent-soft);
-  background: var(--color-surface-elevated);
-  color: var(--color-text-primary);
-}
-
-/* Seletor de campeao em destaque (tema) */
-.theme-picker {
-  margin-top: auto;
-  padding-top: 18px;
-  border-top: 1px solid var(--color-border);
-}
-
-.theme-picker span {
-  display: block;
-  margin-bottom: 10px;
-  color: var(--color-text-secondary);
-  font-size: 11px;
-  letter-spacing: 0.02em;
-}
-
-.theme-picker-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.theme-picker-option {
-  padding: 0;
-  border: 2px solid transparent;
-  border-radius: 8px;
-  background: none;
-  cursor: pointer;
-  line-height: 0;
-  transition: border-color var(--transition-fast), transform var(--transition-fast);
-}
-
-.theme-picker-option:hover {
-  transform: translateY(-2px);
-}
-
-.theme-picker-option.active {
-  border-color: var(--color-accent);
-}
-
 /*
- * Passo 2 do seletor de skin (icone + nome + botao Baixar) - card proprio,
- * nao reusa .theme-picker-option porque aquela classe tem line-height:0
- * (pensada pro grid so-de-icone do passo 1 e do seletor de inimigos) que
- * colapsava o texto do nome/botao um em cima do outro aqui (bug real
- * encontrado nesta sessao).
+ * Estilos que ainda NAO migraram pro design system (`src/ui`).
+ *
+ * Duas categorias:
+ * 1. Telas de autenticacao (`.auth-*`), que vivem fora do shell do app.
+ * 2. Restos das telas que serao reescritas nas proximas subfases
+ *    (Pos-game, Evolucao, Configuracoes, galeria de temas).
+ *
+ * Os tokens saem de `ui/tokens.css` e o reset/base de `ui/base.css` - este
+ * arquivo nao define mais nenhum dos dois. As regras genericas de elemento
+ * descendente que existiam aqui (`.page-header span`, `.metric span`,
+ * `.champion-row span`) foram REMOVIDAS: elas casavam qualquer `<span>` em
+ * qualquer profundidade e ja tinham pintado o numero do ScoreBadge de
+ * vermelho por engano (bug real da Fase 9b). Nada novo deve ser adicionado
+ * aqui - o lugar de estilo novo e um componente em `ui/`.
  */
-.skin-picker-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  width: 160px;
-  padding: 10px;
-  border: 2px solid var(--color-border);
-  border-radius: 8px;
-  background: var(--color-surface-elevated);
-  transition: border-color var(--transition-fast), transform var(--transition-fast);
-}
 
-.skin-picker-card:hover {
-  transform: translateY(-2px);
-}
-
-.skin-picker-card.active {
-  border-color: var(--color-accent);
-}
-
-.skin-picker-card img {
-  width: 100%;
-  height: 90px;
-  border-radius: 6px;
-  object-fit: cover;
-  cursor: pointer;
-}
-
-.skin-picker-card span {
-  font-size: 13px;
-  text-align: center;
-}
-
-.skin-picker-card button {
-  width: 100%;
-  height: 32px;
-  border: 1px solid var(--color-accent-soft);
-  border-radius: 6px;
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-  cursor: pointer;
-  transition: background-color var(--transition-fast);
-}
-
-.skin-picker-card button:hover {
-  background: #1a0d0d;
-}
-
-.content {
-  padding: 40px;
-  overflow: auto;
-}
-
-.content > * {
-  animation: fadeIn var(--transition-medium);
-}
-
-.page-header {
-  max-width: 860px;
-  margin-bottom: 32px;
-}
-
-.page-header.compact {
-  margin-bottom: 22px;
-}
-
-/*
- * Cabecalho de tela com a splash art do tema ao fundo (linguagem visual de
- * Blitz/Mobalytics/iTero: toda tela carrega a identidade do campeao, nao so
- * a home). Mais baixo que o `.hero-splash` do Dashboard - aqui a arte e
- * ambientacao, nao o assunto principal da tela.
- */
-.page-header.themed {
-  position: relative;
-  max-width: none;
-  padding: 22px 26px;
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
-  overflow: hidden;
-  background-color: var(--color-surface);
-  background-size: cover;
-  background-position: center 22%;
-  animation: fadeInSoft 0.5s ease;
-}
-
-/* Duas camadas: um scrim escuro que garante a legibilidade do texto e uma
-   lavagem na cor do tema, que e o que da o "ar" colorido dos apps de
-   referencia sem comprometer o contraste. */
-.page-header.themed::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(100deg, rgba(5, 5, 5, 0.95) 30%, rgba(5, 5, 5, 0.75) 65%, rgba(5, 5, 5, 0.45) 100%),
-    linear-gradient(0deg, var(--color-accent-glow), transparent 70%);
-}
-
-.page-header.themed > * {
-  position: relative;
-}
-
-.themed-header-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-/* O titulo do cabecalho tematizado e menor que o `h1` gigante do Dashboard -
-   aqui e um rotulo de tela, nao a chamada principal do app. */
-.page-header.themed h1 {
-  font-size: 27px;
-  margin-top: 2px;
-}
-
-/* Faixa de destaque na cor do tema marcando a tela ativa (padrao dos tres
-   apps de referencia). */
-.page-header.themed::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  background: var(--color-accent);
-}
-
-.page-header span,
-.recommendation span,
-.metric span {
-  color: var(--color-accent);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-}
-
-h1,
-h2,
-p {
-  margin-top: 0;
-}
-
-h1 {
-  max-width: 820px;
-  font-family: var(--font-sans);
-  font-size: 40px;
-  font-weight: 700;
-  line-height: 1.18;
-  letter-spacing: -0.01em;
-  margin-bottom: 0;
-}
-
-h2 {
-  font-size: 20px;
-}
-
-p {
-  color: #c7c7ce;
-  line-height: 1.7;
-}
-
-.metric-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 14px;
-  margin-bottom: 18px;
-}
-
-.metric,
-.panel,
-.recommendation,
-.table-panel,
-.draft-controls {
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: var(--color-surface-panel);
-  transition: border-color var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
-}
-
-.metric:hover,
-.recommendation:hover {
-  border-color: var(--color-accent-soft);
-  transform: translateY(-2px);
-  box-shadow: 0 12px 24px -16px var(--color-accent-glow);
-}
-
-.metric {
-  min-height: 132px;
-  padding: 18px;
-}
-
-.metric strong {
-  display: block;
-  margin: 16px 0 8px;
-  font-size: 28px;
-}
-
-.metric-value-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 12px 0 8px;
-}
-
-.metric-value-row strong {
-  margin: 0;
-}
-
-.metric small,
-.recommendation small {
-  color: var(--color-text-secondary);
-}
+/* ─── Restos de tela (a migrar) ─────────────────────────────────────── */
 
 .panel {
-  padding: 24px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-veil);
+  padding: var(--space-6);
 }
 
 .panel.wide {
-  max-width: 960px;
-}
-
-/* Dashboard: 3 scores de forma recente (10/20/50) lado a lado */
-.form-scores {
-  display: flex;
-  gap: 28px;
-  margin-top: 16px;
-}
-
-.form-score {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  color: var(--color-text-secondary);
-}
-
-/* Dashboard: mini-leaderboard dos melhores campeoes */
-.leaderboard {
-  display: grid;
-  gap: 4px;
-  margin-top: 12px;
-}
-
-.leaderboard-row {
-  display: grid;
-  grid-template-columns: 28px 26px 1.2fr 0.8fr 1fr auto;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  transition: background-color var(--transition-fast);
-}
-
-.leaderboard-row:hover {
-  background: rgba(255, 255, 255, 0.02);
-}
-
-.leaderboard-rank {
-  color: var(--color-accent);
-  font-weight: 800;
-}
-
-.leaderboard-role,
-.leaderboard-games {
-  color: var(--color-text-secondary);
-  font-size: 13px;
+  max-width: none;
 }
 
 .table-panel {
   display: grid;
-  max-width: 980px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-veil);
   overflow: hidden;
 }
 
 .champion-row {
   display: grid;
   grid-template-columns: 1.3fr 0.7fr 0.7fr 1.8fr;
-  gap: 12px;
-  padding: 16px 18px;
-  border-bottom: 1px solid var(--color-border);
-  transition: background-color var(--transition-fast);
-}
-
-.champion-row-bars {
-  display: grid;
-  gap: 6px;
-}
-
-/* Rotulo do ponto fraco na Evolucao: nome + confianca embaixo */
-.trend-label {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.trend-label small {
-  color: var(--color-text-muted);
-  font-size: 11px;
-}
-
-.champion-row:hover {
-  background: rgba(255, 255, 255, 0.02);
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--border-subtle);
+  transition: background-color var(--duration-fast) var(--ease-out);
 }
 
 .champion-row:last-child {
   border-bottom: 0;
 }
 
-.champion-row span {
-  color: var(--color-text-secondary);
+.champion-row:hover {
+  background: var(--surface-hover);
 }
 
-.draft-controls {
-  display: flex;
-  align-items: end;
-  gap: 14px;
-  max-width: 760px;
-  padding: 16px;
-  margin-bottom: 18px;
-}
-
-.draft-controls label {
-  display: grid;
-  gap: 8px;
-  color: var(--color-text-secondary);
-  font-size: 13px;
-}
-
-.draft-controls input,
-.draft-controls select {
-  width: 140px;
-  height: 42px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: var(--color-bg);
-  color: var(--color-text-primary);
-  padding: 0 12px;
-  transition: border-color var(--transition-fast);
-}
-
-.draft-controls input {
-  width: 110px;
-}
-
-.draft-controls input:focus,
-.draft-controls select:focus {
-  outline: none;
-  border-color: var(--color-accent-soft);
-}
-
-/* Esconde as setinhas nativas de incrementar/decrementar dos inputs
-   numericos (pick order manual, "quantas partidas analisar" em
-   Configuracoes) - destoavam do resto do app (Fase 10). */
-input[type="number"] {
-  appearance: textfield;
-  -moz-appearance: textfield;
-}
-
-input[type="number"]::-webkit-outer-spin-button,
-input[type="number"]::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-
-.recommendation-list {
-  display: grid;
-  max-width: 920px;
-  gap: 12px;
-}
-
-.recommendation {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 18px;
-}
-
-.recommendation-header {
+.champion-identity {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
+  min-width: 0;
 }
 
+.champion-row-bars,
 .recommendation-bars {
   display: grid;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
-.champion-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 6px;
-  border: 1px solid var(--color-border);
-  object-fit: cover;
-  background: var(--color-surface);
-  flex-shrink: 0;
-  transition: border-color var(--transition-fast), transform var(--transition-fast);
-}
-
-.champion-icon.sm {
-  width: 26px;
-  height: 26px;
-  border-radius: 5px;
-}
-
-/* Ultimo estagio de fallback do ChampionIcon (Fase 10) - nunca mostra o
-   icone nativo de imagem quebrada do navegador quando Data Dragon e
-   Community Dragon falham os dois. */
-.champion-icon-fallback {
-  display: grid;
-  place-items: center;
-  color: var(--color-text-muted);
-}
-
-.champion-row {
-  align-items: center;
-}
-
-.champion-row .champion-identity {
+.trend-label {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .trend-cell {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
 .trend-cell.improving {
@@ -712,242 +84,119 @@ input[type="number"]::-webkit-inner-spin-button {
 }
 
 .trend-cell.worsening {
-  color: var(--color-error);
+  color: var(--color-red);
 }
 
-/* Anel de score (Fase 9) - conic-gradient puro, sem lib de grafico */
-.score-badge {
-  position: relative;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  flex-shrink: 0;
-  font-weight: 800;
-  color: var(--color-text-primary);
-}
-
-.score-badge::before {
-  content: "";
-  position: absolute;
-  inset: 4px;
-  border-radius: 50%;
-  background: var(--color-bg);
-}
-
-.score-badge span {
-  /* Sobrescreve `color` de regras genericas mais antigas de mesma
-     especificidade (`.metric span`, `.recommendation span`,
-     `.champion-row span` - todas coloriam o numero do badge de
-     vermelho/cinza sem querer, ja que span descendente casa em qualquer
-     profundidade) - bug real encontrado na validacao visual da Fase 9b. */
-  position: relative;
-  color: var(--color-text-primary);
-}
-
-/* Barra de estatistica (Fase 9) - div com width% simples, sem lib */
-.stat-bar {
-  display: grid;
-  gap: 4px;
-}
-
-.stat-bar-header {
+.draft-controls {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  font-size: 12px;
-  color: var(--color-text-secondary);
-}
-
-.stat-bar-header small {
-  color: var(--color-text-muted);
-}
-
-.stat-bar-track {
-  position: relative;
-  height: 6px;
-  border-radius: 3px;
-  background: var(--color-border);
-  overflow: hidden;
-}
-
-.stat-bar-track.centered::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 50%;
-  width: 1px;
-  background: var(--color-text-muted);
-}
-
-.stat-bar-fill {
-  height: 100%;
-  border-radius: 3px;
-  transition: width var(--transition-medium);
-}
-
-/* Chip de reason/warning/strength/weakness (Fase 9) - substitui os
-   paragrafos soltos de texto por pills curtas com icone. */
-.signal-chip-list {
-  display: flex;
+  align-items: flex-end;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-sunken);
 }
 
-.signal-chip {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  border: 1px solid var(--color-border);
-  background: var(--color-surface-elevated);
-  color: var(--color-text-secondary);
+.draft-controls label {
+  display: grid;
+  gap: var(--space-2);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
 }
 
-.signal-chip.positive {
-  border-color: var(--color-green);
-  color: var(--color-green);
+.draft-controls input {
+  width: 120px;
+  height: 38px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--surface-1);
+  color: var(--text-primary);
+  padding: 0 var(--space-3);
+  transition: border-color var(--duration-fast) var(--ease-out);
 }
 
-.signal-chip.negative {
-  border-color: var(--color-accent-soft);
-  color: var(--color-error);
-}
-
-.recommendation .recommendation-title {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-/* Botao secundario reaproveitavel - "Confirmar campeao", "Voltar pra lista
-   de campeoes", "Reanalisar", "Simular manualmente". Antes cada um desses
-   era um <button> sem classe nenhuma (HTML puro, sem estilo - feedback real
-   do usuario) ou tinha o estilo duplicado inline. */
-.btn-secondary,
-.recommendation button {
-  align-self: flex-start;
-  height: 36px;
-  padding: 0 14px;
-  border: 1px solid var(--color-accent-soft);
-  border-radius: 8px;
-  background: var(--color-surface-elevated);
-  color: var(--color-text-primary);
-  cursor: pointer;
-  transition: background-color var(--transition-fast), border-color var(--transition-fast);
-}
-
-.btn-secondary:hover,
-.recommendation button:hover {
-  background: #1a0d0d;
-}
-
-/* Seletor de campeao reusavel (time inimigo, seletor de skin) */
-.champion-grid-picker input {
-  width: 100%;
-  max-width: 320px;
-  height: 40px;
-  margin-bottom: 12px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: var(--color-bg);
-  color: var(--color-text-primary);
-  padding: 0 12px;
-  transition: border-color var(--transition-fast);
-}
-
-.champion-grid-picker input:focus {
+.draft-controls input:focus {
   outline: none;
-  border-color: var(--color-accent-soft);
+  border-color: var(--color-accent);
 }
 
-.champion-grid-picker .theme-picker-option:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
+.draft-controls button {
+  height: 38px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: var(--transition-colors);
 }
 
-.build-panel h2 {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.draft-controls button:hover {
+  color: var(--text-primary);
+  border-color: var(--border-strong);
 }
 
-.build-slots {
-  display: grid;
-  gap: 16px;
-  margin: 16px 0;
+.draft-controls button.active {
+  border-color: var(--color-accent);
+  background: var(--surface-4);
+  color: var(--text-primary);
 }
 
-.build-slot span {
-  display: block;
-  margin-bottom: 8px;
-  color: var(--color-text-secondary);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-}
-
-.build-item-row {
+/* Galeria de temas (reescrita na subfase E) */
+.theme-picker-grid {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: var(--space-3);
 }
 
-.build-item {
+.skin-picker-card {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px 6px 6px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: var(--color-surface-elevated);
-  transition: border-color var(--transition-fast), transform var(--transition-fast);
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 170px;
+  padding: var(--space-2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  transition: var(--transition-colors), var(--transition-transform);
 }
 
-.build-item:hover {
-  border-color: var(--color-accent-soft);
+.skin-picker-card:hover {
   transform: translateY(-2px);
+  border-color: var(--border-strong);
 }
 
-.hero-splash {
-  position: relative;
-  border-radius: 8px;
-  overflow: hidden;
-  padding: 28px 32px;
-  margin-bottom: 18px;
-  border: 1px solid var(--color-border);
-  background-color: var(--color-surface);
-  background-size: cover;
-  background-position: center 20%;
-  animation: fadeInSoft 0.5s ease;
+.skin-picker-card.active {
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-accent);
 }
 
-.hero-splash::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(100deg, rgba(5, 5, 5, 0.94) 20%, rgba(5, 5, 5, 0.72) 60%, rgba(5, 5, 5, 0.4) 100%),
-    linear-gradient(0deg, #050505 0%, transparent 55%);
+.skin-picker-card img {
+  width: 100%;
+  height: 92px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  cursor: pointer;
 }
 
-.hero-splash > * {
-  position: relative;
+.skin-picker-card > span {
+  font-size: var(--text-sm);
+  text-align: center;
 }
 
-/* Telas de autenticacao */
+/* ─── Telas de autenticacao ─────────────────────────────────────────── */
+
 .auth-shell {
+  position: relative;
   min-height: 100vh;
   display: grid;
   place-items: center;
-  padding: 32px;
-  background-color: var(--color-bg);
+  padding: var(--space-7);
+  background-color: var(--bg-base);
   background-size: cover;
   background-position: center 15%;
-  position: relative;
-  animation: fadeInSoft 0.6s ease;
+  animation: sp-fade var(--duration-slow) var(--ease-out);
 }
 
 .auth-shell::before {
@@ -955,26 +204,38 @@ input[type="number"]::-webkit-inner-spin-button {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(circle at 50% 0%, rgba(127, 29, 29, 0.16), transparent 45%),
-    linear-gradient(180deg, rgba(5, 5, 5, 0.55) 0%, rgba(5, 5, 5, 0.92) 70%, #050505 100%);
+    radial-gradient(circle at 50% 0%, var(--color-accent-glow), transparent 48%),
+    linear-gradient(180deg, rgba(5, 5, 6, 0.6) 0%, rgba(5, 5, 6, 0.93) 68%, var(--bg-base) 100%);
 }
 
 .auth-card {
   position: relative;
   width: 100%;
   max-width: 380px;
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
-  background: rgba(10, 10, 12, 0.92);
-  padding: 32px;
-  animation: fadeIn var(--transition-medium);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-xl);
+  background: var(--surface-veil-strong);
+  padding: var(--space-7);
+  box-shadow: var(--shadow-lg);
+  animation: sp-fade-in var(--duration-slow) var(--ease-out);
 }
 
 .auth-brand {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 24px;
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
+}
+
+.brand-mark {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(140deg, var(--color-accent), var(--color-accent-soft));
+  color: var(--text-on-accent);
+  font-weight: var(--weight-black);
 }
 
 .auth-brand strong,
@@ -983,86 +244,84 @@ input[type="number"]::-webkit-inner-spin-button {
 }
 
 .auth-brand strong {
-  font-weight: 800;
-  font-size: 17px;
+  font-weight: var(--weight-black);
+  font-size: var(--text-lg);
 }
 
 .auth-brand span {
-  color: var(--color-text-secondary);
-  font-size: 12px;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
 }
 
 .auth-title {
-  font-family: var(--font-sans);
-  font-size: 26px;
-  font-weight: 700;
-  margin: 0 0 6px;
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-bold);
+  margin: 0 0 var(--space-1);
 }
 
 .auth-subtitle {
-  color: var(--color-text-secondary);
-  font-size: 13px;
-  margin: 0 0 22px;
+  color: var(--text-secondary);
+  font-size: var(--text-md);
+  margin: 0 0 var(--space-5);
 }
 
 .auth-field {
   display: grid;
-  gap: 6px;
-  margin-bottom: 14px;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
 }
 
 .auth-field label {
-  color: var(--color-text-secondary);
-  font-size: 12px;
-  letter-spacing: 0.01em;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
 }
 
 .auth-field input {
   height: 42px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: var(--color-bg);
-  color: var(--color-text-primary);
-  padding: 0 12px;
-  transition: border-color var(--transition-fast);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--bg-sunken);
+  color: var(--text-primary);
+  padding: 0 var(--space-3);
+  transition: var(--transition-colors);
 }
 
 .auth-field input:focus {
   outline: none;
-  border-color: var(--color-accent-soft);
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-glow);
 }
 
 .auth-submit {
   width: 100%;
   height: 44px;
-  margin-top: 6px;
-  border: 1px solid var(--color-accent-soft);
-  border-radius: 8px;
-  background: #1a0d0d;
-  color: var(--color-text-primary);
-  font-weight: 600;
-  letter-spacing: 0.02em;
+  margin-top: var(--space-2);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  background: var(--color-accent);
+  color: var(--text-on-accent);
+  font-weight: var(--weight-bold);
   cursor: pointer;
-  transition: background-color var(--transition-fast), transform var(--transition-fast);
+  transition: var(--transition-colors), var(--transition-transform), filter var(--duration-fast) var(--ease-out);
 }
 
-.auth-submit:hover {
-  background: #24100f;
+.auth-submit:hover:not(:disabled) {
+  filter: brightness(1.1);
 }
 
-.auth-submit:active {
-  transform: scale(0.98);
+.auth-submit:active:not(:disabled) {
+  transform: translateY(1px);
 }
 
 .auth-submit:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
 .auth-switch {
-  margin-top: 18px;
-  font-size: 13px;
-  color: var(--color-text-secondary);
+  margin-top: var(--space-4);
+  font-size: var(--text-md);
+  color: var(--text-secondary);
   text-align: center;
 }
 
@@ -1071,31 +330,32 @@ input[type="number"]::-webkit-inner-spin-button {
   border: none;
   color: var(--color-accent);
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
   padding: 0;
 }
 
 .auth-error {
   color: var(--color-error);
-  font-size: 12px;
-  margin: -6px 0 14px;
+  font-size: var(--text-sm);
+  margin: 0 0 var(--space-3);
 }
 
 .auth-skip {
-  margin-top: 14px;
+  margin-top: var(--space-3);
   text-align: center;
 }
 
 .auth-skip button {
   background: none;
   border: none;
-  color: #666;
-  font-size: 11px;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
   cursor: pointer;
   text-decoration: underline;
-  transition: color var(--transition-fast);
+  transition: var(--transition-colors);
 }
 
 .auth-skip button:hover {
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
 }

@@ -25,6 +25,7 @@ export default [
         localStorage: "readonly",
         Image: "readonly",
         HTMLImageElement: "readonly",
+        HTMLButtonElement: "readonly",
         RequestInit: "readonly",
         Response: "readonly",
         __dirname: "readonly"

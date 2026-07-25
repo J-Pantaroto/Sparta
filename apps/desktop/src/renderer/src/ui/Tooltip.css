@@ -1,0 +1,59 @@
+/*
+ * Tooltip em CSS puro (sem lib de posicionamento). Aparece acima do
+ * elemento, centralizado. Limitacao aceita: e recortado por ancestrais com
+ * `overflow: hidden` - por isso e usado em icones e rotulos soltos, nao
+ * dentro de listas com scroll proprio.
+ */
+
+.sp-tooltip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.sp-tooltip__bubble {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) translateY(3px);
+  z-index: var(--z-tooltip);
+  width: max-content;
+  max-width: 260px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-4);
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-snug);
+  text-align: left;
+  white-space: normal;
+  box-shadow: var(--shadow-lg);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--duration-fast) var(--ease-out), transform var(--duration-fast) var(--ease-out);
+}
+
+/* Aparece no hover E no foco por teclado - um tooltip que so responde ao
+   mouse esconde a explicacao de quem navega por Tab. */
+.sp-tooltip:hover .sp-tooltip__bubble,
+.sp-tooltip:focus-within .sp-tooltip__bubble {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.sp-tooltip__trigger {
+  display: inline-flex;
+  align-items: center;
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--text-muted);
+  cursor: help;
+  transition: var(--transition-colors);
+}
+
+.sp-tooltip__trigger:hover {
+  color: var(--text-secondary);
+}

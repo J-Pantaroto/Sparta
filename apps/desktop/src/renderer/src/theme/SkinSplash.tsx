@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { championSplashUrl, championSquareUrl, communityDragonSplashUrl } from "./datadragon";
+import { championSplashUrl, championSquareUrl, communityDragonSplashUrl } from "../services/datadragon";
 
 interface SkinSplashProps {
   championKey: string;

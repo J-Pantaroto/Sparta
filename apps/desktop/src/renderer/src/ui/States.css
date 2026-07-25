@@ -1,0 +1,101 @@
+/* Estados transversais: carregando, vazio, erro, esqueleto. */
+
+.sp-loading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--text-secondary);
+  font-size: var(--text-md);
+  animation: sp-fade var(--duration-base) var(--ease-out);
+}
+
+.sp-loading--block {
+  justify-content: center;
+  padding: var(--space-8) var(--space-4);
+}
+
+.sp-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border-default);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  flex-shrink: 0;
+  animation: sp-spin 0.7s linear infinite;
+}
+
+/* ─── Esqueleto ─────────────────────────────────────────────────────── */
+
+.sp-skeleton {
+  border-radius: var(--radius-sm);
+  background: linear-gradient(
+    90deg,
+    var(--surface-2) 25%,
+    var(--surface-4) 37%,
+    var(--surface-2) 63%
+  );
+  background-size: 640px 100%;
+  animation: sp-shimmer 1.4s var(--ease-out) infinite;
+}
+
+.sp-skeleton-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.sp-skeleton-rows {
+  display: grid;
+  gap: var(--space-2);
+}
+
+/* ─── Vazio / erro ──────────────────────────────────────────────────── */
+
+.sp-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-9) var(--space-6);
+  text-align: center;
+  animation: sp-fade var(--duration-base) var(--ease-out);
+}
+
+.sp-state--inline {
+  padding: var(--space-6) var(--space-4);
+}
+
+.sp-state__icon {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  margin-bottom: var(--space-1);
+  border-radius: var(--radius-full);
+  background: var(--surface-3);
+  color: var(--text-muted);
+}
+
+.sp-state--error .sp-state__icon {
+  background: var(--color-red-dim);
+  color: var(--color-red);
+}
+
+.sp-state__title {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+  color: var(--text-primary);
+}
+
+.sp-state__description {
+  max-width: 52ch;
+  color: var(--text-secondary);
+  font-size: var(--text-md);
+  line-height: var(--leading-snug);
+}
+
+.sp-state__actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
