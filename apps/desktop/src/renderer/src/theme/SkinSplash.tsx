@@ -8,6 +8,7 @@ interface SkinSplashProps {
   ddragonVersion: string;
   alt: string;
   onClick?: () => void;
+  className?: string;
 }
 
 /**
@@ -19,7 +20,15 @@ interface SkinSplashProps {
  * 3. icone quadrado do campeao, sempre confiavel, em vez do icone nativo de
  *    imagem quebrada do navegador.
  */
-export function SkinSplash({ championKey, championId, skinNum, ddragonVersion, alt, onClick }: SkinSplashProps) {
+export function SkinSplash({
+  championKey,
+  championId,
+  skinNum,
+  ddragonVersion,
+  alt,
+  onClick,
+  className
+}: SkinSplashProps) {
   const [stage, setStage] = useState<0 | 1 | 2>(0);
   const [fallbackUrl, setFallbackUrl] = useState<string | undefined>();
 
@@ -51,6 +60,7 @@ export function SkinSplash({ championKey, championId, skinNum, ddragonVersion, a
 
   return (
     <img
+      className={className}
       src={src}
       alt={alt}
       onClick={onClick}

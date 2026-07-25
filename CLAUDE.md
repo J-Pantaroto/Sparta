@@ -200,6 +200,32 @@ partidas analisadas, 4 pontos acompanhados, 0 com comparação, foco sugerido "K
 esperado" em 62.5% das partidas recentes. 0 imagens quebradas.
 `pnpm typecheck && pnpm lint && pnpm test && pnpm build` completos.
 
+#### Subfase 14E - Configurações e galeria de temas
+
+O seletor de skins era um grid técnico: cards de 160px com a splash (1215x717) esmagada em
+90px de altura - a arte, que é justamente o que se está escolhendo, ficava irreconhecível. A
+seção "Análise" reusava `.draft-controls`, a classe dos controles do Champion Select.
+
+1. **`theme/ThemeGallery.tsx`** (substitui `ChampionSkinPicker.tsx`) - card de **tema atual**
+   com prévia da arte, as **três amostras da cor extraída** (destaque / suave / brilho) e um
+   badge de "Disponível offline" vs "Só online", mais a explicação do que o tema de fato afeta
+   no app. Na escolha, a arte ganhou **prévia grande** (16:6) com as ações por cima e uma
+   **grade compacta** embaixo, marcando com um selo a skin aplicada. `SkinSplash` ganhou
+   `className` pra servir aos dois tamanhos. A filtragem de chromas da Fase 13 é preservada
+   integralmente.
+2. **`features/SettingsScreen.tsx`** - as duas áreas viraram abas (`Tabs`), e a configuração de
+   profundidade de análise trocou `.draft-controls` por `SegmentedControl` + `NumberField`, com
+   badge de "Salvando..." / "Salvo" e a explicação de que o valor vale a partir do próximo sync.
+
+Validado no Electron real via CDP com Zekerus#117: Zed com **15 skins e 0 nomes com parênteses**
+(chromas continuam fora); aplicar "PROJETO: Zed" mudou o token `--color-accent` de
+`hsl(218 100% 62%)` (azul) pra `hsl(8 100% 62%)` (laranja) e voltar pra "Zed Lâmina do Trovão"
+restaurou o azul - o tema dinâmico da Fase 13 segue intacto; baixar gravou o data URL e o badge
+virou "Disponível offline"; na aba Análise, clicar "Últimas 100" salvou e o
+`GET /players/settings` da API real confirmou `matchAnalysisLimit: 100` (restaurado pra 50
+depois do teste). 0 imagens quebradas.
+`pnpm typecheck && pnpm lint && pnpm test && pnpm build` completos.
+
 ### Fase 13: o tema veste o app (sem chromas + cor dinâmica + splash nas telas)
 
 Pedido do usuário depois da Fase 12: tirar os **chromas** do seletor de skins (poluíam a lista como se fossem temas) e fazer o tema **refletir muito mais no app** - cores derivadas da skin e splash art de fundo, com a linguagem visual de **Mobalytics, Blitz e iTero**.
