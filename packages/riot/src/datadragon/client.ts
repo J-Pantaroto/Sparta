@@ -4,6 +4,14 @@ export interface DataDragonChampion {
   name: string;
   title: string;
   tags: string[];
+  /**
+   * Notas de 0 a 10 publicadas pela propria Riot no `champion.json`. Sao a
+   * unica leitura quantitativa disponivel pra TODOS os campeoes - usada
+   * pra derivar o `ChampionTag` (ver champion-tag-derivation.ts em
+   * @sparta/core). Opcional porque locales/versoes antigas do arquivo nem
+   * sempre trazem o objeto.
+   */
+  info?: { attack: number; defense: number; magic: number; difficulty: number };
 }
 
 /**

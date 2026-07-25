@@ -6,6 +6,66 @@ Este arquivo é um handoff para outro agente de desenvolvimento continuar o proj
 
 Uma sessão anterior fez uma auditoria completa do repositório (real vs mock vs so-tipo), aprovou um plano de evolução em 5 épicos (Riot Sync, Player Intelligence, Draft Intelligence, Post-Game Coach, Growth Journey) e implementou todas as 5 fases, além de um refinamento visual do desktop e correções de infra/segurança. Uma sessão seguinte **conectou o desktop às rotas reais da API** (Dashboard/Perfil/Champion Select/Pós-game/nova tela Evolução, removendo `mock-data.ts`) e implementou as **Sub-fases 6a e 6b** (tela de Configurações + tema com campeão/skin real + configuração "quantas partidas analisar"). Uma sessão seguinte implementou a **Sub-fase 6c (ordem de pick automática via LCU)**, encerrando a Fase 6. Uma sessão seguinte implementou a **Fase 7 (auditoria e documentação dos algoritmos de scoring)**. Uma sessão seguinte implementou a **Fase 8 inteira** (Sub-fase 8a: motor de build de campeão + seletor de time inimigo; Sub-fase 8b: polimento visual do desktop) e validou tudo contra a conta real Zekerus#117. Essa validação real encontrou um bug real (corrigido, ver abaixo) e motivou o pedido desta sessão: **Fase 9 (linguagem visual real - badges/barras nas telas de análise)**, implementada em duas sub-fases (9a: componentes compartilhados + Dashboard + Champion Select; 9b: Perfil + Pós-game + Evolução), encerrando a Fase 9. A validação real da 9b encontrou mais um bug real (corrigido, ver abaixo). **Depois do merge da 9b, o usuário pediu explicitamente validação contra o app Electron real empacotado (não só o dev server aberto numa aba de navegador comum)** — essa validação descobriu e corrigiu um bug real grave e pré-existente (ver "Bug real corrigido: preload nunca carregava de verdade" abaixo), presente desde o início do projeto. Depois de abrir o app real pro usuário avaliar, ele deu **feedback de UX ao vivo** (capturas do próprio Sparta + referências de apps reais de LoL) que motivou a **Fase 10 (polimento de UX + robustez de ícones de campeão)**, com liberdade explícita do usuário pra usar outras fontes/APIs como fallback e não se limitar ao escopo inicial ("não é mais protótipo, é programa real"). Uma sessão seguinte configurou o **`gh` CLI autenticado** (instalado via winget, device flow) - PRs/merges/CI agora são feitos pelo terminal, não mais pelo navegador. Uma nova rodada de feedback do usuário (as mudanças visuais ainda pareciam pequenas, botões sem estilo, download de skin quebrado, Champion Select acessível livremente sem sessão real, falta de detecção de posição/lane, telas resumidas demais) motivou a **Fase 11 (detecção real de posição/lane via LCU + gating do Champion Select + correções de polimento)**. Depois do merge da 11, o usuário reportou que **o módulo de temas continuava instável, sem baixar nem aplicar o tema** - a investigação achou dois bugs reais e independentes (ver "Bug real corrigido: módulo de temas" logo abaixo), ambos corrigidos na **Fase 12**. Depois veio a **Fase 13** (o tema veste o app). A partir daí o usuário pediu uma **modernização completa de UI/UX** tendo Mobalytics, Blitz e iTero como referência de princípios - isso virou a **Fase 14**, implementada em seis subfases (A a F), uma por PR. Tudo isso **já está mergeado em `main`**.
 
+### Fase 15: cobertura real do motor de draft (ChampionTag derivado)
+
+Depois da Fase 14 o usuário perguntou o que ainda estava pendente. A resposta apontava o
+Champion Select como o gargalo — e a investigação **corrigiu uma causa que estava errada neste
+próprio arquivo desde a Fase 3**.
+
+**Correção de diagnóstico (importante)**: o CLAUDE.md registrava que o Champion Select
+devolvia 0 recomendações em MID "por causa da tabela `ChampionTag` com 2 campeões". Isso é
+falso. Medido contra a API real: `SUPPORT` retornava Vel'Koz, que **não está** no seed. O
+motor monta os candidatos a partir de `championStats` (os campeões que o jogador jogou) e
+corta em `personalPerformance > 0`, que é 0 quando `games < MIN_GAMES_FOR_RANKING` (5).
+Zekerus#117 tem 1 partida de Orianna em MID — por isso a lista vinha vazia. Campeão sem
+`ChampionTag` entra na lista normalmente, só com métricas neutras.
+
+Ou seja, eram dois problemas distintos: **a lista vazia** (piso de amostra) e **os cards
+chapados** (6 das 8 métricas eram o default 50). Esta fase resolve os dois.
+
+1. **`packages/core/src/draft/champion-tag-derivation.ts`** (novo) - `deriveChampionTag`
+   deriva as 9 dimensões do `ChampionTag` a partir do único dado que a Riot publica pra todos
+   os campeões: `tags` (classe) e `info` (attack/defense/magic/difficulty) do `champion.json`.
+   Híbrido combina pelo **maior** valor de cada dimensão (Support/Tank protege como suporte E
+   segura a frente como tanque - média apagaria as duas), exceto `blindSafety`, que usa o
+   **menor** (se qualquer classe é arriscada sem informação, o campeão é arriscado).
+   `mergeChampionTags` preserva entradas curadas. 14 testes.
+2. **CLI `champion-tags:generate`** (`apps/api`) regenera `data/seeds/champion-tags.json`
+   (versionado de propósito, pra a derivação ser revisável num diff). Resultado: **2 → 173
+   campeões**, com Orianna e Ahri preservadas via `"source": "manual"`.
+3. **`roles` fica vazio nas entradas derivadas** - a Data Dragon não publica rota, e chutar
+   erraria em todo campeão flex. Nenhum motor consome `tag.roles` hoje.
+4. **Bug real no seed**: o upsert passava `update: {}`, então rodar o seed de novo **nunca
+   atualizava** um campeão já gravado - regenerar o JSON não chegaria ao banco. Corrigido.
+5. **Bug real exposto pela expansão** (`recommendation-engine.ts`): sem nenhum aliado
+   escolhido, `analyzeTeamComposition` passa a descrever só o próprio candidato, e
+   `calculateAllySynergy` degenera em `100*(e² + p² + w²)/3` - que **nunca passa de 33**. Todo
+   first pick levava uma penalidade que não diz nada. Ficava invisível enquanto quase ninguém
+   tinha tag (sem tag a função já devolvia 50); passou a valer pra todos quando a tabela
+   cobriu o roster. Agora devolve o neutro 50 sem aliados, mesma convenção que
+   `calculateEnemyAnswer` já usava pro time inimigo vazio. Pelo mesmo motivo, os rótulos de
+   risco/força de composição só são emitidos quando há pelo menos um aliado - antes o card do
+   first pick exibia "Pouca linha de frente, Engage limitado, Wave clear baixo" como se fosse
+   leitura do time, sendo leitura só do próprio campeão. 2 testes de regressão.
+6. **Estado vazio honesto no Champion Select** (`features/ChampionSelectScreen.tsx`) - a
+   descrição culpava a tabela curada (o mesmo diagnóstico errado). Agora explica o piso de 5
+   partidas e lista os campeões daquela posição que estão perto do corte, com quantas partidas
+   faltam, usando o perfil real.
+
+**Medido no app/API reais, conta Zekerus#117:**
+
+| Cenário | Antes | Depois |
+|---|---|---|
+| Viego (JUNGLE), first pick | blind 50, sinergia 50, encaixe 50 (defaults) | blind **43**, sinergia **50** (neutro correto), encaixe **65** |
+| Viego, com Ahri+Jinx aliados e Lee Sin inimigo | idem, tudo 50 | sinergia **21.3**, resposta ao draft **57.8**, encaixe **69**, aviso de composição real |
+| Avisos no first pick | "Pouca linha de frente, Engage limitado, Wave clear baixo, Dano pouco balanceado" | só "Amostra pequena" |
+| MID (sem amostra) | "Nenhuma recomendação" + motivo errado | "Ainda sem amostra suficiente em Mid" + "Orianna: 1 de 5 partidas" |
+
+`matchup` e `meta` seguem em 50 de propósito: o primeiro precisa de histórico do confronto, o
+segundo de `PatchMetaData`, que o Sparta não tem.
+
+`pnpm typecheck && pnpm lint && pnpm test && pnpm build` completos (181 testes).
+
 ### Fase 14: modernização completa de UI/UX (concluída)
 
 Pedido do usuário depois da Fase 13: transformar o Sparta num app desktop com aparência e
@@ -914,6 +974,7 @@ Migrations aplicadas e validadas contra Postgres real:
 ```bash
 npx pnpm@10.34.4 --filter @sparta/api prisma:generate
 npx pnpm@10.34.4 --filter @sparta/api prisma migrate deploy --schema prisma/schema.prisma
+npx pnpm@10.34.4 --filter @sparta/api champion-tags:generate
 npx pnpm@10.34.4 --filter @sparta/api prisma:seed
 npx pnpm@10.34.4 --filter @sparta/api backfill:match-participants
 ```
@@ -924,7 +985,7 @@ Tabelas com uso real vs ainda sem código:
 |---|---|
 | `User`, `RiotAccount` | Real desde antes da Fase 1 |
 | `Champion` | Real — sincronizado via Data Dragon (`catalog:sync`) |
-| `ChampionTag` | Real — seed corrigido na Fase 3 (`prisma:seed` lê `data/seeds/champion-tags.json` de verdade agora, cobre Orianna+Ahri); Data Dragon não fornece os atributos de gameplay do Sparta, então continua manual/curado |
+| `ChampionTag` | Real — cobre os **173 campeões** desde a Fase 15: `champion-tags:generate` deriva os atributos das tags/notas da Data Dragon e grava em `data/seeds/champion-tags.json`, e `prisma:seed` faz upsert com update de verdade. Entradas `"source": "manual"` sobrevivem à regeneração |
 | `Match`, `MatchParticipant`, `MatchTimeline` | Real — persistidos pelo sync incremental; desde a Fase 3, os 10 participantes por partida (não só o rastreado), com `teamId` |
 | `PlayerProfile`, `PlayerChampionStats` | Real — agregado apos cada sync; `strengthsJson`/`weaknessesJson`/`recentFormJson` tambem reais desde a Fase 2; `matchAnalysisLimit` desde a Fase 6b |
 | `ApiCacheEntry` | Real — cache de Account-V1 (24h) e Data Dragon (7 dias) |
@@ -1061,7 +1122,7 @@ Não usar force push sem pedido explícito.
 Fase 1 (Riot Sync), o refinamento visual do desktop, Fase 2 (Player Intelligence), Fase 3 (Draft Intelligence), Fase 4 (Post-Game Coach), Fase 5 (Growth Journey), a conexão do desktop às rotas reais, a Fase 6 inteira (Configurações + tema com skins + "quantas partidas analisar" + ordem de pick automática via LCU), a Fase 7 (auditoria e documentação dos algoritmos de scoring), a Fase 8 inteira (Sub-fase 8a: motor de build + seletor de time inimigo; Sub-fase 8b: polimento visual do desktop, validada com a conta real Zekerus#117), a Fase 9 inteira (Sub-fase 9a: `ScoreBadge`/`StatBar`/`SignalChip`, Dashboard, Champion Select; Sub-fase 9b: Perfil, Pós-game, Evolução), a Fase 10 (polimento de UX + `ChampionIcon.tsx` com fallback Data Dragon → Community Dragon → placeholder) , a Fase 11 (detecção de posição/lane via LCU + gating do Champion Select + correções de polimento) e a Fase 12 (módulo de temas: splash art com extensão errada + `file://` bloqueado no renderer, mais fallback via Community Dragon) estão completas em `main` — mais sete bugs reais corrigidos ao longo do caminho: card de skin sobreposto, cor errada do número do `ScoreBadge`, o preload nunca carregando de verdade em nenhuma sessão anterior, ícones de campeão quebrados por depender do `championName` cru da Riot, `draft.playerRole` hardcoded em MID (recomendações pro papel errado), splash art pedida como `.png` quando a CDN só serve `.jpg` (403 em tudo: prévia e download), e `localSplashPath` gravado como `file://`, que o renderer nunca conseguiu carregar. Próximo:
 
 1. **Validar a detecção automática de posição/ordem de pick dentro de uma sessão de champion select real** (precisa do cliente do League aberto e em champ select) — a Fase 11 implementou `derivePlayerRole` e o gating, e o download de skin já foi validado de verdade (não é mais pendência), mas a detecção de papel/pick order/troca de lane só pode ser confirmada de ponta a ponta com o League rodando, indisponível neste ambiente.
-2. Expandir `ChampionTag` além dos 2 campeões do seed (`data/seeds/champion-tags.json`) — sem bloqueio técnico desde a Fase 3 (o seed já lê o JSON de verdade), é só curadoria manual contínua; o motor de recomendação de draft (`recommendation-engine.ts`, diferente do motor de build da 8a) já tolera ausência, mas mais cobertura melhora a qualidade das recomendações (confirmado na validação: o Champion Select real devolveu 0 recomendações pra Zekerus#117 no papel MID justamente por causa disso, comportamento honesto, não bug — funciona normalmente pro papel real do jogador, ex. JUNGLE/Viego).
+2. Refinar `ChampionTag` campeão a campeão onde a leitura de classe é grosseira demais (Fase 15 cobriu os 173 automaticamente, mas duas Marksman recebem o mesmo perfil, e campeão fora do arquétipo — Senna, Pyke, Ivern — fica genérico). Editar a entrada em `data/seeds/champion-tags.json` e marcar `"source": "manual"`: a regeneração preserva.
 3. Tornar `/drafts/pre-game-analysis` real (hoje 100% estático) — usar `analyzeTeamComposition` (já existe em `packages/core`) com `championTags`/`matchups` reais; motor de geração de texto explicativo ainda por desenhar (a composição por fragmentos da Fase 4, em `packages/core/src/postgame/post-game-analysis.ts`, é um precedente reaproveitável). A Fase 9 só enriquece a apresentação visual do lado do desktop, não essa rota.
 4. Pré-computar/cachear matchups se a latência de `POST /drafts/recommendations` incomodar conforme o histórico crescer (hoje calculado na hora a cada chamada, ver "O que a Fase 3 entregou").
 5. Dicas de objetivos no `PostGameAnalysis` — `objectiveEvents` (Fase 1) não preserva atribuição de time no formato atual (`"LABEL@M:SS"`), precisaria de um `MatchTimelineSummary` mais rico pra saber quais objetivos foram do próprio time.

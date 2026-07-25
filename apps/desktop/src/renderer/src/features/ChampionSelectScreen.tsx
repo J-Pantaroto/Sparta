@@ -1,7 +1,9 @@
-import type { DraftState, PickRecommendation, Role } from "@sparta/core";
+import { MIN_GAMES_FOR_RANKING, type DraftState, type PickRecommendation, type Role } from "@sparta/core";
 import { Check, Crosshair, Pencil, X } from "lucide-react";
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import { ROLES, categoryLabels, confidenceLabels, metricLabels, roleLabels } from "../app/labels";
+import { useAsyncData } from "../hooks/use-async-data";
+import { fetchPlayerProfile, type PlayerProfileResponse, type RiotAccountSummary } from "../services/api-client";
 import type { DataDragonChampionSummary } from "../services/datadragon";
 import { ThemedPageHero } from "../theme/ThemedPageHero";
 import {
@@ -48,6 +50,7 @@ interface ChampionSelectScreenProps {
   recommendationsStatus: string;
   noAccountLinked: boolean;
   ddragonVersion: string;
+  riotAccounts: RiotAccountSummary[];
 }
 
 /**
@@ -65,7 +68,8 @@ export function ChampionSelectScreen({
   recommendations,
   recommendationsStatus,
   noAccountLinked,
-  ddragonVersion
+  ddragonVersion,
+  riotAccounts
 }: ChampionSelectScreenProps) {
   const [confirmedChampion, setConfirmedChampion] = useState<{ championId: number; championName: string } | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -73,6 +77,14 @@ export function ChampionSelectScreen({
   // Simulação manual: só quando NÃO há sessão real detectada (com sessão a
   // tela abre direto). Existe pra dar pra testar sem o League aberto.
   const [devOverride, setDevOverride] = useState(false);
+
+  // So e consultado pra explicar uma lista vazia: sem isso a tela nao
+  // tem como dizer QUANTAS partidas faltam pro campeao entrar no corte.
+  const account = riotAccounts[0];
+  const profile = useAsyncData<PlayerProfileResponse>(
+    () => (account ? fetchPlayerProfile(account.gameName, account.tagLine) : undefined),
+    [account?.gameName, account?.tagLine]
+  );
 
   // A recomendação #1 muda conforme o draft evolui; sem seleção explícita, o
   // detalhe acompanha o topo da lista em vez de ficar preso num campeão que
@@ -259,10 +271,10 @@ export function ChampionSelectScreen({
 
       {recommendations.length === 0 && recommendationsStatus !== "loading" ? (
         <Card>
-          <EmptyState
-            icon={<Crosshair size={22} />}
-            title="Nenhuma recomendação pra esta posição"
-            description="O motor só recomenda campeões que estão na tabela curada do Sparta e no seu histórico. Sem sobreposição entre os dois, ele prefere não sugerir nada a inventar uma escolha."
+          <NoRecommendations
+            role={draft.playerRole}
+            championStats={profile.data?.championStats ?? []}
+            ddragonVersion={ddragonVersion}
           />
         </Card>
       ) : (
@@ -386,5 +398,59 @@ export function ChampionSelectScreen({
         )
       )}
     </PageLayout>
+  );
+}
+
+/**
+ * Lista vazia explicada com numero real. O motor so pontua campeao com pelo
+ * menos `MIN_GAMES_FOR_RANKING` partidas NAQUELA posicao (abaixo disso
+ * `scoreChampionPerformance` devolve 0 e o campeao e descartado) - a versao
+ * anterior desta tela culpava a tabela de atributos do Sparta, o que era
+ * falso: campeao sem atributo entra na lista normalmente, so com metricas
+ * neutras.
+ */
+function NoRecommendations({
+  role,
+  championStats,
+  ddragonVersion
+}: {
+  role: Role;
+  championStats: PlayerProfileResponse["championStats"];
+  ddragonVersion: string;
+}) {
+  const naPosicao = championStats
+    .filter((champion) => champion.role === role)
+    .sort((a, b) => b.games - a.games)
+    .slice(0, 3);
+
+  return (
+    <EmptyState
+      icon={<Crosshair size={22} />}
+      title={`Ainda sem amostra suficiente em ${roleLabels[role]}`}
+      description={`O Sparta só recomenda um campeão depois de ${MIN_GAMES_FOR_RANKING} partidas com ele nessa posição — abaixo disso a comparação não se sustenta, e ele prefere não sugerir a inventar uma escolha.`}
+      actions={
+        naPosicao.length > 0 && (
+          <div style={{ display: "grid", gap: "var(--space-2)", justifyItems: "start" }}>
+            {naPosicao.map((champion) => (
+              <div
+                key={`${champion.championId}-${champion.role}`}
+                style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}
+              >
+                <ChampionAvatar
+                  championId={champion.championId}
+                  ddragonVersion={ddragonVersion}
+                  size="sm"
+                  alt={champion.championName}
+                />
+                <span>{champion.championName}</span>
+                <Badge tone="neutral">
+                  {champion.games} de {MIN_GAMES_FOR_RANKING} partidas
+                </Badge>
+              </div>
+            ))}
+          </div>
+        )
+      }
+    />
   );
 }
