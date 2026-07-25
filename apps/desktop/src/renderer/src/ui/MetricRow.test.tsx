@@ -97,13 +97,17 @@ describe("MetricRow", () => {
   it("renderiza candidatos com disponibilidades diferentes lado a lado", () => {
     const { container } = render(
       <>
-        <MetricRow label="Matchup de rota" metric={availableMetric({ key: "LANE_MATCHUP", value: 58 })} />
-        <MetricRow label="Matchup de rota" metric={unavailableMetric("LANE_MATCHUP", "Sem histórico do confronto")} />
+        <MetricRow label="Seu histórico no confronto" metric={availableMetric({ key: "PERSONAL_MATCHUP", value: 58 })} />
+        <MetricRow
+          label="Força no meta"
+          metric={unavailableMetric("META_STRENGTH", "Dados estatísticos do meta deste patch ainda não estão disponíveis.")}
+        />
       </>
     );
 
     expect(container.querySelectorAll(".sp-statbar__fill")).toHaveLength(1);
-    expect(screen.getAllByText("Matchup de rota")).toHaveLength(2);
+    expect(screen.getByText("Seu histórico no confronto")).toBeTruthy();
+    expect(screen.getByText("Força no meta")).toBeTruthy();
     expect(screen.getByText("Indisponível")).toBeTruthy();
   });
 });

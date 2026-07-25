@@ -19,7 +19,7 @@ Saída: 3 a 5 recomendações com score, confiança, categoria, motivos e avisos
 Três tabelas de peso, cada uma somando 1.0 (invariante testada em `recommendation-engine.test.ts`):
 
 - **Blind pick / first pick** (`draft.pickOrder <= 1`): `personalPerformance 0.45, blindSafety 0.2, compositionFit 0.15, recentForm 0.1, meta 0.05, allySynergy 0.05, matchup 0, enemyDraftAnswer 0`. Sem lane inimiga revelada nem composição aliada formada, matchup/enemyDraftAnswer não fazem sentido (peso 0); `blindSafety` ganha peso alto porque "funciona sem depender do que o inimigo faz" é a própria definição de segurança em blind.
-- **Lane inimiga revelada** (`draft.enemyLaneChampionId` definido): `personalPerformance 0.35, matchup 0.25, recentForm 0.15, allySynergy 0.1, enemyDraftAnswer 0.1, meta 0.05, blindSafety 0, compositionFit 0`. `matchup` passa a valer (segunda maior fatia) porque agora há dado concreto de "esse campeão vs aquele campeão"; `blindSafety`/`compositionFit` zeram — "segurança às cegas" não é mais o problema relevante.
+- **Lane inimiga revelada** (`draft.enemyLaneChampionId` definido): `personalPerformance 0.35, matchup 0.25, recentForm 0.15, allySynergy 0.1, enemyDraftAnswer 0.1, meta 0.05, blindSafety 0, compositionFit 0`. `matchup` só entra quando há histórico pessoal real daquele campeão contra o adversário, na mesma posição; `blindSafety`/`compositionFit` zeram — "segurança às cegas" não é mais o problema relevante.
 - **Nem blind nem matchup revelado** (pick do meio do draft): `personalPerformance 0.3, enemyDraftAnswer 0.2, allySynergy 0.2, matchup 0.15, recentForm 0.1, meta 0.05, blindSafety 0, compositionFit 0`. `enemyDraftAnswer`/`allySynergy` ganham peso porque a composição de ambos os times já tem mais picks pra reagir/encaixar.
 
 ## Sinergia e resposta ao draft
@@ -53,6 +53,16 @@ bloco numérico `metrics` continua existindo apenas como entrada do `totalScore`
 
 Ver `docs/data-provenance.md` pro contrato completo, incluindo por que `50` calculado e `50`
 por ausência de dado deixaram de ser a mesma coisa.
+
+`PERSONAL_MATCHUP` representa apenas o histórico observado do próprio jogador. Ele traz
+amostra, confiança e proveniência quando existe; sem amostra ou sem oponente de rota, fica
+indisponível. `GLOBAL_MATCHUP` permanece indisponível até uma fonte global ser integrada, e
+`META_STRENGTH` também permanece indisponível até haver Meta Intelligence estatística real.
+
+Quando um sinal com peso ativo está indisponível, `normalizeAvailableWeights` exclui apenas
+aquele sinal para o candidato e normaliza os pesos restantes. `dataCoverage` preserva a soma
+dos pesos originalmente cobertos, sem ser misturada à confiança estatística: com matchup
+(`0,25`) e meta (`0,05`) ausentes, por exemplo, a cobertura é `0,70`.
 
 ## Origem dos ChampionTag
 

@@ -201,6 +201,11 @@ export interface PickRecommendation {
   reasons: RecommendationReason[];
   warnings: RecommendationReason[];
   /**
+   * Fração (0-1) dos pesos originalmente ativos que tinha dados para este
+   * candidato. É cobertura do modelo, não confiança estatística.
+   */
+  dataCoverage: number;
+  /**
    * Entrada numérica do `totalScore`. Continua sendo o que os pesos
    * multiplicam - **não** é o que a interface deve exibir, porque um número
    * aqui não distingue "calculou neutro" de "não temos o dado". Use
@@ -209,12 +214,12 @@ export interface PickRecommendation {
   metrics: {
     personalPerformance: number;
     recentForm: number;
-    matchup: number;
+    matchup: number | null;
     blindSafety: number;
     allySynergy: number;
     enemyDraftAnswer: number;
     compositionFit: number;
-    meta: number;
+    meta: number | null;
   };
   /**
    * Métricas estruturadas **deste candidato**: cada uma com a própria

@@ -5,7 +5,7 @@ import { compositionRules } from "../../config/composition-rules.js";
 import { prisma } from "../../db/prisma.js";
 import { getAuthenticatedUserId } from "../auth/routes.js";
 import { findAllChampionTags } from "../catalog/champion-repository.js";
-import { findLaneMatchupHistory } from "../matches/matchup-repository.js";
+import { findPersonalLaneMatchupHistory } from "../matches/matchup-repository.js";
 import {
   derivePreferredRoles,
   findChampionStatsByPuuid,
@@ -67,7 +67,9 @@ export const draftsRoutes: FastifyPluginAsync = async (app) => {
 
     const [championTags, laneHistory] = await Promise.all([
       findAllChampionTags(),
-      findLaneMatchupHistory(payload.draft.playerRole)
+      riotAccount
+        ? findPersonalLaneMatchupHistory(riotAccount.puuid, payload.draft.playerRole)
+        : Promise.resolve([])
     ]);
     const matchups = aggregateMatchupData(laneHistory);
 

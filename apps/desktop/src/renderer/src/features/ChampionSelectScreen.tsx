@@ -381,6 +381,11 @@ export function ChampionSelectScreen({
                       title="Por que este pick"
                       description="Cada dimensão vale 0 a 100 e entra no score com o peso do cenário de draft atual."
                     />
+                    {Number.isFinite(selected.dataCoverage) && (
+                      <p className="sp-recdetail__coverage">
+                        {Math.round(selected.dataCoverage * 100)}% dos sinais previstos possuem dados disponíveis.
+                      </p>
+                    )}
                     <div className="sp-recdetail__metrics">
                       {/* Ordena por valor, mas empurra o que nao tem valor
                           pro fim: metrica ausente nao disputa posicao com

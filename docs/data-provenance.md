@@ -83,7 +83,7 @@ Construtores (`availableMetric`, `unavailableMetric`, `staleMetric`) garantem o 
 | Par | Por quê |
 |---|---|
 | `PERSONAL_MATCHUP` vs `GLOBAL_MATCHUP` | Histórico do próprio jogador vs taxa observada no meta. Um jogador pode ir bem num confronto estatisticamente ruim. |
-| `LANE_MATCHUP` | Confronto direto de rota como sinal de draft, independente de quem joga. |
+| `LANE_MATCHUP` (legado) | Alias de transporte de versões anteriores. É convertido centralmente para `PERSONAL_MATCHUP` indisponível quando não há proveniência suficiente; não é produzido pelo motor atual. |
 | `PATCH_OFFICIAL_CHANGE` vs `PATCH_IMPACT` vs `META_STRENGTH` | Fato publicado, interpretação do fato, e o que as partidas mostram depois. |
 | `CHAMPION_DIFFICULTY` vs `EXECUTION_RISK` | Dificuldade do campeão pra qualquer um vs risco desse campeão pra **este** jogador. |
 | `PERSONAL_PERFORMANCE` vs `PERSONAL_EXPERIENCE` | Quão bem joga vs quanto já jogou. |
@@ -125,19 +125,36 @@ sem sugerir posição na escala.
 - `metrics` — bloco numérico, continua sendo a entrada do `totalScore`.
 - `metricDetails` — métricas estruturadas, o que a interface consome.
 
-`toRecommendationMetrics` (`packages/core/src/draft/recommendation-metrics.ts`) é o **único**
-adaptador entre os dois. A duplicação é temporária e tem ponto de término definido: quando o
-motor passar a produzir métricas que podem estar ausentes (a etapa que converte `META_STRENGTH`
-e `LANE_MATCHUP` em indisponíveis), aquele módulo deixa de ser adaptador e vira o produtor, e
-`metrics` sai de cena.
+`toRecommendationMetrics` (`packages/core/src/draft/recommendation-metrics.ts`) é o produtor
+central das métricas estruturadas. O bloco `metrics` continua como compatibilidade da entrada
+do score; `matchup` e `meta` ficam `null` quando indisponíveis.
 
-**Nesta etapa nenhum cálculo mudou.** Todas as 8 métricas saem `AVAILABLE`, inclusive as duas
-cujo `50` hoje significa "não temos esse dado". A diferença é que agora elas saem **sem
-`provenance`** — dizer que vieram de algum lugar seria inventar — e o contrato já sabe
-representar a indisponibilidade quando ela for declarada.
+O motor produz `PERSONAL_MATCHUP` apenas com partidas do jogador autenticado, no mesmo
+campeão, adversário e posição. A métrica disponível carrega `sampleSize`, confiança da
+metodologia de matchup e proveniência `CALCULATED` do `MatchParticipant`; portanto, um `50`
+calculado de verdade continua disponível. Sem amostra, ou sem adversário da rota identificado,
+ela fica `UNAVAILABLE` com motivo explícito. `GLOBAL_MATCHUP` fica indisponível enquanto não
+houver fonte global real, e `META_STRENGTH` fica indisponível enquanto não houver Meta
+Intelligence observada para o patch.
+
+O legado `LANE_MATCHUP` existe apenas na borda de compatibilidade. Respostas antigas com
+`metrics.matchup: 50`, `metrics.meta: 50` ou `metricDetails` legado não recuperam esses
+números como evidência: o adaptador devolve as métricas correspondentes como indisponíveis.
 
 `ensureRecommendationMetrics` normaliza respostas de um backend anterior ao contrato. Não é
 defensividade hipotética: desktop e API são implantados separadamente, e ao validar esta etapa
 contra a API em execução a tela inteira quebrou num `metricDetails is not iterable`. A
 normalização acontece uma vez, no cliente da API — nenhum componente se defende por conta
 própria.
+
+## Score e cobertura quando faltam sinais
+
+`normalizeAvailableWeights` remove somente a métrica indisponível do cálculo daquele
+candidato e normaliza proporcionalmente os pesos ativos restantes para continuarem somando 1.
+Peso que era zero no cenário original continua zero. Assim, ausência não vira `0` nem `50` e a
+nota permanece na escala 0–100.
+
+`PickRecommendation.dataCoverage` é a soma dos **pesos originais ativos** cujas métricas têm
+dados, calculada individualmente por candidato. Por exemplo, matchup pessoal (`0,25`) e meta
+(`0,05`) indisponíveis num cenário de lane revelada deixam cobertura `0,70`. Cobertura informa
+quanto do modelo foi observado; não substitui nem altera a confiança estatística do jogador.

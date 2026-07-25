@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { analyzeTeamComposition, recommendPicks, selectWeights } from "./recommendation-engine.js";
+import { analyzeTeamComposition, normalizeAvailableWeights, recommendPicks, selectWeights } from "./recommendation-engine.js";
 import type { ChampionTag, DraftState, PlayerChampionStats, PlayerProfile } from "../types/domain.js";
 
 const championStats: PlayerChampionStats[] = [
@@ -110,6 +110,70 @@ describe("recommendation engine", () => {
       const total = Object.values(selectWeights(scenario)).reduce((sum, weight) => sum + weight, 0);
       expect(total).toBeCloseTo(1.0, 5);
     }
+  });
+
+  it("normaliza apenas os pesos de métricas disponíveis e conserva a cobertura original", () => {
+    const weights = selectWeights({
+      playerRole: "MID",
+      pickOrder: 3,
+      enemyLaneChampionId: 157,
+      allies: [],
+      enemies: [],
+      bannedChampionIds: []
+    });
+    const { normalizedWeights, dataCoverage } = normalizeAvailableWeights(weights, {
+      personalPerformance: true,
+      recentForm: true,
+      matchup: false,
+      blindSafety: true,
+      allySynergy: true,
+      enemyDraftAnswer: true,
+      compositionFit: true,
+      meta: false
+    });
+
+    expect(dataCoverage).toBeCloseTo(0.7, 5);
+    expect(Object.values(normalizedWeights).reduce((sum, weight) => sum + weight, 0)).toBeCloseTo(1, 5);
+    expect(normalizedWeights.matchup).toBe(0);
+    expect(normalizedWeights.meta).toBe(0);
+    expect(normalizedWeights.blindSafety).toBe(0); // tinha peso zero no cenário original
+  });
+
+  it("calcula cobertura por candidato sem tirar a escala 0-100 do score", () => {
+    const recommendations = recommendPicks({
+      draft: {
+        playerRole: "MID",
+        pickOrder: 3,
+        enemyLaneChampionId: 157,
+        allies: [],
+        enemies: [],
+        bannedChampionIds: []
+      },
+      player,
+      championStats: [
+        championStats[0],
+        { ...championStats[0], championId: 99, championName: "Outro campeão" }
+      ],
+      championTags: tags,
+      matchups: [
+        { championId: 61, enemyChampionId: 157, role: "MID", score: 50, sampleSize: 8, confidence: "medium" }
+      ],
+      compositionRules: {
+        minimumFrontline: 35,
+        minimumEngage: 35,
+        minimumWaveclear: 35,
+        preferDamageBalance: true
+      },
+      patchMeta: null
+    });
+
+    const withMatchup = recommendations.find((recommendation) => recommendation.championId === 61)!;
+    const withoutMatchup = recommendations.find((recommendation) => recommendation.championId === 99)!;
+    expect(withMatchup.dataCoverage).toBeCloseTo(0.95, 5);
+    expect(withoutMatchup.dataCoverage).toBeCloseTo(0.7, 5);
+    expect(withMatchup.totalScore).toBeGreaterThanOrEqual(0);
+    expect(withMatchup.totalScore).toBeLessThanOrEqual(100);
+    expect(withMatchup.metricDetails.find((metric) => metric.key === "PERSONAL_MATCHUP")?.value).toBe(50);
   });
 });
 

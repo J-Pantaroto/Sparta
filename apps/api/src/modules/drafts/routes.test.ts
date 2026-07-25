@@ -6,14 +6,14 @@ const {
   findChampionStatsByPuuidMock,
   findPlayerInsightsByPuuidMock,
   findAllChampionTagsMock,
-  findLaneMatchupHistoryMock
+  findPersonalLaneMatchupHistoryMock
 } = vi.hoisted(() => ({
   getAuthenticatedUserIdMock: vi.fn(),
   riotAccountFindFirstMock: vi.fn(),
   findChampionStatsByPuuidMock: vi.fn(),
   findPlayerInsightsByPuuidMock: vi.fn(),
   findAllChampionTagsMock: vi.fn(),
-  findLaneMatchupHistoryMock: vi.fn()
+  findPersonalLaneMatchupHistoryMock: vi.fn()
 }));
 
 vi.mock("../auth/routes.js", () => ({
@@ -30,7 +30,7 @@ vi.mock("../catalog/champion-repository.js", () => ({
 }));
 
 vi.mock("../matches/matchup-repository.js", () => ({
-  findLaneMatchupHistory: findLaneMatchupHistoryMock
+  findPersonalLaneMatchupHistory: findPersonalLaneMatchupHistoryMock
 }));
 
 vi.mock("../players/player-stats-repository.js", () => ({
@@ -49,7 +49,7 @@ describe("drafts routes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     findAllChampionTagsMock.mockResolvedValue([]);
-    findLaneMatchupHistoryMock.mockResolvedValue([]);
+    findPersonalLaneMatchupHistoryMock.mockResolvedValue([]);
   });
 
   it("retorna 401 sem autenticacao", async () => {
@@ -115,7 +115,7 @@ describe("drafts routes", () => {
     const body = response.json();
 
     expect(response.statusCode).toBe(200);
-    expect(findLaneMatchupHistoryMock).toHaveBeenCalledWith("MID");
+    expect(findPersonalLaneMatchupHistoryMock).toHaveBeenCalledWith("puuid-1", "MID");
     expect(body.recommendations.length).toBeGreaterThan(0);
     expect(body.recommendations[0].championName).toBe("Orianna");
     await app.close();

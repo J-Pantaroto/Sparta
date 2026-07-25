@@ -10,16 +10,20 @@ export interface LaneParticipantRecord {
 }
 
 /**
- * Historico de participantes de um role especifico, com teamId conhecido -
- * insumo pra `aggregateMatchupData` (packages/core) parear laners opostos.
- * Escopado por role pra limitar o tamanho da consulta (o draft so precisa
- * de matchups do role sendo draftado). So inclui linhas com teamId
- * preenchido - partidas persistidas antes da Fase 3 nao tem esse dado ainda,
- * ate rodar o backfill (`pnpm backfill:match-participants`).
+ * Histórico do PRÓPRIO jogador num role, mais os oponentes dessas mesmas
+ * partidas. Isso produz matchup pessoal; o banco local não é amostra do
+ * meta e nunca deve ser usado como matchup global.
  */
-export async function findLaneMatchupHistory(role: Role): Promise<LaneParticipantRecord[]> {
+export async function findPersonalLaneMatchupHistory(puuid: string, role: Role): Promise<LaneParticipantRecord[]> {
+  const playerRows = await prisma.matchParticipant.findMany({
+    where: { puuid, role, teamId: { not: null } },
+    select: { matchId: true }
+  });
+  const matchIds = playerRows.map((row) => row.matchId);
+  if (matchIds.length === 0) return [];
+
   const rows = await prisma.matchParticipant.findMany({
-    where: { role, teamId: { not: null } },
+    where: { matchId: { in: matchIds }, role, teamId: { not: null } },
     select: { matchId: true, championId: true, role: true, teamId: true, won: true }
   });
 

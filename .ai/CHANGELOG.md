@@ -21,6 +21,13 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-07-25 14:15 — Meta e matchup indisponíveis sem dados reais
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0003-meta-matchup-indisponiveis.md`
+
+Separa matchup pessoal de global, elimina os fallbacks falsos de `50` para matchup/meta e
+normaliza o score somente com sinais disponíveis. A Champion Select mostra a cobertura de dados
+por candidato; compatibilidade com respostas antigas continua sem inventar evidência.
+
 ## 2026-07-25 15:52 — Contrato de origem, disponibilidade e confiança dos dados
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0002-contrato-origem-disponibilidade.md`
 

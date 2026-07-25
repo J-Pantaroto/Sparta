@@ -23,18 +23,17 @@ function round(value: number): number {
 }
 
 /**
- * Agrega o historico de MatchParticipant (todas as partidas, todos os
- * jogadores - matchup e um sinal de meta, nao pessoal) em MatchupData[].
- * Pura, sem I/O - quem chama decide o escopo da consulta (normalmente por
- * role, pra limitar o tamanho).
+ * Agrega registros de MatchParticipant já escopados por quem chama em
+ * MatchupData[]. É pura, sem I/O: a rota de draft passa somente as partidas
+ * do jogador autenticado e seus oponentes, portanto o resultado é matchup
+ * pessoal, nunca uma estatística global de meta.
  *
  * Agrupa por (matchId, role) pra achar os dois laners opostos (times
  * diferentes); grupos com != 2 participantes (dado incompleto/inconsistente
  * - ex.: teamPosition mapeado errado) sao ignorados em vez de inventar um
  * pareamento. Cada partida gera dois pontos de dado direcionais (X-vs-Y da
- * perspectiva de X, Y-vs-X da perspectiva de Y). Nao emite entrada nenhuma
- * pra pares sem nenhuma partida - o fallback de `findMatchupScore` (?? 50)
- * ja cobre a ausencia honestamente.
+ * perspectiva de X, Y-vs-X da perspectiva de Y). Não emite entrada para
+ * pares sem nenhuma partida: a ausência é preservada pelo motor.
  */
 export function aggregateMatchupData(records: MatchupParticipantRecord[]): MatchupData[] {
   const byMatchRole = new Map<string, MatchupParticipantRecord[]>();

@@ -67,6 +67,26 @@ métrica. Os estados PARTIAL/STALE/UNAVAILABLE **não** foram vistos no app real
 métrica os produz ainda; estão cobertos por teste de componente. Ver `docs/data-provenance.md`.
 24 testes novos (230 no total).
 
+### Etapa 3: matchup e meta indisponíveis sem dado real
+
+`PERSONAL_MATCHUP` passou a usar exclusivamente partidas do jogador autenticado, com o mesmo
+campeão, adversário e posição. Quando existe amostra, a métrica carrega valor (inclusive 50
+legítimo), tamanho da amostra, confiança e proveniência `CALCULATED`; sem confronto observado
+ou sem inimigo de rota, fica `UNAVAILABLE` com motivo. `GLOBAL_MATCHUP` não usa o banco local
+como pseudo-meta e permanece explicitamente indisponível até haver fonte global real.
+
+`META_STRENGTH` também fica `UNAVAILABLE` enquanto não houver Meta Intelligence observada para
+o patch. O motor não usa ausência como 0 ou 50: `normalizeAvailableWeights` remove somente a
+métrica indisponível por candidato, normaliza os pesos restantes e expõe `dataCoverage` como a
+soma dos pesos originais que tinham dados. Cobertura e confiança estatística são conceitos
+separados; a Champion Select mostra a cobertura sem aumentar a densidade do painel.
+
+Compatibilidade continua centralizada em `ensureRecommendationMetrics`: `LANE_MATCHUP` existe
+apenas como alias legado e respostas antigas com `matchup: 50`/`meta: 50` viram indisponíveis,
+nunca evidência inventada. `docs/data-provenance.md` e `docs/draft-recommendation.md` registram
+o contrato. Testes novos cobrem ausência, 50 calculado, proveniência, normalização, cobertura
+individual e os caminhos legados.
+
 ### Fase 16: o draft real vem do League Client
 
 Até aqui o Sparta lia da sessão de champion select **só** a posição do jogador e a ordem de

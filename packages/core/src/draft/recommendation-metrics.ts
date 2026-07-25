@@ -1,7 +1,7 @@
-import type { Confidence, PickRecommendation } from "../types/domain.js";
+import type { Confidence, MatchupData, PickRecommendation, Role } from "../types/domain.js";
 import type { DataProvenance } from "../types/provenance.js";
 import { toConfidenceScore } from "../types/provenance.js";
-import { availableMetric, type RecommendationMetric } from "../types/recommendation-metric.js";
+import { availableMetric, unavailableMetric, type RecommendationMetric } from "../types/recommendation-metric.js";
 
 /**
  * Adaptador ÚNICO entre os números que o motor calcula hoje
@@ -9,12 +9,9 @@ import { availableMetric, type RecommendationMetric } from "../types/recommendat
  * (`RecommendationMetric`), que é o que a interface passa a consumir.
  *
  * Por que existe um adaptador em vez de trocar o tipo de uma vez: esta etapa
- * não pode mudar cálculo nenhum, e `metrics` continua sendo a entrada
- * numérica do `totalScore`. Manter os dois lados por enquanto é a transição
- * menos destrutiva — mas ela é **temporária e centralizada aqui**: quando o
- * motor passar a produzir métricas que podem estar ausentes (a etapa que
- * converte `meta` e `LANE_MATCHUP` em indisponíveis), este módulo deixa de
- * ser adaptador e passa a ser o produtor, e `metrics` sai de cena.
+ * preserva a transição: `metrics` continua como entrada numérica do score,
+ * enquanto este módulo é o produtor central de disponibilidade,
+ * proveniência e compatibilidade legada das métricas estruturadas.
  *
  * Enquanto isso: nada aqui inventa proveniência. Métrica cuja origem ainda
  * não é declarável sai **sem** o campo `provenance`, que é diferente de sair
@@ -41,32 +38,43 @@ const championTagProvenance: DataProvenance = {
 };
 
 /**
- * Converte o bloco numérico atual em métricas estruturadas, uma por
- * candidato. Todas saem `AVAILABLE` de propósito: esta etapa preserva o
- * comportamento atual: os casos em que hoje o 50 na verdade significa
- * "não temos esse dado" (`META_STRENGTH` sempre, `LANE_MATCHUP` sem
- * histórico do confronto) só passam a declarar indisponibilidade na etapa
- * seguinte. Por isso essas duas saem sem `provenance`: dizer que vieram de
- * algum lugar seria inventar.
- *
- * `confidence` vem da confiança já calculada pelo motor para o candidato, e
- * só se aplica às métricas que dependem do histórico dele — as derivadas de
- * tabela de classe não têm confiança conhecida e ficam com `null`.
+ * Converte o bloco de score em métricas estruturadas, uma por candidato.
+ * `PERSONAL_MATCHUP` só recebe valor quando há um agregado do histórico do
+ * próprio jogador. `GLOBAL_MATCHUP` e `META_STRENGTH` ficam explicitamente
+ * indisponíveis até existirem fontes externas reais para cada conceito.
  */
 export function toRecommendationMetrics(
-  metrics: {
-    personalPerformance: number;
-    recentForm: number;
-    matchup: number;
-    blindSafety: number;
-    allySynergy: number;
-    enemyDraftAnswer: number;
-    compositionFit: number;
-    meta: number;
-  },
-  confidence: Confidence
+  metrics: PickRecommendation["metrics"],
+  confidence: Confidence,
+  context: {
+    personalMatchup?: MatchupData;
+    playerRole?: Role;
+    enemyLaneKnown?: boolean;
+  } = {}
 ): RecommendationMetric[] {
   const personalConfidence = toConfidenceScore(confidence);
+  const personalMatchup = context.personalMatchup;
+  const personalMatchupMetric = personalMatchup
+    ? availableMetric({
+        key: "PERSONAL_MATCHUP",
+        value: personalMatchup.score,
+        confidence: toConfidenceScore(personalMatchup.confidence),
+        provenance: {
+          sourceType: "CALCULATED",
+          sourceId: "sparta",
+          resource: "MatchParticipant",
+          position: context.playerRole ?? personalMatchup.role,
+          sampleSize: personalMatchup.sampleSize,
+          algorithmVersion: RECOMMENDATION_ENGINE_VERSION
+        },
+        explanation: `Calculado a partir de ${personalMatchup.sampleSize ?? 0} partida(s) do seu histórico neste confronto.`
+      })
+    : unavailableMetric(
+        "PERSONAL_MATCHUP",
+        context.enemyLaneKnown
+          ? "Sem partidas registradas neste confronto."
+          : "O adversário da posição ainda não foi identificado."
+      );
 
   return [
     availableMetric({
@@ -81,7 +89,8 @@ export function toRecommendationMetrics(
       confidence: personalConfidence,
       provenance: personalHistoryProvenance
     }),
-    availableMetric({ key: "LANE_MATCHUP", value: metrics.matchup }),
+    personalMatchupMetric,
+    unavailableMetric("GLOBAL_MATCHUP", "Dados globais de matchup ainda não estão disponíveis."),
     availableMetric({
       key: "BLIND_SAFETY",
       value: metrics.blindSafety,
@@ -102,7 +111,7 @@ export function toRecommendationMetrics(
       value: metrics.compositionFit,
       provenance: championTagProvenance
     }),
-    availableMetric({ key: "META_STRENGTH", value: metrics.meta })
+    unavailableMetric("META_STRENGTH", "Dados estatísticos do meta deste patch ainda não estão disponíveis.")
   ];
 }
 
@@ -131,7 +140,11 @@ type MaybeStructured = Pick<PickRecommendation, "metrics" | "confidence"> & {
  */
 export function ensureRecommendationMetrics(recommendation: MaybeStructured): RecommendationMetric[] {
   if (Array.isArray(recommendation.metricDetails) && recommendation.metricDetails.length > 0) {
-    return recommendation.metricDetails;
+    return recommendation.metricDetails.map((metric) =>
+      metric.key === "LANE_MATCHUP"
+        ? unavailableMetric("PERSONAL_MATCHUP", "Dados legados de matchup não têm proveniência suficiente.")
+        : metric
+    );
   }
   if (!recommendation.metrics) return [];
   return toRecommendationMetrics(recommendation.metrics, recommendation.confidence);

@@ -30,15 +30,16 @@ describe("toRecommendationMetrics", () => {
     expect(porChave.get("TEAM_COMPOSITION")).toBe(65);
   });
 
-  it("declara proveniência só onde ela é conhecida hoje", () => {
+  it("declara proveniência só onde há uma fonte real", () => {
     const porChave = new Map(metricas.map((metric) => [metric.key, metric]));
     expect(porChave.get("PERSONAL_PERFORMANCE")!.provenance?.sourceType).toBe("CALCULATED");
     expect(porChave.get("BLIND_SAFETY")!.provenance?.sourceType).toBe("DERIVED");
     expect(porChave.get("BLIND_SAFETY")!.provenance?.algorithmVersion).toBe(RECOMMENDATION_ENGINE_VERSION);
-    // Estas duas ainda não têm origem declarável - ficam sem provenance em
-    // vez de receber uma inventada.
+    // Meta e matchup global não têm fonte nesta etapa. Matchup pessoal sem
+    // amostra também não pode inventar uma origem.
     expect(porChave.get("META_STRENGTH")!.provenance).toBeUndefined();
-    expect(porChave.get("LANE_MATCHUP")!.provenance).toBeUndefined();
+    expect(porChave.get("PERSONAL_MATCHUP")!.provenance).toBeUndefined();
+    expect(porChave.get("GLOBAL_MATCHUP")!.provenance).toBeUndefined();
   });
 
   it("só atribui confiança às métricas que dependem do histórico do jogador", () => {
@@ -47,12 +48,39 @@ describe("toRecommendationMetrics", () => {
     expect(porChave.get("BLIND_SAFETY")!.confidence).toBeNull();
   });
 
-  it("mantém o 50 calculado como disponível (não vira ausência nesta etapa)", () => {
+  it("não transforma meta e matchup sem fonte em 50 disponível", () => {
     const composicao = metricas.find((metric) => metric.key === "TEAM_COMPOSITION")!;
     const meta = metricas.find((metric) => metric.key === "META_STRENGTH")!;
-    expect(meta.value).toBe(50);
-    expect(meta.status).toBe("AVAILABLE");
+    const matchup = metricas.find((metric) => metric.key === "PERSONAL_MATCHUP")!;
+    const global = metricas.find((metric) => metric.key === "GLOBAL_MATCHUP")!;
+    expect(meta.value).toBeNull();
+    expect(meta.status).toBe("UNAVAILABLE");
+    expect(matchup.value).toBeNull();
+    expect(matchup.status).toBe("UNAVAILABLE");
+    expect(global.value).toBeNull();
+    expect(global.status).toBe("UNAVAILABLE");
     expect(composicao.status).toBe("AVAILABLE");
+  });
+
+  it("mantém disponível o 50 que foi realmente calculado do histórico pessoal", () => {
+    const metricasComAmostra = toRecommendationMetrics(metricasNumericas, "low", {
+      playerRole: "MID",
+      enemyLaneKnown: true,
+      personalMatchup: {
+        championId: 10,
+        enemyChampionId: 99,
+        role: "MID",
+        score: 50,
+        sampleSize: 8,
+        confidence: "medium"
+      }
+    });
+    const matchup = metricasComAmostra.find((metric) => metric.key === "PERSONAL_MATCHUP")!;
+    expect(matchup.value).toBe(50);
+    expect(matchup.status).toBe("AVAILABLE");
+    expect(matchup.confidence).not.toBeNull();
+    expect(matchup.provenance?.sampleSize).toBe(8);
+    expect(matchup.provenance?.sourceType).toBe("CALCULATED");
   });
 });
 
@@ -120,8 +148,8 @@ describe("recommendPicks com o contrato novo", () => {
   it("entrega métricas estruturadas por candidato", () => {
     expect(recomendacoes.length).toBeGreaterThan(1);
     recomendacoes.forEach((recomendacao) => {
-      expect(recomendacao.metricDetails.length).toBe(8);
-      expect(new Set(recomendacao.metricDetails.map((metric) => metric.key)).size).toBe(8);
+      expect(recomendacao.metricDetails.length).toBe(9);
+      expect(new Set(recomendacao.metricDetails.map((metric) => metric.key)).size).toBe(9);
     });
   });
 
@@ -129,7 +157,7 @@ describe("recommendPicks com o contrato novo", () => {
     const [primeira] = recomendacoes;
     const estruturada = primeira.metricDetails.find((metric) => metric.key === "PERSONAL_PERFORMANCE")!;
     expect(estruturada.value).toBe(primeira.metrics.personalPerformance);
-    expect(typeof primeira.metrics.meta).toBe("number");
+    expect(primeira.metrics.meta).toBeNull();
   });
 
   it("nunca produz métrica indisponível com número", () => {
@@ -147,22 +175,25 @@ describe("ensureRecommendationMetrics", () => {
     confidence: "low" as const
   };
 
-  it("reconstrói as métricas quando o backend não envia metricDetails", () => {
+  it("trata matchup e meta legados como indisponíveis quando o backend não envia metricDetails", () => {
     // Cenário medido na validação da Etapa 2: desktop novo contra API
     // anterior ao contrato. Sem isso a tela quebrava inteira.
     const metricas = ensureRecommendationMetrics(recomendacaoAntiga);
-    expect(metricas).toHaveLength(8);
+    expect(metricas).toHaveLength(9);
     expect(metricas.find((metric) => metric.key === "PERSONAL_PERFORMANCE")!.value).toBe(52.2);
+    expect(metricas.find((metric) => metric.key === "PERSONAL_MATCHUP")!.value).toBeNull();
+    expect(metricas.find((metric) => metric.key === "META_STRENGTH")!.value).toBeNull();
   });
 
   it("preserva as métricas já estruturadas quando elas vêm", () => {
     const jaEstruturada = {
       ...recomendacaoAntiga,
-      metricDetails: [unavailableMetric("META_STRENGTH", "Sem fonte")]
+      metricDetails: [unavailableMetric("LANE_MATCHUP", "Sem fonte")]
     };
     const metricas = ensureRecommendationMetrics(jaEstruturada);
     expect(metricas).toHaveLength(1);
-    expect(metricas[0].status).toBe("UNAVAILABLE");
+    expect(metricas[0].key).toBe("PERSONAL_MATCHUP");
+    expect(metricas[0].value).toBeNull();
   });
 
   it("devolve lista vazia (não valores inventados) quando não há nada", () => {

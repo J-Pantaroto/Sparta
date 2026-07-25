@@ -131,6 +131,12 @@
   gap: var(--space-3) var(--space-5);
 }
 
+.sp-recdetail__coverage {
+  margin: calc(var(--space-2) * -1) 0 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
 @media (max-width: 1180px) {
   .sp-recdetail__metrics {
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));

@@ -13,6 +13,33 @@ import type {
   TeamComposition
 } from "../types/domain.js";
 
+type MetricKey = keyof PickRecommendation["metrics"];
+export type RecommendationWeights = Record<MetricKey, number>;
+export type MetricAvailability = Record<MetricKey, boolean>;
+
+/**
+ * Remove do score apenas os sinais sem dados e redistribui o peso original
+ * entre os sinais restantes. `dataCoverage` continua registrando quanto do
+ * modelo previsto realmente participou; normalizar o score não finge que a
+ * recomendação teve a mesma evidência.
+ */
+export function normalizeAvailableWeights(
+  weights: RecommendationWeights,
+  availability: MetricAvailability
+): { normalizedWeights: RecommendationWeights; dataCoverage: number } {
+  const dataCoverage = (Object.keys(weights) as MetricKey[]).reduce(
+    (sum, key) => sum + (weights[key] > 0 && availability[key] ? weights[key] : 0),
+    0
+  );
+
+  const normalizedWeights = (Object.keys(weights) as MetricKey[]).reduce((result, key) => {
+    result[key] = weights[key] > 0 && availability[key] && dataCoverage > 0 ? weights[key] / dataCoverage : 0;
+    return result;
+  }, {} as RecommendationWeights);
+
+  return { normalizedWeights, dataCoverage };
+}
+
 export function recommendPicks(input: {
   draft: DraftState;
   player: PlayerProfile;
@@ -36,11 +63,18 @@ export function recommendPicks(input: {
       const tag = input.championTags.find(
         (candidate) => candidate.championId === stats.championId || candidate.championName === stats.championName
       );
-      const matchup = findMatchupScore(stats.championId, enemyLaneChampionId, input.matchups);
+      const personalMatchup = findPersonalMatchup(
+        stats.championId,
+        enemyLaneChampionId,
+        input.draft.playerRole,
+        input.matchups
+      );
       const composition = analyzeTeamComposition(input.draft, input.championTags, tag);
       const allySynergy = calculateAllySynergy(tag, composition, input.draft);
       const enemyAnswer = calculateEnemyAnswer(tag, input.draft, input.championTags);
-      const meta = input.patchMeta?.championScores[stats.championId] ?? 50;
+      // PatchMeta ainda não é Meta Intelligence: enquanto não houver fonte
+      // estatística observada, a ausência fica null, nunca 50 artificial.
+      const meta = null;
       const blindSafety = (tag?.blindSafety ?? 0.5) * 100;
       const recentForm = personal.components.recent ?? 50;
       const compositionFit = calculateCompositionFit(tag, composition, input.compositionRules);
@@ -48,7 +82,7 @@ export function recommendPicks(input: {
       const metrics = {
         personalPerformance: personal.score,
         recentForm,
-        matchup,
+        matchup: personalMatchup?.score ?? null,
         blindSafety,
         allySynergy,
         enemyDraftAnswer: enemyAnswer,
@@ -56,15 +90,21 @@ export function recommendPicks(input: {
         meta
       };
 
+      const { normalizedWeights, dataCoverage } = normalizeAvailableWeights(weights, {
+        personalPerformance: true,
+        recentForm: true,
+        matchup: personalMatchup !== undefined,
+        blindSafety: true,
+        allySynergy: true,
+        enemyDraftAnswer: true,
+        compositionFit: true,
+        meta: false
+      });
       const totalScore = round(
-        metrics.personalPerformance * weights.personalPerformance +
-          metrics.recentForm * weights.recentForm +
-          metrics.matchup * weights.matchup +
-          metrics.blindSafety * weights.blindSafety +
-          metrics.allySynergy * weights.allySynergy +
-          metrics.enemyDraftAnswer * weights.enemyDraftAnswer +
-          metrics.compositionFit * weights.compositionFit +
-          metrics.meta * weights.meta
+        (Object.keys(normalizedWeights) as MetricKey[]).reduce(
+          (score, key) => score + (metrics[key] ?? 0) * normalizedWeights[key],
+          0
+        )
       );
 
       const reasons = buildReasons(stats, metrics, composition);
@@ -76,11 +116,16 @@ export function recommendPicks(input: {
         role: stats.role,
         totalScore,
         confidence: personal.confidence,
+        dataCoverage,
         category: selectCategory(input.draft, metrics),
         reasons,
         warnings,
         metrics,
-        metricDetails: toRecommendationMetrics(metrics, personal.confidence)
+        metricDetails: toRecommendationMetrics(metrics, personal.confidence, {
+          personalMatchup,
+          playerRole: input.draft.playerRole,
+          enemyLaneKnown: enemyLaneChampionId !== undefined
+        })
       } satisfies PickRecommendation;
     })
     .filter((recommendation) => recommendation.metrics.personalPerformance > 0)
@@ -142,7 +187,7 @@ export function analyzeTeamComposition(
  * julgamento de design sobre o que mais importa em cada situacao (mesma
  * ressalva de `roleBaselines`/`weights` em champion-performance.ts).
  */
-export function selectWeights(draft: DraftState): Record<string, number> {
+export function selectWeights(draft: DraftState): RecommendationWeights {
   if (draft.pickOrder <= 1) {
     // Blind pick / first pick: nao ha lane inimiga revelada nem composicao
     // aliada formada ainda, entao matchup/enemyDraftAnswer nao fazem sentido
@@ -196,9 +241,17 @@ export function selectWeights(draft: DraftState): Record<string, number> {
   };
 }
 
-function findMatchupScore(championId: number, enemyChampionId: number | undefined, matchups: MatchupData[]): number {
-  if (!enemyChampionId) return 50;
-  return matchups.find((matchup) => matchup.championId === championId && matchup.enemyChampionId === enemyChampionId)?.score ?? 50;
+function findPersonalMatchup(
+  championId: number,
+  enemyChampionId: number | undefined,
+  role: DraftState["playerRole"],
+  matchups: MatchupData[]
+): MatchupData | undefined {
+  if (!enemyChampionId) return undefined;
+  return matchups.find(
+    (matchup) =>
+      matchup.championId === championId && matchup.enemyChampionId === enemyChampionId && matchup.role === role
+  );
 }
 
 /**
@@ -289,7 +342,7 @@ function buildReasons(
       impact: metrics.blindSafety
     });
   }
-  if (metrics.matchup >= 60) {
+  if (metrics.matchup !== null && metrics.matchup >= 60) {
     reasons.push({
       code: "matchup",
       label: "Boa matchup",
@@ -357,7 +410,7 @@ function selectCategory(
   metrics: PickRecommendation["metrics"]
 ): PickRecommendation["category"] {
   if (draft.pickOrder <= 1 && metrics.blindSafety >= 70) return "best_blind";
-  if (draft.enemyLaneChampionId && metrics.matchup >= 60) return "best_matchup";
+  if (draft.enemyLaneChampionId && metrics.matchup !== null && metrics.matchup >= 60) return "best_matchup";
   if (metrics.allySynergy >= 60) return "best_teamfit";
   if (metrics.blindSafety >= 65) return "safe_pick";
   return "comfort_pick";

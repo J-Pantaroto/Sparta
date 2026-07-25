@@ -19,8 +19,9 @@ import type { AvailabilityStatus, ConfidenceScore, DataProvenance } from "./prov
  * - `PERSONAL_MATCHUP` vs `GLOBAL_MATCHUP` — o primeiro é o histórico do
  *   próprio jogador naquele confronto; o segundo é a taxa observada no meta
  *   em geral. Um jogador pode ir bem num confronto estatisticamente ruim.
- * - `LANE_MATCHUP` — o confronto direto de rota como sinal de draft,
- *   independente de quem está jogando.
+ * - `LANE_MATCHUP` — chave legada de transporte. O motor não a produz; a
+ *   compatibilidade a migra para `PERSONAL_MATCHUP` indisponível se faltar
+ *   proveniência suficiente.
  * - `PATCH_OFFICIAL_CHANGE` vs `PATCH_IMPACT` vs `META_STRENGTH` — o
  *   primeiro é fato publicado pela Riot (o campeão foi alterado); o segundo
  *   é leitura sobre esse fato (a alteração ajuda ou atrapalha); o terceiro é
