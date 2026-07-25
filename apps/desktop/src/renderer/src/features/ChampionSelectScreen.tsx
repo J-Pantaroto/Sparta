@@ -1,7 +1,7 @@
 import type { DraftState, PickRecommendation, Role } from "@sparta/core";
-import { Crosshair, Swords } from "lucide-react";
-import { useState } from "react";
-import { metricLabels, ROLES, roleLabels } from "../app/labels";
+import { Check, Crosshair, Pencil, X } from "lucide-react";
+import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import { ROLES, categoryLabels, confidenceLabels, metricLabels, roleLabels } from "../app/labels";
 import type { DataDragonChampionSummary } from "../services/datadragon";
 import { ThemedPageHero } from "../theme/ThemedPageHero";
 import {
@@ -10,10 +10,13 @@ import {
   Card,
   ChampionAvatar,
   ChampionGrid,
+  Columns,
+  EmptyAvatarSlot,
   EmptyState,
   ErrorState,
   Field,
-  Grid,
+  IconButton,
+  InteractiveCard,
   Loading,
   NumberField,
   PageLayout,
@@ -24,16 +27,20 @@ import {
   SignalChip,
   SignalChipList,
   StatBar,
-  StatusBadge,
-  Toolbar
+  StatusBadge
 } from "../ui";
 import { BuildPanel } from "./BuildPanel";
+import "./ChampionSelectScreen.css";
 
 const MAX_ENEMIES = 5;
 
 interface ChampionSelectScreenProps {
   draft: DraftState;
-  setDraft: (draft: DraftState) => void;
+  // Aceita a forma funcional de propósito: dois cliques rápidos no grid
+  // de inimigos caem no mesmo lote de render, e passar um objeto pronto
+  // faria o segundo sobrescrever o primeiro (o estado lido viria do
+  // fechamento antigo).
+  setDraft: Dispatch<SetStateAction<DraftState>>;
   autoPickOrder: number | null;
   autoPlayerRole: Role | null;
   champSelectActive: boolean;
@@ -43,6 +50,12 @@ interface ChampionSelectScreenProps {
   ddragonVersion: string;
 }
 
+/**
+ * Workspace de decisão: lista compacta de recomendações à esquerda, detalhe
+ * completo da selecionada à direita. A versão anterior empilhava cards
+ * completos um embaixo do outro, cada um repetindo score, barras, sinais e
+ * botão - com 5 recomendações, comparar duas exigia rolar a tela.
+ */
 export function ChampionSelectScreen({
   draft,
   setDraft,
@@ -55,45 +68,70 @@ export function ChampionSelectScreen({
   ddragonVersion
 }: ChampionSelectScreenProps) {
   const [confirmedChampion, setConfirmedChampion] = useState<{ championId: number; championName: string } | null>(null);
-  // Simulacao manual: so quando NAO ha sessao real detectada (com sessao a
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [editingEnemies, setEditingEnemies] = useState(false);
+  // Simulação manual: só quando NÃO há sessão real detectada (com sessão a
   // tela abre direto). Existe pra dar pra testar sem o League aberto.
   const [devOverride, setDevOverride] = useState(false);
 
-  function toggleEnemy(champion: DataDragonChampionSummary) {
-    const alreadyPicked = draft.enemies.some((enemy) => enemy.championId === champion.id);
-    if (alreadyPicked) {
-      setDraft({ ...draft, enemies: draft.enemies.filter((enemy) => enemy.championId !== champion.id) });
-      return;
+  // A recomendação #1 muda conforme o draft evolui; sem seleção explícita, o
+  // detalhe acompanha o topo da lista em vez de ficar preso num campeão que
+  // já não é mais o melhor.
+  const selected =
+    recommendations.find((recommendation) => recommendation.championId === selectedId) ?? recommendations[0];
+
+  useEffect(() => {
+    if (selectedId !== null && !recommendations.some((item) => item.championId === selectedId)) {
+      setSelectedId(null);
     }
-    if (draft.enemies.length >= MAX_ENEMIES) return;
-    // `role` e obrigatorio no tipo mas nao e usado pelo motor de build (so
-    // championId importa) - placeholder, mesmo padrao de antes.
-    setDraft({
-      ...draft,
-      enemies: [...draft.enemies, { championId: champion.id, championName: champion.name, role: "MID", team: "enemy" }]
+  }, [recommendations, selectedId]);
+
+  function toggleEnemy(champion: DataDragonChampionSummary) {
+    setDraft((current) => {
+      const alreadyPicked = current.enemies.some((enemy) => enemy.championId === champion.id);
+      if (alreadyPicked) {
+        return { ...current, enemies: current.enemies.filter((enemy) => enemy.championId !== champion.id) };
+      }
+      if (current.enemies.length >= MAX_ENEMIES) return current;
+      // `role` é obrigatório no tipo mas não é usado pelo motor de build (só
+      // championId importa) - placeholder, mesmo padrão de antes.
+      return {
+        ...current,
+        enemies: [
+          ...current.enemies,
+          { championId: champion.id, championName: champion.name, role: "MID" as const, team: "enemy" as const }
+        ]
+      };
     });
+  }
+
+  function removeEnemy(championId: number) {
+    setDraft((current) => ({
+      ...current,
+      enemies: current.enemies.filter((enemy) => enemy.championId !== championId)
+    }));
   }
 
   function confirmChampion(recommendation: PickRecommendation) {
     setConfirmedChampion({ championId: recommendation.championId, championName: recommendation.championName });
-    setDraft({ ...draft, selectedChampionId: recommendation.championId });
+    setDraft((current) => ({ ...current, selectedChampionId: recommendation.championId }));
   }
 
-  // Champion Select nao e modulo de uso livre (feedback do usuario): sem
-  // sessao real e sem o usuario pedir simulacao, mostra a espera.
+  // Champion Select não é módulo de uso livre (feedback do usuário): sem
+  // sessão real e sem o usuário pedir simulação, mostra a espera.
   if (!champSelectActive && !devOverride) {
     return (
       <PageLayout>
         <ThemedPageHero
           eyebrow="Champion Select"
           title="Aguardando sua seleção de campeões"
-          meta={<StatusBadge state="offline">Nenhuma seleção de campeões ativa</StatusBadge>}
+          meta={<StatusBadge state="offline">League Client sem seleção de campeões ativa</StatusBadge>}
         />
         <Card>
           <EmptyState
             icon={<Crosshair size={22} />}
             title="Esta tela abre sozinha"
-            description="Assim que o cliente do League entrar em seleção de campeões, o Sparta detecta a sua posição, a ordem de pick e o time inimigo, e traz as recomendações aqui."
+            description="Assim que o cliente do League entrar em seleção de campeões, o Sparta detecta sua posição, a ordem de pick e o time inimigo, e traz as recomendações aqui — tudo por leitura, sem nenhuma ação no cliente."
             actions={
               <Button variant="secondary" onClick={() => setDevOverride(true)}>
                 Simular manualmente
@@ -112,49 +150,100 @@ export function ChampionSelectScreen({
         title="Sua decisão de pick"
         meta={
           champSelectActive ? (
-            <StatusBadge state="live">Detectado via League Client</StatusBadge>
+            <StatusBadge state="live">Posição e ordem detectadas pelo League Client</StatusBadge>
           ) : (
-            <StatusBadge state="warning">Modo manual (simulação)</StatusBadge>
+            <StatusBadge state="warning">Modo manual — nada está sendo lido do cliente</StatusBadge>
           )
         }
       />
 
       {noAccountLinked && (
-        <Card tone="flat" pad="sm">
-          <SignalChip tone="info">
-            Sem conta Riot vinculada — as recomendações usam a referência geral do papel, não seu histórico.
-          </SignalChip>
-        </Card>
+        <SignalChip tone="info">
+          Sem conta Riot vinculada — as recomendações usam a referência geral do papel, não seu histórico.
+        </SignalChip>
       )}
 
-      <Card pad="sm">
-        <Toolbar>
-          <Field label="Posição">
-            {autoPlayerRole !== null ? (
-              <ReadOnlyValue>{roleLabels[autoPlayerRole]}</ReadOnlyValue>
-            ) : (
-              <Select<Role>
-                value={draft.playerRole}
-                onChange={(role) => setDraft({ ...draft, playerRole: role })}
-                options={ROLES.map((role) => ({ value: role, label: roleLabels[role] }))}
-                ariaLabel="Posição"
+      <Card pad="md">
+        <div className="sp-draftbar">
+          <div className="sp-draftbar__field">
+            <Field label="Posição">
+              {autoPlayerRole !== null ? (
+                <ReadOnlyValue>{roleLabels[autoPlayerRole]}</ReadOnlyValue>
+              ) : (
+                <Select<Role>
+                  value={draft.playerRole}
+                  onChange={(role) => setDraft((current) => ({ ...current, playerRole: role }))}
+                  options={ROLES.map((role) => ({ value: role, label: roleLabels[role] }))}
+                  ariaLabel="Posição"
+                />
+              )}
+            </Field>
+          </div>
+          <div className="sp-draftbar__field">
+            <Field label="Ordem de pick">
+              {autoPickOrder !== null ? (
+                <ReadOnlyValue>{autoPickOrder}</ReadOnlyValue>
+              ) : (
+                <NumberField
+                  value={draft.pickOrder}
+                  min={1}
+                  max={5}
+                  onChange={(value) => setDraft((current) => ({ ...current, pickOrder: value }))}
+                  ariaLabel="Ordem de pick"
+                />
+              )}
+            </Field>
+          </div>
+
+          <div className="sp-draftbar__team">
+            <span className="sp-draftbar__team-label">
+              Time inimigo
+              <Badge tone={draft.enemies.length > 0 ? "accent" : "neutral"}>
+                {draft.enemies.length}/{MAX_ENEMIES} revelados
+              </Badge>
+            </span>
+            <div className="sp-draftbar__slots">
+              {Array.from({ length: MAX_ENEMIES }, (_, index) => {
+                const enemy = draft.enemies[index];
+                if (!enemy) return <EmptyAvatarSlot key={`empty-${index}`} label="Inimigo ainda não revelado" />;
+                return (
+                  <button
+                    key={enemy.championId}
+                    type="button"
+                    className="sp-slot"
+                    onClick={() => removeEnemy(enemy.championId)}
+                    title={`Remover ${enemy.championName}`}
+                    aria-label={`Remover ${enemy.championName} do time inimigo`}
+                  >
+                    <ChampionAvatar
+                      championId={enemy.championId}
+                      ddragonVersion={ddragonVersion}
+                      alt={enemy.championName}
+                    />
+                  </button>
+                );
+              })}
+              <IconButton
+                label={editingEnemies ? "Fechar seletor" : "Editar time inimigo"}
+                icon={editingEnemies ? <X size={16} /> : <Pencil size={16} />}
+                active={editingEnemies}
+                onClick={() => setEditingEnemies((current) => !current)}
               />
-            )}
-          </Field>
-          <Field label="Ordem de pick">
-            {autoPickOrder !== null ? (
-              <ReadOnlyValue>{autoPickOrder}</ReadOnlyValue>
-            ) : (
-              <NumberField
-                value={draft.pickOrder}
-                min={1}
-                max={5}
-                onChange={(value) => setDraft({ ...draft, pickOrder: value })}
-                ariaLabel="Ordem de pick"
-              />
-            )}
-          </Field>
-        </Toolbar>
+            </div>
+          </div>
+        </div>
+
+        {editingEnemies && (
+          <div style={{ marginTop: "var(--space-5)" }}>
+            <ChampionGrid
+              ddragonVersion={ddragonVersion}
+              maxHeight="200px"
+              onSelect={toggleEnemy}
+              isSelected={(champion) => draft.enemies.some((enemy) => enemy.championId === champion.id)}
+              isDisabled={() => draft.enemies.length >= MAX_ENEMIES}
+            />
+          </div>
+        )}
       </Card>
 
       {recommendationsStatus === "loading" && (
@@ -168,91 +257,133 @@ export function ChampionSelectScreen({
         </Card>
       )}
 
-      {recommendations.length > 0 && (
-        <Grid cols={2}>
-          {recommendations.map((recommendation, index) => {
-            const topMetrics = Object.entries(recommendation.metrics)
-              .sort((a, b) => b[1] - a[1])
-              .slice(0, 4);
-            const confirmed = confirmedChampion?.championId === recommendation.championId;
-            return (
-              <Card tone={index === 0 ? "feature" : "default"} key={recommendation.championId}>
-                <SectionHeader
-                  eyebrow={index === 0 ? "Melhor escolha" : recommendation.category}
-                  title={
-                    <>
+      {recommendations.length === 0 && recommendationsStatus !== "loading" ? (
+        <Card>
+          <EmptyState
+            icon={<Crosshair size={22} />}
+            title="Nenhuma recomendação pra esta posição"
+            description="O motor só recomenda campeões que estão na tabela curada do Sparta e no seu histórico. Sem sobreposição entre os dois, ele prefere não sugerir nada a inventar uma escolha."
+          />
+        </Card>
+      ) : (
+        recommendations.length > 0 && (
+          <Columns
+            asideFirst
+            asideWidth="286px"
+            aside={
+              <div className="sp-reclist">
+                {recommendations.map((recommendation, index) => (
+                  <InteractiveCard
+                    key={recommendation.championId}
+                    pad="sm"
+                    tone={index === 0 ? "feature" : "default"}
+                    selected={selected?.championId === recommendation.championId}
+                    onClick={() => setSelectedId(recommendation.championId)}
+                    label={`Ver detalhes de ${recommendation.championName}`}
+                  >
+                    {index === 0 && <span className="sp-rec__rank">TOP</span>}
+                    <div className="sp-rec">
                       <ChampionAvatar
                         championId={recommendation.championId}
                         ddragonVersion={ddragonVersion}
-                        size="sm"
                         alt={recommendation.championName}
+                        ring={confirmedChampion?.championId === recommendation.championId}
                       />
-                      {recommendation.championName}
-                    </>
-                  }
-                  actions={<ScoreBadge score={recommendation.totalScore} />}
-                />
-                <div style={{ display: "grid", gap: "var(--space-2)", marginBottom: "var(--space-4)" }}>
-                  {topMetrics.map(([key, value]) => (
-                    <StatBar
-                      key={key}
-                      label={metricLabels[key] ?? key}
-                      value={value}
-                      value_label={`${Math.round(value)}`}
+                      <span style={{ minWidth: 0 }}>
+                        <strong className="sp-rec__name">{recommendation.championName}</strong>
+                        <span className="sp-rec__category">{categoryLabels[recommendation.category]}</span>
+                      </span>
+                      <ScoreBadge score={recommendation.totalScore} size="xs" />
+                    </div>
+                  </InteractiveCard>
+                ))}
+              </div>
+            }
+            main={
+              selected && (
+                <div style={{ display: "grid", gap: "var(--space-4)" }}>
+                  <Card>
+                    <div className="sp-recdetail__head">
+                      <ChampionAvatar
+                        championId={selected.championId}
+                        ddragonVersion={ddragonVersion}
+                        size="xl"
+                        alt={selected.championName}
+                        ring={confirmedChampion?.championId === selected.championId}
+                      />
+                      <div className="sp-recdetail__title">
+                        <strong className="sp-recdetail__name">{selected.championName}</strong>
+                        <div className="sp-recdetail__badges">
+                          <Badge tone="accent" square>
+                            {categoryLabels[selected.category]}
+                          </Badge>
+                          <Badge tone="neutral">{roleLabels[selected.role]}</Badge>
+                          <Badge tone="neutral">confiança {confidenceLabels[selected.confidence]}</Badge>
+                        </div>
+                      </div>
+                      <ScoreBadge score={selected.totalScore} size="lg" />
+                    </div>
+
+                    <SectionHeader
+                      title="Por que este pick"
+                      description="Cada dimensão vale 0 a 100 e entra no score com o peso do cenário de draft atual."
                     />
-                  ))}
-                </div>
-                <SignalChipList stacked>
-                  {recommendation.reasons.map((reason) => (
-                    <SignalChip key={reason.code} tone="positive" title={reason.detail}>
-                      {reason.label}
-                    </SignalChip>
-                  ))}
-                  {recommendation.warnings.map((warning) => (
-                    <SignalChip key={warning.code} tone="negative" title={warning.detail}>
-                      {warning.label}
-                    </SignalChip>
-                  ))}
-                </SignalChipList>
-                <div style={{ marginTop: "var(--space-4)" }}>
-                  <Button
-                    variant={confirmed ? "confirmed" : "primary"}
-                    onClick={() => confirmChampion(recommendation)}
-                  >
-                    {confirmed ? "Campeão confirmado" : "Confirmar campeão"}
-                  </Button>
-                </div>
-              </Card>
-            );
-          })}
-        </Grid>
-      )}
+                    <div className="sp-recdetail__metrics">
+                      {Object.entries(selected.metrics)
+                        .sort((a, b) => b[1] - a[1])
+                        .map(([key, value]) => (
+                          <StatBar
+                            key={key}
+                            label={metricLabels[key] ?? key}
+                            value={value}
+                            value_label={Math.round(value).toString()}
+                          />
+                        ))}
+                    </div>
 
-      <Card>
-        <SectionHeader
-          eyebrow="Contexto do draft"
-          title={
-            <>
-              <Swords size={16} /> Time inimigo
-            </>
-          }
-          description="Selecione os campeões inimigos já revelados — a build sugerida se ajusta ao que você marcar."
-          actions={
-            <Badge tone={draft.enemies.length > 0 ? "accent" : "neutral"}>
-              {draft.enemies.length}/{MAX_ENEMIES}
-            </Badge>
-          }
-        />
-        <ChampionGrid
-          ddragonVersion={ddragonVersion}
-          onSelect={toggleEnemy}
-          isSelected={(champion) => draft.enemies.some((enemy) => enemy.championId === champion.id)}
-          isDisabled={() => draft.enemies.length >= MAX_ENEMIES}
-        />
-      </Card>
+                    {(selected.reasons.length > 0 || selected.warnings.length > 0) && (
+                      <div style={{ marginTop: "var(--space-5)" }}>
+                        <SignalChipList stacked>
+                          {selected.reasons.map((reason) => (
+                            <SignalChip key={reason.code} tone="positive" title={reason.detail}>
+                              {reason.detail}
+                            </SignalChip>
+                          ))}
+                          {selected.warnings.map((warning) => (
+                            <SignalChip key={warning.code} tone="negative" title={warning.detail}>
+                              {warning.detail}
+                            </SignalChip>
+                          ))}
+                        </SignalChipList>
+                      </div>
+                    )}
 
-      {confirmedChampion && (
-        <BuildPanel confirmedChampion={confirmedChampion} enemies={draft.enemies} ddragonVersion={ddragonVersion} />
+                    <div style={{ marginTop: "var(--space-6)" }}>
+                      <Button
+                        variant={confirmedChampion?.championId === selected.championId ? "confirmed" : "primary"}
+                        size="lg"
+                        icon={confirmedChampion?.championId === selected.championId ? <Check size={16} /> : undefined}
+                        onClick={() => confirmChampion(selected)}
+                      >
+                        {confirmedChampion?.championId === selected.championId
+                          ? `${selected.championName} confirmado`
+                          : `Confirmar ${selected.championName}`}
+                      </Button>
+                    </div>
+                  </Card>
+
+                  {confirmedChampion && (
+                    <BuildPanel
+                      confirmedChampion={confirmedChampion}
+                      enemies={draft.enemies}
+                      ddragonVersion={ddragonVersion}
+                    />
+                  )}
+                </div>
+              )
+            }
+          />
+        )
       )}
     </PageLayout>
   );

@@ -1,0 +1,138 @@
+/* Barra de sessão: o estado do draft sempre visível no topo da tela. */
+
+.sp-draftbar {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: var(--space-5);
+}
+
+.sp-draftbar__field {
+  min-width: 150px;
+}
+
+.sp-draftbar__team {
+  flex: 1;
+  min-width: 260px;
+}
+
+.sp-draftbar__team-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+
+/*
+ * Cinco vagas fixas em vez de uma lista que cresce: mostrar quantos
+ * inimigos ainda são desconhecidos é informação de draft, não espaço
+ * vazio - a build e a recomendação mudam conforme eles aparecem.
+ */
+.sp-draftbar__slots {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.sp-slot {
+  position: relative;
+  border: 0;
+  padding: 0;
+  background: none;
+  line-height: 0;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: var(--transition-transform);
+}
+
+.sp-slot:hover {
+  transform: translateY(-2px);
+}
+
+/* Lista de recomendações (rail da esquerda) */
+
+.sp-reclist {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.sp-rec {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+}
+
+.sp-rec__name {
+  display: block;
+  font-weight: var(--weight-bold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sp-rec__category {
+  display: block;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.sp-rec__rank {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  display: grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: var(--radius-xs);
+  background: var(--color-accent);
+  color: var(--text-on-accent);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-black);
+}
+
+/* Painel de detalhe da recomendação selecionada */
+
+.sp-recdetail__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+
+.sp-recdetail__title {
+  flex: 1;
+  min-width: 0;
+}
+
+.sp-recdetail__name {
+  display: block;
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-black);
+  line-height: var(--leading-tight);
+}
+
+.sp-recdetail__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.sp-recdetail__metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3) var(--space-5);
+}
+
+@media (max-width: 1180px) {
+  .sp-recdetail__metrics {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  }
+}
