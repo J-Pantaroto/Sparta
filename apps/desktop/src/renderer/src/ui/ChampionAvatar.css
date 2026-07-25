@@ -1,0 +1,68 @@
+.sp-avatar {
+  display: block;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  object-fit: cover;
+  flex-shrink: 0;
+  transition: var(--transition-colors), var(--transition-transform);
+}
+
+.sp-avatar--xs {
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-xs);
+}
+
+.sp-avatar--sm {
+  width: 30px;
+  height: 30px;
+}
+
+.sp-avatar--md {
+  width: 40px;
+  height: 40px;
+}
+
+.sp-avatar--lg {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-md);
+}
+
+.sp-avatar--xl {
+  width: 76px;
+  height: 76px;
+  border-radius: var(--radius-md);
+}
+
+/* Anel na cor do tema - marca o campeao selecionado/confirmado. */
+.sp-avatar--ring {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--color-accent-glow);
+}
+
+/* Cinza + opaco: campeao do time inimigo ainda nao revelado, ou opcao
+   indisponivel. Estado, nao decoracao. */
+.sp-avatar--muted {
+  filter: grayscale(1);
+  opacity: 0.55;
+}
+
+/* Ultimo estagio de fallback: nunca mostra o icone nativo de imagem
+   quebrada do navegador. */
+.sp-avatar--fallback {
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+}
+
+/* Placeholder de slot vazio (ex. inimigo ainda desconhecido no draft). */
+.sp-avatar--empty {
+  display: grid;
+  place-items: center;
+  border-style: dashed;
+  border-color: var(--border-default);
+  background: var(--bg-sunken);
+  color: var(--text-muted);
+}

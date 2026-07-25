@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { login, register } from "./api-client";
+import { login, register } from "../services/api-client";
 
 interface AuthScreenProps {
   splashUrl: string;

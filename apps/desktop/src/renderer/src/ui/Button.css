@@ -1,0 +1,155 @@
+.sp-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-primary);
+  font-weight: var(--weight-semibold);
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: var(--transition-colors), var(--transition-transform), box-shadow var(--duration-fast) var(--ease-out);
+}
+
+.sp-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.sp-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ─── Tamanhos ──────────────────────────────────────────────────────── */
+
+.sp-btn--sm {
+  height: 30px;
+  padding: 0 var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.sp-btn--md {
+  height: 38px;
+  padding: 0 var(--space-4);
+  font-size: var(--text-md);
+}
+
+.sp-btn--lg {
+  height: 46px;
+  padding: 0 var(--space-6);
+  font-size: var(--text-base);
+}
+
+.sp-btn--block {
+  width: 100%;
+}
+
+/* ─── Variantes ─────────────────────────────────────────────────────── */
+
+/* Acao principal da tela: preenchida na cor do tema, com tinta escura por
+   cima (a luminosidade do accent e travada numa faixa em que texto escuro
+   contrasta melhor que branco pra qualquer matiz de skin). */
+.sp-btn--primary {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--text-on-accent);
+}
+
+.sp-btn--primary:hover:not(:disabled) {
+  box-shadow: var(--shadow-accent);
+  filter: brightness(1.1);
+}
+
+/* Acao secundaria: superficie elevada, borda neutra que acende no tema. */
+.sp-btn--secondary {
+  border-color: var(--border-default);
+  background: var(--surface-3);
+}
+
+.sp-btn--secondary:hover:not(:disabled) {
+  border-color: var(--color-accent-soft);
+  background: var(--surface-4);
+}
+
+/* Acao terciaria: sem superficie propria, pra barras de ferramentas. */
+.sp-btn--ghost {
+  color: var(--text-secondary);
+}
+
+.sp-btn--ghost:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+/* Acao destrutiva/negativa - usa o vermelho SEMANTICO, nao o do tema. */
+.sp-btn--danger {
+  border-color: var(--color-red-dim);
+  background: var(--color-red-dim);
+  color: var(--color-red);
+}
+
+.sp-btn--danger:hover:not(:disabled) {
+  border-color: var(--color-red);
+}
+
+/* Estado "ja feito" (ex. campeao confirmado) - le como confirmacao, nao
+   como um botao a clicar de novo. */
+.sp-btn--confirmed {
+  border-color: var(--color-green);
+  background: var(--color-green-dim);
+  color: var(--color-green);
+}
+
+/* ─── Icone ─────────────────────────────────────────────────────────── */
+
+.sp-icon-btn {
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: var(--transition-colors);
+}
+
+.sp-icon-btn--sm {
+  width: 28px;
+  height: 28px;
+}
+
+.sp-icon-btn--md {
+  width: 34px;
+  height: 34px;
+}
+
+.sp-icon-btn:hover:not(:disabled) {
+  border-color: var(--border-default);
+  background: var(--surface-3);
+  color: var(--text-primary);
+}
+
+.sp-icon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.sp-icon-btn--active {
+  border-color: var(--color-accent-soft);
+  background: var(--surface-3);
+  color: var(--color-accent);
+}
+
+/* Spinner inline do estado de carregamento do botao. */
+.sp-btn__spinner {
+  width: 13px;
+  height: 13px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  opacity: 0.85;
+  animation: sp-spin 0.7s linear infinite;
+}

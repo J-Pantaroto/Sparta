@@ -1,0 +1,61 @@
+/* Barra horizontal de comparacao (CSS puro, sem lib de grafico). */
+
+.sp-statbar {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.sp-statbar__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.sp-statbar__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sp-statbar__value {
+  color: var(--text-primary);
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.sp-statbar__track {
+  position: relative;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--surface-4);
+  overflow: hidden;
+}
+
+.sp-statbar--lg .sp-statbar__track {
+  height: 8px;
+}
+
+/* Marca do centro na variante "ratio": e a linha de referencia (1.0x = a
+   baseline do role), sem ela a barra nao diz se o valor esta acima ou
+   abaixo do esperado. */
+.sp-statbar__track--centered::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  background: var(--text-muted);
+  z-index: var(--z-raised);
+}
+
+.sp-statbar__fill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  transition: width var(--duration-slow) var(--ease-out);
+}

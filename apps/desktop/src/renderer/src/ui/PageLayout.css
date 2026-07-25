@@ -1,0 +1,232 @@
+/*
+ * Composicao de uma tela: heroi (identidade + contexto) e secoes.
+ *
+ * O heroi e onde a skin escolhida aparece com mais forca. Fora dele, o
+ * tema entra so como iluminacao e cor de destaque - splash art atras de
+ * texto pequeno prejudica leitura, que e exatamente o que os apps de
+ * referencia evitam.
+ */
+
+.sp-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+/* ─── Heroi ─────────────────────────────────────────────────────────── */
+
+.sp-hero {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  background-color: var(--surface-1);
+  background-size: cover;
+  background-position: center 24%;
+  animation: sp-fade var(--duration-slow) var(--ease-out);
+}
+
+.sp-hero--compact {
+  min-height: 92px;
+  padding: var(--space-5) var(--space-6);
+}
+
+.sp-hero--feature {
+  min-height: 168px;
+  padding: var(--space-6) var(--space-7);
+}
+
+/*
+ * Duas camadas de scrim: uma escurece da esquerda (onde fica o texto) e
+ * outra tinge o conjunto na cor do tema. Sem a primeira, titulo sobre
+ * splash clara fica ilegivel; sem a segunda, o heroi nao "veste" o tema.
+ */
+.sp-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(95deg, rgba(4, 4, 5, 0.97) 26%, rgba(4, 4, 5, 0.82) 56%, rgba(4, 4, 5, 0.35) 100%),
+    linear-gradient(0deg, var(--color-accent-glow), transparent 72%);
+}
+
+/* Faixa de destaque na lateral, marcando a tela. */
+.sp-hero::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--color-accent);
+}
+
+.sp-hero__main {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.sp-hero__aside {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  flex-shrink: 0;
+}
+
+.sp-hero__eyebrow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+  color: var(--color-accent);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.sp-hero__title {
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-black);
+  line-height: var(--leading-tight);
+  letter-spacing: -0.01em;
+}
+
+.sp-hero--feature .sp-hero__title {
+  font-size: var(--text-3xl);
+}
+
+.sp-hero__subtitle {
+  margin-top: var(--space-2);
+  max-width: 62ch;
+  color: var(--text-secondary);
+  font-size: var(--text-md);
+  line-height: var(--leading-snug);
+}
+
+.sp-hero__meta {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  margin-top: var(--space-4);
+}
+
+/* ─── Secao ─────────────────────────────────────────────────────────── */
+
+.sp-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+/* ─── Grids ─────────────────────────────────────────────────────────── */
+
+.sp-grid {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: repeat(var(--sp-grid-cols, 3), minmax(0, 1fr));
+}
+
+/* Colunas viram menos conforme a janela encolhe, em vez de espremer os
+   cards ate ficarem ilegiveis. */
+@media (max-width: 1420px) {
+  .sp-grid[style*="--sp-grid-cols: 4"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1160px) {
+  .sp-grid {
+    grid-template-columns: repeat(min(var(--sp-grid-cols, 3), 2), minmax(0, 1fr));
+  }
+}
+
+/*
+ * Duas colunas com painel lateral fixo (workspace). O `aside` gruda no
+ * topo enquanto a lista rola - padrao dos apps de referencia pra manter o
+ * detalhe da selecao sempre visivel.
+ */
+.sp-columns {
+  display: grid;
+  gap: var(--space-4);
+  align-items: start;
+  grid-template-columns: minmax(0, 1fr) minmax(0, var(--sp-aside, 380px));
+}
+
+.sp-columns--aside-first {
+  grid-template-columns: minmax(0, var(--sp-aside, 320px)) minmax(0, 1fr);
+}
+
+.sp-columns__sticky {
+  position: sticky;
+  top: 0;
+}
+
+@media (max-width: 1280px) {
+  .sp-columns,
+  .sp-columns--aside-first {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sp-columns__sticky {
+    position: static;
+  }
+}
+
+/* ─── Barra de ferramentas de uma secao ─────────────────────────────── */
+
+.sp-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.sp-toolbar__spacer {
+  flex: 1;
+  min-width: var(--space-2);
+}
+
+/* ─── Lista de estatisticas em linha ────────────────────────────────── */
+
+.sp-inline-stats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-6);
+}
+
+.sp-inline-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sp-inline-stat__label {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+}
+
+.sp-inline-stat__value {
+  color: var(--text-primary);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+}
+
+.sp-inline-stat__value--muted {
+  color: var(--text-muted);
+  font-weight: var(--weight-semibold);
+}

@@ -1,0 +1,88 @@
+.sp-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  border: 1px solid transparent;
+  border-radius: var(--radius-full);
+  padding: 0 var(--space-2);
+  height: 20px;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.sp-badge--md {
+  height: 24px;
+  padding: 0 var(--space-3);
+  font-size: var(--text-sm);
+}
+
+/* Retangular: usado quando o badge rotula um bloco (role, patch) em vez de
+   marcar um estado - raio diferente evita "tudo com a mesma aparencia". */
+.sp-badge--square {
+  border-radius: var(--radius-xs);
+}
+
+.sp-badge--neutral {
+  border-color: var(--border-default);
+  background: var(--surface-3);
+  color: var(--text-secondary);
+}
+
+.sp-badge--accent {
+  border-color: var(--color-accent-soft);
+  background: var(--color-accent-glow);
+  color: var(--text-primary);
+}
+
+.sp-badge--positive {
+  border-color: transparent;
+  background: var(--color-green-dim);
+  color: var(--color-green);
+}
+
+.sp-badge--warning {
+  border-color: transparent;
+  background: var(--color-yellow-dim);
+  color: var(--color-yellow);
+}
+
+.sp-badge--negative {
+  border-color: transparent;
+  background: var(--color-red-dim);
+  color: var(--color-red);
+}
+
+/* Ponto de status (conexao com o League Client, sync). */
+.sp-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+
+.sp-status__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--text-muted);
+}
+
+.sp-status--live .sp-status__dot {
+  background: var(--color-green);
+  box-shadow: 0 0 0 3px var(--color-green-dim);
+  animation: sp-pulse 2s var(--ease-out) infinite;
+}
+
+.sp-status--warning .sp-status__dot {
+  background: var(--color-yellow);
+  box-shadow: 0 0 0 3px var(--color-yellow-dim);
+}
+
+.sp-status--offline .sp-status__dot {
+  background: var(--text-muted);
+}

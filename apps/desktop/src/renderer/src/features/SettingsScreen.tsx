@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { ChampionSkinPicker } from "./ChampionSkinPicker";
-import { fetchSettings, updateSettings } from "./api-client";
-import { Loading } from "./Loading";
-import { ThemedHeader } from "./ThemedHeader";
-import { useAsyncData } from "./use-async-data";
+import { ChampionSkinPicker } from "../theme/ChampionSkinPicker";
+import { fetchSettings, updateSettings } from "../services/api-client";
+import { ThemedPageHero } from "../theme/ThemedPageHero";
+import { Loading } from "../ui";
+import { useAsyncData } from "../hooks/use-async-data";
 
 interface SettingsScreenProps {
   ddragonVersion: string;
@@ -23,7 +23,7 @@ const MAX_LIMIT = 200;
 export function SettingsScreen({ ddragonVersion, sessionToken }: SettingsScreenProps) {
   return (
     <>
-      <ThemedHeader label="Configurações" title="Preferências pessoais" />
+      <ThemedPageHero eyebrow="Configurações" title="Preferências pessoais" />
       <ChampionSkinPicker ddragonVersion={ddragonVersion} />
       <AnalysisSettings sessionToken={sessionToken} />
     </>

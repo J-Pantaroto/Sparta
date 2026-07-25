@@ -1,16 +1,15 @@
 import { useState } from "react";
-import { ChampionGridPicker } from "./ChampionGridPicker";
 import {
   championSplashUrl,
   communityDragonSplashUrl,
   fetchChampionSkins,
   type DataDragonChampionSummary,
   type DataDragonSkin
-} from "./datadragon";
+} from "../services/datadragon";
 import { useFeaturedChampion } from "./featured-champion-context";
-import { GridSkeleton } from "./GridSkeleton";
 import { SkinSplash } from "./SkinSplash";
-import { useAsyncData } from "./use-async-data";
+import { Button, ChampionGrid, SkeletonGrid } from "../ui";
+import { useAsyncData } from "../hooks/use-async-data";
 
 interface ChampionSkinPickerProps {
   ddragonVersion: string;
@@ -83,17 +82,17 @@ export function ChampionSkinPicker({ ddragonVersion }: ChampionSkinPickerProps) 
       </p>
 
       {!selectedChampion && (
-        <ChampionGridPicker ddragonVersion={ddragonVersion} onSelect={setSelectedChampion} />
+        <ChampionGrid ddragonVersion={ddragonVersion} onSelect={setSelectedChampion} />
       )}
 
       {selectedChampion && (
         <>
-          <button type="button" className="btn-secondary" onClick={() => setSelectedChampion(null)}>
+          <Button variant="ghost" size="sm" onClick={() => setSelectedChampion(null)}>
             ← Voltar pra lista de campeões
-          </button>
+          </Button>
           <h3>{selectedChampion.name}</h3>
           {downloadError && <p className="auth-error">{downloadError}</p>}
-          {skins.status === "loading" && <GridSkeleton count={6} />}
+          {skins.status === "loading" && <SkeletonGrid count={6} size={120} />}
           <div className="theme-picker-grid">
             {(skins.data ?? []).map((skin) => {
               const isActive = featuredChampion.key === selectedChampion.key && featuredChampion.skinIndex === skin.num;
@@ -108,14 +107,15 @@ export function ChampionSkinPicker({ ddragonVersion }: ChampionSkinPickerProps) 
                     onClick={() => applySkin(selectedChampion, skin)}
                   />
                   <span>{skin.num === 0 ? selectedChampion.name : skin.name}</span>
-                  <button
-                    type="button"
-                    className="btn-secondary"
-                    disabled={downloadingSkin === skin.num}
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    block
+                    loading={downloadingSkin === skin.num}
                     onClick={() => void downloadSkin(selectedChampion, skin)}
                   >
                     {downloadingSkin === skin.num ? "Baixando..." : "Baixar"}
-                  </button>
+                  </Button>
                 </div>
               );
             })}

@@ -1,0 +1,242 @@
+/*
+ * Estrutura principal: sidebar fixa + area de conteudo rolavel.
+ *
+ * Antes a sidebar tinha 260px e a area util era limitada por `max-width`
+ * hardcoded (860-980px), entao em 1920px metade da tela ficava vazia e em
+ * 1000px a navegacao comia 26% da largura. Aqui a sidebar e mais enxuta e
+ * o conteudo usa a largura real ate um teto generoso.
+ */
+
+.sp-shell {
+  display: grid;
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ─── Sidebar ───────────────────────────────────────────────────────── */
+
+.sp-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  height: 100vh;
+  padding: var(--space-5) var(--space-3) var(--space-4);
+  border-right: 1px solid var(--border-subtle);
+  background: linear-gradient(180deg, var(--surface-veil-strong), rgba(5, 5, 6, 0.96));
+  overflow: hidden;
+}
+
+.sp-sidebar__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0 var(--space-2);
+  min-width: 0;
+}
+
+.sp-sidebar__mark {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: var(--radius-md);
+  background: linear-gradient(140deg, var(--color-accent), var(--color-accent-soft));
+  color: var(--text-on-accent);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-black);
+  box-shadow: var(--shadow-accent);
+}
+
+.sp-sidebar__wordmark {
+  display: block;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-black);
+  letter-spacing: 0.02em;
+  line-height: 1.1;
+}
+
+.sp-sidebar__tagline {
+  display: block;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.sp-sidebar__nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: var(--space-1);
+}
+
+.sp-navgroup {
+  display: grid;
+  gap: 2px;
+}
+
+.sp-navgroup__label {
+  padding: 0 var(--space-3) var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.sp-navitem {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  text-align: left;
+  cursor: pointer;
+  transition: var(--transition-colors);
+}
+
+.sp-navitem__icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  color: var(--text-muted);
+  transition: var(--transition-colors);
+}
+
+.sp-navitem__label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sp-navitem:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.sp-navitem:hover .sp-navitem__icon {
+  color: var(--text-secondary);
+}
+
+.sp-navitem--active {
+  background: var(--surface-3);
+  color: var(--text-primary);
+  font-weight: var(--weight-bold);
+}
+
+/* Barra na cor do tema marcando a tela atual. */
+.sp-navitem--active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 7px;
+  bottom: 7px;
+  width: 3px;
+  border-radius: 0 var(--radius-full) var(--radius-full) 0;
+  background: var(--color-accent);
+}
+
+.sp-navitem--active .sp-navitem__icon {
+  color: var(--color-accent);
+}
+
+/* Ponto de "acontecendo agora" (ex. champion select detectado pelo LCU) -
+   o unico elemento animado da navegacao, de proposito. */
+.sp-navitem__pulse {
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--color-green);
+  box-shadow: 0 0 0 3px var(--color-green-dim);
+  animation: sp-pulse 2s var(--ease-out) infinite;
+}
+
+/* ─── Resumo do jogador (rodape da sidebar) ─────────────────────────── */
+
+.sp-player {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  min-width: 0;
+}
+
+.sp-player__art {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-default);
+  background-color: var(--surface-3);
+  background-size: cover;
+  background-position: center 22%;
+}
+
+.sp-player__text {
+  min-width: 0;
+  flex: 1;
+}
+
+.sp-player__name {
+  display: block;
+  font-size: var(--text-md);
+  font-weight: var(--weight-bold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sp-player__meta {
+  display: block;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ─── Conteudo ──────────────────────────────────────────────────────── */
+
+.sp-content {
+  height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  /* Padding acompanha a largura da janela, em vez de um valor fixo que
+     desperdica espaco em telas grandes e sufoca em telas pequenas. */
+  padding: clamp(var(--space-5), 2.2vw, var(--space-8));
+}
+
+.sp-content__inner {
+  max-width: var(--content-max);
+  margin: 0 auto;
+  animation: sp-fade-in var(--duration-slow) var(--ease-out);
+}
+
+/* Janelas estreitas (1000-1160px): sidebar encolhe antes de o conteudo
+   ficar apertado. */
+@media (max-width: 1160px) {
+  .sp-shell {
+    grid-template-columns: 196px minmax(0, 1fr);
+  }
+
+  .sp-sidebar__tagline {
+    display: none;
+  }
+}

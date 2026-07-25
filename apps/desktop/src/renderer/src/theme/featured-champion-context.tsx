@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { extractAccentPalette, type AccentPalette } from "./accent-color";
-import { championSplashUrl } from "./datadragon";
+import { championSplashUrl } from "../services/datadragon";
 
 export interface FeaturedChampionOption {
   key: string;

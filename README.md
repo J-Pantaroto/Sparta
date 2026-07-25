@@ -18,11 +18,10 @@ O produto não implementa overlay, tracking durante a partida, automação de pi
 ## Estrutura
 
 ```txt
-apps/desktop      App Electron + React
+apps/desktop      App Electron + React (design system em src/renderer/src/ui)
 apps/api          Backend Fastify e Prisma
 packages/core     Domínio, tipos e algoritmos
 packages/riot     Adaptadores Riot, Data Dragon e LCU read-only
-packages/ui       Tokens e componentes compartilhados
 services/analyzer Serviço Python opcional
 docs              Documentação técnica
 data/seeds        Seeds editáveis de campeões, matchups e composição

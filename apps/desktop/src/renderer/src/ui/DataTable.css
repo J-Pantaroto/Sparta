@@ -1,0 +1,113 @@
+/*
+ * Lista tabular. Substitui o `.champion-row` antigo, que tinha as colunas
+ * fixas do Perfil e era emprestado pelo Pos-game e pela Evolucao - as duas
+ * telas precisavam corrigir o encaixe com `gridColumn` inline. Aqui o
+ * template de colunas e um parametro de quem usa.
+ */
+
+.sp-table {
+  display: grid;
+  min-width: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-veil);
+  overflow: hidden;
+}
+
+.sp-table__head,
+.sp-table__row {
+  display: grid;
+  grid-template-columns: var(--sp-cols, 1fr);
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-5);
+  min-width: 0;
+}
+
+.sp-table__head {
+  padding-top: var(--space-3);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-sunken);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.sp-table__row {
+  position: relative;
+  border: 0;
+  border-bottom: 1px solid var(--border-subtle);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  padding-top: var(--space-4);
+  padding-bottom: var(--space-4);
+  transition: var(--transition-colors);
+}
+
+.sp-table__row:last-child {
+  border-bottom: 0;
+}
+
+.sp-table__row--clickable {
+  cursor: pointer;
+}
+
+.sp-table__row--clickable:hover {
+  background: var(--surface-hover);
+}
+
+.sp-table__row--selected {
+  background: var(--surface-active);
+}
+
+.sp-table__row--selected::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--color-accent);
+}
+
+/* Celula de identidade (avatar + nome + badge), a mais comum aqui. */
+.sp-identity {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.sp-identity__text {
+  min-width: 0;
+}
+
+.sp-identity__name {
+  display: block;
+  font-weight: var(--weight-bold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sp-identity__meta {
+  display: block;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+/* Numero de tabela: alinhamento estavel entre linhas. */
+.sp-num {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+
+.sp-num--strong {
+  color: var(--text-primary);
+  font-weight: var(--weight-bold);
+}
