@@ -5,8 +5,11 @@ import type { LcuChampionSelectSnapshot } from "./read-only-client.js";
  * Mapeia o `assignedPosition` do LCU (minusculo, vocabulario do cliente
  * League) pro `Role` do Sparta. `"bottom"` = ADC, `"utility"` = SUPPORT -
  * nomenclatura da Riot, nao inventada aqui.
+ *
+ * Exportado pra `draft-snapshot.ts` reusar na posicao dos outros jogadores
+ * (aliados e inimigos), em vez de duplicar a tabela.
  */
-const POSITION_TO_ROLE: Record<string, Role> = {
+export const POSITION_TO_ROLE: Record<string, Role> = {
   top: "TOP",
   jungle: "JUNGLE",
   middle: "MID",

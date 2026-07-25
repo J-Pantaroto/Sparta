@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from "electron";
-import type { LcuGameflowPhase } from "@sparta/riot";
+import type { LcuDraftSnapshot, LcuGameflowPhase } from "@sparta/riot";
 import type { Role } from "@sparta/core";
 
 contextBridge.exposeInMainWorld("sparta", {
@@ -42,5 +42,28 @@ contextBridge.exposeInMainWorld("sparta", {
     const listener = (_event: unknown, role: Role | null) => callback(role);
     ipcRenderer.on("sparta:player-role", listener);
     return () => ipcRenderer.removeListener("sparta:player-role", listener);
+  },
+  /**
+   * Assina o draft real lido da sessao de champion select (aliados,
+   * inimigos, banimentos e o inimigo da propria rota) - somente leitura,
+   * nenhuma acao e enviada ao cliente. null fora do champion select.
+   */
+  /**
+   * Estado atual do LCU sob demanda. Os `on*` acima so disparam quando o
+   * valor muda; quem monta depois (recarga do renderer, ou o app aberto ja
+   * dentro do champion select) usa isto pra nao comecar vazio.
+   */
+  getLcuState(): Promise<{
+    phase: LcuGameflowPhase | null;
+    pickOrder: number | null;
+    playerRole: Role | null;
+    draft: LcuDraftSnapshot | null;
+  }> {
+    return ipcRenderer.invoke("sparta:lcu-state");
+  },
+  onDraftSnapshot(callback: (draft: LcuDraftSnapshot | null) => void) {
+    const listener = (_event: unknown, draft: LcuDraftSnapshot | null) => callback(draft);
+    ipcRenderer.on("sparta:draft-snapshot", listener);
+    return () => ipcRenderer.removeListener("sparta:draft-snapshot", listener);
   }
 });

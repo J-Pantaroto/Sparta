@@ -1,4 +1,4 @@
-import type { LcuGameflowPhase } from "@sparta/riot";
+import type { LcuDraftSnapshot, LcuGameflowPhase } from "@sparta/riot";
 import type { Role } from "@sparta/core";
 
 export {};
@@ -13,6 +13,15 @@ declare global {
       downloadSkin: (url: string, fileName: string) => Promise<string>;
       onPickOrder: (callback: (pickOrder: number | null) => void) => () => void;
       onPlayerRole: (callback: (role: Role | null) => void) => () => void;
+      /** Estado atual do LCU, pra quem monta depois do ultimo evento. */
+      getLcuState: () => Promise<{
+        phase: LcuGameflowPhase | null;
+        pickOrder: number | null;
+        playerRole: Role | null;
+        draft: LcuDraftSnapshot | null;
+      }>;
+      /** Draft real (aliados/inimigos/bans) lido da sessao de champion select. */
+      onDraftSnapshot: (callback: (draft: LcuDraftSnapshot | null) => void) => () => void;
     };
   }
 }

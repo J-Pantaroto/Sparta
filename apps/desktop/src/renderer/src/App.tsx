@@ -1,5 +1,6 @@
-import type { DraftState, PickRecommendation, Role } from "@sparta/core";
-import { useEffect, useState } from "react";
+import type { DraftPick, DraftState, PickRecommendation, Role } from "@sparta/core";
+import type { LcuDraftMember, LcuDraftSnapshot } from "@sparta/riot";
+import { useEffect, useMemo, useState } from "react";
 import { navGroups, type Page } from "./app/navigation";
 import { useAsyncData } from "./hooks/use-async-data";
 import {
@@ -9,7 +10,7 @@ import {
   type RiotAccountSummary,
   type SessionUser
 } from "./services/api-client";
-import { fetchLatestDataDragonVersion } from "./services/datadragon";
+import { fetchAllChampions, fetchLatestDataDragonVersion, type DataDragonChampionSummary } from "./services/datadragon";
 import { AuthScreen } from "./features/AuthScreen";
 import { ChampionSelectScreen } from "./features/ChampionSelectScreen";
 import { DashboardScreen } from "./features/DashboardScreen";
@@ -130,6 +131,86 @@ function SpartaApp() {
     );
   }, [autoPlayerRole]);
 
+  // Draft real (aliados, inimigos, banimentos) lido da sessao do LCU.
+  // null fora do champion select - ai o preenchimento manual volta a valer.
+  const [autoDraft, setAutoDraft] = useState<LcuDraftSnapshot | null>(null);
+  useEffect(() => {
+    if (sessionStatus !== "ready" || !window.sparta?.onDraftSnapshot) return;
+    const unsubscribe = window.sparta.onDraftSnapshot(setAutoDraft);
+    return unsubscribe;
+  }, [sessionStatus]);
+
+  // Os `on*` acima so disparam quando o valor MUDA. Abrir o Sparta ja dentro
+  // de um champion select (ou recarregar o renderer no meio dele) deixaria a
+  // tela vazia ate o proximo pick - por isso o estado atual e pedido uma vez
+  // no monte.
+  useEffect(() => {
+    if (sessionStatus !== "ready" || !window.sparta?.getLcuState) return;
+    let cancelled = false;
+    void window.sparta.getLcuState().then((state) => {
+      if (cancelled) return;
+      if (state.phase === "ChampSelect") {
+        setChampSelectActive(true);
+        setPage("select");
+      }
+      if (state.pickOrder !== null) setAutoPickOrder(state.pickOrder);
+      if (state.playerRole !== null) setAutoPlayerRole(state.playerRole);
+      if (state.draft !== null) setAutoDraft(state.draft);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionStatus]);
+
+  // O LCU so entrega championId; o nome (que o motor usa pra casar com a
+  // tabela de atributos) vem do catalogo da Data Dragon, ja carregado no
+  // renderer. Sem catalogo ainda, o merge espera - melhor um tick a mais do
+  // que gravar "Campeao 64" como nome.
+  const championCatalog = useAsyncData<DataDragonChampionSummary[]>(
+    () => fetchAllChampions(ddragonVersion),
+    [ddragonVersion]
+  );
+  const championNames = useMemo(() => {
+    const names = new Map<number, string>();
+    (championCatalog.data ?? []).forEach((champion) => names.set(champion.id, champion.name));
+    return names;
+  }, [championCatalog.data]);
+
+  useEffect(() => {
+    if (!autoDraft || championNames.size === 0) return;
+
+    const toPick = (member: LcuDraftMember, team: "ally" | "enemy"): DraftPick => ({
+      championId: member.championId,
+      championName: championNames.get(member.championId) ?? String(member.championId),
+      // `role` e obrigatorio no tipo, mas nenhum motor le o papel de aliado
+      // ou inimigo (o confronto de rota vem de `enemyLaneChampionId`). Sem
+      // posicao atribuida pela fila, fica o mesmo placeholder ja usado no
+      // seletor manual.
+      role: member.position ?? "MID",
+      team
+    });
+
+    const proximo: Partial<DraftState> = {
+      allies: autoDraft.allies.map((member) => toPick(member, "ally")),
+      enemies: autoDraft.enemies.map((member) => toPick(member, "enemy")),
+      bannedChampionIds: autoDraft.bannedChampionIds,
+      enemyLaneChampionId: autoDraft.enemyLaneChampionId,
+      selectedChampionId: autoDraft.selectedChampionId
+    };
+
+    setDraft((current) => {
+      const igual =
+        JSON.stringify({
+          allies: current.allies,
+          enemies: current.enemies,
+          bannedChampionIds: current.bannedChampionIds,
+          enemyLaneChampionId: current.enemyLaneChampionId,
+          selectedChampionId: current.selectedChampionId
+        }) === JSON.stringify(proximo);
+      return igual ? current : { ...current, ...proximo };
+    });
+  }, [autoDraft, championNames]);
+
   function handleAuthenticated(token: string) {
     localStorage.setItem(SESSION_TOKEN_KEY, token);
     setSessionToken(token);
@@ -228,6 +309,7 @@ function SpartaApp() {
           noAccountLinked={riotAccounts.length === 0}
           ddragonVersion={ddragonVersion}
           riotAccounts={riotAccounts}
+          draftAutoFilled={autoDraft !== null}
         />
       )}
       {page === "pregame" && <PreGameScreen draft={draft} ddragonVersion={ddragonVersion} />}

@@ -1,7 +1,15 @@
 import { app, BrowserWindow, ipcMain } from "electron";
 import { mkdir, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
-import { derivePickOrder, derivePlayerRole, LcuReadOnlyClient, type LcuGameflowPhase } from "@sparta/riot";
+import {
+  deriveDraftSnapshot,
+  derivePickOrder,
+  derivePlayerRole,
+  isSameDraftSnapshot,
+  LcuReadOnlyClient,
+  type LcuDraftSnapshot,
+  type LcuGameflowPhase
+} from "@sparta/riot";
 import type { Role } from "@sparta/core";
 
 const GAMEFLOW_POLL_INTERVAL_MS = 2500;
@@ -72,11 +80,30 @@ function createWindow() {
  * vez do input manual). Nao envia nenhuma acao ao cliente (ver
  * docs/riot-compliance.md e packages/riot/src/lcu).
  */
+/**
+ * Ultimo estado lido do LCU. O watcher transmite so quando algo muda - sem
+ * isto, um renderer que monta depois (recarga, ou o app aberto ja dentro do
+ * champion select) ficaria sem estado nenhum ate a proxima mudanca.
+ */
+interface LcuState {
+  phase: LcuGameflowPhase | null;
+  pickOrder: number | null;
+  playerRole: Role | null;
+  draft: LcuDraftSnapshot | null;
+}
+
+let lcuState: LcuState = { phase: null, pickOrder: null, playerRole: null, draft: null };
+
+function registerLcuStateHandler() {
+  ipcMain.handle("sparta:lcu-state", () => lcuState);
+}
+
 function startGameflowWatcher() {
   const client = new LcuReadOnlyClient();
   let lastPhase: LcuGameflowPhase | null = null;
   let lastPickOrder: number | null = null;
   let lastPlayerRole: Role | null = null;
+  let lastDraft: LcuDraftSnapshot | undefined;
 
   function broadcast(channel: string, payload: unknown) {
     for (const window of BrowserWindow.getAllWindows()) {
@@ -90,6 +117,7 @@ function startGameflowWatcher() {
         lastPhase = phase;
         broadcast("sparta:gameflow-phase", phase);
       }
+      lcuState = { ...lcuState, phase: lastPhase };
 
       if (phase !== "ChampSelect") {
         if (lastPickOrder !== null) {
@@ -100,6 +128,11 @@ function startGameflowWatcher() {
           lastPlayerRole = null;
           broadcast("sparta:player-role", null);
         }
+        if (lastDraft !== undefined) {
+          lastDraft = undefined;
+          broadcast("sparta:draft-snapshot", null);
+        }
+        lcuState = { phase: lastPhase, pickOrder: null, playerRole: null, draft: null };
         return;
       }
 
@@ -121,12 +154,30 @@ function startGameflowWatcher() {
         lastPlayerRole = playerRole ?? null;
         broadcast("sparta:player-role", lastPlayerRole);
       }
+
+      // Aliados, inimigos e banimentos reais. So propaga quando muda de
+      // fato: o poll roda a cada 2.5s e a maior parte dos ticks e igual -
+      // sem a comparacao o renderer refaria a busca de recomendacoes a cada
+      // tick, porque `draft` entraria como dependencia nova.
+      const draft = deriveDraftSnapshot(snapshot) ?? lastDraft;
+      if (!isSameDraftSnapshot(draft, lastDraft)) {
+        lastDraft = draft;
+        broadcast("sparta:draft-snapshot", draft ?? null);
+      }
+
+      lcuState = {
+        phase: lastPhase,
+        pickOrder: lastPickOrder,
+        playerRole: lastPlayerRole,
+        draft: lastDraft ?? null
+      };
     });
   }, GAMEFLOW_POLL_INTERVAL_MS);
 }
 
 void app.whenReady().then(() => {
   createWindow();
+  registerLcuStateHandler();
   startGameflowWatcher();
   registerSkinDownloadHandler();
   app.on("activate", () => {

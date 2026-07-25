@@ -6,6 +6,55 @@ Este arquivo é um handoff para outro agente de desenvolvimento continuar o proj
 
 Uma sessão anterior fez uma auditoria completa do repositório (real vs mock vs so-tipo), aprovou um plano de evolução em 5 épicos (Riot Sync, Player Intelligence, Draft Intelligence, Post-Game Coach, Growth Journey) e implementou todas as 5 fases, além de um refinamento visual do desktop e correções de infra/segurança. Uma sessão seguinte **conectou o desktop às rotas reais da API** (Dashboard/Perfil/Champion Select/Pós-game/nova tela Evolução, removendo `mock-data.ts`) e implementou as **Sub-fases 6a e 6b** (tela de Configurações + tema com campeão/skin real + configuração "quantas partidas analisar"). Uma sessão seguinte implementou a **Sub-fase 6c (ordem de pick automática via LCU)**, encerrando a Fase 6. Uma sessão seguinte implementou a **Fase 7 (auditoria e documentação dos algoritmos de scoring)**. Uma sessão seguinte implementou a **Fase 8 inteira** (Sub-fase 8a: motor de build de campeão + seletor de time inimigo; Sub-fase 8b: polimento visual do desktop) e validou tudo contra a conta real Zekerus#117. Essa validação real encontrou um bug real (corrigido, ver abaixo) e motivou o pedido desta sessão: **Fase 9 (linguagem visual real - badges/barras nas telas de análise)**, implementada em duas sub-fases (9a: componentes compartilhados + Dashboard + Champion Select; 9b: Perfil + Pós-game + Evolução), encerrando a Fase 9. A validação real da 9b encontrou mais um bug real (corrigido, ver abaixo). **Depois do merge da 9b, o usuário pediu explicitamente validação contra o app Electron real empacotado (não só o dev server aberto numa aba de navegador comum)** — essa validação descobriu e corrigiu um bug real grave e pré-existente (ver "Bug real corrigido: preload nunca carregava de verdade" abaixo), presente desde o início do projeto. Depois de abrir o app real pro usuário avaliar, ele deu **feedback de UX ao vivo** (capturas do próprio Sparta + referências de apps reais de LoL) que motivou a **Fase 10 (polimento de UX + robustez de ícones de campeão)**, com liberdade explícita do usuário pra usar outras fontes/APIs como fallback e não se limitar ao escopo inicial ("não é mais protótipo, é programa real"). Uma sessão seguinte configurou o **`gh` CLI autenticado** (instalado via winget, device flow) - PRs/merges/CI agora são feitos pelo terminal, não mais pelo navegador. Uma nova rodada de feedback do usuário (as mudanças visuais ainda pareciam pequenas, botões sem estilo, download de skin quebrado, Champion Select acessível livremente sem sessão real, falta de detecção de posição/lane, telas resumidas demais) motivou a **Fase 11 (detecção real de posição/lane via LCU + gating do Champion Select + correções de polimento)**. Depois do merge da 11, o usuário reportou que **o módulo de temas continuava instável, sem baixar nem aplicar o tema** - a investigação achou dois bugs reais e independentes (ver "Bug real corrigido: módulo de temas" logo abaixo), ambos corrigidos na **Fase 12**. Depois veio a **Fase 13** (o tema veste o app). A partir daí o usuário pediu uma **modernização completa de UI/UX** tendo Mobalytics, Blitz e iTero como referência de princípios - isso virou a **Fase 14**, implementada em seis subfases (A a F), uma por PR. Tudo isso **já está mergeado em `main`**.
 
+### Fase 16: o draft real vem do League Client
+
+Até aqui o Sparta lia da sessão de champion select **só** a posição do jogador e a ordem de
+pick. Aliados, inimigos e banimentos ficavam de fora: o time inimigo tinha que ser marcado à
+mão num grid de ~170 ícones, no meio do champion select. `myTeam`/`theirTeam`/`actions` já
+estavam tipados em `read-only-client.ts` desde a Fase 6c e nunca foram consumidos.
+
+1. **`packages/riot/src/lcu/draft-snapshot.ts`** (novo) - `deriveDraftSnapshot` monta
+   aliados, inimigos, banimentos, o inimigo da própria rota e o campeão do jogador a partir da
+   sessão. Decisões: `championId: 0` (ainda não escolheu) é descartado; bans só quando a ação
+   está `completed`, dos dois times (um ban derruba o campeão pra todo mundo); e o **próprio
+   jogador fica fora de `allies`** - aliado ali significa companheiro de time, e incluir a si
+   mesmo faria a análise de composição contar o candidato duas vezes (o motor já injeta o
+   campeão avaliado). O campeão do jogador sai em `selectedChampionId`. `isSameDraftSnapshot`
+   evita propagar ticks idênticos - sem isso o renderer refaria a busca de recomendações a
+   cada 2.5s. 14 testes.
+2. **IPC `sparta:draft-snapshot`** no mesmo poll que já derivava posição e ordem de pick.
+3. **`App.tsx`** resolve `championId → championName` pelo catálogo da Data Dragon já carregado
+   no renderer (o motor casa aliados e inimigos **por nome**) e sincroniza no `DraftState`.
+   O processo main não tem catálogo, por isso a derivação devolve só IDs.
+4. **Champion Select** ganhou a fileira "Seu time", o contador de banidos, e **esconde o lápis
+   de edição manual quando o draft vem do cliente** - uma edição manual seria sobrescrita no
+   tick seguinte, em silêncio. Sem cliente (modo simulação), a edição manual continua igual.
+
+**Limitação real encontrada e corrigida no caminho**: o watcher só transmitia **quando o valor
+mudava**. Abrir o Sparta já dentro de um champion select (ou recarregar o renderer no meio de
+um) deixava a tela vazia até o próximo pick, porque o último evento já tinha passado. Novo
+`sparta:lcu-state` (request/response) devolve o estado atual sob demanda, e o renderer o
+consulta uma vez ao montar.
+
+**Validação**: a leitura HTTP do cliente do League continua **não validada** - exige o League
+aberto e em champion select, indisponível neste ambiente. O que foi validado, injetando
+temporariamente uma sessão sintética no lugar da chamada ao LCU (revertida antes do commit),
+é **todo o caminho a partir da derivação**: `deriveDraftSnapshot` → comparação no main → IPC →
+preload → merge no `DraftState` → resolução de nomes → tela. Medido no Electron real:
+`getLcuState()` devolvendo `allies [103 MID, 222 ADC]`, `enemies [64 JUNGLE, 157 MID]`,
+`bans [55, 91]`, `enemyLaneChampionId 64`, `selectedChampionId 234`; a tela abriu sozinha em
+Champion Select com posição Jungle, "Seu time 2 escolhidos" (Ahri, Jinx), "2/5 revelados" +
+"2 banidos" (Lee Sin, Yasuo), lápis ausente, 0 imagens quebradas. E as métricas reagiram ao
+draft real: encaixe de composição 69, resposta ao draft inimigo 58 e sinergia com o time 21
+(vermelho) - contra 50 neutro em três delas quando não havia time.
+
+`docs/riot-compliance.md` foi atualizado com o escopo exato do que passa a ser lido e a
+reafirmação de que nada é escrito no cliente: o Sparta não seleciona, bane, trava nem troca
+campeão ou runas. O botão "Confirmar campeão" registra a escolha **só no Sparta**, pra gerar
+build e análise pré-game.
+
+`pnpm typecheck && pnpm lint && pnpm test && pnpm build` completos (194 testes).
+
 ### Fase 15: cobertura real do motor de draft (ChampionTag derivado)
 
 Depois da Fase 14 o usuário perguntou o que ainda estava pendente. A resposta apontava o
@@ -1127,7 +1176,7 @@ Fase 1 (Riot Sync), o refinamento visual do desktop, Fase 2 (Player Intelligence
 4. Pré-computar/cachear matchups se a latência de `POST /drafts/recommendations` incomodar conforme o histórico crescer (hoje calculado na hora a cada chamada, ver "O que a Fase 3 entregou").
 5. Dicas de objetivos no `PostGameAnalysis` — `objectiveEvents` (Fase 1) não preserva atribuição de time no formato atual (`"LABEL@M:SS"`), precisaria de um `MatchTimelineSummary` mais rico pra saber quais objetivos foram do próprio time.
 6. Fila real (Redis/BullMQ) para o sync, se o padrão de uso mostrar que o teto de 20-50 partidas por chamada síncrona é pouco — o `docker-compose.yml` já provisiona Redis, só falta o worker.
-7. LCU read-only: já implementado o poll de `gameflow-phase` (trocar de aba) e, desde a Fase 6c, de `champ-select-session` pra ordem de pick automática. Próximo passo natural: usar o resto da sessão (`myTeam`/`theirTeam`/`actions`, já tipados em `read-only-client.ts`) pra pré-carregar aliados/inimigos/banimentos reais no `DraftState` automaticamente — hoje (Sub-fase 8a) o time inimigo é escolhido manualmente no seletor novo, LCU real substituiria isso quando disponível.
+7. Validar a leitura do LCU dentro de um champion select **real** (precisa do League aberto): posição, ordem de pick, troca de lane e o draft importado na Fase 16. A derivação e todo o caminho até a tela já foram validados com sessão sintética; o que falta é a chamada HTTP ao cliente de verdade.
 8. Trocar o token HMAC caseiro por algo mais robusto (rotação de segredo, refresh token) se o produto for além do MVP local.
 9. Empacotamento do desktop (electron-builder/NSIS/ASAR) — hoje não existe nenhuma configuração de build de instalador, só `electron-vite build`.
 10. Mitigar a limitação conhecida da Fase 5 (`WeaknessTrend` derivado de um corte top-3 por partida, ver "O que a Fase 5 entregou") lendo razões brutas em vez de só `weaknesses[]`, se o ruído de entrada/saída na fronteira do corte incomodar na prática.
