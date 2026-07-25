@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add *)",
+      "Bash(rm \".git/index.lock\")",
+      "Bash(git commit -m ' *)",
+      "Bash(npx pnpm@10.34.4 install)",
+      "Bash(docker compose *)",
+      "Bash(git log *)",
+      "Bash(curl -s \"https://ddragon.leagueoflegends.com/cdn/14.14.1/data/en_US/item.json\")",
+      "Bash(node -e ' *)",
+      "Bash(curl -s \"https://ddragon.leagueoflegends.com/cdn/14.14.1/data/en_US/champion.json\")",
+      "Bash(cd \"C:\\\\Users\\\\jhona\\\\OneDrive\\\\Área de Trabalho\\\\Sparta\" && cat apps/desktop/src/renderer/src/features/SkinSplash.tsx | head -20 && echo \"=== datadragon fetchChampionSkins ===\" && sed -n '/export async function fetchChampionSkins/,/^}/p' apps/desktop/src/renderer/src/features/datadragon.ts)",
+      "Bash(curl -s -I -H \"Origin: http://localhost:5173\" \"https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Zed_1.jpg\")",
+      "Bash(curl -s -I -H \"Origin: http://localhost:5173\" \"https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champions/238.json\")",
+      "Bash(sed -i 's#from \"\\\\./api-client\"#from \"../services/api-client\"#; s#from \"\\\\./datadragon\"#from \"../services/datadragon\"#; s#from \"\\\\./use-async-data\"#from \"../hooks/use-async-data\"#; s#from \"\\\\./featured-champion-context\"#from \"../theme/featured-champion-context\"#; s#from \"\\\\./ChampionSkinPicker\"#from \"../theme/ChampionSkinPicker\"#' features/*.tsx)",
+      "Bash(sed -i 's#from \"\\\\./datadragon\"#from \"../services/datadragon\"#; s#from \"\\\\./use-async-data\"#from \"../hooks/use-async-data\"#; s#from \"\\\\./ChampionGridPicker\"#from \"../features/ChampionGridPicker\"#' theme/*.tsx theme/*.ts)",
+      "Bash(sed -i 's#\\\\./features/datadragon#./services/datadragon#; s#\\\\./features/api-client#./services/api-client#; s#\\\\./features/use-async-data#./hooks/use-async-data#; s#\\\\./features/featured-champion-context#./theme/featured-champion-context#' App.tsx)",
+      "Bash(git rm *)"
+    ]
+  }
+}
