@@ -4,9 +4,9 @@ Este arquivo é um handoff para outro agente de desenvolvimento continuar o proj
 
 ## Pendências desta sessão (ler primeiro)
 
-Uma sessão anterior fez uma auditoria completa do repositório (real vs mock vs so-tipo), aprovou um plano de evolução em 5 épicos (Riot Sync, Player Intelligence, Draft Intelligence, Post-Game Coach, Growth Journey) e implementou todas as 5 fases, além de um refinamento visual do desktop e correções de infra/segurança. Uma sessão seguinte **conectou o desktop às rotas reais da API** (Dashboard/Perfil/Champion Select/Pós-game/nova tela Evolução, removendo `mock-data.ts`) e implementou as **Sub-fases 6a e 6b** (tela de Configurações + tema com campeão/skin real + configuração "quantas partidas analisar"). Uma sessão seguinte implementou a **Sub-fase 6c (ordem de pick automática via LCU)**, encerrando a Fase 6. Uma sessão seguinte implementou a **Fase 7 (auditoria e documentação dos algoritmos de scoring)**. Uma sessão seguinte implementou a **Fase 8 inteira** (Sub-fase 8a: motor de build de campeão + seletor de time inimigo; Sub-fase 8b: polimento visual do desktop) e validou tudo contra a conta real Zekerus#117. Essa validação real encontrou um bug real (corrigido, ver abaixo) e motivou o pedido desta sessão: **Fase 9 (linguagem visual real - badges/barras nas telas de análise)**, implementada em duas sub-fases (9a: componentes compartilhados + Dashboard + Champion Select; 9b: Perfil + Pós-game + Evolução), encerrando a Fase 9. A validação real da 9b encontrou mais um bug real (corrigido, ver abaixo). **Depois do merge da 9b, o usuário pediu explicitamente validação contra o app Electron real empacotado (não só o dev server aberto numa aba de navegador comum)** — essa validação descobriu e corrigiu um bug real grave e pré-existente (ver "Bug real corrigido: preload nunca carregava de verdade" abaixo), presente desde o início do projeto. Depois de abrir o app real pro usuário avaliar, ele deu **feedback de UX ao vivo** (capturas do próprio Sparta + referências de apps reais de LoL) que motivou a **Fase 10 (polimento de UX + robustez de ícones de campeão)**, com liberdade explícita do usuário pra usar outras fontes/APIs como fallback e não se limitar ao escopo inicial ("não é mais protótipo, é programa real"). Uma sessão seguinte configurou o **`gh` CLI autenticado** (instalado via winget, device flow) - PRs/merges/CI agora são feitos pelo terminal, não mais pelo navegador. Uma nova rodada de feedback do usuário (as mudanças visuais ainda pareciam pequenas, botões sem estilo, download de skin quebrado, Champion Select acessível livremente sem sessão real, falta de detecção de posição/lane, telas resumidas demais) motivou a **Fase 11 (detecção real de posição/lane via LCU + gating do Champion Select + correções de polimento)**. Depois do merge da 11, o usuário reportou que **o módulo de temas continuava instável, sem baixar nem aplicar o tema** - a investigação achou dois bugs reais e independentes (ver "Bug real corrigido: módulo de temas" logo abaixo), ambos corrigidos na **Fase 12**. Tudo isso **já está mergeado em `main`**.
+Uma sessão anterior fez uma auditoria completa do repositório (real vs mock vs so-tipo), aprovou um plano de evolução em 5 épicos (Riot Sync, Player Intelligence, Draft Intelligence, Post-Game Coach, Growth Journey) e implementou todas as 5 fases, além de um refinamento visual do desktop e correções de infra/segurança. Uma sessão seguinte **conectou o desktop às rotas reais da API** (Dashboard/Perfil/Champion Select/Pós-game/nova tela Evolução, removendo `mock-data.ts`) e implementou as **Sub-fases 6a e 6b** (tela de Configurações + tema com campeão/skin real + configuração "quantas partidas analisar"). Uma sessão seguinte implementou a **Sub-fase 6c (ordem de pick automática via LCU)**, encerrando a Fase 6. Uma sessão seguinte implementou a **Fase 7 (auditoria e documentação dos algoritmos de scoring)**. Uma sessão seguinte implementou a **Fase 8 inteira** (Sub-fase 8a: motor de build de campeão + seletor de time inimigo; Sub-fase 8b: polimento visual do desktop) e validou tudo contra a conta real Zekerus#117. Essa validação real encontrou um bug real (corrigido, ver abaixo) e motivou o pedido desta sessão: **Fase 9 (linguagem visual real - badges/barras nas telas de análise)**, implementada em duas sub-fases (9a: componentes compartilhados + Dashboard + Champion Select; 9b: Perfil + Pós-game + Evolução), encerrando a Fase 9. A validação real da 9b encontrou mais um bug real (corrigido, ver abaixo). **Depois do merge da 9b, o usuário pediu explicitamente validação contra o app Electron real empacotado (não só o dev server aberto numa aba de navegador comum)** — essa validação descobriu e corrigiu um bug real grave e pré-existente (ver "Bug real corrigido: preload nunca carregava de verdade" abaixo), presente desde o início do projeto. Depois de abrir o app real pro usuário avaliar, ele deu **feedback de UX ao vivo** (capturas do próprio Sparta + referências de apps reais de LoL) que motivou a **Fase 10 (polimento de UX + robustez de ícones de campeão)**, com liberdade explícita do usuário pra usar outras fontes/APIs como fallback e não se limitar ao escopo inicial ("não é mais protótipo, é programa real"). Uma sessão seguinte configurou o **`gh` CLI autenticado** (instalado via winget, device flow) - PRs/merges/CI agora são feitos pelo terminal, não mais pelo navegador. Uma nova rodada de feedback do usuário (as mudanças visuais ainda pareciam pequenas, botões sem estilo, download de skin quebrado, Champion Select acessível livremente sem sessão real, falta de detecção de posição/lane, telas resumidas demais) motivou a **Fase 11 (detecção real de posição/lane via LCU + gating do Champion Select + correções de polimento)**. Depois do merge da 11, o usuário reportou que **o módulo de temas continuava instável, sem baixar nem aplicar o tema** - a investigação achou dois bugs reais e independentes (ver "Bug real corrigido: módulo de temas" logo abaixo), ambos corrigidos na **Fase 12**. Depois veio a **Fase 13** (o tema veste o app). A partir daí o usuário pediu uma **modernização completa de UI/UX** tendo Mobalytics, Blitz e iTero como referência de princípios - isso virou a **Fase 14**, implementada em seis subfases (A a F), uma por PR. Tudo isso **já está mergeado em `main`**.
 
-### Fase 14: modernização completa de UI/UX (em andamento)
+### Fase 14: modernização completa de UI/UX (concluída)
 
 Pedido do usuário depois da Fase 13: transformar o Sparta num app desktop com aparência e
 experiência comparáveis a produtos consolidados de LoL (Mobalytics, Blitz, iTero como
@@ -225,6 +225,38 @@ virou "Disponível offline"; na aba Análise, clicar "Últimas 100" salvou e o
 `GET /players/settings` da API real confirmou `matchAnalysisLimit: 100` (restaurado pra 50
 depois do teste). 0 imagens quebradas.
 `pnpm typecheck && pnpm lint && pnpm test && pnpm build` completos.
+
+#### Subfase 14F - polimento, acessibilidade e validação final (encerra a Fase 14)
+
+1. **Telas de autenticação migradas** - `AuthScreen` e `LinkRiotAccountScreen` eram as últimas
+   com CSS próprio (`.auth-*`). Novo `ui/AuthLayout.tsx` (+ `AuthForm`) e novo primitivo
+   `TextField`; as duas telas passaram a usar `Field`/`Button`/`SignalChip` como o resto do app.
+   O estado "verificando sessão" também usa o `AuthLayout`, pra a transição pro app não trocar
+   o fundo debaixo do usuário.
+2. **`styles/global.css` deletado** e os **aliases legados de token removidos** de `tokens.css`
+   (existiam só pra a migração ser incremental). O CSS do app agora é 100% `ui/tokens.css` +
+   `ui/base.css` + um arquivo por componente. **Zero classe fora do prefixo `sp-`** no DOM.
+
+**Validação medida no app Electron real (CDP), conta Zekerus#117:**
+
+| O quê | Resultado |
+|---|---|
+| 1000x720 / 1280x720 / 1440x900 / 1920x1080, nas 7 telas | Sem overflow horizontal, sem card cortado, navegação completa |
+| Sidebar responsiva | 232px acima de 1160px de viewport, 196px abaixo (medido em cada largura) |
+| Foco por teclado | Tab real (`Input.dispatchKeyEvent`): `focusVisible: true`, anel de 2px na cor do tema |
+| `prefers-reduced-motion: reduce` | Transição de card e animação de spinner caem pra ~0s |
+| Trava da cor de destaque | 4 skins de artes bem diferentes: Lux Elementalista `hsl(38)` dourada, Thresh Terror Profundo `hsl(203 100% 45%)` (o mais escuro permitido), Leona Solari `hsl(23)`, Nocturne `hsl(203)` - **todas dentro** de S≥55% e L entre 45% e 62% |
+| Offline com tema baixado | Com a rede desligada, a arte (data URL) e a cor continuam aplicadas |
+| Imagens quebradas | 0 em todas as telas, em todas as validações |
+
+**Limite honesto do teste de offline**: recarregar a página com a rede desligada não renderiza
+nada **em modo de desenvolvimento**, porque o renderer é servido pelo Vite via
+`http://localhost:5173` - não é comportamento do app empacotado, onde a página vem do bundle
+local. O que dá pra afirmar com o que foi medido: o tema baixado e a cor sobrevivem sem rede
+enquanto o app está aberto. Recarga offline no app empacotado continua não validada.
+
+**Não validado nesta fase** (mesmo limite de sempre): a detecção real de posição/ordem de pick
+dentro de uma sessão de champion select de verdade, que precisa do cliente do League aberto.
 
 ### Fase 13: o tema veste o app (sem chromas + cor dinâmica + splash nas telas)
 
@@ -903,11 +935,21 @@ Próximo passo natural: conectar o desktop às rotas de perfil/drafts reais (hoj
 
 ## Desktop atual
 
-Entrada:
+Estrutura do renderer (reorganizada na Fase 14):
 
 ```txt
-apps/desktop/src/renderer/src/App.tsx
+apps/desktop/src/renderer/src/
+  App.tsx        # so sessao, deteccao via LCU e roteamento (~215 linhas)
+  app/           # navegacao (grupos da sidebar) e rotulos do dominio
+  ui/            # DESIGN SYSTEM: tokens.css + base.css + 1 CSS por componente
+  features/      # uma tela por arquivo
+  theme/         # tema por skin (contexto, extracao de cor, galeria)
+  services/      # api-client e Data Dragon
+  hooks/         # use-async-data
 ```
+
+Nao existe mais `styles/global.css`: todo o CSS sai de `ui/tokens.css`, `ui/base.css` e do
+arquivo colocado de cada componente. Toda classe usa o prefixo `sp-`. Ver `docs/design-system.md`.
 
 Telas existentes:
 

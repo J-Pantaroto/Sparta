@@ -19,13 +19,14 @@
  */
 
 export { AppShell, Sidebar, SidebarGroup, SidebarNavItem, PlayerSummary } from "./AppShell";
+export { AuthForm, AuthLayout } from "./AuthLayout";
 export { Badge, StatusBadge, type BadgeTone } from "./Badge";
 export { Button, IconButton } from "./Button";
 export { Card, InteractiveCard, SectionHeader } from "./Card";
 export { ChampionAvatar, EmptyAvatarSlot } from "./ChampionAvatar";
 export { ChampionGrid } from "./ChampionGrid";
 export { DataRow, DataTable, IdentityCell, NumCell } from "./DataTable";
-export { Field, NumberField, ReadOnlyValue, SearchInput, Select } from "./Field";
+export { Field, NumberField, ReadOnlyValue, SearchInput, Select, TextField } from "./Field";
 export {
   Columns,
   Grid,

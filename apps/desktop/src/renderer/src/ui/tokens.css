@@ -135,20 +135,4 @@
   --sidebar-width: 232px;
   --content-max: 1560px;
 
-  /*
-   * ALIASES LEGADOS - os nomes que `styles/global.css` ainda usa enquanto
-   * as telas migram (uma subfase por vez). Existem so pra a migracao ser
-   * incremental em vez de big-bang; devem sumir quando nada mais os
-   * referenciar.
-   */
-  --color-bg: var(--bg-base);
-  --color-surface: var(--surface-1);
-  --color-surface-elevated: var(--surface-3);
-  --color-surface-panel: var(--surface-veil);
-  --color-border: var(--border-default);
-  --color-text-primary: var(--text-primary);
-  --color-text-secondary: var(--text-secondary);
-  --color-text-muted: var(--text-muted);
-  --transition-fast: var(--duration-fast) var(--ease-out);
-  --transition-medium: var(--duration-slow) var(--ease-out);
 }

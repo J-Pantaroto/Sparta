@@ -1,0 +1,132 @@
+/*
+ * Telas fora do shell (entrar, criar conta, vincular Riot). Mesma
+ * linguagem do resto do app - a splash do tema ao fundo, um cartão
+ * elevado por cima e os mesmos primitivos de botão e campo.
+ */
+
+.sp-auth {
+  position: relative;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: var(--space-7);
+  background-color: var(--bg-base);
+  background-size: cover;
+  background-position: center 15%;
+  animation: sp-fade var(--duration-slow) var(--ease-out);
+}
+
+.sp-auth::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 50% 0%, var(--color-accent-glow), transparent 48%),
+    linear-gradient(180deg, rgba(4, 4, 5, 0.62) 0%, rgba(4, 4, 5, 0.93) 68%, var(--bg-base) 100%);
+}
+
+.sp-auth__card {
+  position: relative;
+  width: 100%;
+  max-width: 390px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-xl);
+  background: var(--surface-veil-strong);
+  padding: var(--space-7);
+  box-shadow: var(--shadow-lg);
+  animation: sp-fade-in var(--duration-slow) var(--ease-out);
+}
+
+.sp-auth__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
+}
+
+.sp-auth__mark {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: var(--radius-md);
+  background: linear-gradient(140deg, var(--color-accent), var(--color-accent-soft));
+  color: var(--text-on-accent);
+  font-weight: var(--weight-black);
+  box-shadow: var(--shadow-accent);
+}
+
+.sp-auth__wordmark {
+  display: block;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-black);
+}
+
+.sp-auth__tagline {
+  display: block;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.sp-auth__title {
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-tight);
+}
+
+.sp-auth__subtitle {
+  margin-top: var(--space-2);
+  color: var(--text-secondary);
+  font-size: var(--text-md);
+  line-height: var(--leading-snug);
+}
+
+.sp-auth__form {
+  display: grid;
+  gap: var(--space-4);
+  margin-top: var(--space-6);
+}
+
+.sp-auth__footer {
+  margin-top: var(--space-5);
+  color: var(--text-secondary);
+  font-size: var(--text-md);
+  text-align: center;
+}
+
+.sp-auth__link {
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--color-accent);
+  font: inherit;
+  font-weight: var(--weight-semibold);
+  cursor: pointer;
+  border-radius: var(--radius-xs);
+}
+
+.sp-auth__link:hover {
+  text-decoration: underline;
+}
+
+.sp-auth__skip {
+  margin-top: var(--space-4);
+  text-align: center;
+}
+
+.sp-auth__skip button {
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  text-decoration: underline;
+  cursor: pointer;
+  border-radius: var(--radius-xs);
+  transition: var(--transition-colors);
+}
+
+.sp-auth__skip button:hover {
+  color: var(--text-secondary);
+}

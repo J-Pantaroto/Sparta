@@ -124,3 +124,31 @@ export function SearchInput({ value, onChange, placeholder = "Buscar...", ariaLa
     </div>
   );
 }
+
+interface TextFieldProps {
+  value: string;
+  onChange: (value: string) => void;
+  id?: string;
+  type?: "text" | "email" | "password";
+  placeholder?: string;
+  required?: boolean;
+  minLength?: number;
+  autoComplete?: string;
+  ariaLabel?: string;
+}
+
+/** Entrada de texto simples com o estilo do design system. */
+export function TextField({ value, onChange, id, type = "text", ...rest }: TextFieldProps) {
+  const { ariaLabel, ...inputProps } = rest;
+  return (
+    <input
+      {...inputProps}
+      id={id}
+      type={type}
+      className="sp-input"
+      value={value}
+      aria-label={ariaLabel}
+      onChange={(event) => onChange(event.target.value)}
+    />
+  );
+}
