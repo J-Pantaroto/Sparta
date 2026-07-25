@@ -51,6 +51,8 @@ interface ChampionSelectScreenProps {
   noAccountLinked: boolean;
   ddragonVersion: string;
   riotAccounts: RiotAccountSummary[];
+  /** O draft veio da sessao do LCU - a edicao manual sai de cena. */
+  draftAutoFilled: boolean;
 }
 
 /**
@@ -69,7 +71,8 @@ export function ChampionSelectScreen({
   recommendationsStatus,
   noAccountLinked,
   ddragonVersion,
-  riotAccounts
+  riotAccounts,
+  draftAutoFilled
 }: ChampionSelectScreenProps) {
   const [confirmedChampion, setConfirmedChampion] = useState<{ championId: number; championName: string } | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -162,7 +165,11 @@ export function ChampionSelectScreen({
         title="Sua decisão de pick"
         meta={
           champSelectActive ? (
-            <StatusBadge state="live">Posição e ordem detectadas pelo League Client</StatusBadge>
+            <StatusBadge state="live">
+              {draftAutoFilled
+                ? "Posição, ordem de pick e draft lidos do League Client"
+                : "Posição e ordem detectadas pelo League Client"}
+            </StatusBadge>
           ) : (
             <StatusBadge state="warning">Modo manual — nada está sendo lido do cliente</StatusBadge>
           )
@@ -207,17 +214,49 @@ export function ChampionSelectScreen({
             </Field>
           </div>
 
+          {draftAutoFilled && draft.allies.length > 0 && (
+            <div className="sp-draftbar__team">
+              <span className="sp-draftbar__team-label">
+                Seu time
+                <Badge tone="neutral">{draft.allies.length} escolhidos</Badge>
+              </span>
+              <div className="sp-draftbar__slots">
+                {draft.allies.map((ally) => (
+                  <ChampionAvatar
+                    key={ally.championId}
+                    championId={ally.championId}
+                    ddragonVersion={ddragonVersion}
+                    alt={ally.championName}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="sp-draftbar__team">
             <span className="sp-draftbar__team-label">
               Time inimigo
               <Badge tone={draft.enemies.length > 0 ? "accent" : "neutral"}>
                 {draft.enemies.length}/{MAX_ENEMIES} revelados
               </Badge>
+              {draft.bannedChampionIds.length > 0 && (
+                <Badge tone="neutral">{draft.bannedChampionIds.length} banidos</Badge>
+              )}
             </span>
             <div className="sp-draftbar__slots">
               {Array.from({ length: MAX_ENEMIES }, (_, index) => {
                 const enemy = draft.enemies[index];
                 if (!enemy) return <EmptyAvatarSlot key={`empty-${index}`} label="Inimigo ainda não revelado" />;
+                if (draftAutoFilled) {
+                  return (
+                    <ChampionAvatar
+                      key={enemy.championId}
+                      championId={enemy.championId}
+                      ddragonVersion={ddragonVersion}
+                      alt={enemy.championName}
+                    />
+                  );
+                }
                 return (
                   <button
                     key={enemy.championId}
@@ -235,17 +274,19 @@ export function ChampionSelectScreen({
                   </button>
                 );
               })}
-              <IconButton
-                label={editingEnemies ? "Fechar seletor" : "Editar time inimigo"}
-                icon={editingEnemies ? <X size={16} /> : <Pencil size={16} />}
-                active={editingEnemies}
-                onClick={() => setEditingEnemies((current) => !current)}
-              />
+              {!draftAutoFilled && (
+                <IconButton
+                  label={editingEnemies ? "Fechar seletor" : "Editar time inimigo"}
+                  icon={editingEnemies ? <X size={16} /> : <Pencil size={16} />}
+                  active={editingEnemies}
+                  onClick={() => setEditingEnemies((current) => !current)}
+                />
+              )}
             </div>
           </div>
         </div>
 
-        {editingEnemies && (
+        {editingEnemies && !draftAutoFilled && (
           <div style={{ marginTop: "var(--space-5)" }}>
             <ChampionGrid
               ddragonVersion={ddragonVersion}

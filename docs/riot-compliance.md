@@ -30,7 +30,12 @@ Dados que a Riot não fornece (ex.: objeto `challenges` ausente em patches antig
 Implementados em `packages/riot/src/lcu/read-only-client.ts` (`LcuReadOnlyClient`), consumidos apenas pelo processo `main` do Electron (`apps/desktop/src/main/index.ts`), nunca pelo backend nem por integrações remotas:
 
 - `GET /lol-gameflow/v1/gameflow-phase` — poll a cada 2.5s so para saber a fase atual (ex.: `ChampSelect`) e trocar a aba da UI do Sparta automaticamente. Nenhuma escrita, nenhuma automação.
-- `GET /lol-champ-select/v1/session` — leitura da sessão de champion select (times, ações, banimentos) exposta via `getChampionSelectSession`; ainda não consumida pela UI (ver próximos passos no `CLAUDE.md`), mas já documentada aqui antes de habilitar o uso real.
+- `GET /lol-champ-select/v1/session` — leitura da sessão de champion select, no mesmo poll de 2.5s. O que é lido e pra quê:
+  - `myTeam[].assignedPosition` do próprio jogador → posição (Top/Jungle/Mid/ADC/Suporte), pra a recomendação usar o papel certo e refletir troca de lane feita pela ferramenta do próprio cliente;
+  - `actions[]` → ordem de pick do jogador e campeões **banidos** (bans concluídos), pra o motor não recomendar quem já está fora;
+  - `myTeam[]` / `theirTeam[]` → campeões já escolhidos dos dois times, pra a recomendação considerar composição e o confronto de rota.
+
+  Tudo isso é **apenas leitura pra refletir o estado na UI do Sparta**. Nenhuma escrita é enviada ao cliente: o Sparta não seleciona, não bane, não trava, não troca campeão e não altera runas — a confirmação do pick continua sendo feita pelo jogador dentro do cliente da Riot. O botão "Confirmar campeão" da tela do Sparta só registra a escolha **no próprio Sparta**, pra gerar a build sugerida e a análise pré-game.
 
 Autenticação: lockfile local (`Riot Games/League of Legends/lockfile` ou `LEAGUE_CLIENT_PATH`), Basic Auth `riot:<password>` contra `127.0.0.1`, certificado autoassinado do próprio cliente.
 

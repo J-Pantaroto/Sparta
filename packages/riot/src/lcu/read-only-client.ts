@@ -35,6 +35,12 @@ export interface LcuChampSelectAction {
   actorCellId: number;
   type: string;
   completed: boolean;
+  /**
+   * Campeao alvo da acao. Em bans concluidos e o campeao banido; em picks e
+   * o campeao escolhido. `0` enquanto a acao ainda nao foi travada, e por
+   * isso opcional aqui - o LCU nem sempre inclui a chave.
+   */
+  championId?: number;
 }
 
 /** Um jogador (aliado ou inimigo) na sessao de champion select. */
