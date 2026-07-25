@@ -126,6 +126,48 @@ tabela de 11 pra 1 linha ("thre" → Thresh), clique numa linha trocando o paine
 (Vel'Koz) com os 10 componentes renderizados. `pnpm typecheck && pnpm lint && pnpm test &&
 pnpm build` completos (164 testes).
 
+#### Subfase 14C - Champion Select e Pré-game
+
+O Champion Select empilhava cards completos de recomendação um embaixo do outro, cada um
+repetindo score, barras, sinais e botão - com 5 recomendações, comparar duas exigia rolar a
+tela. O seletor de time inimigo era um grid de ~170 ícones sempre aberto, embaixo das
+recomendações. O Pré-game apresentava um texto 100% estático com o mesmo peso visual do dado
+real, o que fazia a orientação padrão parecer análise personalizada.
+
+1. **Champion Select vira workspace de decisão** (`features/ChampionSelectScreen.tsx` + `.css`)
+   - barra de sessão fixa no topo (posição, ordem de pick e **as 5 vagas do time inimigo**, com
+   `EmptyAvatarSlot` marcando quem ainda não foi revelado: quantos faltam é informação de
+   draft, não espaço vazio); rail estreito à esquerda com as recomendações compactas
+   (selecionáveis, a #1 destacada como `feature` + selo TOP) e painel de detalhe à direita com
+   as **8 métricas** (antes só as 4 maiores), razões e alertas completos e o botão de confirmar.
+   O grid de campeões inimigos virou **colapsável** (lápis na barra) e rola por dentro. Clicar
+   numa vaga preenchida remove aquele inimigo.
+2. **Rótulos crus traduzidos** - `PickRecommendation.category` (`best_blind`, `comfort_pick`…)
+   e `confidence` apareciam em inglês na tela; novo `categoryLabels` em `app/labels.ts`.
+3. **Pré-game reorganizado** (`features/PreGameScreen.tsx`) - herói com a splash do campeão
+   confirmado e números reais (posição, inimigos revelados, perfil de dano da composição);
+   composição inimiga com as 5 vagas e as duas médias de dano como barras comparáveis (escala
+   0-10 da Data Dragon convertida pra 0-100); **build sugerida reaproveitando o `BuildPanel`**
+   do Champion Select, agora também no Pré-game. O texto estático ficou num card `flat` com o
+   rótulo "Orientação geral" e uma frase explicando que a rota do backend ainda não usa dado
+   real - separado do que é derivado de verdade.
+
+**Bug real encontrado na validação**: `toggleEnemy` (e os outros handlers de draft) montavam o
+próximo estado a partir do `draft` do fechamento (`setDraft({ ...draft, ... })`). Dois cliques
+no mesmo lote de render liam o mesmo estado antigo e o segundo sobrescrevia o primeiro -
+medido no app real: **3 cliques no grid deixavam só 1 inimigo selecionado**. Corrigido passando
+`setDraft` como `Dispatch<SetStateAction<DraftState>>` e usando a forma funcional em todos os
+handlers; reteste no app real confirmou os 3 cliques aplicando (o primeiro removeu um inimigo
+já marcado, os outros dois adicionaram → 2 vagas preenchidas, exatamente o esperado).
+
+Validado no Electron real via CDP com Zekerus#117 em JUNGLE (o papel com histórico real):
+recomendação de Viego com score 53, categoria "Zona de conforto" traduzida, 8 barras de
+métrica, 1 razão e 2 alertas reais; grid de 173 campeões abrindo pelo lápis; build sugerida
+com itens reais em pt-BR (Grevas do Berserker / Gume do Infinito / Sedenta por Sangue / Força
+da Trindade) e o aviso honesto "só 2 de 5 campeões inimigos informados"; Pré-game com a splash
+de Viego, composição 2/5 e as duas barras de dano em 5.5/10. 0 imagens quebradas.
+`pnpm typecheck && pnpm lint && pnpm test && pnpm build` completos.
+
 ### Fase 13: o tema veste o app (sem chromas + cor dinâmica + splash nas telas)
 
 Pedido do usuário depois da Fase 12: tirar os **chromas** do seletor de skins (poluíam a lista como se fossem temas) e fazer o tema **refletir muito mais no app** - cores derivadas da skin e splash art de fundo, com a linguagem visual de **Mobalytics, Blitz e iTero**.
