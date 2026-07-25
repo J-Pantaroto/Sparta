@@ -1,0 +1,117 @@
+/* Lista de partidas (rail da esquerda) */
+
+.sp-matchlist {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.sp-match {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+}
+
+/*
+ * Faixa de resultado (ganhou/perdeu) sem precisar ler texto. Fica na borda
+ * DIREITA de propósito: a esquerda é onde `.sp-card--selected` desenha a
+ * marca de item selecionado, e as duas no mesmo lugar se sobreporiam.
+ */
+.sp-match__result {
+  position: absolute;
+  right: 0;
+  top: var(--space-2);
+  bottom: var(--space-2);
+  width: 3px;
+  border-radius: var(--radius-full) 0 0 var(--radius-full);
+  background: var(--color-red);
+}
+
+.sp-match__result--won {
+  background: var(--color-green);
+}
+
+.sp-match__name {
+  display: block;
+  font-weight: var(--weight-bold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sp-match__meta {
+  display: block;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.sp-match__kda {
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* Bloco de leitura rápida do relatório */
+
+.sp-report__headline {
+  font-size: var(--text-xl);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-snug);
+}
+
+.sp-report__pair {
+  display: grid;
+  gap: var(--space-1);
+  margin-top: var(--space-4);
+}
+
+.sp-report__pair-label {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.sp-report__pair-text {
+  color: var(--text-secondary);
+  font-size: var(--text-md);
+  line-height: var(--leading-normal);
+}
+
+.sp-report__metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: var(--space-4) var(--space-5);
+}
+
+/* Ação prática pra próxima partida - numerada, não uma lista de emoji. */
+.sp-tip {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--bg-sunken);
+}
+
+.sp-tip__number {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+  color: var(--text-on-accent);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-black);
+}
+
+.sp-tip__text {
+  color: var(--text-secondary);
+  font-size: var(--text-md);
+  line-height: var(--leading-snug);
+}

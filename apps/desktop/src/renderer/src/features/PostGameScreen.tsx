@@ -1,10 +1,37 @@
-import { useState } from "react";
 import { calculateKda, roleBaselines, type PostGameAnalysis, type RecentChampionMatch } from "@sparta/core";
-import { analyzePostgame, ApiError, fetchPostgameReport, fetchRecentMatches, type RiotAccountSummary } from "../services/api-client";
+import { AlertTriangle, ListChecks, RefreshCw, UserPlus } from "lucide-react";
+import { useState } from "react";
+import { roleLabels, severityLabels } from "../app/labels";
+import { useAsyncData } from "../hooks/use-async-data";
+import {
+  analyzePostgame,
+  ApiError,
+  fetchPostgameReport,
+  fetchRecentMatches,
+  type RiotAccountSummary
+} from "../services/api-client";
 import { fetchAllChampions, type DataDragonChampionSummary } from "../services/datadragon";
 import { ThemedPageHero } from "../theme/ThemedPageHero";
-import { Button, ChampionAvatar, Loading, SignalChip, SignalChipList, StatBar } from "../ui";
-import { useAsyncData } from "../hooks/use-async-data";
+import {
+  Badge,
+  Button,
+  Card,
+  ChampionAvatar,
+  Columns,
+  EmptyState,
+  ErrorState,
+  InlineStat,
+  InlineStats,
+  InteractiveCard,
+  Loading,
+  PageLayout,
+  SectionHeader,
+  SignalChip,
+  SignalChipList,
+  SkeletonRows,
+  StatBar
+} from "../ui";
+import "./PostGameScreen.css";
 
 interface PostGameScreenProps {
   riotAccounts: RiotAccountSummary[];
@@ -13,10 +40,10 @@ interface PostGameScreenProps {
 }
 
 /**
- * Ao selecionar uma partida, tenta ler o relatorio ja persistido primeiro
- * (GET) e so cai pro POST /postgame/analyze se ainda nao foi analisada
- * (404) - nao reanalisa a toa a cada clique. O botao "Reanalisar" chama o
- * POST direto, pro caso de querer atualizar o relatorio depois de mais sync.
+ * Revisão de uma partida. Ao selecionar, tenta primeiro o relatório já
+ * persistido (GET) e só cai pro POST de análise em 404 - não reanalisa à
+ * toa a cada clique. "Reanalisar" chama o POST direto, pro caso de mais
+ * histórico ter sido sincronizado desde a primeira análise.
  */
 export function PostGameScreen({ riotAccounts, sessionToken, ddragonVersion }: PostGameScreenProps) {
   const account = riotAccounts[0];
@@ -29,11 +56,10 @@ export function PostGameScreen({ riotAccounts, sessionToken, ddragonVersion }: P
     () => (account ? fetchRecentMatches(account.puuid, 10) : undefined),
     [account?.puuid]
   );
-  // Catalogo de campeoes (Fase 8a, ja buscado pro seletor de time inimigo)
-  // reaproveitado aqui pra resolver championId -> nome/icone na lista de
-  // partidas - antes mostrava so "Campeao #<id>", gap documentado no
-  // CLAUDE.md ("Catalogo de campeoes pro desktop").
-  const catalog = useAsyncData<DataDragonChampionSummary[]>(() => fetchAllChampions(ddragonVersion), [ddragonVersion]);
+  const catalog = useAsyncData<DataDragonChampionSummary[]>(
+    () => fetchAllChampions(ddragonVersion),
+    [ddragonVersion]
+  );
 
   async function openMatch(matchId: string) {
     if (!sessionToken) return;
@@ -41,21 +67,19 @@ export function PostGameScreen({ riotAccounts, sessionToken, ddragonVersion }: P
     setReportStatus("loading");
     setReportError(null);
     try {
-      const existing = await fetchPostgameReport(sessionToken, matchId);
-      setReport(existing);
+      setReport(await fetchPostgameReport(sessionToken, matchId));
       setReportStatus("idle");
     } catch (error) {
       if (error instanceof ApiError && error.status === 404) {
         try {
-          const analysis = await analyzePostgame(sessionToken, matchId);
-          setReport(analysis);
+          setReport(await analyzePostgame(sessionToken, matchId));
           setReportStatus("idle");
         } catch (analyzeError) {
-          setReportError(analyzeError instanceof Error ? analyzeError.message : "Nao foi possivel analisar a partida.");
+          setReportError(analyzeError instanceof Error ? analyzeError.message : "Não foi possível analisar a partida.");
           setReportStatus("error");
         }
       } else {
-        setReportError(error instanceof Error ? error.message : "Nao foi possivel carregar o relatorio.");
+        setReportError(error instanceof Error ? error.message : "Não foi possível carregar o relatório.");
         setReportStatus("error");
       }
     }
@@ -66,122 +90,310 @@ export function PostGameScreen({ riotAccounts, sessionToken, ddragonVersion }: P
     setReportStatus("loading");
     setReportError(null);
     try {
-      const analysis = await analyzePostgame(sessionToken, selectedMatchId);
-      setReport(analysis);
+      setReport(await analyzePostgame(sessionToken, selectedMatchId));
       setReportStatus("idle");
     } catch (error) {
-      setReportError(error instanceof Error ? error.message : "Nao foi possivel reanalisar a partida.");
+      setReportError(error instanceof Error ? error.message : "Não foi possível reanalisar a partida.");
       setReportStatus("error");
     }
   }
 
   if (!account) {
     return (
-      <section className="panel wide">
-        <h1>Análise pós-game</h1>
-        <p>Vincule sua conta Riot para analisar suas partidas.</p>
-      </section>
+      <PageLayout>
+        <ThemedPageHero eyebrow="Pós-game" title="Revisão de partidas" />
+        <Card>
+          <EmptyState
+            icon={<UserPlus size={22} />}
+            title="Nenhuma conta Riot vinculada"
+            description="Vincule sua conta pra o Sparta revisar suas partidas."
+          />
+        </Card>
+      </PageLayout>
     );
   }
 
-  const selectedMatch = matches.data?.matches.find((match) => match.matchId === selectedMatchId);
-  // Barras "ratio" (valor da partida / baseline do role) - mesmo padrao
-  // client-side ja usado pelo motor de build/Pre-game (Fase 8): sem rota
-  // nova, so combina PostGameAnalysis.metrics (ja real) com roleBaselines
-  // (ja exportado) usando o role da partida (RecentChampionMatch, ja
-  // carregado na lista acima, casado por matchId).
-  const ratioBars =
-    report && selectedMatch
-      ? (() => {
-          const baseline = roleBaselines[selectedMatch.role];
-          const kda = calculateKda(report.metrics.kills, report.metrics.deaths, report.metrics.assists);
-          return [
-            { label: "KDA", value: kda / baseline.kda },
-            { label: "CS/min", value: report.metrics.csPerMinute / baseline.cs },
-            { label: "Dano/min", value: report.metrics.damagePerMinute / baseline.damage },
-            { label: "Visão/min", value: report.metrics.visionScorePerMinute / baseline.vision },
-            { label: "Ouro/min", value: report.metrics.goldPerMinute / baseline.gold }
-          ];
-        })()
-      : [];
+  const matchList = matches.data?.matches ?? [];
+  const selectedMatch = matchList.find((match) => match.matchId === selectedMatchId);
+  const wins = matchList.filter((match) => match.won).length;
 
   return (
-    <>
-      <ThemedPageHero eyebrow="Análise pós-game" title="Partidas recentes" />
+    <PageLayout>
+      <ThemedPageHero
+        eyebrow="Pós-game"
+        title="Revisão de partidas"
+        meta={
+          matchList.length > 0 && (
+            <InlineStats>
+              <InlineStat label="Partidas listadas" value={matchList.length} />
+              <InlineStat label="Resultado" value={`${wins}V — ${matchList.length - wins}D`} />
+            </InlineStats>
+          )
+        }
+      />
 
-      {matches.status === "loading" && <Loading label="Carregando partidas..." />}
-      {matches.status === "error" && <p>{matches.error}</p>}
-
-      <section className="table-panel">
-        {(matches.data?.matches ?? []).map((match) => {
-          const champion = catalog.data?.find((candidate) => candidate.id === match.championId);
-          return (
-            <article
-              className="champion-row"
-              key={match.matchId}
-              onClick={() => void openMatch(match.matchId)}
-              style={{ cursor: "pointer" }}
-            >
-              <div className="champion-identity">
-                {champion && (
-                  <ChampionAvatar championId={champion.id} slug={champion.key} ddragonVersion={ddragonVersion} size="sm" alt={champion.name} />
-                )}
-                <strong>{champion?.name ?? `Campeão #${match.championId}`}</strong>
-              </div>
-              <span>{match.role}</span>
-              <span>{match.won ? "Vitória" : "Derrota"}</span>
-              <span>
-                {match.kills}/{match.deaths}/{match.assists}
-              </span>
-            </article>
-          );
-        })}
-      </section>
-
-      {selectedMatchId && (
-        <section className="panel wide">
-          {reportStatus === "loading" && <Loading label="Analisando..." />}
-          {reportStatus === "error" && <p>{reportError}</p>}
-          {report && reportStatus !== "loading" && (
-            <>
-              <h2>{report.pickAssessment}</h2>
-              <p>
-                <strong>Expectativa: </strong>
-                {report.expectedPlan}
-              </p>
-              <p>
-                <strong>Execução: </strong>
-                {report.executionSummary}
-              </p>
-              {ratioBars.length > 0 && (
-                <div className="recommendation-bars">
-                  {ratioBars.map((bar) => (
-                    <StatBar key={bar.label} label={bar.label} value={bar.value} variant="ratio" />
-                  ))}
-                </div>
-              )}
-              <SignalChipList>
-                {report.strengths.map((strength) => (
-                  <SignalChip key={strength.code} tone="positive">
-                    {strength.detail}
-                  </SignalChip>
-                ))}
-                {report.weaknesses.map((weakness) => (
-                  <SignalChip key={weakness.code} tone="negative">
-                    {weakness.detail}
-                  </SignalChip>
-                ))}
-              </SignalChipList>
-              {report.tips.map((tip) => (
-                <p key={tip}>💡 {tip}</p>
-              ))}
-              <Button variant="secondary" size="sm" onClick={() => void reanalyze()}>
-                Reanalisar
-              </Button>
-            </>
-          )}
-        </section>
+      {matches.status === "loading" && (
+        <Card>
+          <SkeletonRows count={5} height={56} />
+        </Card>
       )}
-    </>
+      {matches.status === "error" && (
+        <Card>
+          <ErrorState inline description={matches.error ?? undefined} />
+        </Card>
+      )}
+
+      {matchList.length > 0 && (
+        <Columns
+          asideFirst
+          asideWidth="300px"
+          aside={
+            <div className="sp-matchlist">
+              {matchList.map((match) => {
+                const champion = catalog.data?.find((candidate) => candidate.id === match.championId);
+                return (
+                  <InteractiveCard
+                    key={match.matchId}
+                    pad="sm"
+                    selected={match.matchId === selectedMatchId}
+                    onClick={() => void openMatch(match.matchId)}
+                    label={`Analisar partida de ${champion?.name ?? match.championId}`}
+                  >
+                    <span className={`sp-match__result${match.won ? " sp-match__result--won" : ""}`} />
+                    <div className="sp-match">
+                      <ChampionAvatar
+                        championId={match.championId}
+                        slug={champion?.key}
+                        ddragonVersion={ddragonVersion}
+                        alt={champion?.name ?? `Campeão ${match.championId}`}
+                      />
+                      <span style={{ minWidth: 0 }}>
+                        <strong className="sp-match__name">{champion?.name ?? `Campeão ${match.championId}`}</strong>
+                        <span className="sp-match__meta">
+                          {match.won ? "Vitória" : "Derrota"} · {roleLabels[match.role]}
+                        </span>
+                      </span>
+                      <span className="sp-match__kda">
+                        {match.kills}/{match.deaths}/{match.assists}
+                      </span>
+                    </div>
+                  </InteractiveCard>
+                );
+              })}
+            </div>
+          }
+          main={
+            !selectedMatchId ? (
+              <Card>
+                <EmptyState
+                  icon={<ListChecks size={22} />}
+                  title="Escolha uma partida"
+                  description="O Sparta compara o que a partida entregou com a referência do seu papel e aponta o que mais custou o resultado."
+                />
+              </Card>
+            ) : reportStatus === "loading" ? (
+              <Card>
+                <Loading block label="Analisando a partida..." />
+              </Card>
+            ) : reportStatus === "error" ? (
+              <Card>
+                <ErrorState
+                  inline
+                  description={reportError ?? undefined}
+                  actions={
+                    <Button variant="secondary" icon={<RefreshCw size={14} />} onClick={() => void reanalyze()}>
+                      Tentar de novo
+                    </Button>
+                  }
+                />
+              </Card>
+            ) : (
+              report && selectedMatch && (
+                <MatchReport
+                  report={report}
+                  match={selectedMatch}
+                  champion={catalog.data?.find((candidate) => candidate.id === selectedMatch.championId)}
+                  ddragonVersion={ddragonVersion}
+                  onReanalyze={() => void reanalyze()}
+                />
+              )
+            )
+          }
+        />
+      )}
+
+      {matches.status === "success" && matchList.length === 0 && (
+        <Card>
+          <EmptyState
+            title="Nenhuma partida sincronizada"
+            description="Rode uma sincronização pra o Sparta trazer suas partidas recentes."
+          />
+        </Card>
+      )}
+    </PageLayout>
+  );
+}
+
+function MatchReport({
+  report,
+  match,
+  champion,
+  ddragonVersion,
+  onReanalyze
+}: {
+  report: PostGameAnalysis;
+  match: RecentChampionMatch;
+  champion?: DataDragonChampionSummary;
+  ddragonVersion: string;
+  onReanalyze: () => void;
+}) {
+  const baseline = roleBaselines[match.role];
+  const kda = calculateKda(report.metrics.kills, report.metrics.deaths, report.metrics.assists);
+
+  // Razão (valor da partida / referência do papel) com o valor absoluto ao
+  // lado - só a razão esconde o número real, que é o que o jogador
+  // reconhece da partida.
+  const ratios = [
+    { label: "KDA", ratio: kda / baseline.kda, absolute: kda.toFixed(2), reference: baseline.kda.toString() },
+    {
+      label: "CS/min",
+      ratio: report.metrics.csPerMinute / baseline.cs,
+      absolute: report.metrics.csPerMinute.toFixed(1),
+      reference: baseline.cs.toString()
+    },
+    {
+      label: "Dano/min",
+      ratio: report.metrics.damagePerMinute / baseline.damage,
+      absolute: Math.round(report.metrics.damagePerMinute).toString(),
+      reference: baseline.damage.toString()
+    },
+    {
+      label: "Ouro/min",
+      ratio: report.metrics.goldPerMinute / baseline.gold,
+      absolute: Math.round(report.metrics.goldPerMinute).toString(),
+      reference: baseline.gold.toString()
+    },
+    {
+      label: "Visão/min",
+      ratio: report.metrics.visionScorePerMinute / baseline.vision,
+      absolute: report.metrics.visionScorePerMinute.toFixed(2),
+      reference: baseline.vision.toString()
+    }
+  ];
+
+  // `weaknesses` já vem ordenado por magnitude pelo motor (Fase 4): o
+  // primeiro item é o que mais pesou nesta partida.
+  const priority = report.weaknesses[0];
+
+  return (
+    <div style={{ display: "grid", gap: "var(--space-4)" }}>
+      <Card tone="feature">
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-4)", marginBottom: "var(--space-4)" }}>
+          <ChampionAvatar
+            championId={match.championId}
+            slug={champion?.key}
+            ddragonVersion={ddragonVersion}
+            size="lg"
+            alt={champion?.name ?? `Campeão ${match.championId}`}
+          />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: "flex", gap: "var(--space-2)", marginBottom: "var(--space-2)", flexWrap: "wrap" }}>
+              <Badge tone={match.won ? "positive" : "negative"}>{match.won ? "Vitória" : "Derrota"}</Badge>
+              <Badge tone="neutral" square>
+                {roleLabels[match.role]}
+              </Badge>
+              <Badge tone="neutral">
+                {report.metrics.kills}/{report.metrics.deaths}/{report.metrics.assists}
+              </Badge>
+            </div>
+            <p className="sp-report__headline">{report.pickAssessment}</p>
+          </div>
+        </div>
+
+        <div className="sp-report__pair">
+          <span className="sp-report__pair-label">O que era esperado</span>
+          <span className="sp-report__pair-text">{report.expectedPlan}</span>
+        </div>
+        <div className="sp-report__pair">
+          <span className="sp-report__pair-label">O que aconteceu</span>
+          <span className="sp-report__pair-text">{report.executionSummary}</span>
+        </div>
+      </Card>
+
+      {priority && (
+        <Card>
+          <SectionHeader
+            eyebrow={
+              <>
+                <AlertTriangle size={12} /> Prioridade de melhoria
+              </>
+            }
+            title={priority.label}
+            actions={<Badge tone="negative">severidade {severityLabels[priority.severity]}</Badge>}
+          />
+          <p className="sp-report__pair-text">{priority.detail}</p>
+        </Card>
+      )}
+
+      <Card>
+        <SectionHeader
+          title="Comparado com a referência do papel"
+          description="A barra mostra a razão entre a partida e a referência; o centro é o valor esperado."
+        />
+        <div className="sp-report__metrics">
+          {ratios.map((item) => (
+            <div key={item.label}>
+              <StatBar
+                label={item.label}
+                value={item.ratio}
+                variant="ratio"
+                value_label={`${item.absolute} (${Math.round(item.ratio * 100)}%)`}
+              />
+              <span style={{ color: "var(--text-muted)", fontSize: "var(--text-2xs)" }}>
+                referência {item.reference}
+              </span>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      {(report.strengths.length > 0 || report.weaknesses.length > 0) && (
+        <Card>
+          <SectionHeader title="Sinais da partida" />
+          <SignalChipList stacked>
+            {report.strengths.map((strength) => (
+              <SignalChip key={strength.code} tone="positive">
+                {strength.detail}
+              </SignalChip>
+            ))}
+            {report.weaknesses.map((weakness) => (
+              <SignalChip key={weakness.code} tone="negative">
+                {weakness.detail}
+              </SignalChip>
+            ))}
+          </SignalChipList>
+        </Card>
+      )}
+
+      {report.tips.length > 0 && (
+        <Card>
+          <SectionHeader title="Para a próxima partida" description="Ações práticas, na ordem de impacto." />
+          <div style={{ display: "grid", gap: "var(--space-2)" }}>
+            {report.tips.map((tip, index) => (
+              <div className="sp-tip" key={tip}>
+                <span className="sp-tip__number">{index + 1}</span>
+                <span className="sp-tip__text">{tip}</span>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      <div>
+        <Button variant="secondary" icon={<RefreshCw size={14} />} onClick={onReanalyze}>
+          Reanalisar com o histórico atual
+        </Button>
+      </div>
+    </div>
   );
 }
