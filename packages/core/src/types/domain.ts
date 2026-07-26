@@ -154,7 +154,17 @@ export interface MatchPerformanceMetrics {
   // Vem do objeto "challenges" do Match-V5, ausente em patches antigos -
   // fica undefined em vez de inventar um valor quando a Riot nao fornece.
   killParticipation?: number;
+  /**
+   * Fração dos dragões e barões do próprio time em que o jogador
+   * participou. Ausente quando o payload não sustenta a razão (sem
+   * `challenges`, sem os objetivos do time, ou time sem nenhum objetivo
+   * neutro). Ver `computeObjectiveParticipation`.
+   */
   objectiveParticipation?: number;
+  /** Numerador em absoluto: objetivos do time acompanhados pelo jogador. */
+  objectiveTakedowns?: number;
+  /** Denominador em absoluto: dragões + barões conquistados pelo time. */
+  teamObjectiveKills?: number;
   deathsBefore10?: number;
   deathsBefore15?: number;
   csAt10?: number;

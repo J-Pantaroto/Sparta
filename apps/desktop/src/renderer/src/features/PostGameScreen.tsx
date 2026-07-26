@@ -1,4 +1,10 @@
-import { calculateKda, roleBaselines, type PostGameAnalysis, type RecentChampionMatch } from "@sparta/core";
+import {
+  calculateKda,
+  roleBaselines,
+  type MatchPerformanceMetrics,
+  type PostGameAnalysis,
+  type RecentChampionMatch
+} from "@sparta/core";
 import { AlertTriangle, ListChecks, RefreshCw, UserPlus } from "lucide-react";
 import { useState } from "react";
 import { roleLabels, severityLabels } from "../app/labels";
@@ -318,6 +324,7 @@ function MatchReport({
           <span className="sp-report__pair-label">O que aconteceu</span>
           <span className="sp-report__pair-text">{report.executionSummary}</span>
         </div>
+        <ObjectiveParticipationLine metrics={report.metrics} />
       </Card>
 
       {priority && (
@@ -394,6 +401,32 @@ function MatchReport({
           Reanalisar com o histórico atual
         </Button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Linha factual de participação em objetivos: números absolutos e a razão,
+ * sem nenhuma leitura estratégica. "Você ignorou objetivos" exigiria saber
+ * posição, momento e condição de vitória - nada disso está aqui.
+ *
+ * Time sem dragão nem barão não vira `0%`: a razão não existe, e é isso que
+ * a linha diz.
+ */
+function ObjectiveParticipationLine({ metrics }: { metrics: MatchPerformanceMetrics }) {
+  const takedowns = metrics.objectiveTakedowns;
+  const teamKills = metrics.teamObjectiveKills;
+  if (takedowns === undefined) return null;
+
+  const semDenominador = teamKills === undefined || teamKills === 0;
+  const texto = semDenominador
+    ? "O time não conquistou dragão nem barão nesta partida - sem base para a razão."
+    : `${takedowns} de ${teamKills} (${Math.round((takedowns / teamKills) * 100)}%) dos dragões e barões do seu time.`;
+
+  return (
+    <div className="sp-report__pair">
+      <span className="sp-report__pair-label">Participação em objetivos</span>
+      <span className="sp-report__pair-text">{texto}</span>
     </div>
   );
 }

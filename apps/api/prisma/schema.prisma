@@ -110,6 +110,10 @@ model MatchParticipant {
   visionScorePerMinute  Float
   killParticipation     Float?
   objectiveParticipation Float?
+  // Numerador e denominador da participacao em objetivos (20260726150000).
+  // NULL = nao observado; a razao acima e NULL junto.
+  objectiveTakedowns    Int?
+  teamObjectiveKills    Int?
   match                 Match @relation(fields: [matchId], references: [id])
   riotAccount           RiotAccount? @relation(fields: [riotAccountId], references: [id])
   champion              Champion @relation(fields: [championId], references: [id])

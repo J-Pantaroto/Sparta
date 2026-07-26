@@ -76,3 +76,61 @@ describe("ChampionDetail: ausência versus zero", () => {
     expect(container.textContent).not.toMatch(/NaN|Infinity|undefined/);
   });
 });
+
+describe("participação em objetivos real no Perfil (Etapa 5)", () => {
+  it("mostra o percentual quando a métrica passa a existir", () => {
+    render(
+      <ChampionDetail
+        champion={stats({
+          objectiveParticipation: 0.75,
+          coverage: { killParticipation: availableCoverage(8), objectiveParticipation: availableCoverage(8) }
+        })}
+        ddragonVersion="14.1.1"
+      />
+    );
+    expect(screen.getByText("75%")).toBeDefined();
+    expect(screen.queryByText("Indisponível")).toBeNull();
+  });
+
+  it("mostra 0% legítimo em vez de indisponível", () => {
+    render(
+      <ChampionDetail
+        champion={stats({
+          objectiveParticipation: 0,
+          coverage: { killParticipation: availableCoverage(8), objectiveParticipation: availableCoverage(8) }
+        })}
+        ddragonVersion="14.1.1"
+      />
+    );
+    expect(screen.queryByText("Indisponível")).toBeNull();
+    expect(screen.getAllByText("0%").length).toBeGreaterThan(0);
+  });
+
+  it("expõe a amostra realmente usada quando a cobertura é parcial", () => {
+    render(
+      <ChampionDetail
+        champion={stats({
+          objectiveParticipation: 0.36,
+          coverage: { killParticipation: availableCoverage(8), objectiveParticipation: partialCoverage(8, 7) }
+        })}
+        ddragonVersion="14.1.1"
+      />
+    );
+    expect(screen.getByText(/7 de 8 partidas/)).toBeDefined();
+    expect(screen.getAllByText("parcial").length).toBe(1);
+  });
+
+  it("com a métrica disponível, a barra do componente volta a aparecer", () => {
+    const { container } = render(
+      <ChampionDetail
+        champion={stats({
+          objectiveParticipation: 0.5,
+          coverage: { killParticipation: availableCoverage(8), objectiveParticipation: availableCoverage(8) }
+        })}
+        ddragonVersion="14.1.1"
+      />
+    );
+    const labels = [...container.querySelectorAll(".sp-statbar__label")].map((node) => node.textContent);
+    expect(labels).toContain("Participação em objetivos");
+  });
+});

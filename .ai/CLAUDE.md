@@ -67,6 +67,54 @@ métrica. Os estados PARTIAL/STALE/UNAVAILABLE **não** foram vistos no app real
 métrica os produz ainda; estão cobertos por teste de componente. Ver `docs/data-provenance.md`.
 24 testes novos (230 no total).
 
+### Etapa 5: participação em objetivos com dado real
+
+A Etapa 4 deixou `objectiveParticipation` honestamente indisponível. Esta etapa passa a
+calculá-lo do payload Match-V5 **já persistido**, sem integração externa nova.
+
+**Auditoria que definiu a fórmula** (22 partidas, 220 participantes, patch 16.14):
+`challenges` e `teams[].objectives` existem em 100% delas. Dragão e barão batem em todos os
+220 casos; o **Arauto não**. Na partida `BR1_3263128214` nenhum dos dois times tem
+`riftHerald.kills > 0` e mesmo assim um participante tem `riftHeraldTakedowns: 1` — e o
+`teamRiftHeraldKills` dele é `0`, ou seja, o payload se contradiz internamente.
+`riftHeraldTakedowns` e `objectives.riftHerald.kills` não estão na mesma base de contabilidade.
+
+**Decisão**: a métrica é `(dragonTakedowns + baronTakedowns) / (dragões + barões do próprio
+time)`. O Arauto fica de fora, documentado. Incluí-lo exigiria aceitar numerador maior que
+denominador ou mascarar com clamp — nenhuma das duas produz um percentual verificável.
+
+1. **`packages/core/src/aggregation/objective-participation.ts`** (novo) —
+   `computeObjectiveParticipation`, pura. Time sem dragão nem barão fica `UNAVAILABLE` (não há
+   denominador, e `0%` diria "não participou de nada" quando não houve nada de que participar).
+   Só um dos dois campos de takedown presente também fica indisponível: somar um subconjunto
+   contra um denominador que conta os dois subestimaria o percentual sistematicamente.
+   Numerador > denominador **não é truncado** — sai como está, marcado `PARTIAL` com o motivo.
+2. **Mapper do Match-V5** lê `teams[].objectives` pelo `teamId` real do participante (objetivo
+   do inimigo nunca entra no denominador) e grava a razão mais os **absolutos**
+   (`objectiveTakedowns`/`teamObjectiveKills`, migration `20260726150000`, ambos nullable).
+3. **Backfill local** (`pnpm --filter @sparta/api backfill:objective-participation`) reprocessa
+   o `Match.rawJson` já gravado, sem nenhuma chamada à Riot, e recalcula os `PlayerChampionStats`
+   das contas vinculadas no fim — sem isso a métrica ficaria no `MatchParticipant` sem chegar ao
+   perfil nem ao score até o próximo sync.
+4. **Score**: o componente `objective` volta a participar pelo peso original (15% em JUNGLE e
+   SUPPORT). Nenhum peso recalibrado; a normalização das Etapas 3 e 4 segue intacta.
+
+**Achado real**: a primeira versão do backfill não era idempotente — comparava a **razão**
+persistida com a recalculada, e `1/6` não faz round-trip exato pelo `double precision` do
+Postgres, então uma linha era reescrita a cada execução. A comparação passou a usar os
+inteiros, que são exatos e determinam a razão por completo.
+
+**Medido na conta real (Zekerus#117)**: Viego JUNGLE **61,4 → 67,2** com `dataCoverage`
+**0,85 → 1,0**; Vel'Koz SUPPORT cobertura 0,85 → 1,0 com `objective 53,6`; Thresh com **0%
+real** (participou de 0 do único objetivo do time). Backfill: 220 participantes atualizados,
+25 sem denominador, 0 inconsistentes, segunda execução com 0 escritas.
+
+Validado no Electron real (CDP): Perfil com "Part. objetivos 100% · parcial · 4 de 5 partidas"
+e a barra do componente de volta; Pós-game com "1 de 2 (50%) dos dragões e barões do seu time",
+factual, sem leitura estratégica. **Não validado**: patch sem `challenges` (só existe 16.14 no
+banco) e o caso `PARTIAL` por numerador maior que denominador — ambos cobertos por teste com
+fixture. Ver `docs/data-provenance.md`. 37 testes novos (301).
+
 ### Etapa 4: ausência versus zero nas estatísticas
 
 Depois de resolver o `50` ambíguo (Etapas 2 e 3), o mesmo problema existia com `0`: zero medido

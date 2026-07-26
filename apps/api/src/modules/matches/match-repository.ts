@@ -65,7 +65,9 @@ async function persistMatchParticipants(
         damagePerMinute: summary.metrics.damagePerMinute,
         visionScorePerMinute: summary.metrics.visionScorePerMinute,
         killParticipation: summary.metrics.killParticipation,
-        objectiveParticipation: summary.metrics.objectiveParticipation
+        objectiveParticipation: summary.metrics.objectiveParticipation,
+        objectiveTakedowns: summary.metrics.objectiveTakedowns,
+        teamObjectiveKills: summary.metrics.teamObjectiveKills
       })),
       skipDuplicates: true
     });
@@ -216,6 +218,8 @@ export interface MatchDetailParticipant {
   visionScorePerMinute: number;
   killParticipation: number | null;
   objectiveParticipation: number | null;
+  objectiveTakedowns: number | null;
+  teamObjectiveKills: number | null;
 }
 
 export interface MatchDetail {
@@ -283,7 +287,10 @@ export async function findMatchDetail(matchId: string, puuid: string): Promise<M
       damagePerMinute: own.damagePerMinute,
       visionScorePerMinute: own.visionScorePerMinute,
       killParticipation: own.killParticipation,
-      objectiveParticipation: own.objectiveParticipation
+      objectiveParticipation: own.objectiveParticipation,
+      // Absolutos por tras da razao - o pos-game mostra "N de M".
+      objectiveTakedowns: own.objectiveTakedowns,
+      teamObjectiveKills: own.teamObjectiveKills
     },
     enemyLaneChampionName: enemy?.champion.name,
     timeline: match.timeline

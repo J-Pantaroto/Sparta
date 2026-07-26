@@ -251,3 +251,94 @@ campo nunca foi preenchido por nenhuma partida. Linhas legadas (`objectivePartic
 nulo e valor `0`) são servidas como indisponíveis, no repositório. A mesma regra, e só ela,
 existe no cliente (`ensureChampionStatsCoverage`) pro caso de o desktop falar com uma API
 anterior a esta etapa. `killParticipation: 0` não é tocado em nenhum dos dois lados.
+
+## Participação em objetivos (Etapa 5)
+
+A Etapa 4 deixou `objectiveParticipation` honestamente indisponível porque o Sparta não extraía
+o dado de fonte nenhuma. Esta etapa passa a calculá-lo a partir do payload Match-V5 **já
+persistido**, sem nenhuma integração externa nova.
+
+### Definição
+
+Fração dos objetivos neutros conquistados pelo **próprio time** em que o jogador participou.
+
+```txt
+numerador   = challenges.dragonTakedowns + challenges.baronTakedowns
+denominador = teams[meuTime].objectives.dragon.kills + .baron.kills
+```
+
+### Objetivos incluídos e excluídos
+
+| Objetivo | Situação | Motivo |
+|---|---|---|
+| Dragão | **Incluído** | 0 inconsistências em 220 participantes reais |
+| Barão | **Incluído** | 0 inconsistências em 220 participantes reais |
+| Arauto | **Excluído** | Contabilidade divergente (ver abaixo) |
+| Void grubs (`horde`), Atakhan, torre, inibidor | Fora do escopo | Existem no payload, mas a contabilidade de cada um não foi validada contra dado real |
+
+**Por que o Arauto ficou de fora.** `challenges.riftHeraldTakedowns` e
+`teams[].objectives.riftHerald.kills` não medem a mesma coisa. Na partida `BR1_3263128214`,
+**nenhum dos dois times** matou Arauto (`riftHerald.kills = 0` para ambos) e mesmo assim um
+participante tem `riftHeraldTakedowns: 1` — e o `challenges.teamRiftHeraldKills` dele é `0`, ou
+seja, o payload se contradiz internamente. Incluí-lo exigiria aceitar numerador maior que
+denominador ou mascarar a diferença com um clamp; nenhuma das duas produz um percentual que
+corresponda a algo verificável.
+
+### Tratamento de zero, ausência e parcialidade
+
+| Situação | Resultado |
+|---|---|
+| Jogador participou de 0 dos objetivos, time conquistou pelo menos 1 | `0` real, `AVAILABLE` |
+| Time não conquistou dragão nem barão | **`UNAVAILABLE`** — não existe denominador, e `0%` diria "não participou de nada" quando não houve nada de que participar |
+| Sem `challenges` no payload | `UNAVAILABLE` |
+| Só um dos dois campos de takedown presente | `UNAVAILABLE` — somar um subconjunto contra um denominador que conta os dois subestimaria o percentual de forma sistemática |
+| Sem `teams`, ou time do jogador ausente da lista | `UNAVAILABLE` |
+| Numerador maior que denominador | Valor sai **sem truncar**, marcado `PARTIAL` com o motivo — a anomalia aparece em vez de ser escondida |
+
+Os absolutos (`objectiveTakedowns`, `teamObjectiveKills`) são preservados mesmo quando a razão
+é indisponível: saber que o jogador participou de 0 de 0 é diferente de não saber nada.
+
+### Proveniência
+
+`sourceType: "CALCULATED"`, `sourceId: "riot"`,
+`resource: "match-v5:challenges+teams.objectives"`, mais `algorithmVersion`, `patch` e
+`collectedAt`. O percentual é conta do Sparta; os dois números que entram nele são oficiais, e
+o `resource` registra exatamente de onde vieram. Observação indisponível **não** carrega
+proveniência de cálculo — não houve cálculo.
+
+### Agregação e score
+
+A agregação usa `averageAvailable` (Etapa 4) sem alteração: média só sobre as partidas com
+observação válida, `PARTIAL` quando parte da amostra tem o dado, `UNAVAILABLE` quando nenhuma
+tem. O componente `objective` volta a participar do score pelo peso original (15% em JUNGLE e
+SUPPORT, 0 nos demais papéis) sempre que houver valor — inclusive quando esse valor é zero
+medido. Nenhum peso foi recalibrado.
+
+### Cobertura observada
+
+Medido no banco real (22 partidas, patch 16.14, 220 participantes):
+
+| | |
+|---|---|
+| Partidas com `challenges` e `teams.objectives` | 22 de 22 |
+| Participantes com razão calculável | 195 |
+| Participantes com participação zero medida | 62 |
+| Participantes indisponíveis (time sem dragão/barão) | 25 |
+| Participantes com numerador > denominador | 0 |
+
+Patches anteriores ao `challenges` não existem no banco atual; o caminho está coberto por teste.
+
+### Backfill
+
+```bash
+pnpm --filter @sparta/api backfill:objective-participation
+```
+
+Recalcula a partir do `Match.rawJson` já gravado. **Não faz nenhuma chamada à Riot API** e o
+`rawJson` nunca é apagado — ele continua sendo a fonte reprocessável se a metodologia mudar.
+Idempotente: a comparação de "não mudou" usa os **inteiros**, não a razão, porque comparar o
+float por igualdade quebra a idempotência (medido: `1/6` não faz round-trip exato pelo `double
+precision` do Postgres, e aquela linha era reescrita a cada execução). Ao final, recalcula os
+`PlayerChampionStats` das contas vinculadas — sem isso a métrica ficaria no `MatchParticipant`
+sem chegar ao perfil nem ao score até o próximo sync. O resumo é só de contagens; nenhum puuid
+ou payload é impresso.

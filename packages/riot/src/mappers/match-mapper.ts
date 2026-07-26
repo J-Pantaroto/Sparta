@@ -1,4 +1,5 @@
-import type { MatchPerformanceMetrics, MatchSummary, Role } from "@sparta/core";
+import { computeObjectiveParticipation } from "@sparta/core";
+import type { MatchPerformanceMetrics, MatchSummary, Role, TeamNeutralObjectiveKills } from "@sparta/core";
 
 export interface RiotMatchParticipantDto {
   puuid: string;
@@ -17,6 +18,25 @@ export interface RiotMatchParticipantDto {
   visionScore: number;
   challenges?: {
     killParticipation?: number;
+    // Participações do jogador em objetivos neutros. `riftHeraldTakedowns`
+    // existe no payload mas NÃO é lido: sua contabilidade diverge de
+    // `teams[].objectives.riftHerald.kills` (ver
+    // `objective-participation.ts` em @sparta/core).
+    dragonTakedowns?: number;
+    baronTakedowns?: number;
+  };
+}
+
+/**
+ * Objetivos conquistados por um time. Só os campos que o Sparta consome -
+ * o payload traz mais (torre, inibidor, `horde`, `atakhan`), ainda não
+ * validados contra dado real.
+ */
+export interface RiotMatchTeamDto {
+  teamId: number;
+  objectives?: {
+    dragon?: { kills?: number };
+    baron?: { kills?: number };
   };
 }
 
@@ -27,6 +47,7 @@ export interface RiotMatchDto {
     gameVersion: string;
     gameStartTimestamp: number;
     participants: RiotMatchParticipantDto[];
+    teams?: RiotMatchTeamDto[];
   };
 }
 
@@ -54,12 +75,31 @@ function perMinute(value: number, durationSeconds: number): number {
   return value / (durationSeconds / 60);
 }
 
+/**
+ * Objetivos do time do participante, pelo `teamId` real. `undefined`
+ * quando o payload não traz `teams` (patch antigo) ou quando o time do
+ * jogador não está na lista - as duas coisas deixam a participação em
+ * objetivos indisponível, nunca zero.
+ */
+function findTeamObjectives(
+  teams: RiotMatchTeamDto[] | undefined,
+  teamId: number
+): TeamNeutralObjectiveKills | undefined {
+  const team = teams?.find((entry) => entry.teamId === teamId);
+  if (!team?.objectives) return undefined;
+  return {
+    dragonKills: team.objectives.dragon?.kills,
+    baronKills: team.objectives.baron?.kills
+  };
+}
+
 function mapParticipant(
   participant: RiotMatchParticipantDto,
   matchId: string,
   durationSeconds: number,
   startedAt: number,
-  patch: string
+  patch: string,
+  teams: RiotMatchTeamDto[] | undefined
 ): MatchSummary {
   const role = TEAM_POSITION_TO_ROLE[participant.teamPosition] ?? "MID";
   const cs = participant.totalMinionsKilled + participant.neutralMinionsKilled;
@@ -76,6 +116,25 @@ function mapParticipant(
     // antigos do Match-V5 - fica undefined em vez de inventar 0.
     killParticipation: participant.challenges?.killParticipation
   };
+
+  const objective = computeObjectiveParticipation({
+    takedowns: participant.challenges,
+    teamKills: findTeamObjectives(teams, participant.teamId),
+    patch,
+    observedAt: new Date(startedAt).toISOString()
+  });
+
+  // Só um valor usável vira métrica. Indisponível permanece ausente - o
+  // absoluto continua exposto porque o pós-game mostra "N de M objetivos".
+  if (objective.value !== null) {
+    metrics.objectiveParticipation = objective.value;
+  }
+  if (objective.personalTakedowns !== null) {
+    metrics.objectiveTakedowns = objective.personalTakedowns;
+  }
+  if (objective.teamObjectives !== null) {
+    metrics.teamObjectiveKills = objective.teamObjectives;
+  }
 
   return {
     matchId,
@@ -99,7 +158,14 @@ function mapParticipant(
 export function mapMatchToSummaries(raw: RiotMatchDto): MatchSummary[] {
   const patch = extractPatch(raw.info.gameVersion);
   return raw.info.participants.map((participant) =>
-    mapParticipant(participant, raw.metadata.matchId, raw.info.gameDuration, raw.info.gameStartTimestamp, patch)
+    mapParticipant(
+      participant,
+      raw.metadata.matchId,
+      raw.info.gameDuration,
+      raw.info.gameStartTimestamp,
+      patch,
+      raw.info.teams
+    )
   );
 }
 

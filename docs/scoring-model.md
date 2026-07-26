@@ -81,3 +81,8 @@ fato participou, e `components` só traz as dimensões com dado.
 Isso não é recalibração: a tabela de pesos por papel continua idêntica. O que mudou é que
 ausência deixou de ser pontuada como desempenho zero. Ver `docs/data-provenance.md` para as
 regras de ausência versus zero.
+
+O componente `objective` voltou a participar do score na Etapa 5, quando a participação em
+objetivos passou a ser extraída de fonte real (dragões e barões do Match-V5 já persistido). O
+peso permanece o documentado — 15% em JUNGLE e SUPPORT, 0 nos demais papéis — e continua sendo
+removido e redistribuído quando a partida não sustenta a razão. Ver `docs/data-provenance.md`.

@@ -63,7 +63,9 @@ export const postgameRoutes: FastifyPluginAsync = async (app) => {
         damagePerMinute: detail.ownParticipant.damagePerMinute,
         visionScorePerMinute: detail.ownParticipant.visionScorePerMinute,
         killParticipation: detail.ownParticipant.killParticipation ?? undefined,
-        objectiveParticipation: detail.ownParticipant.objectiveParticipation ?? undefined
+        objectiveParticipation: detail.ownParticipant.objectiveParticipation ?? undefined,
+        objectiveTakedowns: detail.ownParticipant.objectiveTakedowns ?? undefined,
+        teamObjectiveKills: detail.ownParticipant.teamObjectiveKills ?? undefined
       },
       timeline: detail.timeline,
       championHistory,

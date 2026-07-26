@@ -164,3 +164,46 @@ describe("ausência versus zero nos componentes do score (Etapa 4)", () => {
     expect(score.dataCoverage).toBeCloseTo(0.7, 5);
   });
 });
+
+describe("participação em objetivos reintroduzida no score (Etapa 5)", () => {
+  const jungle: PlayerChampionStats = {
+    ...baseStats,
+    championId: 234,
+    championName: "Viego",
+    role: "JUNGLE",
+    games: 8
+  };
+
+  it("reintroduz o peso quando a métrica passa a existir", () => {
+    const semDado = scoreChampionPerformance({ ...jungle, objectiveParticipation: null });
+    const comDado = scoreChampionPerformance({ ...jungle, objectiveParticipation: 0.62 });
+
+    expect(semDado.dataCoverage).toBeCloseTo(0.85, 5);
+    // A cobertura sobe pro modelo inteiro quando o dado existe.
+    expect(comDado.dataCoverage).toBeCloseTo(1, 5);
+    expect(comDado.components.objective).toBeGreaterThan(0);
+  });
+
+  it("valor real zero participa do score e da cobertura", () => {
+    const zeroReal = scoreChampionPerformance({ ...jungle, objectiveParticipation: 0 });
+    expect(zeroReal.components.objective).toBe(0);
+    // Zero medido é dado: a cobertura é cheia, não 0.85.
+    expect(zeroReal.dataCoverage).toBeCloseTo(1, 5);
+  });
+
+  it("preserva a normalização quando a métrica continua indisponível", () => {
+    const semDado = scoreChampionPerformance({ ...jungle, objectiveParticipation: null });
+    expect(semDado.components.objective).toBeUndefined();
+    expect(semDado.score).toBeGreaterThan(0);
+    expect(semDado.score).toBeLessThanOrEqual(100);
+  });
+
+  it("não altera papéis que não pesam objetivos", () => {
+    // TOP/MID/ADC nao tem `objective` na tabela de pesos - a cobertura
+    // continua cheia com ou sem a metrica.
+    const comDado = scoreChampionPerformance({ ...baseStats, objectiveParticipation: 0.5 });
+    const semDado = scoreChampionPerformance({ ...baseStats, objectiveParticipation: null });
+    expect(comDado.score).toBe(semDado.score);
+    expect(semDado.dataCoverage).toBeCloseTo(1, 5);
+  });
+});

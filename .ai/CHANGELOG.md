@@ -21,6 +21,17 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-07-26 14:40 — Participação em objetivos a partir de dados reais
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0005-participacao-objetivos-real.md`
+
+`objectiveParticipation` passa a ser calculado do Match-V5 já persistido: dragões e barões que
+o jogador acompanhou sobre os que o próprio time conquistou. O Arauto ficou **de fora** por
+evidência — `riftHeraldTakedowns` e `objectives.riftHerald.kills` não usam a mesma
+contabilidade (existe partida em que ninguém matou Arauto e um jogador tem takedown). Time sem
+objetivo neutro fica indisponível, não `0%`. Novo backfill local idempotente que reprocessa o
+`rawJson` sem nenhuma chamada à Riot. Efeito real: Viego JUNGLE 61,4 → 67,2 com cobertura
+0,85 → 1,0. 37 testes novos (301 no total).
+
 ## 2026-07-26 11:55 — Ausência versus zero nas estatísticas
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0004-ausencia-versus-zero-estatisticas.md`
 
