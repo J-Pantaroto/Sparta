@@ -121,8 +121,10 @@ export const playersRoutes: FastifyPluginAsync = async (app) => {
       goldPerMinute: entry.goldPerMinute,
       damagePerMinute: entry.damagePerMinute,
       visionScorePerMinute: entry.visionScorePerMinute,
-      killParticipation: entry.killParticipation ?? 0,
-      objectiveParticipation: entry.objectiveParticipation ?? 0
+      // `null` atravessa como `null`: a partida pode nao ter esse dado, e
+      // 0 aqui seria participacao zero medida.
+      killParticipation: entry.killParticipation,
+      objectiveParticipation: entry.objectiveParticipation
     }));
 
     return { puuid: params.puuid, matches };

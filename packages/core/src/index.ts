@@ -10,5 +10,7 @@ export * from "./draft/build-recommendation.js";
 export * from "./draft/champion-tag-derivation.js";
 export * from "./draft/recommendation-metrics.js";
 export * from "./types/provenance.js";
+export * from "./types/stat-coverage.js";
+export * from "./scoring/weight-normalization.js";
 export * from "./types/recommendation-metric.js";
 export * from "./postgame/post-game-analysis.js";

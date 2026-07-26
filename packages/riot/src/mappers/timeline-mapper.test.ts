@@ -38,4 +38,46 @@ describe("mapTimelineToSummary", () => {
     const shortSummary = mapTimelineToSummary(shortGame, 1, teams);
     expect(shortSummary.goldDiffAt15).toBeUndefined();
   });
+
+  // Etapa 4: ate aqui a partida curta reportava csAt10/csAt15 = 0, ou o CS
+  // de um minuto anterior rotulado como se fosse do minuto pedido.
+  it("csAt10/csAt15 ficam undefined se a partida nao chegou naqueles minutos", () => {
+    const shortGame: RiotMatchTimelineDto = {
+      metadata: fixture.metadata,
+      info: { frameInterval: 60000, frames: fixture.info.frames.slice(0, 2) }
+    };
+    const shortSummary = mapTimelineToSummary(shortGame, 1, teams);
+    expect(shortSummary.csAt10).toBeUndefined();
+    expect(shortSummary.csAt15).toBeUndefined();
+    // Contagem de eventos continua sendo um numero real: nao morreu = 0.
+    expect(shortSummary.deathsBefore10).toBe(1);
+    expect(typeof shortSummary.deathsBefore15).toBe("number");
+  });
+
+  it("csAt fica undefined quando o frame nao traz aquele participante", () => {
+    const outroParticipante = mapTimelineToSummary(fixture, 99, [
+      ...teams,
+      { participantId: 99, teamId: 100 }
+    ]);
+    expect(outroParticipante.csAt10).toBeUndefined();
+    expect(outroParticipante.csAt15).toBeUndefined();
+  });
+
+  it("timeline sem frames nao produz estatisticas zeradas", () => {
+    const vazia: RiotMatchTimelineDto = {
+      metadata: fixture.metadata,
+      info: { frameInterval: 60000, frames: [] }
+    };
+    const summaryVazia = mapTimelineToSummary(vazia, 1, teams);
+    expect(summaryVazia.csAt10).toBeUndefined();
+    expect(summaryVazia.csAt15).toBeUndefined();
+    expect(summaryVazia.goldDiffAt15).toBeUndefined();
+    expect(summaryVazia.objectiveEvents).toEqual([]);
+  });
+
+  it("nao produz NaN nem Infinity em nenhum campo numerico", () => {
+    [summary.deathsBefore10, summary.deathsBefore15, summary.csAt10, summary.csAt15, summary.goldDiffAt15]
+      .filter((value): value is number => value !== undefined)
+      .forEach((value) => expect(Number.isFinite(value)).toBe(true));
+  });
 });

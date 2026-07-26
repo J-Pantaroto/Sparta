@@ -49,3 +49,22 @@ describe("extractParticipantTeams", () => {
     ]);
   });
 });
+
+describe("extractParticipantTeams sem teamId (Etapa 4)", () => {
+  it("descarta o participante em vez de inventar o time 0", () => {
+    const raw = {
+      metadata: { matchId: "BR1_1", participants: ["p1", "p2"] },
+      info: {
+        gameDuration: 1800,
+        gameStartTimestamp: 1,
+        gameVersion: "14.1.1",
+        participants: [{ puuid: "p1", teamId: 100 }]
+      }
+    } as unknown as Parameters<typeof extractParticipantTeams>[0];
+
+    const teams = extractParticipantTeams(raw);
+    expect(teams).toHaveLength(1);
+    expect(teams[0]).toEqual({ participantId: 1, puuid: "p1", teamId: 100 });
+    expect(teams.some((team) => team.teamId === 0)).toBe(false);
+  });
+});

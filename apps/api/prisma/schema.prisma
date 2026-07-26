@@ -145,8 +145,13 @@ model PlayerChampionStats {
   goldPerMinute          Float
   damagePerMinute        Float
   visionScorePerMinute   Float
-  killParticipation      Float
-  objectiveParticipation Float
+  // Nullable desde 20260726120000: ausencia de dado nao pode ser gravada
+  // como 0. Os *Samples guardam quantas partidas do agregado tinham o dado
+  // (NULL = cobertura desconhecida, linha anterior a migration).
+  killParticipation      Float?
+  objectiveParticipation Float?
+  killParticipationSamples      Int?
+  objectiveParticipationSamples Int?
   recentMatchesJson      Json @default("[]")
   updatedAt              DateTime @updatedAt
   playerProfile          PlayerProfile @relation(fields: [playerProfileId], references: [id])

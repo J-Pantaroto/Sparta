@@ -1,14 +1,19 @@
 import type { Prisma } from "@prisma/client";
 import {
   aggregatePlayerChampionStats,
+  availableCoverage,
   computeRecentForm,
   derivePlayerStrengthsWeaknesses,
+  partialCoverage,
+  unavailableCoverage,
+  unknownCoverage,
   type PlayerChampionStats,
   type PlayerStrength,
   type PlayerWeakness,
   type RecentChampionMatch,
   type RecentForm,
-  type Role
+  type Role,
+  type StatCoverage
 } from "@sparta/core";
 import { prisma } from "../../db/prisma.js";
 import { findParticipationHistory } from "../matches/match-repository.js";
@@ -59,41 +64,31 @@ export async function recomputeChampionStats(
     if (matches.length === 0) continue;
 
     const stats = aggregatePlayerChampionStats(championId, matches[0].championName, role as Role, matches);
+    // `null` so acontece com coleção vazia, ja descartada acima - a guarda
+    // existe pro tipo, nao pro caso.
+    if (!stats) continue;
     const recentMatchesJson = stats.recentMatches as unknown as Prisma.InputJsonValue;
+    const persistedStats = {
+      games: stats.games,
+      wins: stats.wins,
+      kills: stats.kills,
+      deaths: stats.deaths,
+      assists: stats.assists,
+      csPerMinute: stats.csPerMinute,
+      goldPerMinute: stats.goldPerMinute,
+      damagePerMinute: stats.damagePerMinute,
+      visionScorePerMinute: stats.visionScorePerMinute,
+      killParticipation: stats.killParticipation,
+      objectiveParticipation: stats.objectiveParticipation,
+      killParticipationSamples: stats.coverage.killParticipation.availableSampleSize,
+      objectiveParticipationSamples: stats.coverage.objectiveParticipation.availableSampleSize,
+      recentMatchesJson
+    };
 
     await prisma.playerChampionStats.upsert({
       where: { playerProfileId_championId_role: { playerProfileId, championId, role } },
-      update: {
-        games: stats.games,
-        wins: stats.wins,
-        kills: stats.kills,
-        deaths: stats.deaths,
-        assists: stats.assists,
-        csPerMinute: stats.csPerMinute,
-        goldPerMinute: stats.goldPerMinute,
-        damagePerMinute: stats.damagePerMinute,
-        visionScorePerMinute: stats.visionScorePerMinute,
-        killParticipation: stats.killParticipation,
-        objectiveParticipation: stats.objectiveParticipation,
-        recentMatchesJson
-      },
-      create: {
-        playerProfileId,
-        championId,
-        role,
-        games: stats.games,
-        wins: stats.wins,
-        kills: stats.kills,
-        deaths: stats.deaths,
-        assists: stats.assists,
-        csPerMinute: stats.csPerMinute,
-        goldPerMinute: stats.goldPerMinute,
-        damagePerMinute: stats.damagePerMinute,
-        visionScorePerMinute: stats.visionScorePerMinute,
-        killParticipation: stats.killParticipation,
-        objectiveParticipation: stats.objectiveParticipation,
-        recentMatchesJson
-      }
+      update: persistedStats,
+      create: { playerProfileId, championId, role, ...persistedStats }
     });
   }
 }
@@ -232,7 +227,10 @@ export async function findChampionStatsByPuuid(puuid: string): Promise<PlayerCha
     include: { champion: true }
   });
 
-  return rows.map((row) => ({
+  return rows.map((row) => {
+    const objectiveIsLegacyArtificialZero = row.objectiveParticipationSamples === null && row.objectiveParticipation === 0;
+
+    return {
     championId: row.championId,
     championName: row.champion.name,
     role: row.role as Role,
@@ -245,10 +243,61 @@ export async function findChampionStatsByPuuid(puuid: string): Promise<PlayerCha
     goldPerMinute: row.goldPerMinute,
     damagePerMinute: row.damagePerMinute,
     visionScorePerMinute: row.visionScorePerMinute,
-    killParticipation: row.killParticipation ?? 0,
-    objectiveParticipation: row.objectiveParticipation ?? 0,
+    killParticipation: row.killParticipation,
+    // Zero legado provadamente artificial nao e servido como valor.
+    objectiveParticipation: objectiveIsLegacyArtificialZero ? null : row.objectiveParticipation,
+    coverage: {
+      killParticipation: toStatCoverage(
+        row.games,
+        row.killParticipation,
+        row.killParticipationSamples,
+        "Nenhuma das partidas traz participação em abates."
+      ),
+      objectiveParticipation: toStatCoverage(
+        row.games,
+        row.objectiveParticipation,
+        row.objectiveParticipationSamples,
+        "O Sparta ainda não extrai participação em objetivos de nenhuma fonte.",
+        true
+      )
+    },
     recentMatches: (row.recentMatchesJson as unknown as RecentChampionMatch[] | null) ?? []
-  }));
+    };
+  });
+}
+
+/**
+ * Reconstroi a cobertura a partir da linha persistida.
+ *
+ * `samples === null` e o caso das linhas gravadas antes da migration
+ * `20260726120000`: sabemos o valor mas nao quantas partidas o
+ * sustentaram. Fica AVAILABLE com `availableSampleSize: null` (cobertura
+ * desconhecida) em vez de virar 0, que afirmaria "nenhuma partida tinha o
+ * dado" sem base. A proxima sincronizacao regrava a contagem real.
+ */
+function toStatCoverage(
+  games: number,
+  value: number | null,
+  samples: number | null,
+  unavailableReason: string,
+  /**
+   * Marca o campo cujo `0` numa linha legada e **provadamente** artificial.
+   * Vale so pra `objectiveParticipation`: o mapper do Match-V5 nunca
+   * preencheu esse campo, entao nenhuma partida jamais teve o dado e a
+   * agregacao antiga era obrigada a gravar 0 (medido: 0 de 220
+   * participantes). Nao se aplica a `killParticipation`, onde 0 pode ser
+   * participacao zero medida - ali a ambiguidade historica permanece e esta
+   * documentada em `docs/data-provenance.md`.
+   */
+  legacyZeroIsArtificial = false
+): StatCoverage {
+  if (value === null) return unavailableCoverage(games, unavailableReason);
+  if (samples === null) {
+    if (legacyZeroIsArtificial && value === 0) return unavailableCoverage(games, unavailableReason);
+    return unknownCoverage(games);
+  }
+  if (samples < games) return partialCoverage(games, samples);
+  return availableCoverage(games);
 }
 
 /**

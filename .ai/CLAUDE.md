@@ -67,6 +67,53 @@ métrica. Os estados PARTIAL/STALE/UNAVAILABLE **não** foram vistos no app real
 métrica os produz ainda; estão cobertos por teste de componente. Ver `docs/data-provenance.md`.
 24 testes novos (230 no total).
 
+### Etapa 4: ausência versus zero nas estatísticas
+
+Depois de resolver o `50` ambíguo (Etapas 2 e 3), o mesmo problema existia com `0`: zero medido
+e ausência de dado chegavam idênticos na tela e, pior, no score.
+
+**Falso zero de maior impacto**: `objectiveParticipation` nunca foi extraído de fonte nenhuma —
+o mapper do Match-V5 simplesmente não preenche esse campo. Medido no banco real: **0 de 220**
+participantes têm o dado. A agregação (`averageAvailable`) era obrigada a devolver `0`, a coluna
+era `NOT NULL`, e `scoreChampionPerformance` pontuava esse zero com **15% do peso** em JUNGLE e
+SUPPORT — exatamente os papéis que Zekerus#117 joga. Contra a conta real: Viego JUNGLE
+**52 → 61,4**, Vel'Koz SUPPORT **46 → 53,7**, ambos com `dataCoverage 0,85`.
+
+1. **`StatCoverage`** (`types/domain.ts` + construtores em `types/stat-coverage.ts`) — valor
+   agregado passa a carregar `sampleSize`, `availableSampleSize` (`null` = cobertura
+   desconhecida) e `status`, reusando o `AvailabilityStatus` da Etapa 2 em vez de criar um
+   segundo mecanismo. Média parcial usa **só as observações válidas** como denominador.
+2. **`normalizeWeightsByAvailability`** (`scoring/weight-normalization.ts`, novo) — a regra da
+   Etapa 3 virou função compartilhada; `normalizeAvailableWeights` (draft) e
+   `scoreChampionPerformance` agora usam a mesma. Componente sem dado sai do cálculo e o peso é
+   redistribuído; `ChampionPerformanceScore.dataCoverage` registra quanto do modelo participou.
+3. **Timeline** — `csAt10/csAt15` ficam `undefined` quando a partida não chegou no minuto (a
+   guarda que `goldDiffAt15` já tinha desde a Fase 1). `deathsBefore10/15` continuam `number`:
+   contagem de eventos, `0` = não morreu.
+4. **Bug real corrigido no caminho**: o filtro `stats.killParticipation > 0` em
+   `player-insights.ts` (workaround do falso zero, desde a Fase 2) também descartava
+   participação zero **legítima** — time com abates, jogador sem participar de nenhum. Virou
+   `!== null`, que resolve os dois lados.
+5. **`extractParticipantTeams`**: `teamId ?? 0` criava um time fantasma (a Riot usa 100/200) que
+   entrava na conta de aliados/inimigos do `goldDiffAt15`. A entrada é descartada.
+6. **Migration `20260726120000`** — colunas de participação viram nullable, mais
+   `killParticipationSamples`/`objectiveParticipationSamples`. **Nenhum dado existente
+   alterado**: de dentro do agregado não dá pra provar que um `killParticipation: 0` histórico é
+   artificial, e as linhas se recalculam sozinhas no próximo sync. Já o `0` legado de
+   `objectiveParticipation` é provadamente artificial e é servido como indisponível — regra
+   centralizada no repositório, espelhada no cliente pro caso de API antiga.
+
+**Dois achados extras**: `round(dataCoverage)` esmagava `0,85` pra `0,8` (`round` é da escala
+0-100 dos scores); e faltava `globals: true` no vitest do renderer, então o
+`@testing-library/react` nunca registrava o cleanup automático e o DOM acumulava entre testes
+desde a Etapa 2.
+
+Validado no Electron real (CDP, Zekerus#117): Perfil mostrando "Part. abates 47% · ref. 62%" ao
+lado de "Part. objetivos **Indisponível**" com o motivo; `objective` fora das barras de
+componente; Pós-game com timeline real íntegro; 0 `NaN`/`Infinity`/`undefined` em 4 telas.
+**Não validado**: partida encerrada antes dos 10 minutos (remake) — não existe nenhuma no banco
+real; coberta por teste com fixture. Ver `docs/data-provenance.md`. 35 testes novos (264).
+
 ### Etapa 3: matchup e meta indisponíveis sem dado real
 
 `PERSONAL_MATCHUP` passou a usar exclusivamente partidas do jogador autenticado, com o mesmo

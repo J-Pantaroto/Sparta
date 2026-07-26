@@ -1,4 +1,5 @@
-import type { PlayerChampionStats, RecentChampionMatch, Role } from "../types/domain.js";
+import type { PlayerChampionStats, RecentChampionMatch, Role, StatCoverage } from "../types/domain.js";
+import { availableCoverage, partialCoverage, unavailableCoverage } from "../types/stat-coverage.js";
 
 export interface MatchParticipationRecord {
   matchId: string;
@@ -22,23 +23,59 @@ function sum(matches: MatchParticipationRecord[], selector: (match: MatchPartici
   return matches.reduce((total, match) => total + selector(match), 0);
 }
 
+/**
+ * Média dos campos que **toda** partida tem (CS, ouro, dano, visão). Só é
+ * chamada com a coleção não vazia - `aggregatePlayerChampionStats` devolve
+ * `null` antes de chegar aqui quando não há partida nenhuma, em vez de
+ * produzir uma média 0 que ninguém conseguiria distinguir de desempenho
+ * zerado real.
+ */
 function average(matches: MatchParticipationRecord[], selector: (match: MatchParticipationRecord) => number): number {
-  if (matches.length === 0) return 0;
   return sum(matches, selector) / matches.length;
 }
 
-/**
- * Media de killParticipation/objectiveParticipation so sobre as partidas
- * que realmente tem o dado (challenges da Riot, ausente em patches
- * antigos) - nao inventa 0 pras que faltam. So cai pra 0 se NENHUMA
- * partida do campeao tiver o dado (caso raro: jogador so jogou esse
- * campeao em patches sem o objeto challenges).
- */
-function averageAvailable(matches: MatchParticipationRecord[], selector: (match: MatchParticipationRecord) => number | null): number {
-  const available = matches.filter((match) => selector(match) !== null);
-  if (available.length === 0) return 0;
-  return available.reduce((total, match) => total + (selector(match) as number), 0) / available.length;
+interface PartialAverage {
+  value: number | null;
+  coverage: StatCoverage;
 }
+
+/**
+ * Média sobre as partidas que realmente têm o dado, com a cobertura
+ * declarada junto.
+ *
+ * O denominador é a quantidade de observações **válidas**, não o total de
+ * partidas: dividir pelo total diluiria o valor proporcionalmente ao
+ * tanto de dado que falta, o que é uma forma silenciosa de tratar ausência
+ * como zero. Sem nenhuma observação válida o resultado é `null` - antes da
+ * Etapa 4 era `0`, e esse `0` chegava ao score como participação zero
+ * medida.
+ */
+function averageAvailable(
+  matches: MatchParticipationRecord[],
+  selector: (match: MatchParticipationRecord) => number | null,
+  unavailableReason: string
+): PartialAverage {
+  const available = matches
+    .map(selector)
+    .filter((value): value is number => value !== null && Number.isFinite(value));
+
+  const sampleSize = matches.length;
+
+  if (available.length === 0) {
+    return { value: null, coverage: unavailableCoverage(sampleSize, unavailableReason) };
+  }
+
+  const value = available.reduce((total, entry) => total + entry, 0) / available.length;
+  const coverage =
+    available.length < sampleSize ? partialCoverage(sampleSize, available.length) : availableCoverage(sampleSize);
+
+  return { value, coverage };
+}
+
+const KILL_PARTICIPATION_UNAVAILABLE =
+  "Nenhuma das partidas traz participação em abates (a Riot não envia `challenges` em patches antigos).";
+const OBJECTIVE_PARTICIPATION_UNAVAILABLE =
+  "O Sparta ainda não extrai participação em objetivos de nenhuma fonte.";
 
 /**
  * Agrega o historico de partidas de um (championId, role) num
@@ -46,13 +83,18 @@ function averageAvailable(matches: MatchParticipationRecord[], selector: (match:
  * decide de onde vem o historico e garante que `matches` esta ordenado do
  * mais recente pro mais antigo (recentMatches[0] precisa ser a partida mais
  * nova, ja que scoreChampionPerformance pondera forma recente por indice).
+ *
+ * Devolve `null` sem nenhuma partida: agregação sem observação não é um
+ * agregado com valores zerados, é a ausência de agregado.
  */
 export function aggregatePlayerChampionStats(
   championId: number,
   championName: string,
   role: Role,
   matches: MatchParticipationRecord[]
-): PlayerChampionStats {
+): PlayerChampionStats | null {
+  if (matches.length === 0) return null;
+
   const recentMatches: RecentChampionMatch[] = matches.slice(0, RECENT_MATCHES_LIMIT).map((match) => ({
     matchId: match.matchId,
     championId: match.championId,
@@ -65,9 +107,20 @@ export function aggregatePlayerChampionStats(
     goldPerMinute: match.goldPerMinute,
     damagePerMinute: match.damagePerMinute,
     visionScorePerMinute: match.visionScorePerMinute,
-    killParticipation: match.killParticipation ?? 0,
-    objectiveParticipation: match.objectiveParticipation ?? 0
+    killParticipation: match.killParticipation,
+    objectiveParticipation: match.objectiveParticipation
   }));
+
+  const killParticipation = averageAvailable(
+    matches,
+    (match) => match.killParticipation,
+    KILL_PARTICIPATION_UNAVAILABLE
+  );
+  const objectiveParticipation = averageAvailable(
+    matches,
+    (match) => match.objectiveParticipation,
+    OBJECTIVE_PARTICIPATION_UNAVAILABLE
+  );
 
   return {
     championId,
@@ -82,8 +135,12 @@ export function aggregatePlayerChampionStats(
     goldPerMinute: average(matches, (match) => match.goldPerMinute),
     damagePerMinute: average(matches, (match) => match.damagePerMinute),
     visionScorePerMinute: average(matches, (match) => match.visionScorePerMinute),
-    killParticipation: averageAvailable(matches, (match) => match.killParticipation),
-    objectiveParticipation: averageAvailable(matches, (match) => match.objectiveParticipation),
+    killParticipation: killParticipation.value,
+    objectiveParticipation: objectiveParticipation.value,
+    coverage: {
+      killParticipation: killParticipation.coverage,
+      objectiveParticipation: objectiveParticipation.coverage
+    },
     recentMatches
   };
 }

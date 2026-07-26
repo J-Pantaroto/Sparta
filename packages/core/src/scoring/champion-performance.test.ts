@@ -1,3 +1,4 @@
+import { availableCoverage } from "../types/stat-coverage.js";
 import { describe, expect, it } from "vitest";
 import {
   calculateKda,
@@ -25,6 +26,7 @@ const baseStats: PlayerChampionStats = {
   visionScorePerMinute: 0.9,
   killParticipation: 0.62,
   objectiveParticipation: 0.42,
+  coverage: { killParticipation: availableCoverage(6), objectiveParticipation: availableCoverage(6) },
   recentMatches: []
 };
 
@@ -107,5 +109,58 @@ describe("champion performance score", () => {
     // e exatamente 0.1 * 100 = 10 pontos, provando que calculateRecentForm usa
     // o mesmo DEATHS_BAD_VALUE que scoreChampionPerformance/normalizeInverse.
     expect(scoreWithNoDeaths - scoreWithBadDeaths).toBeCloseTo(10, 5);
+  });
+});
+
+describe("ausência versus zero nos componentes do score (Etapa 4)", () => {
+  const jungleStats: PlayerChampionStats = {
+    ...baseStats,
+    championId: 234,
+    championName: "Viego",
+    role: "JUNGLE",
+    games: 8
+  };
+
+  it("deixa de fora o componente sem dado em vez de pontuá-lo como 0", () => {
+    const semObjetivo = scoreChampionPerformance({ ...jungleStats, objectiveParticipation: null });
+    expect(semObjetivo.components.objective).toBeUndefined();
+    // JUNGLE pesa `objective` em 0.15 - o peso sai e e redistribuido.
+    expect(semObjetivo.dataCoverage).toBeCloseTo(0.85, 5);
+  });
+
+  it("não pune o campeão por um dado que o Sparta nunca teve", () => {
+    const comDado = scoreChampionPerformance(jungleStats);
+    const semDado = scoreChampionPerformance({ ...jungleStats, objectiveParticipation: null });
+    const comZeroInventado = scoreChampionPerformance({ ...jungleStats, objectiveParticipation: 0 });
+
+    // O caminho antigo (0 no lugar da ausencia) produzia um score menor que
+    // qualquer um dos dois - era o falso zero entrando com peso real.
+    expect(comZeroInventado.score).toBeLessThan(semDado.score);
+    expect(semDado.score).toBeGreaterThan(0);
+    expect(comDado.dataCoverage).toBeCloseTo(1, 5);
+  });
+
+  it("preserva participação zero medida como componente real", () => {
+    const zeroReal = scoreChampionPerformance({ ...jungleStats, killParticipation: 0 });
+    expect(zeroReal.components.kp).toBe(0);
+    // Zero medido continua no calculo: coberturaa cheia, nao ausencia.
+    expect(zeroReal.dataCoverage).toBeCloseTo(1, 5);
+  });
+
+  it("não produz NaN nem Infinity com zero partidas", () => {
+    const semPartidas = scoreChampionPerformance({ ...baseStats, games: 0, wins: 0, deaths: 0 });
+    Object.values(semPartidas.components).forEach((value) => expect(Number.isFinite(value)).toBe(true));
+    expect(Number.isFinite(semPartidas.score)).toBe(true);
+  });
+
+  it("mantém o score na escala 0-100 mesmo com metade dos componentes ausentes", () => {
+    const score = scoreChampionPerformance({
+      ...jungleStats,
+      killParticipation: null,
+      objectiveParticipation: null
+    });
+    expect(score.score).toBeGreaterThanOrEqual(0);
+    expect(score.score).toBeLessThanOrEqual(100);
+    expect(score.dataCoverage).toBeCloseTo(0.7, 5);
   });
 });

@@ -158,3 +158,96 @@ nota permanece na escala 0–100.
 dados, calculada individualmente por candidato. Por exemplo, matchup pessoal (`0,25`) e meta
 (`0,05`) indisponíveis num cenário de lane revelada deixam cobertura `0,70`. Cobertura informa
 quanto do modelo foi observado; não substitui nem altera a confiança estatística do jogador.
+
+## Ausência versus zero (Etapa 4)
+
+O contrato acima resolveu o `50` ambíguo. O mesmo problema existia com `0`, que também
+significava duas coisas incompatíveis.
+
+### Quando `0` é um valor real
+
+Zero é um valor como qualquer outro quando a fonte informou zero, ou quando o cálculo rodou
+sobre entradas válidas e deu zero:
+
+- zero mortes, zero abates, zero assistências;
+- **participação em abates igual a 0 com o time tendo tido abates** — o jogador não participou
+  de nenhum, e isso é informação;
+- diferença de ouro zero entre dois valores conhecidos;
+- CS zero num minuto que a partida de fato alcançou.
+
+Esses casos aparecem como `0` / `0%` na interface, com barra normal.
+
+### Quando o campo fica ausente
+
+O valor é `null` (ou o campo simplesmente não existe) quando:
+
+- a Riot não envia o campo naquele patch (`challenges` ausente);
+- a timeline não foi obtida;
+- a partida não chegou no minuto de referência;
+- o denominador é zero ou desconhecido;
+- nenhuma observação da amostra tem o dado;
+- a métrica ainda não é extraída de fonte nenhuma.
+
+Ausência nunca vira `0`. A interface mostra "Indisponível" com o motivo, sem barra.
+
+### Percentuais sem denominador
+
+Participação em abates com o time em 0 abates é **indisponível**, não `0%`: a razão não existe.
+O mesmo vale quando os abates do time, ou os do jogador, não estão disponíveis.
+
+### Agregações parciais
+
+Média de um campo que falta em parte das partidas usa **apenas as observações válidas** como
+denominador. Dividir pelo total diluiria o valor na proporção do que falta, que é tratar
+ausência como zero por outro caminho.
+
+`StatCoverage` (`packages/core/src/types/domain.ts`) acompanha o valor:
+
+| Campo | Significado |
+|---|---|
+| `sampleSize` | Partidas consideradas no contexto. |
+| `availableSampleSize` | Partidas que realmente tinham o dado. `null` = cobertura desconhecida. |
+| `status` | `AVAILABLE` / `PARTIAL` / `UNAVAILABLE` — o mesmo enum da Etapa 2, não um segundo. |
+| `reason` | Por que está parcial ou indisponível. |
+
+Construtores em `packages/core/src/types/stat-coverage.ts`. Cobertura não é confiança: são dois
+eixos, e nenhum é derivado do outro.
+
+### Score com componente ausente
+
+`scoreChampionPerformance` **remove** o componente sem dado e redistribui o peso entre os
+restantes (`normalizeWeightsByAvailability`, a mesma função que o motor de draft usa desde a
+Etapa 3). `ChampionPerformanceScore.dataCoverage` registra quanto do modelo participou.
+
+Isso corrigiu um erro medido: `objectiveParticipation` nunca foi extraído de fonte nenhuma
+(0 de 220 participantes no banco real tinham o dado), então a agregação gravava `0`, e esse
+zero entrava com **15% do peso** em JUNGLE e SUPPORT como se fosse participação medida. Contra
+a conta real: Viego JUNGLE **52 → 61,4**, Vel'Koz SUPPORT **46 → 53,7**, ambos com
+`dataCoverage 0,85`.
+
+### Decisões por campo
+
+| Campo | Decisão | Por quê |
+|---|---|---|
+| `killParticipation` (partida) | Já era `undefined` sem `challenges` | Correto desde a Fase 1 |
+| `killParticipation` (agregado) | `null` sem observação; média só sobre as válidas | Antes caía pra `0` |
+| `objectiveParticipation` | Sempre `null` | Não é extraído de nenhuma fonte hoje |
+| `deathsBefore10/15` | Continua `number` | Contagem de eventos: `0` = não morreu |
+| `csAt10/csAt15` | `undefined` se a partida não chegou no minuto | Antes era `0`, ou o CS de um minuto anterior rotulado como se fosse do minuto pedido |
+| `goldDiffAt15` | Já era `undefined` | Correto desde a Fase 1 |
+| `teamId` (participante) | Entrada descartada sem `teamId` | O `?? 0` criava um time fantasma (a Riot usa 100/200) na conta de aliados/inimigos |
+| `csPerMinute`, `goldPerMinute`, `damagePerMinute`, `visionScorePerMinute` | Continuam `number` | Toda partida persistida tem |
+| Agregado de coleção vazia | `aggregatePlayerChampionStats` devolve `null` | Sem observação não há agregado, e não um agregado zerado |
+
+### Ambiguidade histórica que permanece
+
+`PlayerChampionStats.killParticipation` gravado antes da migration `20260726120000` pode ter
+`0` legítimo ou artificial — de dentro do agregado não dá pra distinguir. Esses valores **não
+foram convertidos**: as linhas são recalculadas inteiras a cada sync a partir de
+`MatchParticipant`, então se corrigem sozinhas na próxima sincronização.
+
+`objectiveParticipation` é diferente: ali o `0` legado é **provadamente** artificial, porque o
+campo nunca foi preenchido por nenhuma partida. Linhas legadas (`objectiveParticipationSamples`
+nulo e valor `0`) são servidas como indisponíveis, no repositório. A mesma regra, e só ela,
+existe no cliente (`ensureChampionStatsCoverage`) pro caso de o desktop falar com uma API
+anterior a esta etapa. `killParticipation: 0` não é tocado em nenhum dos dois lados.

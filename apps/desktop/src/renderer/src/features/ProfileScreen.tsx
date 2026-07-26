@@ -4,6 +4,7 @@ import {
   roleBaselines,
   scoreChampionPerformance,
   type PlayerChampionStats,
+  type StatCoverage,
   type Role
 } from "@sparta/core";
 import { MousePointerClick, UserPlus } from "lucide-react";
@@ -294,33 +295,65 @@ export function ProfileScreen({
   );
 }
 
+interface RawStat {
+  label: string;
+  value: string;
+  hint: string;
+  /** Sem dado: renderiza o texto de ausência, nunca um número. */
+  unavailable?: boolean;
+  /** Tem valor, mas calculado sobre parte da amostra. */
+  partial?: boolean;
+}
+
 /**
  * Detalhamento progressivo: a tabela mostra o resumo, este painel abre o
  * que ja vinha da API e nunca era exibido (KP, participacao em objetivos,
  * ouro e visao por minuto, e os 10 componentes do score).
  */
-function ChampionDetail({ champion, ddragonVersion }: { champion: PlayerChampionStats; ddragonVersion: string }) {
+export function ChampionDetail({ champion, ddragonVersion }: { champion: PlayerChampionStats; ddragonVersion: string }) {
   const performance = scoreChampionPerformance(champion);
   const baseline = roleBaselines[champion.role];
   const kda = calculateKda(champion.kills, champion.deaths, champion.assists);
   const games = champion.games;
 
-  const rawStats: { label: string; value: string; hint: string }[] = [
+  /**
+   * Percentual que pode simplesmente não existir. `0%` continua sendo `0%`
+   * (participação zero medida); ausência vira "Indisponível" com o motivo -
+   * antes da Etapa 4 os dois casos apareciam como `0%`.
+   */
+  function participationStat(
+    label: string,
+    value: number | null,
+    coverage: StatCoverage | undefined,
+    baselineValue: number
+  ): RawStat {
+    if (value === null || value === undefined) {
+      return { label, value: "Indisponível", hint: coverage?.reason ?? "Sem dado para este campeão", unavailable: true };
+    }
+    const partial = coverage?.status === "PARTIAL";
+    return {
+      label,
+      value: `${Math.round(value * 100)}%`,
+      hint: partial
+        ? `ref. ${Math.round(baselineValue * 100)}% · ${coverage?.availableSampleSize} de ${coverage?.sampleSize} partidas`
+        : `ref. ${Math.round(baselineValue * 100)}%`,
+      partial
+    };
+  }
+
+  const rawStats: RawStat[] = [
     { label: "KDA", value: kda.toFixed(2), hint: `ref. ${baseline.kda}` },
     { label: "CS/min", value: champion.csPerMinute.toFixed(1), hint: `ref. ${baseline.cs}` },
     { label: "Dano/min", value: Math.round(champion.damagePerMinute).toString(), hint: `ref. ${baseline.damage}` },
     { label: "Ouro/min", value: Math.round(champion.goldPerMinute).toString(), hint: `ref. ${baseline.gold}` },
     { label: "Visão/min", value: champion.visionScorePerMinute.toFixed(2), hint: `ref. ${baseline.vision}` },
-    {
-      label: "Part. abates",
-      value: `${Math.round(champion.killParticipation * 100)}%`,
-      hint: `ref. ${Math.round(baseline.kp * 100)}%`
-    },
-    {
-      label: "Part. objetivos",
-      value: `${Math.round(champion.objectiveParticipation * 100)}%`,
-      hint: `ref. ${Math.round(baseline.objective * 100)}%`
-    },
+    participationStat("Part. abates", champion.killParticipation, champion.coverage?.killParticipation, baseline.kp),
+    participationStat(
+      "Part. objetivos",
+      champion.objectiveParticipation,
+      champion.coverage?.objectiveParticipation,
+      baseline.objective
+    ),
     { label: "Mortes/jogo", value: (champion.deaths / Math.max(1, games)).toFixed(1), hint: "menor é melhor" }
   ];
 
@@ -372,7 +405,21 @@ function ChampionDetail({ champion, ddragonVersion }: { champion: PlayerChampion
             <span style={{ display: "block", color: "var(--text-muted)", fontSize: "var(--text-xs)" }}>
               {stat.label}
             </span>
-            <strong style={{ fontSize: "var(--text-lg)", fontVariantNumeric: "tabular-nums" }}>{stat.value}</strong>
+            <strong
+              style={{
+                fontSize: stat.unavailable ? "var(--text-sm)" : "var(--text-lg)",
+                fontVariantNumeric: "tabular-nums",
+                color: stat.unavailable ? "var(--text-muted)" : undefined,
+                fontWeight: stat.unavailable ? "var(--weight-medium)" : undefined
+              }}
+            >
+              {stat.value}
+              {stat.partial && (
+                <span style={{ marginLeft: "var(--space-2)", fontSize: "var(--text-2xs)", color: "var(--text-muted)" }}>
+                  parcial
+                </span>
+              )}
+            </strong>
             <span style={{ display: "block", color: "var(--text-muted)", fontSize: "var(--text-2xs)" }}>
               {stat.hint}
             </span>

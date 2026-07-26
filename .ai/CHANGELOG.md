@@ -21,6 +21,17 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-07-26 11:55 — Ausência versus zero nas estatísticas
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0004-ausencia-versus-zero-estatisticas.md`
+
+Auditoria e correção do fluxo de estatísticas pra que `0` signifique zero medido e ausência
+permaneça ausente. O maior falso zero era `objectiveParticipation`, nunca extraído de fonte
+nenhuma (0 de 220 participantes no banco real) mas gravado como `0` e valendo 15% do peso do
+score em JUNGLE/SUPPORT: Viego 52 → 61,4 e Vel'Koz 46 → 53,7 na conta real. Também corrigidos
+`csAt10/15` de partida curta, `teamId` fantasma, filtro `> 0` que descartava participação zero
+legítima, e agregação de coleção vazia. Nova `StatCoverage` com amostra total e disponível.
+35 testes novos (264 no total); migration sem alterar dado existente.
+
 ## 2026-07-25 14:15 — Meta e matchup indisponíveis sem dados reais
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0003-meta-matchup-indisponiveis.md`
 

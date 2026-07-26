@@ -48,15 +48,34 @@ function findFrameAtOrBefore(frames: RiotTimelineFrameDto[], timestampMs: number
   return candidate;
 }
 
-function csAtFrame(frame: RiotTimelineFrameDto | undefined, participantId: number): number {
+/**
+ * CS do participante no frame. `undefined` quando o frame nao existe ou nao
+ * traz esse participante - devolver 0 ali seria indistinguivel de "nao
+ * farmou nada ate esse minuto".
+ */
+function csAtFrame(frame: RiotTimelineFrameDto | undefined, participantId: number): number | undefined {
   const participantFrame = frame?.participantFrames[String(participantId)];
-  if (!participantFrame) return 0;
+  if (!participantFrame) return undefined;
   return participantFrame.minionsKilled + participantFrame.jungleMinionsKilled;
 }
 
-function goldAtFrame(frame: RiotTimelineFrameDto | undefined, participantIds: number[]): number {
-  if (!frame) return 0;
+/**
+ * Ouro do time no frame. So e chamada depois de confirmar que o frame
+ * existe e que a partida chegou no minuto - por isso soma direto os
+ * participantes presentes.
+ */
+function goldAtFrame(frame: RiotTimelineFrameDto, participantIds: number[]): number {
   return participantIds.reduce((sum, id) => sum + (frame.participantFrames[String(id)]?.totalGold ?? 0), 0);
+}
+
+/**
+ * Um frame so representa "o minuto X" se a partida de fato chegou perto de
+ * X. `findFrameAtOrBefore` sempre devolve algum frame anterior, entao sem
+ * esta checagem uma partida encerrada aos 8 minutos reportaria o CS do
+ * minuto 8 como se fosse "CS aos 10".
+ */
+function reachedMinute(frame: RiotTimelineFrameDto | undefined, timestampMs: number, frameInterval: number): boolean {
+  return frame !== undefined && frame.timestamp >= timestampMs - frameInterval;
 }
 
 function countDeathsBefore(events: RiotTimelineEventDto[], participantId: number, cutoffMs: number): number {
@@ -70,12 +89,13 @@ function countDeathsBefore(events: RiotTimelineEventDto[], participantId: number
  * (GET /lol/match/v5/matches/{id}/timeline) para o MatchTimelineSummary de
  * um participante especifico. Puro, sem I/O.
  *
- * deathsBefore10/15 e csAt10/15 sao contados diretamente dos eventos/frames
- * reais da timeline (sempre calculaveis, nao dependem do objeto "challenges"
- * que falta em patches antigos - ver match-mapper.ts). goldDiffAt15 exige
- * saber quem esta em cada time (`teams`, derivado de
- * `extractParticipantTeams` no match-mapper) e fica undefined se a
- * partida acabou antes dos 15 minutos.
+ * deathsBefore10/15 sao contagem de eventos: `0` significa "nao morreu" e
+ * e sempre calculavel quando a timeline existe. csAt10/15 e goldDiffAt15
+ * ficam `undefined` quando a partida nao chegou no minuto correspondente
+ * (ou o frame nao traz o participante) - um numero ali seria o valor de um
+ * minuto anterior apresentado como se fosse do minuto pedido.
+ * goldDiffAt15 exige tambem saber quem esta em cada time (`teams`, derivado
+ * de `extractParticipantTeams` no match-mapper).
  */
 export function mapTimelineToSummary(
   raw: RiotMatchTimelineDto,
@@ -90,13 +110,10 @@ export function mapTimelineToSummary(
   const allyIds = teams.filter((team) => team.teamId === ownTeamId).map((team) => team.participantId);
   const enemyIds = teams.filter((team) => team.teamId !== ownTeamId).map((team) => team.participantId);
 
-  // So calcula se existir um frame realmente proximo dos 15 minutos - senao
-  // "o frame mais recente disponivel" pode ser de uma partida que terminou
-  // bem antes, e usar esse dado como se fosse "aos 15 minutos" inventaria
-  // uma informacao que a partida nao tem.
-  const reachedFifteenMinutes = frameAt15 !== undefined && frameAt15.timestamp >= FIFTEEN_MINUTES_MS - raw.info.frameInterval;
+  const reachedTenMinutes = reachedMinute(frameAt10, TEN_MINUTES_MS, raw.info.frameInterval);
+  const reachedFifteenMinutes = reachedMinute(frameAt15, FIFTEEN_MINUTES_MS, raw.info.frameInterval);
   const goldDiffAt15 =
-    reachedFifteenMinutes && allyIds.length > 0 && enemyIds.length > 0
+    frameAt15 !== undefined && reachedFifteenMinutes && allyIds.length > 0 && enemyIds.length > 0
       ? goldAtFrame(frameAt15, allyIds) - goldAtFrame(frameAt15, enemyIds)
       : undefined;
 
@@ -114,8 +131,8 @@ export function mapTimelineToSummary(
     matchId: raw.metadata.matchId,
     deathsBefore10: countDeathsBefore(allEvents, participantId, TEN_MINUTES_MS),
     deathsBefore15: countDeathsBefore(allEvents, participantId, FIFTEEN_MINUTES_MS),
-    csAt10: csAtFrame(frameAt10, participantId),
-    csAt15: csAtFrame(frameAt15, participantId),
+    csAt10: reachedTenMinutes ? csAtFrame(frameAt10, participantId) : undefined,
+    csAt15: reachedFifteenMinutes ? csAtFrame(frameAt15, participantId) : undefined,
     goldDiffAt15,
     objectiveEvents
   };

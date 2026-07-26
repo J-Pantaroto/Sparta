@@ -48,10 +48,11 @@ function toRecentChampionMatch(record: MatchParticipationRecord): RecentChampion
     goldPerMinute: record.goldPerMinute,
     damagePerMinute: record.damagePerMinute,
     visionScorePerMinute: record.visionScorePerMinute,
-    // calculateRecentForm nao usa kp/objective na formula - coagir null pra 0
-    // aqui e inocuo (nao afeta o score, so preenche o formato exigido).
-    killParticipation: record.killParticipation ?? 0,
-    objectiveParticipation: record.objectiveParticipation ?? 0
+    // Passa direto: `calculateRecentForm` nao usa esses dois na formula, e
+    // coagi-los pra 0 aqui gravaria uma participacao zero inventada em
+    // `recentMatches`, que a interface exibe.
+    killParticipation: record.killParticipation,
+    objectiveParticipation: record.objectiveParticipation
   };
 }
 
@@ -110,9 +111,10 @@ const MAX_WEAKNESSES = 3;
  * reaproveita `components` (ja clampado e centrado em 75 pras razoes, nao
  * em 50) - em vez disso agrega a razao bruta valor/baseline por campeao,
  * ponderada por jogos, e so entao aplica o corte de sinal diretamente
- * sobre a razao agregada. kp/objective excluem campeoes com o valor
- * exatamente 0, que na agregacao de PlayerChampionStats significa "sem
- * dado" (challenges ausente da Riot em patches antigos), nao "0% real".
+ * sobre a razao agregada. kp/objective consideram apenas campeoes cujo
+ * valor nao e `null` - ate a Etapa 4 o filtro era `> 0`, o que tambem
+ * descartava participacao zero legitima (time com abates, jogador sem
+ * participar em nenhum) junto com a ausencia de dado.
  */
 export function derivePlayerStrengthsWeaknesses(
   championStats: PlayerChampionStats[]
@@ -147,17 +149,24 @@ export function derivePlayerStrengthsWeaknesses(
     ),
     kp: weightedAverage(
       eligible
-        .filter((stats) => stats.killParticipation > 0)
+        .filter((stats): stats is PlayerChampionStats & { killParticipation: number } => stats.killParticipation !== null)
         .map((stats) => ({ value: stats.killParticipation / roleBaselines[stats.role].kp, weight: stats.games }))
     ),
     objective: weightedAverage(
       eligible
-        .filter((stats) => stats.objectiveParticipation > 0)
+        .filter(
+          (stats): stats is PlayerChampionStats & { objectiveParticipation: number } =>
+            stats.objectiveParticipation !== null
+        )
         .map((stats) => ({ value: stats.objectiveParticipation / roleBaselines[stats.role].objective, weight: stats.games }))
     )
   };
 
-  const deathsPerGame = weightedAverage(eligible.map((stats) => ({ value: stats.deaths / stats.games, weight: stats.games })));
+  const deathsPerGame = weightedAverage(
+    // `games` de um campeao elegivel e sempre >= MIN_GAMES_FOR_RANKING, mas
+    // o piso evita Infinity se um consumidor montar o objeto a mao.
+    eligible.map((stats) => ({ value: stats.deaths / Math.max(1, stats.games), weight: stats.games }))
+  );
   const scoreValues: Record<string, number | undefined> = {
     winrate: weightedAverage(eligible.map((stats) => ({ value: (stats.wins / stats.games) * 100, weight: stats.games }))),
     deaths: deathsPerGame === undefined ? undefined : normalizeInverse(deathsPerGame, DEATHS_BAD_VALUE)

@@ -1,3 +1,4 @@
+import type { AvailabilityStatus } from "./provenance.js";
 import type { RecommendationMetric } from "./recommendation-metric.js";
 
 export type Role = "TOP" | "JUNGLE" | "MID" | "ADC" | "SUPPORT";
@@ -46,6 +47,27 @@ export interface ChampionTag {
   earlyPressure: number;
 }
 
+/**
+ * Cobertura de um campo agregado que pode faltar em parte das partidas.
+ *
+ * Existe porque "média 0,42 sobre 12 partidas" e "média 0,42 sobre 3 das 12"
+ * não são a mesma afirmação, e até a Etapa 4 as duas saíam idênticas. Usa o
+ * mesmo `AvailabilityStatus` do contrato da Etapa 2 - não é um segundo
+ * mecanismo de disponibilidade, é o mesmo aplicado a agregação.
+ */
+export interface StatCoverage {
+  /** Partidas consideradas no contexto da agregação. */
+  sampleSize: number;
+  /**
+   * Partidas que realmente tinham o dado. `null` significa cobertura
+   * desconhecida - linha gravada antes desta contagem existir, não zero.
+   */
+  availableSampleSize: number | null;
+  status: AvailabilityStatus;
+  /** Por que está indisponível ou parcial. Ausente quando é AVAILABLE. */
+  reason?: string;
+}
+
 export interface PlayerChampionStats {
   championId: number;
   championName: string;
@@ -59,8 +81,24 @@ export interface PlayerChampionStats {
   goldPerMinute: number;
   damagePerMinute: number;
   visionScorePerMinute: number;
-  killParticipation: number;
-  objectiveParticipation: number;
+  /**
+   * Média sobre as partidas que **tinham** o dado (`challenges` da Riot,
+   * ausente em patches antigos). `null` quando nenhuma tinha - `0` aqui
+   * significa participação zero de verdade, medida.
+   */
+  killParticipation: number | null;
+  /**
+   * Sempre `null` hoje: o Sparta não extrai participação em objetivos de
+   * nenhuma fonte (o mapper do Match-V5 nunca preencheu o campo). Antes da
+   * Etapa 4 isso virava `0` e entrava no score de JUNGLE/SUPPORT como se
+   * o jogador não tivesse participado de objetivo nenhum.
+   */
+  objectiveParticipation: number | null;
+  /** Cobertura dos dois campos acima. */
+  coverage: {
+    killParticipation: StatCoverage;
+    objectiveParticipation: StatCoverage;
+  };
   recentMatches: RecentChampionMatch[];
 }
 
@@ -76,8 +114,9 @@ export interface RecentChampionMatch {
   goldPerMinute: number;
   damagePerMinute: number;
   visionScorePerMinute: number;
-  killParticipation: number;
-  objectiveParticipation: number;
+  /** `null` quando a partida não trouxe o dado - nunca coagido pra 0. */
+  killParticipation: number | null;
+  objectiveParticipation: number | null;
 }
 
 export interface RecentForm {
@@ -124,10 +163,19 @@ export interface MatchPerformanceMetrics {
 
 export interface MatchTimelineSummary {
   matchId: string;
+  /**
+   * Contagem direta de eventos da timeline: `0` significa "não morreu", e é
+   * sempre calculável quando a timeline existe.
+   */
   deathsBefore10: number;
   deathsBefore15: number;
-  csAt10: number;
-  csAt15: number;
+  /**
+   * CS no minuto correspondente. Ausente quando a partida não chegou nesse
+   * minuto ou o frame não traz o participante - antes da Etapa 4 esse caso
+   * virava `0`, indistinguível de "não farmou nada".
+   */
+  csAt10?: number;
+  csAt15?: number;
   goldDiffAt15?: number;
   objectiveEvents: string[];
 }

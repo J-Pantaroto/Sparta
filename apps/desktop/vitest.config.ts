@@ -21,6 +21,11 @@ export default defineConfig({
   },
   test: {
     environment: "jsdom",
+    // `globals: true` e o que faz o @testing-library/react registrar o
+    // cleanup automatico entre testes. Sem isso o DOM acumulava de um teste
+    // pro seguinte, e uma asserção de ausência podia passar (ou falhar) por
+    // causa do render anterior - achado ao escrever os testes da Etapa 4.
+    globals: true,
     include: ["src/renderer/**/*.test.{ts,tsx}"],
     css: true
   }

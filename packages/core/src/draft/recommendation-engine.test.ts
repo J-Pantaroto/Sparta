@@ -1,3 +1,4 @@
+import { availableCoverage } from "../types/stat-coverage.js";
 import { describe, expect, it } from "vitest";
 import { analyzeTeamComposition, normalizeAvailableWeights, recommendPicks, selectWeights } from "./recommendation-engine.js";
 import type { ChampionTag, DraftState, PlayerChampionStats, PlayerProfile } from "../types/domain.js";
@@ -18,6 +19,7 @@ const championStats: PlayerChampionStats[] = [
     visionScorePerMinute: 0.9,
     killParticipation: 0.62,
     objectiveParticipation: 0.4,
+    coverage: { killParticipation: availableCoverage(10), objectiveParticipation: availableCoverage(10) },
     recentMatches: []
   }
 ];
@@ -218,6 +220,7 @@ describe("guardas de time vazio", () => {
     visionScorePerMinute: 0.8,
     killParticipation: 0.55,
     objectiveParticipation: 0.4,
+    coverage: { killParticipation: availableCoverage(10), objectiveParticipation: availableCoverage(10) },
     recentMatches: []
   };
 

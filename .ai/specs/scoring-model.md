@@ -70,3 +70,14 @@ Deriva sinais de "força"/"fraqueza" a partir de uma razão (centro 1.0) ou de u
 ## Fora de escopo desta revisão
 
 Recalibrar qualquer peso, baseline ou threshold com base em dado estatístico real — não há partidas suficientes acumuladas ainda. Os valores acima devem ser revisitados quando houver volume real de uso do produto.
+
+## Componentes sem dado
+
+Desde a Etapa 4, um componente cuja fonte não existe **sai do cálculo** e seu peso é
+redistribuído proporcionalmente entre os demais (`normalizeWeightsByAvailability`), em vez de
+entrar valendo `0`. `ChampionPerformanceScore.dataCoverage` registra a fração do modelo que de
+fato participou, e `components` só traz as dimensões com dado.
+
+Isso não é recalibração: a tabela de pesos por papel continua idêntica. O que mudou é que
+ausência deixou de ser pontuada como desempenho zero. Ver `docs/data-provenance.md` para as
+regras de ausência versus zero.

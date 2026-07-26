@@ -1,4 +1,5 @@
 import type { Confidence, PlayerChampionStats, RecentChampionMatch, Role } from "../types/domain.js";
+import { normalizeWeightsByAvailability } from "./weight-normalization.js";
 
 export interface ChampionPerformanceScore {
   championId: number;
@@ -8,7 +9,17 @@ export interface ChampionPerformanceScore {
   confidence: Confidence;
   eligible: boolean;
   games: number;
+  /**
+   * Só os componentes com dado. Um componente indisponível fica **fora** do
+   * mapa em vez de aparecer como `0` - a interface itera o que existe.
+   */
   components: Record<string, number>;
+  /**
+   * Soma dos pesos originais do papel que de fato tinham dado. `1` quando
+   * o modelo inteiro participou; menor quando algum componente ficou de
+   * fora. Não é confiança estatística - são coisas diferentes.
+   */
+  dataCoverage: number;
 }
 
 /**
@@ -99,10 +110,10 @@ export function calculateRecentForm(matches: RecentChampionMatch[], decayFactor 
     const kda = calculateKda(match.kills, match.deaths, match.assists);
     const baseline = roleBaselines[match.role];
     // Sub-pesos internos (0.25/0.2/0.15/0.15/0.1/0.1/0.05, soma 1.0) - kp/
-    // objective ficam de fora deliberadamente aqui (RecentChampionMatch as
-    // vezes coage esses campos pra 0 quando a Riot nao manda `challenges`,
-    // ver toRecentChampionMatch em player-insights.ts; incluir aqui
-    // penalizaria erroneamente partidas antigas sem esse dado).
+    // objective ficam de fora deliberadamente aqui: sao os dois campos que
+    // podem faltar por partida (`null` desde a Etapa 4), e inclui-los
+    // exigiria renormalizar por partida sem ganho pratico - a forma recente
+    // ja e capturada pelos outros sete sinais.
     const matchScore =
       normalizeRatio(kda, baseline.kda) * 0.25 +
       // Vitoria/derrota como bonus/penalidade categorico fixo (100/35), nao
@@ -122,32 +133,61 @@ export function calculateRecentForm(matches: RecentChampionMatch[], decayFactor 
   return clamp(weightedTotal / weightSum);
 }
 
-export function scoreChampionPerformance(stats: PlayerChampionStats): ChampionPerformanceScore {
-  const games = stats.games;
-  const eligible = games >= MIN_GAMES_FOR_RANKING;
+/**
+ * Componentes cuja fonte pode simplesmente não existir pra aquele campeão.
+ * Os demais (kda, cs, dano, ouro, mortes, visão, winrate, forma recente)
+ * são derivados de campos que toda partida persistida tem.
+ */
+function buildComponents(stats: PlayerChampionStats): Record<string, number> {
   const kda = calculateKda(stats.kills, stats.deaths, stats.assists);
-  const deathsPerGame = stats.deaths / Math.max(1, games);
-  const winrate = stats.wins / Math.max(1, games);
   const baseline = roleBaselines[stats.role];
-  const recent = calculateRecentForm(stats.recentMatches);
+  // `games` nunca é 0 aqui (agregação sem partida não produz stats), mas o
+  // piso evita divisão por zero se um consumidor montar o objeto à mão -
+  // NaN se propagaria por todo o score sem nenhum sinal de erro.
+  const safeGames = Math.max(1, stats.games);
 
   const components: Record<string, number> = {
     kda: normalizeRatio(kda, baseline.kda),
-    winrate: clamp(winrate * 100),
+    winrate: clamp((stats.wins / safeGames) * 100),
     cs: normalizeRatio(stats.csPerMinute, baseline.cs),
     damage: normalizeRatio(stats.damagePerMinute, baseline.damage),
     gold: normalizeRatio(stats.goldPerMinute, baseline.gold),
-    deaths: normalizeInverse(deathsPerGame, DEATHS_BAD_VALUE),
+    deaths: normalizeInverse(stats.deaths / safeGames, DEATHS_BAD_VALUE),
     vision: normalizeRatio(stats.visionScorePerMinute, baseline.vision),
-    kp: normalizeRatio(stats.killParticipation, baseline.kp),
-    objective: normalizeRatio(stats.objectiveParticipation, baseline.objective),
-    recent
+    recent: calculateRecentForm(stats.recentMatches)
   };
 
-  const roleWeights = weights[stats.role];
-  const rawScore = Object.entries(roleWeights).reduce((sum, [key, weight]) => {
-    return sum + (components[key] ?? 50) * weight;
-  }, 0);
+  // Só entram quando há valor medido. `0` aqui é participação zero de
+  // verdade e continua entrando normalmente; ausência não vira componente.
+  if (stats.killParticipation !== null) {
+    components.kp = normalizeRatio(stats.killParticipation, baseline.kp);
+  }
+  if (stats.objectiveParticipation !== null) {
+    components.objective = normalizeRatio(stats.objectiveParticipation, baseline.objective);
+  }
+
+  return components;
+}
+
+export function scoreChampionPerformance(stats: PlayerChampionStats): ChampionPerformanceScore {
+  const games = stats.games;
+  const eligible = games >= MIN_GAMES_FOR_RANKING;
+  const components = buildComponents(stats);
+
+  // Componente sem dado sai do cálculo e seu peso é redistribuído entre os
+  // que têm - mesma regra do motor de draft (Etapa 3), mesma função. Antes
+  // da Etapa 4, `objective` valia 0 pra todo mundo (o Sparta nunca extraiu
+  // esse dado), o que derrubava 15% do score de JUNGLE e SUPPORT como se
+  // fosse desempenho medido.
+  const { normalizedWeights, dataCoverage } = normalizeWeightsByAvailability(
+    weights[stats.role],
+    (key) => components[key] !== undefined
+  );
+
+  const rawScore = Object.entries(normalizedWeights).reduce(
+    (sum, [key, weight]) => sum + (components[key] ?? 0) * weight,
+    0
+  );
 
   return {
     championId: stats.championId,
@@ -157,7 +197,10 @@ export function scoreChampionPerformance(stats: PlayerChampionStats): ChampionPe
     confidence: confidenceFromGames(games),
     eligible,
     games,
-    components: Object.fromEntries(Object.entries(components).map(([key, value]) => [key, round(value)]))
+    components: Object.fromEntries(Object.entries(components).map(([key, value]) => [key, round(value)])),
+    // Sem `round`: `round` arredonda pra 1 casa (escala 0-100 dos
+    // scores) e esmagaria uma cobertura de 0.85 pra 0.8.
+    dataCoverage
   };
 }
 

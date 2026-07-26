@@ -1,3 +1,4 @@
+import { availableCoverage } from "../types/stat-coverage.js";
 import { describe, expect, it } from "vitest";
 import { computeRecentForm, derivePlayerStrengthsWeaknesses } from "./player-insights.js";
 import type { MatchParticipationRecord } from "./player-champion-stats.js";
@@ -105,6 +106,7 @@ function buildStats(role: Role, overrides: Partial<PlayerChampionStats> = {}): P
     visionScorePerMinute: role === "SUPPORT" ? 2.2 : 0.85,
     killParticipation: role === "SUPPORT" ? 0.64 : 0.56,
     objectiveParticipation: role === "SUPPORT" ? 0.5 : 0.38,
+    coverage: { killParticipation: availableCoverage(10), objectiveParticipation: availableCoverage(10) },
     recentMatches: [],
     ...overrides
   };
@@ -169,8 +171,8 @@ describe("derivePlayerStrengthsWeaknesses", () => {
     expect(codes).not.toContain("farm_consistente");
   });
 
-  it("excludes kill participation / objective participation when the value is exactly 0 (missing Riot challenges data)", () => {
-    const withoutChallenges = buildStats("MID", { killParticipation: 0, objectiveParticipation: 0 });
+  it("exclui participacao em abates/objetivos quando o dado esta ausente (null)", () => {
+    const withoutChallenges = buildStats("MID", { killParticipation: null, objectiveParticipation: null });
     const result = derivePlayerStrengthsWeaknesses([withoutChallenges]);
     const codes = [...result.strengths, ...result.weaknesses].map((signal) => signal.code);
     expect(codes).not.toContain("boa_participacao_abates");
@@ -179,10 +181,20 @@ describe("derivePlayerStrengthsWeaknesses", () => {
     expect(codes).not.toContain("baixa_contribuicao_objetivos");
   });
 
-  it("does not let a zero-kp champion drag down the weighted average of a champion with real kp data", () => {
+  it("nao deixa um campeao sem o dado derrubar a media de quem tem kp real", () => {
     const withData = buildStats("MID", { championId: 61, killParticipation: 0.8, games: 20 });
-    const withoutData = buildStats("MID", { championId: 157, championName: "Yasuo", killParticipation: 0, games: 20 });
+    const withoutData = buildStats("MID", { championId: 157, championName: "Yasuo", killParticipation: null, games: 20 });
     const result = derivePlayerStrengthsWeaknesses([withData, withoutData]);
     expect(result.strengths.some((strength) => strength.code === "boa_participacao_abates")).toBe(true);
+  });
+
+  // Etapa 4: ate aqui o filtro era `> 0`, entao participacao zero MEDIDA
+  // (time teve abates, jogador nao participou de nenhum) era descartada
+  // junto com a ausencia de dado - o sinal real nunca aparecia.
+  it("mantem participacao em abates igual a zero como sinal real", () => {
+    const semParticipar = buildStats("MID", { killParticipation: 0, games: 20 });
+    const result = derivePlayerStrengthsWeaknesses([semParticipar]);
+    const codes = [...result.strengths, ...result.weaknesses].map((signal) => signal.code);
+    expect(codes).toContain("baixa_participacao_abates");
   });
 });

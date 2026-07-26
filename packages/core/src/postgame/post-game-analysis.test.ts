@@ -1,3 +1,4 @@
+import { availableCoverage } from "../types/stat-coverage.js";
 import { describe, expect, it } from "vitest";
 import { generatePostGameAnalysis, type PostGameMatchContext } from "./post-game-analysis.js";
 import type { PlayerChampionStats } from "../types/domain.js";
@@ -50,6 +51,7 @@ function championHistory(overrides: Partial<PlayerChampionStats> = {}): PlayerCh
     visionScorePerMinute: 0.85,
     killParticipation: 0.56,
     objectiveParticipation: 0.38,
+    coverage: { killParticipation: availableCoverage(10), objectiveParticipation: availableCoverage(10) },
     recentMatches: [],
     ...overrides
   };

@@ -108,8 +108,13 @@ export function mapMatchToSummaries(raw: RiotMatchDto): MatchSummary[] {
  * calcular goldDiffAt15 (precisa saber quem esta em cada time).
  */
 export function extractParticipantTeams(raw: RiotMatchDto): { participantId: number; puuid: string; teamId: number }[] {
-  return raw.metadata.participants.map((puuid, index) => {
-    const participant = raw.info.participants.find((entry) => entry.puuid === puuid);
-    return { participantId: index + 1, puuid, teamId: participant?.teamId ?? 0 };
-  });
+  return raw.metadata.participants
+    .map((puuid, index) => {
+      const participant = raw.info.participants.find((entry) => entry.puuid === puuid);
+      // Sem `teamId` a entrada fica de fora: o `?? 0` anterior criava um
+      // time fantasma (a Riot usa 100/200), e esse time entrava na conta de
+      // aliados/inimigos do goldDiffAt15 como se fosse real.
+      return participant?.teamId === undefined ? undefined : { participantId: index + 1, puuid, teamId: participant.teamId };
+    })
+    .filter((entry): entry is { participantId: number; puuid: string; teamId: number } => entry !== undefined);
 }

@@ -291,8 +291,10 @@ export async function findMatchDetail(matchId: string, puuid: string): Promise<M
           matchId: match.matchId,
           deathsBefore10: match.timeline.deathsBefore10,
           deathsBefore15: match.timeline.deathsBefore15,
-          csAt10: match.timeline.csAt10 ?? 0,
-          csAt15: match.timeline.csAt15 ?? 0,
+          // Colunas nullable no banco: null significa que a partida nao
+          // chegou naquele minuto, nao que o CS foi zero.
+          csAt10: match.timeline.csAt10 ?? undefined,
+          csAt15: match.timeline.csAt15 ?? undefined,
           goldDiffAt15: match.timeline.goldDiffAt15 ?? undefined,
           objectiveEvents: (match.timeline.eventsJson as unknown as string[] | null) ?? []
         }

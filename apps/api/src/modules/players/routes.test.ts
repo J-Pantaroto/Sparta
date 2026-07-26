@@ -121,6 +121,55 @@ describe("players routes", () => {
     await app.close();
   });
 
+  // Etapa 4: a rota nao pode transformar ausencia em zero no caminho de
+  // saida - o cliente perderia a distincao sem nenhum aviso.
+  it("recent-matches devolve null quando a partida nao traz participacao, sem converter pra 0", async () => {
+    findParticipationHistoryMock.mockResolvedValue([
+      {
+        matchId: "BR1_1",
+        championId: 234,
+        championName: "Viego",
+        role: "JUNGLE",
+        won: true,
+        kills: 5,
+        deaths: 2,
+        assists: 7,
+        csPerMinute: 5.4,
+        goldPerMinute: 390,
+        damagePerMinute: 560,
+        visionScorePerMinute: 0.8,
+        killParticipation: null,
+        objectiveParticipation: null
+      },
+      {
+        matchId: "BR1_2",
+        championId: 234,
+        championName: "Viego",
+        role: "JUNGLE",
+        won: false,
+        kills: 0,
+        deaths: 4,
+        assists: 0,
+        csPerMinute: 4.1,
+        goldPerMinute: 310,
+        damagePerMinute: 400,
+        visionScorePerMinute: 0.5,
+        killParticipation: 0,
+        objectiveParticipation: null
+      }
+    ]);
+
+    const app = await buildApp();
+    const response = await app.inject({ method: "GET", url: "/players/puuid-x/recent-matches" });
+    const body = response.json();
+
+    expect(response.statusCode).toBe(200);
+    expect(body.matches[0].killParticipation).toBeNull();
+    // Participacao zero medida atravessa como 0, nao vira null.
+    expect(body.matches[1].killParticipation).toBe(0);
+    expect(body.matches[1].objectiveParticipation).toBeNull();
+  });
+
   it("recent-matches devolve lista vazia quando o jogador nunca sincronizou", async () => {
     findParticipationHistoryMock.mockResolvedValue([]);
     const app = await buildApp();

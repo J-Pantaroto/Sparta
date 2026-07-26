@@ -1,3 +1,4 @@
+import { availableCoverage } from "../types/stat-coverage.js";
 import { describe, expect, it } from "vitest";
 import { recommendPicks } from "./recommendation-engine.js";
 import {
@@ -118,6 +119,7 @@ describe("recommendPicks com o contrato novo", () => {
       visionScorePerMinute: 0.8,
       killParticipation: 0.55,
       objectiveParticipation: 0.4,
+      coverage: { killParticipation: availableCoverage(10), objectiveParticipation: availableCoverage(10) },
       recentMatches: []
     };
   }

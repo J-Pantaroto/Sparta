@@ -1,4 +1,4 @@
-import { ensureRecommendationMetrics } from "@sparta/core";
+import { ensureRecommendationMetrics, unavailableCoverage, unknownCoverage } from "@sparta/core";
 import type {
   ChampionPerformanceScore,
   DraftState,
@@ -99,8 +99,51 @@ export function linkRiotAccount(
   });
 }
 
-export function fetchPlayerProfile(gameName: string, tagLine: string) {
-  return request<PlayerProfileResponse>(`/players/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}/profile`);
+
+/**
+ * Normaliza estatisticas de campeao vindas de uma API anterior a Etapa 4.
+ *
+ * Regra deliberadamente estreita: so `objectiveParticipation` e convertido.
+ * Ali o `0` **e provadamente artificial** - o mapper do Match-V5 nunca
+ * preencheu esse campo, entao nenhuma partida jamais teve o dado e a
+ * agregacao antiga era obrigada a gravar 0 (medido: 0 de 220 participantes
+ * no banco real).
+ *
+ * `killParticipation: 0` NAO e tocado: ali o zero pode ser participacao zero
+ * medida (time com abates, jogador sem participar de nenhum), e nao da pra
+ * distinguir os dois casos de fora. Limitacao registrada em
+ * `docs/data-provenance.md`.
+ *
+ * Respostas novas ja trazem `coverage` e passam intactas.
+ */
+export function ensureChampionStatsCoverage(stats: PlayerChampionStats): PlayerChampionStats {
+  if (stats.coverage) return stats;
+
+  const objectiveUnavailable =
+    stats.objectiveParticipation === 0 || stats.objectiveParticipation === null || stats.objectiveParticipation === undefined;
+
+  return {
+    ...stats,
+    killParticipation: stats.killParticipation ?? null,
+    objectiveParticipation: objectiveUnavailable ? null : stats.objectiveParticipation,
+    coverage: {
+      killParticipation:
+        stats.killParticipation === null || stats.killParticipation === undefined
+          ? unavailableCoverage(stats.games, "A resposta da API não traz participação em abates.")
+          : unknownCoverage(stats.games),
+      objectiveParticipation: unavailableCoverage(
+        stats.games,
+        "O Sparta ainda não extrai participação em objetivos de nenhuma fonte."
+      )
+    }
+  };
+}
+
+export async function fetchPlayerProfile(gameName: string, tagLine: string) {
+  const profile = await request<PlayerProfileResponse>(
+    `/players/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}/profile`
+  );
+  return { ...profile, championStats: (profile.championStats ?? []).map(ensureChampionStatsCoverage) };
 }
 
 export function fetchChampionPerformance(puuid: string) {
