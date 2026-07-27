@@ -6,6 +6,7 @@ const {
   findChampionStatsByPuuidMock,
   findPlayerInsightsByPuuidMock,
   findAllChampionTagsMock,
+  findChampionNamesByIdsMock,
   findPersonalLaneMatchupHistoryMock
 } = vi.hoisted(() => ({
   getAuthenticatedUserIdMock: vi.fn(),
@@ -13,6 +14,7 @@ const {
   findChampionStatsByPuuidMock: vi.fn(),
   findPlayerInsightsByPuuidMock: vi.fn(),
   findAllChampionTagsMock: vi.fn(),
+  findChampionNamesByIdsMock: vi.fn(),
   findPersonalLaneMatchupHistoryMock: vi.fn()
 }));
 
@@ -26,7 +28,8 @@ vi.mock("../../db/prisma.js", () => ({
 }));
 
 vi.mock("../catalog/champion-repository.js", () => ({
-  findAllChampionTags: findAllChampionTagsMock
+  findAllChampionTags: findAllChampionTagsMock,
+  findChampionNamesByIds: findChampionNamesByIdsMock
 }));
 
 vi.mock("../matches/matchup-repository.js", () => ({
@@ -49,6 +52,7 @@ describe("drafts routes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     findAllChampionTagsMock.mockResolvedValue([]);
+    findChampionNamesByIdsMock.mockResolvedValue(new Map([[61, "Orianna"]]));
     findPersonalLaneMatchupHistoryMock.mockResolvedValue([]);
   });
 
@@ -183,5 +187,148 @@ describe("drafts routes", () => {
     expect(body.recommendations.length).toBeGreaterThan(0);
     expect(body.recommendations[0].championName).toBe("Orianna");
     await app.close();
+  });
+
+  describe("POST /drafts/pre-game-analysis (Etapa 7)", () => {
+    const preGamePayload = {
+      draft: {
+        playerRole: "MID",
+        pickOrder: 3,
+        allies: [],
+        enemies: [],
+        bannedChampionIds: [],
+        selectedChampionId: 61
+      }
+    };
+
+    it("exige autenticação", async () => {
+      getAuthenticatedUserIdMock.mockResolvedValue(null);
+      const app = await buildApp();
+
+      const response = await app.inject({ method: "POST", url: "/drafts/pre-game-analysis", payload: preGamePayload });
+
+      expect(response.statusCode).toBe(401);
+      await app.close();
+    });
+
+    it("responde 422 PLAYER_ROLE_UNAVAILABLE sem consultar o catálogo", async () => {
+      getAuthenticatedUserIdMock.mockResolvedValue("user-1");
+      const app = await buildApp();
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/drafts/pre-game-analysis",
+        payload: { draft: { ...preGamePayload.draft, playerRole: undefined } }
+      });
+
+      expect(response.statusCode).toBe(422);
+      expect(response.json().code).toBe("PLAYER_ROLE_UNAVAILABLE");
+      expect(findChampionNamesByIdsMock).not.toHaveBeenCalled();
+      expect(findAllChampionTagsMock).not.toHaveBeenCalled();
+      await app.close();
+    });
+
+    it("responde 422 SELECTED_CHAMPION_UNAVAILABLE sem campeão confirmado", async () => {
+      getAuthenticatedUserIdMock.mockResolvedValue("user-1");
+      const app = await buildApp();
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/drafts/pre-game-analysis",
+        payload: { draft: { ...preGamePayload.draft, selectedChampionId: undefined } }
+      });
+
+      expect(response.statusCode).toBe(422);
+      expect(response.json().code).toBe("SELECTED_CHAMPION_UNAVAILABLE");
+      expect(findChampionNamesByIdsMock).not.toHaveBeenCalled();
+      await app.close();
+    });
+
+    it("responde 422 quando o campeão confirmado não existe no catálogo real", async () => {
+      getAuthenticatedUserIdMock.mockResolvedValue("user-1");
+      findChampionNamesByIdsMock.mockResolvedValue(new Map());
+      const app = await buildApp();
+
+      const response = await app.inject({ method: "POST", url: "/drafts/pre-game-analysis", payload: preGamePayload });
+
+      expect(response.statusCode).toBe(422);
+      expect(response.json().code).toBe("SELECTED_CHAMPION_UNAVAILABLE");
+      await app.close();
+    });
+
+    it("devolve o contrato estruturado do motor de domínio, sem as frases estáticas antigas", async () => {
+      getAuthenticatedUserIdMock.mockResolvedValue("user-1");
+      const app = await buildApp();
+
+      const response = await app.inject({ method: "POST", url: "/drafts/pre-game-analysis", payload: preGamePayload });
+      const body = response.json();
+
+      expect(response.statusCode).toBe(200);
+      expect(body.algorithmVersion).toBeTruthy();
+      expect(body.summary).toBeTruthy();
+      expect(body.selectedChampion).toEqual({ championId: 61, championName: "Orianna", role: "MID" });
+      expect(body.winCondition).toBeUndefined();
+      expect(body.allyStrengths).toBeUndefined();
+      expect(JSON.stringify(body)).not.toMatch(/prioridade de rota|spikes de nível 6/i);
+      await app.close();
+    });
+
+    it("não consulta matchup pessoal quando o adversário direto não foi revelado", async () => {
+      getAuthenticatedUserIdMock.mockResolvedValue("user-1");
+      const app = await buildApp();
+
+      await app.inject({ method: "POST", url: "/drafts/pre-game-analysis", payload: preGamePayload });
+
+      expect(findPersonalLaneMatchupHistoryMock).not.toHaveBeenCalled();
+      await app.close();
+    });
+
+    it("consulta o matchup pessoal do próprio jogador quando há adversário direto", async () => {
+      getAuthenticatedUserIdMock.mockResolvedValue("user-1");
+      riotAccountFindFirstMock.mockResolvedValue({
+        puuid: "puuid-1",
+        gameName: "Zekerus",
+        tagLine: "117",
+        platformRegion: "br1",
+        regionalRouting: "americas"
+      });
+      findChampionNamesByIdsMock.mockResolvedValue(
+        new Map([
+          [61, "Orianna"],
+          [64, "Lee Sin"]
+        ])
+      );
+      const app = await buildApp();
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/drafts/pre-game-analysis",
+        payload: {
+          draft: {
+            ...preGamePayload.draft,
+            enemies: [{ championId: 64, championName: "Lee Sin", team: "enemy" }],
+            enemyLaneChampionId: 64
+          }
+        }
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(findPersonalLaneMatchupHistoryMock).toHaveBeenCalledWith("puuid-1", "MID");
+      expect(response.json().laneContext.status).not.toBe("UNAVAILABLE");
+      await app.close();
+    });
+
+    it("gera análise parcial (não erro) com draft incompleto", async () => {
+      getAuthenticatedUserIdMock.mockResolvedValue("user-1");
+      const app = await buildApp();
+
+      const response = await app.inject({ method: "POST", url: "/drafts/pre-game-analysis", payload: preGamePayload });
+      const body = response.json();
+
+      expect(response.statusCode).toBe(200);
+      expect(body.status).toBe("PARTIAL");
+      expect(body.dataCoverage).toBeGreaterThan(0);
+      await app.close();
+    });
   });
 });

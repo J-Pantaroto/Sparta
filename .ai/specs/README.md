@@ -9,7 +9,7 @@ edição significativa numa existente), atualize este espelho copiando o(s) arqu
 Não edite os arquivos aqui diretamente esperando que isso reflita em `docs/` — é uma via de
 mão única (`docs/` → `.ai/specs/`).
 
-Snapshot gerado em: 2026-07-25.
+Snapshot gerado em: 2026-07-25 (atualizado em 2026-07-27).
 
 ## Índice
 
@@ -22,6 +22,7 @@ Snapshot gerado em: 2026-07-25.
 - `draft-recommendation.md` — motor de recomendação de draft.
 - `github.md` — configuração de repositório/CI.
 - `postgame-analysis.md` — análise pós-game.
+- `pre-game-analysis.md` — análise pré-game derivada do draft atual.
 - `replay-analysis.md` — análise de replay (experimental).
 - `riot-compliance.md` — limites de produto e compliance com a Riot.
 - `scoring-model.md` — modelo de scoring de desempenho.

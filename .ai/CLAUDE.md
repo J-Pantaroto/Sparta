@@ -67,6 +67,57 @@ métrica. Os estados PARTIAL/STALE/UNAVAILABLE **não** foram vistos no app real
 métrica os produz ainda; estão cobertos por teste de componente. Ver `docs/data-provenance.md`.
 24 testes novos (230 no total).
 
+### Etapa 7: o pré-game vira real e derivado do draft atual
+
+`POST /drafts/pre-game-analysis` era a última rota 100% estática do produto: devolvia quatro
+listas de frases fixas (`allyStrengths`, `allyWeaknesses`, `enemyThreats`, `winCondition`) e
+**nem lia o body**. O desktop mostrava um card "Orientação geral" com três dicas fixas.
+
+**Auditoria antes de implementar** (registrada em `.ai/prompts/features/0007-...`):
+
+- A rota é `async () => ({ ... })` — nenhum `request`, nenhum parse, nenhuma consulta.
+- **Não existia tipo `PreGameAnalysis`** em lugar nenhum do repositório, nem produtor nem
+  consumidor tipado.
+- `analyzeTeamComposition` (motor de draft) devolve `0` em toda dimensão quando não há nenhuma
+  tag. Lá o zero alimenta um score e nunca é exibido; reusá-lo aqui produziria a frase "o time
+  não tem linha de frente" com zero campeões conhecidos. **Por isso o pré-game não reusa essa
+  função** — `summarizeKnownComposition` deixa a dimensão **ausente** em vez de zero.
+- Confirmado que o jogador continua fora de `draft.allies` (contrato da Fase 16) e entra na
+  composição exatamente uma vez.
+
+1. **`packages/core/src/draft/pre-game-analysis.ts`** (novo, puro) — `generatePreGameAnalysis`
+   devolve `{ok:true, analysis}` ou `{ok:false, reason}`. Contrato com `status`, `dataCoverage`,
+   `coverageBreakdown`, `selectedChampion`, `summary`, cinco seções (`laneContext`,
+   `alliedComposition`, `enemyComposition`, `selectedChampionFit`, `knownRisks`),
+   `unavailableSignals`, `generatedAt` e `algorithmVersion`. Cada `AnalysisSignal` carrega
+   `status`/`tone`/`strength`/`confidence`/`provenance`/`evidence`/`unavailableReason`.
+   `now` entra como parâmetro pra a saída ser determinística.
+2. **Linguagem proporcional à evidência** — dimensão só vira frase fora da faixa 35-55, e o
+   texto muda com a cobertura: "ainda não foi identificada entre 3 dos 5 campeões conhecidos"
+   com draft aberto, "a composição apresenta pouca linha de frente" com o time fechado.
+   `ChampionTag` sai sempre como `DERIVED` e o texto usa "indica"/"apresenta perfil de".
+3. **Bug real achado pelo teste**: `fit_fills_gap` ("necessidade atendida") comparava a média
+   **com** o jogador contra a média **sem** ele — matematicamente impossível de disparar: um
+   aliado em 0 e o jogador em 100 dão média 50, abaixo do limiar de 55. Passou a comparar a
+   média sem o jogador com o **valor do próprio campeão**.
+4. **Rota** — orquestra e nada mais: valida o payload, resolve nomes pelo catálogo real
+   (`findChampionNamesByIds`, novo), carrega `findAllChampionTags`, resolve o matchup pessoal
+   (`findPersonalLaneMatchupHistory` + `aggregateMatchupData`) **só** quando há adversário
+   direto, chama o motor. `422` `PLAYER_ROLE_UNAVAILABLE` / `SELECTED_CHAMPION_UNAVAILABLE`
+   antes de qualquer consulta; campeão fora do catálogo também é `SELECTED_CHAMPION_UNAVAILABLE`
+   (analisar exigiria inventar um nome, e o motor casa tags por nome).
+5. **Desktop** — o card "Orientação geral" foi **removido**; a tela consome o contrato inteiro.
+   Enquanto carrega, **nada** da análise anterior é exibido (mesma decisão da Etapa 6: com o
+   draft mudando ao vivo, mostrar o resultado do draft antigo como atual é pior que um spinner).
+   `ApiError` ganhou `payload` pra o cliente ler o `code` estruturado do 422.
+6. **Compatibilidade** — `fetchPreGameAnalysis` reconhece a resposta antiga num único ponto e a
+   **recusa** ("Análise contextual indisponível nesta versão da API"). O formato antigo não é
+   traduzido; não existem dois motores.
+
+Sem migração, sem tabela nova, sem fonte externa nova, sem persistência (`DraftSession`/
+`PickRecommendation` seguem sem código). Ver `docs/pre-game-analysis.md`.
+58 testes novos (391 no total).
+
 ### Etapa 6: posição desconhecida não vira MID
 
 Ausência de posição era convertida em `MID` em nove pontos do fluxo. O efeito não era cosmético:
@@ -717,7 +768,7 @@ Continuação direta da 8a — mesmo pedido original do usuário (validar telas 
 
 1. **Componente `features/Loading.tsx`** (`<Loading label="..." />`, spinner CSS puro via `@keyframes spin`) substituindo todo `<p>Carregando...</p>` solto que existia em `App.tsx`, `PostGameScreen.tsx`, `GrowthJourneyScreen.tsx`, `SettingsScreen.tsx` — antes cada tela reimplementava o próprio texto de loading, sem nenhum indicador visual de progresso.
 2. **Novo `features/GridSkeleton.tsx`** (shimmer via `@keyframes shimmer`) substituindo o texto "Carregando campeões/skins..." nos grids de `ChampionGridPicker.tsx`/`ChampionSkinPicker.tsx` — grid deixa de ficar vazio enquanto carrega.
-3. **Pré-game enriquecido** (`App.tsx`, função `PreGame`) — passou a receber `draft`/`ddragonVersion` como props (antes não recebia nenhum). Mostra o ícone do campeão confirmado (`draft.selectedChampionId`) com fundo de splash art (`hero-splash`, mesmo padrão já usado no Dashboard), os ícones dos inimigos conhecidos (`draft.enemies`) e um resumo textual da inclinação de dano do time inimigo, reaproveitando `summarizeEnemyDamageLean` (exportada de `@sparta/core` desde a 8a) — a mesma função usada pelo motor de build, evitando duplicar a lógica. **Sem tocar a rota `/drafts/pre-game-analysis`** (continua estática no backend, trabalho futuro separado já documentado) — só a apresentação do lado do desktop ficou real, usando dado já disponível no cliente.
+3. **Pré-game enriquecido** (`App.tsx`, função `PreGame`) — passou a receber `draft`/`ddragonVersion` como props (antes não recebia nenhum). Mostra o ícone do campeão confirmado (`draft.selectedChampionId`) com fundo de splash art (`hero-splash`, mesmo padrão já usado no Dashboard), os ícones dos inimigos conhecidos (`draft.enemies`) e um resumo textual da inclinação de dano do time inimigo, reaproveitando `summarizeEnemyDamageLean` (exportada de `@sparta/core` desde a 8a) — a mesma função usada pelo motor de build, evitando duplicar a lógica. **Sem tocar a rota `/drafts/pre-game-analysis`** (naquele momento ainda estática no backend; virou real na Etapa 7) — só a apresentação do lado do desktop ficou real, usando dado já disponível no cliente.
 4. **Ícones de campeão na lista do Pós-game** (`PostGameScreen.tsx`) — ganhou prop `ddragonVersion`, resolve `championId → nome/ícone` reaproveitando `fetchAllChampions` (já buscado pra outras telas), fechando o gap documentado no CLAUDE.md ("Catálogo de campeões pro desktop", já que `RecentChampionMatch` nunca trouxe `championName`).
 5. **Ícones e cor de tendência em Evolução** (`GrowthJourneyScreen.tsx`) — novo `TrendCell`, ícone `TrendingUp`/`TrendingDown`/`Minus` (lucide-react, já instalado) + nova cor semântica `--color-green` (só pra tendência — a cor de destaque do tema continua fixa em vermelho, decisão inalterada). `improving`/`resolved` tratados como boa notícia (verde), `worsening`/`new` como má notícia (vermelho).
 6. **Ajustes de CSS pequenos** encontrados na auditoria: `.draft-controls button.active` não tinha nenhum estilo distinto do hover (usado em Configurações/Análise) — corrigido.
@@ -892,7 +943,7 @@ Validado ponta a ponta contra a conta real Zekerus#117: backfill rodado (20 part
 O que ficou deliberadamente fora de escopo (confirmado com o usuário antes de implementar):
 
 - Conectar o desktop (`ChampionSelect` em `App.tsx`) à rota real — continua usando `features/mock-data.ts` local, próximo passo separado.
-- Tornar `/drafts/pre-game-analysis` real — problema de design à parte (motor de geração de texto explicativo), não só fiação; continua 100% estático.
+- Tornar `/drafts/pre-game-analysis` real — adiado naquela fase; entregue na Etapa 7.
 - Expandir `ChampionTag` além dos 2 campeões do seed — sem bloqueio técnico agora, é curadoria manual contínua (editar `data/seeds/champion-tags.json`).
 - Cache/pré-computação de matchups — computado na hora a cada chamada da rota, deliberadamente (dado é global, não amarrado a um evento de sync de um jogador). Revisitar se a latência incomodar conforme o histórico crescer.
 
@@ -1201,7 +1252,7 @@ Endpoints iniciais:
 - `GET /players/settings` (autenticado)
 - `PUT /players/settings` (autenticado)
 - `POST /drafts/recommendations`
-- `POST /drafts/pre-game-analysis`
+- `POST /drafts/pre-game-analysis` (autenticado)
 - `POST /postgame/analyze`
 - `GET /postgame/:matchId`
 - `POST /replays/import`
@@ -1229,7 +1280,7 @@ apps/api/src/db/api-cache.ts          # helper generico sobre ApiCacheEntry
 
 `GET /players/:riotName/:tagLine/profile`, `/recent-matches` e `/champion-performance` leem dado real (Fase 1, Tarefa 6). Desde a Fase 2, `strengths`/`weaknesses`/`recentForm` do perfil também são reais (`findPlayerInsightsByPuuid`, calculados e persistidos a cada sync via `computeAndPersistPlayerInsights`). Desde a Fase 3, `POST /drafts/recommendations` também é real (autenticada, ver acima) — `apps/api/src/routes/mock-data.ts` foi removido, não sobrou nenhum uso dele. Desde a Fase 4, `POST /postgame/analyze`/`GET /postgame/:matchId` também são reais e autenticados. Desde a Fase 5, `GET /players/:puuid/growth-journey` também é real (sem autenticação, mesmo padrão de `/recent-matches`/`/champion-performance`).
 
-Ainda 100% mock/estático: `/drafts/pre-game-analysis`, `/replays/*` (fora do escopo até agora).
+Desde a Etapa 7, `POST /drafts/pre-game-analysis` também é real e autenticada (motor puro `generatePreGameAnalysis`, ver `docs/pre-game-analysis.md`). Ainda 100% mock/estático: `/replays/*` (fora do escopo até agora).
 
 ## Banco atual
 
@@ -1301,7 +1352,7 @@ Telas existentes:
 - Evolução (`features/GrowthJourneyScreen.tsx`, com ícone/cor de tendência desde a 8b);
 - Configurações (`features/SettingsScreen.tsx`, novo na Sub-fase 6a).
 
-Desde a sessão que conectou o desktop às rotas reais: Dashboard/Perfil/Champion Select/Pós-game/Evolução leem dado real via `features/api-client.ts` (`fetchPlayerProfile`/`fetchChampionPerformance`/`fetchRecentMatches`/`fetchGrowthJourney`/`fetchDraftRecommendations`/`analyzePostgame`/`fetchPostgameReport`), com loading/erro tratados pelo hook compartilhado `features/use-async-data.ts`. `mock-data.ts` foi removido. A rota `/drafts/pre-game-analysis` continua 100% mock no backend (ver "O que ficou fora de escopo" nas fases anteriores) — a Sub-fase 8b só enriqueceu a apresentação do lado do desktop com dado já disponível no cliente (ver abaixo).
+Desde a sessão que conectou o desktop às rotas reais: Dashboard/Perfil/Champion Select/Pós-game/Evolução leem dado real via `features/api-client.ts` (`fetchPlayerProfile`/`fetchChampionPerformance`/`fetchRecentMatches`/`fetchGrowthJourney`/`fetchDraftRecommendations`/`analyzePostgame`/`fetchPostgameReport`), com loading/erro tratados pelo hook compartilhado `features/use-async-data.ts`. `mock-data.ts` foi removido. A rota `/drafts/pre-game-analysis` era 100% mock no backend até a Etapa 7, que a tornou real — a Sub-fase 8b só tinha enriquecido a apresentação do lado do desktop com dado já disponível no cliente (ver abaixo).
 
 Build de campeão (Sub-fase 8a): ao confirmar um campeão no Champion Select ("Confirmar campeão" em cada card de recomendação), um painel `<BuildPanel>` aparece inline na mesma tela — busca `ChampionClassProfile[]`/`ItemSummary[]` via `features/datadragon.ts` (`fetchChampionClassProfiles`/`fetchItemCatalog`, direto da Data Dragon, sem rota nova no backend) e chama `recommendBuild` (`@sparta/core`) com o campeão confirmado + `draft.enemies` (agora populado por um seletor real de até 5 campeões inimigos, `features/ChampionGridPicker.tsx`, extraído do `ChampionSkinPicker.tsx`). Renderiza botas/itens core/situacionais com ícone real (`itemIconUrl`) e as `reasons`/`warnings` do motor. Sem persistência — some ao sair da tela.
 
@@ -1405,7 +1456,7 @@ Fase 1 (Riot Sync), o refinamento visual do desktop, Fase 2 (Player Intelligence
 
 1. **Validar a detecção automática de posição/ordem de pick dentro de uma sessão de champion select real** (precisa do cliente do League aberto e em champ select) — a Fase 11 implementou `derivePlayerRole` e o gating, e o download de skin já foi validado de verdade (não é mais pendência), mas a detecção de papel/pick order/troca de lane só pode ser confirmada de ponta a ponta com o League rodando, indisponível neste ambiente.
 2. Refinar `ChampionTag` campeão a campeão onde a leitura de classe é grosseira demais (Fase 15 cobriu os 173 automaticamente, mas duas Marksman recebem o mesmo perfil, e campeão fora do arquétipo — Senna, Pyke, Ivern — fica genérico). Editar a entrada em `data/seeds/champion-tags.json` e marcar `"source": "manual"`: a regeneração preserva.
-3. Tornar `/drafts/pre-game-analysis` real (hoje 100% estático) — usar `analyzeTeamComposition` (já existe em `packages/core`) com `championTags`/`matchups` reais; motor de geração de texto explicativo ainda por desenhar (a composição por fragmentos da Fase 4, em `packages/core/src/postgame/post-game-analysis.ts`, é um precedente reaproveitável). A Fase 9 só enriquece a apresentação visual do lado do desktop, não essa rota.
+3. ~~Tornar `/drafts/pre-game-analysis` real~~ — **feito na Etapa 7**. O motor é novo (`packages/core/src/draft/pre-game-analysis.ts`), não `analyzeTeamComposition`: aquela função devolve `0` em toda dimensão sem tags, o que aqui viraria uma frase falsa. Ver `docs/pre-game-analysis.md`.
 4. Pré-computar/cachear matchups se a latência de `POST /drafts/recommendations` incomodar conforme o histórico crescer (hoje calculado na hora a cada chamada, ver "O que a Fase 3 entregou").
 5. Dicas de objetivos no `PostGameAnalysis` — `objectiveEvents` (Fase 1) não preserva atribuição de time no formato atual (`"LABEL@M:SS"`), precisaria de um `MatchTimelineSummary` mais rico pra saber quais objetivos foram do próprio time.
 6. Fila real (Redis/BullMQ) para o sync, se o padrão de uso mostrar que o teto de 20-50 partidas por chamada síncrona é pouco — o `docker-compose.yml` já provisiona Redis, só falta o worker.

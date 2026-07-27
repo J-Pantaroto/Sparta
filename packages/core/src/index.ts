@@ -12,6 +12,7 @@ export * from "./draft/recommendation-metrics.js";
 export * from "./types/provenance.js";
 export * from "./types/stat-coverage.js";
 export * from "./aggregation/objective-participation.js";
+export * from "./draft/pre-game-analysis.js";
 export * from "./scoring/weight-normalization.js";
 export * from "./types/recommendation-metric.js";
 export * from "./postgame/post-game-analysis.js";

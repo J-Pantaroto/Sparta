@@ -425,3 +425,51 @@ A leitura de `assignedPosition` numa sessão de champion select **real** continu
 exige o cliente do League aberto e em champion select, indisponível neste ambiente. O
 mapeamento, o estado de espera, a seleção manual e a troca de posição foram validados no
 Electron real; a origem `LCU` está coberta por teste com fixture.
+
+## Análise pré-game (Etapa 7)
+
+`POST /drafts/pre-game-analysis` deixou de devolver frases fixas e passa a devolver um contrato
+estruturado onde **cada sinal carrega origem, disponibilidade e (quando existe) confiança** — os
+mesmos dois eixos já usados pelas métricas de recomendação. Detalhe completo em
+`docs/pre-game-analysis.md`; o que interessa a este documento:
+
+### Sinal indisponível nunca tem número
+
+`AnalysisSignal` com `status: "UNAVAILABLE"` sai com `strength: null`, `confidence: null` e
+`unavailableReason` preenchido. Não existe neutro artificial: um `50` de matchup pessoal só
+aparece quando foi calculado a partir de amostra real do jogador.
+
+### Parcialidade é status, não adjetivo
+
+Enquanto o draft não fecha, os sinais de composição saem como `PARTIAL` e a frase muda junto
+("ainda não foi identificada entre 3 dos 5 campeões conhecidos", em vez de "a composição não
+tem"). Draft incompleto é estado natural do produto, não erro.
+
+### Origem por tipo de sinal
+
+| Sinal | `sourceType` |
+|---|---|
+| Draft vindo da sessão do cliente | `OBSERVED` |
+| Draft montado à mão pelo usuário | `USER_PROVIDED` |
+| Dimensões de composição (`ChampionTag`) | `DERIVED` — jamais `OFFICIAL` |
+| Desempenho pessoal no confronto | `CALCULATED`, com `sampleSize` |
+
+### Cobertura não é confiança
+
+`dataCoverage` mede quantos dos sinais esperados existem, com pesos documentados por componente.
+É independente da confiança estatística do matchup pessoal (amostra de 2 e de 40 dão a mesma
+cobertura) e **não** é probabilidade de vitória. A interface diz isso em texto, na própria tela.
+
+### O que continua indisponível, sempre
+
+`GLOBAL_MATCHUP` (sem fonte global), `META_STRENGTH` (sem Meta Intelligence do patch) e
+`CHAMPION_INTERACTIONS` (sem modelo estruturado de habilidades). Os três saem numa lista
+separada, com o motivo — repetir "indisponível" dentro de cada bloco poluiria a leitura antes da
+partida, e omiti-los esconderia o que a análise não cobre.
+
+### Resposta de API anterior
+
+Uma API anterior a esta etapa responde as quatro listas de frases fixas antigas. O cliente
+reconhece esse formato num único ponto (`fetchPreGameAnalysis`) e o recusa, exibindo "Análise
+contextual indisponível nesta versão da API" — nunca apresenta o texto genérico como análise do
+draft atual.

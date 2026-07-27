@@ -28,3 +28,11 @@ export const draftStateSchema = z.object({
 export const draftRecommendationRequestSchema = z.object({
   draft: draftStateSchema
 });
+
+// Mesmo formato do request de recomendacao: a analise pre-game le o mesmo
+// DraftState. O que ela exige a mais (campeao confirmado) e barrado na rota
+// com SELECTED_CHAMPION_UNAVAILABLE, nao aqui - "ainda nao confirmei campeao"
+// precisa poder ser expresso no request pra a API responder isso.
+export const preGameAnalysisRequestSchema = z.object({
+  draft: draftStateSchema
+});

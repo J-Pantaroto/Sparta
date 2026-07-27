@@ -61,6 +61,24 @@ export async function syncChampionCatalog(): Promise<{ version: string; count: n
 }
 
 /**
+ * Nomes reais do catalogo para os ids pedidos. Campeao que nao existe no
+ * catalogo simplesmente nao aparece no Map - o chamador precisa distinguir
+ * "id desconhecido" de "id valido", e um nome inventado (`Campeao #64`)
+ * apagaria essa diferenca.
+ */
+export async function findChampionNamesByIds(ids: number[]): Promise<Map<number, string>> {
+  const unique = [...new Set(ids)];
+  if (unique.length === 0) return new Map();
+
+  const rows = await prisma.champion.findMany({
+    where: { id: { in: unique } },
+    select: { id: true, name: true }
+  });
+
+  return new Map(rows.map((row) => [row.id, row.name]));
+}
+
+/**
  * Todos os ChampionTag persistidos (join com Champion pro nome/roles reais
  * do catalogo). Hoje so cobre os campeoes do seed manual
  * (data/seeds/champion-tags.json) - o motor de recomendacao ja tolera

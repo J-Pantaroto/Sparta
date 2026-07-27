@@ -21,6 +21,22 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-07-27 14:20 — Pré-game real e derivado do draft atual
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0007-pregame-real-baseado-no-draft.md`
+
+`POST /drafts/pre-game-analysis` era a última rota estática do produto: devolvia quatro listas de
+frases fixas e nem lia o body; o desktop mostrava um card "Orientação geral" com três dicas fixas.
+Novo motor puro `generatePreGameAnalysis` (`packages/core/src/draft/pre-game-analysis.ts`) devolve
+um contrato estruturado (seções, sinais com origem/disponibilidade/confiança/evidência, cobertura
+com pesos documentados), derivado só do draft real, das `ChampionTag` derivadas e do matchup
+pessoal do jogador. `422` estruturado sem posição ou sem campeão confirmado; draft incompleto gera
+análise parcial com linguagem de parcialidade, nunca "o time não tem". `GLOBAL_MATCHUP`,
+`META_STRENGTH` e interações entre campeões continuam explicitamente indisponíveis. O card estático
+do desktop foi removido, e uma resposta de API anterior é recusada em vez de exibida como análise.
+Deliberadamente **não** reusa `analyzeTeamComposition`, que devolve `0` em toda dimensão sem tags.
+58 testes novos (391 no total). Sem migração, sem persistência, sem fonte externa nova.
+Ver `docs/pre-game-analysis.md`.
+
 ## 2026-07-26 17:30 — Posição desconhecida não vira mais MID
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0006-posicao-desconhecida-sem-fallback-mid.md`
 

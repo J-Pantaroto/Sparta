@@ -8,4 +8,6 @@ Leitura recomendada:
 - `setup.md` para ambiente local.
 - `riot-compliance.md` para limites de integração.
 - `scoring-model.md` e `draft-recommendation.md` para os motores iniciais.
+- `pre-game-analysis.md` para a análise pré-game derivada do draft atual.
+- `data-provenance.md` para origem, disponibilidade e confiança dos dados.
 - `database.md` para o schema inicial.

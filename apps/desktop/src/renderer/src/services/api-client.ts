@@ -8,6 +8,7 @@ import type {
   PlayerStrength,
   PlayerWeakness,
   PostGameAnalysis,
+  PreGameAnalysis,
   RecentChampionMatch,
   RecentForm,
   Role
@@ -44,7 +45,9 @@ export interface RiotAccountSummary {
 export class ApiError extends Error {
   constructor(
     message: string,
-    public readonly status: number
+    public readonly status: number,
+    /** Corpo da resposta, pra quem precisa do `code` estruturado do 422. */
+    public readonly payload?: unknown
   ) {
     super(message);
   }
@@ -61,8 +64,13 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const body = await response.json().catch(() => null);
 
   if (!response.ok) {
-    const message = body && typeof body === "object" && "error" in body ? String(body.error) : "Falha na requisicao.";
-    throw new ApiError(message, response.status);
+    const message =
+      body && typeof body === "object" && "error" in body
+        ? String(body.error)
+        : body && typeof body === "object" && "message" in body
+          ? String((body as { message: unknown }).message)
+          : "Falha na requisicao.";
+    throw new ApiError(message, response.status, body);
   }
 
   return body as T;
@@ -201,6 +209,63 @@ export async function fetchDraftRecommendations(token: string, draft: DraftState
       metricDetails: ensureRecommendationMetrics(recommendation)
     }))
   };
+}
+
+/**
+ * Erro de campeão não confirmado. Mesmo motivo do anterior: "você ainda não
+ * confirmou um campeão" é estado natural do draft, não falha técnica.
+ */
+export class SelectedChampionUnavailableError extends Error {
+  readonly code = "SELECTED_CHAMPION_UNAVAILABLE";
+  constructor(message = "Nenhum campeão foi confirmado para esta partida.") {
+    super(message);
+  }
+}
+
+/**
+ * Resposta anterior à Etapa 7: quatro listas de frases fixas, iguais em toda
+ * partida. Reconhecida **só** pra ser recusada - apresentá-la seria mostrar
+ * texto genérico como se fosse análise do draft atual.
+ */
+function isLegacyPreGameResponse(payload: unknown): boolean {
+  if (typeof payload !== "object" || payload === null) return true;
+  const candidate = payload as Partial<PreGameAnalysis> & { winCondition?: unknown };
+  return candidate.algorithmVersion === undefined || candidate.summary === undefined;
+}
+
+export class PreGameAnalysisIncompatibleError extends Error {
+  readonly code = "PRE_GAME_ANALYSIS_INCOMPATIBLE";
+  constructor() {
+    super("Análise contextual indisponível nesta versão da API.");
+  }
+}
+
+export async function fetchPreGameAnalysis(token: string, draft: DraftState) {
+  // Mesma proteção dupla das recomendações: os pré-requisitos são checados
+  // antes de sair a requisição, e a API os recusa de novo com 422.
+  if (!draft.playerRole) throw new PlayerRoleUnavailableError();
+  if (draft.selectedChampionId === undefined) throw new SelectedChampionUnavailableError();
+
+  let payload: unknown;
+  try {
+    payload = await request<unknown>("/drafts/pre-game-analysis", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ draft })
+    });
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 422) {
+      const code = (error.payload as { code?: string } | undefined)?.code;
+      if (code === "PLAYER_ROLE_UNAVAILABLE") throw new PlayerRoleUnavailableError();
+      if (code === "SELECTED_CHAMPION_UNAVAILABLE") {
+        throw new SelectedChampionUnavailableError((error.payload as { message?: string } | undefined)?.message);
+      }
+    }
+    throw error;
+  }
+
+  if (isLegacyPreGameResponse(payload)) throw new PreGameAnalysisIncompatibleError();
+  return payload as PreGameAnalysis;
 }
 
 export function analyzePostgame(token: string, matchId: string) {

@@ -12,7 +12,7 @@ Endpoints:
 - `GET /players/:puuid/recent-matches?limit=10` — real
 - `GET /players/:puuid/champion-performance` — real
 - `POST /drafts/recommendations` — motor real (`@sparta/core`), mas cai no mock (`apps/api/src/routes/mock-data.ts`) pra qualquer campo que o cliente nao mandar
-- `POST /drafts/pre-game-analysis` — mock
+- `POST /drafts/pre-game-analysis` (autenticado) — real, derivado do draft atual pelo motor puro `generatePreGameAnalysis` (`@sparta/core`). Responde `422` `PLAYER_ROLE_UNAVAILABLE` sem posição e `422` `SELECTED_CHAMPION_UNAVAILABLE` sem campeão confirmado (ou com campeão fora do catálogo). Ver `docs/pre-game-analysis.md`
 - `POST /postgame/analyze`, `GET /postgame/:matchId` — mock
 - `POST /replays/import`, `GET /replays/:jobId` — nao implementado (fora do MVP)
 

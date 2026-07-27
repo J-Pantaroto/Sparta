@@ -345,7 +345,9 @@ function SpartaApp() {
           draftAutoFilled={autoDraft !== null}
         />
       )}
-      {page === "pregame" && <PreGameScreen draft={draft} ddragonVersion={ddragonVersion} />}
+      {page === "pregame" && (
+        <PreGameScreen draft={draft} ddragonVersion={ddragonVersion} sessionToken={sessionToken} />
+      )}
       {page === "postgame" && (
         <PostGameScreen riotAccounts={riotAccounts} sessionToken={sessionToken} ddragonVersion={ddragonVersion} />
       )}
