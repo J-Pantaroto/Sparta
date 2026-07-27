@@ -72,6 +72,16 @@ model ChampionTag {
   waveclear      Float
   scaling        Float
   earlyPressure  Float
+  // Proveniencia (Etapa 8). Tudo nullable: linha gravada antes desta etapa
+  // nao tem origem registrada, e ausencia significa "nao informada" - nunca
+  // "derivado" nem "revisado".
+  dataDragonVersion String?
+  locale            String?
+  sourceResource    String?
+  algorithmVersion  String?
+  generatedAt       DateTime?
+  reviewState       String?
+  reviewedDimensions String[]
   champion       Champion @relation(fields: [championId], references: [id])
 
   @@index([championId])

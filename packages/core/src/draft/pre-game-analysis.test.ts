@@ -729,3 +729,162 @@ describe("generatePreGameAnalysis - cobertura", () => {
     expect(cheio.dataCoverage).toBeGreaterThan(vazio.dataCoverage);
   });
 });
+
+describe("generatePreGameAnalysis - proveniência das ChampionTag (Etapa 8)", () => {
+  const provenanceOf = (patch: string, algorithmVersion = "champion-tag-derivation/1.0.0") => ({
+    source: {
+      sourceType: "DERIVED" as const,
+      sourceId: "data-dragon",
+      resource: "champion.json",
+      patch,
+      locale: "pt_BR",
+      algorithmVersion,
+      status: "AVAILABLE" as const
+    },
+    reviewState: "UNREVIEWED" as const,
+    reviewedDimensions: []
+  });
+
+  it("expõe a origem do perfil do campeão escolhido no contrato", () => {
+    const orianna = tag("Orianna", { provenance: provenanceOf("16.14.1") });
+    const analysis = ok(run({ selectedChampionTag: orianna, championTags: [orianna] }));
+
+    expect(analysis.selectedChampion.profileProvenance?.source.patch).toBe("16.14.1");
+    expect(analysis.selectedChampion.profileProvenance?.reviewState).toBe("UNREVIEWED");
+  });
+
+  it("perfil sem proveniência sai ausente, nunca preenchido com default", () => {
+    const orianna = tag("Orianna");
+    const analysis = ok(run({ selectedChampionTag: orianna, championTags: [orianna] }));
+
+    expect(analysis.selectedChampion.profileProvenance).toBeUndefined();
+  });
+
+  it("sinais de composição declaram a versão quando todas as tags concordam", () => {
+    const ahri = tag("Ahri", { engage: 0.95, provenance: provenanceOf("16.14.1") });
+    const orianna = tag("Orianna", { engage: 0.95, provenance: provenanceOf("16.14.1") });
+
+    const analysis = ok(
+      run({
+        draft: draft({ allies: [{ championId: 103, championName: "Ahri", team: "ally" }] }),
+        selectedChampionTag: orianna,
+        championTags: [ahri, orianna]
+      })
+    );
+
+    const sinal = analysis.alliedComposition.signals[0];
+    expect(sinal.provenance?.patch).toBe("16.14.1");
+    expect(sinal.provenance?.algorithmVersion).toBe("champion-tag-derivation/1.0.0");
+  });
+
+  it("com versões diferentes na mesma composição, a versão fica ausente em vez de escolher uma", () => {
+    const ahri = tag("Ahri", { engage: 0.95, provenance: provenanceOf("16.10.1") });
+    const orianna = tag("Orianna", { engage: 0.95, provenance: provenanceOf("16.14.1") });
+
+    const analysis = ok(
+      run({
+        draft: draft({ allies: [{ championId: 103, championName: "Ahri", team: "ally" }] }),
+        selectedChampionTag: orianna,
+        championTags: [ahri, orianna]
+      })
+    );
+
+    const sinal = analysis.alliedComposition.signals[0];
+    expect(sinal.provenance?.patch).toBeUndefined();
+    expect(sinal.provenance?.sourceType).toBe("DERIVED");
+  });
+
+  it("uma tag sem proveniência derruba a versão declarada do conjunto", () => {
+    const ahri = tag("Ahri", { engage: 0.95 });
+    const orianna = tag("Orianna", { engage: 0.95, provenance: provenanceOf("16.14.1") });
+
+    const analysis = ok(
+      run({
+        draft: draft({ allies: [{ championId: 103, championName: "Ahri", team: "ally" }] }),
+        selectedChampionTag: orianna,
+        championTags: [ahri, orianna]
+      })
+    );
+
+    expect(analysis.alliedComposition.signals[0].provenance?.patch).toBeUndefined();
+  });
+
+  it("nenhum sinal de composição é declarado como OFFICIAL", () => {
+    const ahri = tag("Ahri", { engage: 0.95, provenance: provenanceOf("16.14.1") });
+    const orianna = tag("Orianna", { engage: 0.95, provenance: provenanceOf("16.14.1") });
+
+    const analysis = ok(
+      run({
+        draft: draft({
+          allies: [{ championId: 103, championName: "Ahri", team: "ally" }],
+          enemies: [{ championId: 61, championName: "Orianna", team: "enemy" }]
+        }),
+        selectedChampionTag: orianna,
+        championTags: [ahri, orianna]
+      })
+    );
+
+    const todos = [
+      ...analysis.alliedComposition.signals,
+      ...analysis.enemyComposition.signals,
+      ...analysis.selectedChampionFit.signals,
+      ...analysis.knownRisks.signals
+    ];
+    expect(todos.length).toBeGreaterThan(0);
+    for (const sinal of todos) {
+      expect(sinal.provenance?.sourceType).not.toBe("OFFICIAL");
+    }
+  });
+
+  it("a proveniência não introduz confiança inventada em sinal de composição", () => {
+    const orianna = tag("Orianna", { engage: 0.95, provenance: provenanceOf("16.14.1") });
+    const ahri = tag("Ahri", { engage: 0.95, provenance: provenanceOf("16.14.1") });
+
+    const analysis = ok(
+      run({
+        draft: draft({ allies: [{ championId: 103, championName: "Ahri", team: "ally" }] }),
+        selectedChampionTag: orianna,
+        championTags: [ahri, orianna]
+      })
+    );
+
+    for (const sinal of analysis.alliedComposition.signals) {
+      expect(sinal.confidence).toBeNull();
+      expect(sinal.provenance?.confidence).toBeUndefined();
+    }
+  });
+
+  it("a análise continua determinística com proveniência anexada", () => {
+    const orianna = tag("Orianna", { provenance: provenanceOf("16.14.1") });
+    const input = {
+      draft: draft({ allies: [{ championId: 103, championName: "Ahri", team: "ally" as const }] }),
+      selectedChampionName: "Orianna",
+      selectedChampionTag: orianna,
+      championTags: [tag("Ahri", { provenance: provenanceOf("16.14.1") }), orianna],
+      now: NOW
+    };
+
+    expect(ok(generatePreGameAnalysis(input))).toEqual(ok(generatePreGameAnalysis(input)));
+  });
+
+  it("anexar proveniência não muda nenhum texto nem número da análise", () => {
+    const semProv = tag("Orianna", { engage: 0.95 });
+    const comProv = tag("Orianna", { engage: 0.95, provenance: provenanceOf("16.14.1") });
+    const ahriSem = tag("Ahri", { engage: 0.95 });
+    const ahriCom = tag("Ahri", { engage: 0.95, provenance: provenanceOf("16.14.1") });
+    const draftComAliado = draft({ allies: [{ championId: 103, championName: "Ahri", team: "ally" as const }] });
+
+    const semProveniencia = ok(
+      run({ draft: draftComAliado, selectedChampionTag: semProv, championTags: [ahriSem, semProv] })
+    );
+    const comProveniencia = ok(
+      run({ draft: draftComAliado, selectedChampionTag: comProv, championTags: [ahriCom, comProv] })
+    );
+
+    // Mesmos textos, mesmos status, mesmas forças - só a origem declarada muda.
+    const semTextos = semProveniencia.alliedComposition.signals.map((s) => `${s.key}|${s.description}|${s.strength}`);
+    const comTextos = comProveniencia.alliedComposition.signals.map((s) => `${s.key}|${s.description}|${s.strength}`);
+    expect(comTextos).toEqual(semTextos);
+    expect(comProveniencia.dataCoverage).toBe(semProveniencia.dataCoverage);
+  });
+});

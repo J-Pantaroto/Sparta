@@ -9,6 +9,8 @@ export * from "./draft/recommendation-engine.js";
 export * from "./draft/build-recommendation.js";
 export * from "./draft/champion-tag-derivation.js";
 export * from "./draft/recommendation-metrics.js";
+export * from "./draft/champion-tag-manifest.js";
+export * from "./types/champion-tag-provenance.js";
 export * from "./types/provenance.js";
 export * from "./types/stat-coverage.js";
 export * from "./aggregation/objective-participation.js";

@@ -1,5 +1,14 @@
 import { fetchDataDragonChampions, fetchDataDragonVersions, type DataDragonChampion } from "@sparta/riot";
-import type { ChampionTag, DamageProfile, Role } from "@sparta/core";
+import {
+  CHAMPION_TAG_DIMENSIONS,
+  CHAMPION_TAG_SOURCE_ID,
+  deriveReviewState,
+  type ChampionTag,
+  type ChampionTagDimension,
+  type ChampionTagProvenance,
+  type DamageProfile,
+  type Role
+} from "@sparta/core";
 import { prisma } from "../../db/prisma.js";
 import { getCached, setCached } from "../../db/api-cache.js";
 
@@ -61,6 +70,48 @@ export async function syncChampionCatalog(): Promise<{ version: string; count: n
 }
 
 /**
+ * Colunas de proveniencia -> contrato do dominio.
+ *
+ * Devolve `undefined` quando `reviewState` esta nulo: e assim que uma linha
+ * gravada antes da Etapa 8 se apresenta. Ausencia significa **origem nao
+ * informada** - deliberadamente diferente de `UNREVIEWED`, que afirma que
+ * ninguem revisou. Nenhuma coluna nula vira default aqui.
+ */
+function toChampionTagProvenance(row: {
+  dataDragonVersion: string | null;
+  locale: string | null;
+  sourceResource: string | null;
+  algorithmVersion: string | null;
+  generatedAt: Date | null;
+  reviewState: string | null;
+  reviewedDimensions: string[];
+}): ChampionTagProvenance | undefined {
+  if (row.reviewState === null) return undefined;
+
+  const reviewedDimensions = row.reviewedDimensions.filter((dimension): dimension is ChampionTagDimension =>
+    (CHAMPION_TAG_DIMENSIONS as readonly string[]).includes(dimension)
+  );
+
+  return {
+    source: {
+      // Nunca OFFICIAL: a Riot publica classe e notas, nao estas dimensoes.
+      sourceType: "DERIVED",
+      sourceId: CHAMPION_TAG_SOURCE_ID,
+      resource: row.sourceResource ?? undefined,
+      patch: row.dataDragonVersion ?? undefined,
+      locale: row.locale ?? undefined,
+      algorithmVersion: row.algorithmVersion ?? undefined,
+      collectedAt: row.generatedAt?.toISOString(),
+      status: "AVAILABLE"
+    },
+    // Derivado da lista persistida, nao lido da coluna: assim os dois nunca
+    // divergem, mesma regra do arquivo versionado.
+    reviewState: deriveReviewState(reviewedDimensions),
+    reviewedDimensions
+  };
+}
+
+/**
  * Nomes reais do catalogo para os ids pedidos. Campeao que nao existe no
  * catalogo simplesmente nao aparece no Map - o chamador precisa distinguir
  * "id desconhecido" de "id valido", e um nome inventado (`Campeao #64`)
@@ -88,6 +139,7 @@ export async function findAllChampionTags(): Promise<ChampionTag[]> {
   const rows = await prisma.championTag.findMany({ include: { champion: true } });
 
   return rows.map((row) => ({
+    provenance: toChampionTagProvenance(row),
     championId: row.championId,
     championName: row.champion.name,
     roles: row.champion.roles as Role[],

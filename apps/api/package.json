@@ -15,6 +15,7 @@
     "prisma:seed": "tsx prisma/seed.ts",
     "catalog:sync": "tsx src/modules/catalog/sync-catalog-cli.ts",
     "champion-tags:generate": "tsx src/modules/catalog/generate-champion-tags-cli.ts",
+    "champion-tags:check": "tsx src/modules/catalog/generate-champion-tags-cli.ts --check",
     "backfill:match-participants": "tsx src/modules/matches/backfill-participants-cli.ts",
     "backfill:objective-participation": "tsx src/modules/matches/backfill-objective-participation-cli.ts"
   },

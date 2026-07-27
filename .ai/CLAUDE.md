@@ -67,6 +67,69 @@ métrica. Os estados PARTIAL/STALE/UNAVAILABLE **não** foram vistos no app real
 métrica os produz ainda; estão cobertos por teste de componente. Ver `docs/data-provenance.md`.
 24 testes novos (230 no total).
 
+### Etapa 8: proveniência das ChampionTag
+
+As nove dimensões de gameplay (`engage`, `peel`, `frontline`…) alimentam o motor de draft e o
+pré-game, mas **a Riot não publica nenhuma delas**: são derivadas das `tags` de classe e das
+notas `info` do `champion.json`. Até aqui não havia como saber de que versão da fonte, de que
+versão do algoritmo, nem o que era leitura de classe e o que era curadoria.
+
+**Auditoria** (registrada em `.ai/prompts/features/0008-...`):
+
+- O arquivo versionado era um array plano sem metadado nenhum. `source: "manual" | "derived"`
+  era por **entrada inteira**, não por dimensão.
+- O gerador lia a versão real da Data Dragon e **a descartava** — só imprimia no console.
+- **Fallback fixo de versão achado**: `prisma/seed.ts` criava `Champion` com `version: "seed"`,
+  string inventada.
+- `pre-game-analysis.ts` declarava um `championTagProvenance` **constante** com o
+  `algorithmVersion` do **pré-game**, não o da derivação: a versão anunciada estava errada por
+  construção.
+
+1. **`types/champion-tag-provenance.ts`** (novo) — reusa `DataProvenance` para origem/versões e
+   acrescenta o eixo que faltava: `reviewState` (`UNREVIEWED`/`PARTIALLY_REVIEWED`/`REVIEWED`)
+   com `reviewedDimensions` nomeadas uma a uma. **Sem nenhum campo numérico de confiança**:
+   `REVIEWED` diz "alguém olhou", não "está calibrado". `DataProvenance` ganhou só `locale`.
+2. **`draft/champion-tag-manifest.ts`** (novo, puro) — o arquivo virou
+   `{ metadata, champions }`. Metadados compartilhados (versão real da Data Dragon, locale,
+   recurso, versão do algoritmo, data de geração) em vez de repetidos em 173 entradas. Cada
+   entrada guarda os valores efetivos e, em `review.overrides`, **quais dimensões** foram
+   revisadas, com motivo e data quando conhecidos. O estado de revisão é **derivado** das chaves
+   de `overrides`, nunca declarado — não tem como divergir.
+3. **Curadoria por dimensão** — regenerar preserva cada dimensão sobrescrita e re-deriva as
+   outras. O formato anterior congelava a entrada inteira, então um campeão curado nunca recebia
+   correção nem em dimensão intocada. Editar sem registrar o override é **avisado**, não
+   descartado em silêncio.
+4. **Gerador** — grava a versão real da fonte e do algoritmo, valida as dimensões (finitas,
+   0-1), detecta campeão novo/sumido, e ganhou `champion-tags:check`, que **não escreve** e sai
+   com código 1 quando o arquivo está desatualizado. `generatedAt` só muda quando algo funcional
+   muda: rodar duas vezes produz o arquivo byte a byte idêntico.
+5. **Persistência** — migration `20260727220000` com 7 colunas **todas nullable**. Linha
+   gravada antes desta etapa fica nula e o repositório a serve **sem proveniência** (origem não
+   informada), nunca classificada como derivada ou revisada. O seed passou a ser idempotente de
+   verdade (2ª execução: 0 gravações) e a única fonte dele é o arquivo versionado. O
+   `version: "seed"` foi removido.
+6. **Consumo** — o motor de recomendação não lê proveniência (mesmas dimensões, mesmo score,
+   provado por teste). O pré-game declara a versão **só quando todas as tags usadas concordam**
+   e expõe `selectedChampion.profileProvenance`. A tela mostra uma linha discreta no rodapé de
+   um card só.
+
+**Nenhum valor de dimensão mudou**: medido campeão a campeão antes/depois da regeneração real
+(173 campeões, **0 dimensões alteradas**) e entre arquivo e banco depois do seed (**0
+divergências**). As métricas do Viego no app real continuam 67/65/64/50/50/43, iguais à Etapa 7.
+
+Validado contra o Postgres e o Electron reais: 173 linhas históricas sem proveniência
+respondendo normalmente **antes** do seed (`profileProvenance` ausente, sinal `DERIVED` sem
+versão inventada); depois do seed, 171 `UNREVIEWED` e 2 `REVIEWED` (Ahri e Orianna, 12 dimensões
+cada), todas com `16.14.1` / `champion-tag-derivation/1.0.0`; o app real exibindo "Perfil
+derivado das classes da Data Dragon, sem revisão específica deste campeão. Fonte: champion.json
+16.14.1." 0 imagens quebradas, 0 `NaN`/`undefined`.
+
+**Não validado no app**: os estados `REVIEWED`/`PARTIALLY_REVIEWED` **na tela** — o desktop só
+confirma campeão a partir de um card de recomendação, e os dois campeões curados (Ahri, Orianna)
+não estão no pool de Zekerus#117. Ambos foram validados contra a API real e por teste de
+componente. Ver `docs/champion-tags.md`.
+54 testes novos (450 no total).
+
 ### Etapa 7: o pré-game vira real e derivado do draft atual
 
 `POST /drafts/pre-game-analysis` era a última rota 100% estática do produto: devolvia quatro

@@ -20,6 +20,17 @@ import type { ChampionClassProfile, ChampionTag, DamageProfile } from "../types/
  * entrada curada a mao - ver `mergeChampionTags`, que preserva as manuais.
  */
 
+/**
+ * Versao do algoritmo de derivacao. Faz parte da proveniencia gravada em
+ * `data/seeds/champion-tags.json` (Etapa 8): sem ela nao da pra saber com
+ * que regra um perfil foi produzido, nem detectar que o arquivo ficou pra
+ * tras depois de a tabela de classes mudar.
+ *
+ * **Suba esta versao sempre que CLASS_PROFILE, os pesos ou os limiares
+ * mudarem** - sao eles que determinam o resultado.
+ */
+export const CHAMPION_TAG_DERIVATION_VERSION = "champion-tag-derivation/1.0.0";
+
 /** Classes da Data Dragon. Sao as unicas 6 possiveis no `champion.json`. */
 type ChampionClass = "Assassin" | "Fighter" | "Mage" | "Marksman" | "Support" | "Tank";
 

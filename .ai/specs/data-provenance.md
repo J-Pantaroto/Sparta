@@ -473,3 +473,48 @@ Uma API anterior a esta etapa responde as quatro listas de frases fixas antigas.
 reconhece esse formato num único ponto (`fetchPreGameAnalysis`) e o recusa, exibindo "Análise
 contextual indisponível nesta versão da API" — nunca apresenta o texto genérico como análise do
 draft atual.
+
+## Proveniência das ChampionTag (Etapa 8)
+
+As nove dimensões de gameplay do `ChampionTag` passaram a carregar de onde vieram e quanto foi
+revisado. Detalhe completo em `docs/champion-tags.md`; o que interessa a este documento:
+
+### Um eixo novo, ortogonal aos dois existentes
+
+`DataProvenance` responde "de que fonte veio e está disponível?". Isso não cobria a pergunta que
+importa aqui: **quanto do perfil é leitura de classe e quanto é curadoria**. Um campeão pode ter
+`pickoff` revisado à mão e as outras oito dimensões derivadas; um único `sourceType` para a
+entrada inteira apagaria a diferença.
+
+`ChampionTagProvenance` reusa `DataProvenance` para origem/versões e acrescenta
+`reviewState` (`UNREVIEWED` / `PARTIALLY_REVIEWED` / `REVIEWED`) mais `reviewedDimensions`,
+nomeadas uma a uma. `DataProvenance` ganhou só um campo: `locale`.
+
+### Estado de revisão não é confiança
+
+`REVIEWED` significa "alguém olhou este campeão", não "este número está calibrado contra
+partidas reais" — o segundo não existe no Sparta. Por isso `ChampionTagProvenance` **não tem
+nenhum campo numérico de confiança**, e a proveniência de um perfil revisado sai sem
+`confidence`. `DataProvenance.confidence` continua para quem de fato mede algo (matchup pessoal).
+
+### Nunca OFFICIAL
+
+A Riot publica classe e notas (`tags`/`info` do `champion.json`), não estas dimensões. Toda
+entrada sai como `DERIVED` — inclusive a revisada à mão, que é julgamento de design, não
+publicação da Riot.
+
+### Ausência é o quarto estado
+
+Proveniência **ausente** significa origem não informada, típico de registro gravado antes desta
+etapa. Não é `UNREVIEWED`: "ninguém revisou" é uma afirmação, "não sabemos" não é. As colunas do
+banco são todas nullable e o repositório devolve `undefined` quando `reviewState` está nulo —
+nenhuma coluna nula vira default.
+
+Pelo mesmo motivo, versão ausente **não** é tratada como desatualizada por `isChampionTagOutdated`:
+sem versão não dá pra afirmar que o registro está velho, só que não se sabe.
+
+### Versão declarada só quando o conjunto concorda
+
+Um sinal de composição do pré-game agrega vários campeões. A versão da fonte e do algoritmo são
+declaradas apenas quando **todas** as tags usadas concordam; com perfis de versões diferentes, o
+campo fica ausente em vez de anunciar uma delas como se fosse a do conjunto.

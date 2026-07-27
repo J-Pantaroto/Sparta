@@ -1,4 +1,6 @@
 import type { ChampionTag, DraftState, MatchupData, Role } from "../types/domain.js";
+import type { ChampionTagProvenance } from "../types/champion-tag-provenance.js";
+import { CHAMPION_TAG_SOURCE_ID } from "./champion-tag-manifest.js";
 import type { AvailabilityStatus, DataProvenance } from "../types/provenance.js";
 import { toConfidenceScore } from "../types/provenance.js";
 
@@ -77,7 +79,19 @@ export interface PreGameAnalysis {
    */
   dataCoverage: number;
   coverageBreakdown: PreGameCoverageBreakdown;
-  selectedChampion: { championId: number; championName: string; role: Role };
+  selectedChampion: {
+    championId: number;
+    championName: string;
+    role: Role;
+    /**
+     * Origem do perfil (`ChampionTag`) usado nesta análise: derivado das
+     * classes da Data Dragon, parcialmente revisado ou revisado. **Ausente
+     * significa origem não informada** - perfil gravado antes da Etapa 8,
+     * ou campeão sem tag. A interface mostra isso num lugar secundário; não
+     * é estatística oficial nem entra em nenhuma frase da análise.
+     */
+    profileProvenance?: ChampionTagProvenance;
+  };
   summary: AnalysisSignal;
   laneContext: AnalysisSection;
   alliedComposition: AnalysisSection;
@@ -103,20 +117,39 @@ export interface PreGameAnalysisInput {
 }
 
 /**
- * Proveniência das dimensões de composição.
+ * Proveniência das dimensões de composição, montada a partir das tags que
+ * de fato entraram no cálculo.
  *
  * `DERIVED` e não `OFFICIAL`: a tabela `ChampionTag` é gerada a partir das
  * classes e notas que a Data Dragon publica (`champion-tags:generate`), com
- * julgamento de design embutido. As poucas entradas curadas à mão não são
- * distinguíveis no tipo atual, então a origem declarada é a do caso geral -
- * e o texto usa "indica"/"sugere", nunca afirmação categórica.
+ * julgamento de design embutido. Vale inclusive para entrada revisada à
+ * mão - curadoria é julgamento de design, não publicação da Riot. O texto
+ * usa "indica"/"sugere", nunca afirmação categórica.
+ *
+ * Versão da fonte e do algoritmo só são declaradas quando **todas** as tags
+ * usadas concordam. Com perfis de versões diferentes na mesma composição,
+ * anunciar uma delas seria atribuir ao conjunto uma origem que ele não tem;
+ * o campo fica ausente. Até a Etapa 8 esta proveniência era uma constante
+ * que declarava a versão do **pré-game** como se fosse a da derivação —
+ * estava errada por construção.
  */
-const championTagProvenance: DataProvenance = {
-  sourceType: "DERIVED",
-  sourceId: "sparta",
-  resource: "ChampionTag",
-  algorithmVersion: PRE_GAME_ANALYSIS_VERSION
-};
+function championTagProvenanceOf(tags: ChampionTag[]): DataProvenance {
+  const unique = <T>(values: (T | undefined)[]): T | undefined => {
+    const present = values.filter((value): value is T => value !== undefined);
+    if (present.length === 0 || present.length !== values.length) return undefined;
+    return present.every((value) => value === present[0]) ? present[0] : undefined;
+  };
+
+  const sources = tags.map((tag) => tag.provenance?.source);
+  return {
+    sourceType: "DERIVED",
+    sourceId: CHAMPION_TAG_SOURCE_ID,
+    resource: "ChampionTag",
+    patch: unique(sources.map((source) => source?.patch)),
+    locale: unique(sources.map((source) => source?.locale)),
+    algorithmVersion: unique(sources.map((source) => source?.algorithmVersion))
+  };
+}
 
 /** O draft veio da sessão do cliente ou da escolha do usuário. */
 function draftProvenance(draft: DraftState): DataProvenance {
@@ -144,6 +177,9 @@ const DIMENSION_LABELS: Record<CompositionDimension, string> = {
 interface KnownComposition {
   /** Média 0-100 por dimensão. Vazio quando nenhum campeão tem tag. */
   dimensions: Partial<Record<CompositionDimension, number>>;
+  /** Tags que sustentam os números - fonte da proveniência declarada. */
+  tags: ChampionTag[];
+  provenance: DataProvenance;
   /** Campeões com tag encontrada. */
   taggedCount: number;
   /** Campeões revelados (com ou sem tag). */
@@ -165,7 +201,7 @@ function summarizeKnownComposition(names: string[], championTags: ChampionTag[])
     .filter((tag): tag is ChampionTag => tag !== undefined);
 
   if (tags.length === 0) {
-    return { dimensions: {}, taggedCount: 0, knownCount: names.length };
+    return { dimensions: {}, tags, provenance: championTagProvenanceOf(tags), taggedCount: 0, knownCount: names.length };
   }
 
   const dimensions: Partial<Record<CompositionDimension, number>> = {};
@@ -185,7 +221,14 @@ function summarizeKnownComposition(names: string[], championTags: ChampionTag[])
   const damageProfile =
     tags.length < 3 ? undefined : ad >= 4 ? "AD_HEAVY" : ap >= 4 ? "AP_HEAVY" : ad + ap <= 1 ? "LOW_DAMAGE" : "BALANCED";
 
-  return { dimensions, taggedCount: tags.length, knownCount: names.length, damageProfile };
+  return {
+    dimensions,
+    tags,
+    provenance: championTagProvenanceOf(tags),
+    taggedCount: tags.length,
+    knownCount: names.length,
+    damageProfile
+  };
 }
 
 /** "3 dos 5" — usado pra qualificar toda afirmação sobre composição. */
@@ -244,7 +287,7 @@ function compositionSignals(
       tone: present ? (perspective === "ally" ? "POSITIVE" : "WARNING") : perspective === "ally" ? "WARNING" : "NEUTRAL",
       strength: round(value),
       confidence: null,
-      provenance: championTagProvenance,
+      provenance: composition.provenance,
       // A contagem só vira evidência quando **difere** dos campeões
       // revelados: repeti-la idêntica em cada dimensão só ocupa a tela (visto
       // no app real, 7 sinais com a mesma linha embaixo). Quando algum
@@ -274,7 +317,7 @@ function compositionSignals(
       tone: "NEUTRAL",
       strength: null,
       confidence: null,
-      provenance: championTagProvenance
+      provenance: composition.provenance
     });
   }
 
@@ -376,6 +419,9 @@ function buildFit(
   }
 
   const signals: AnalysisSignal[] = [];
+  // Estes sinais falam do campeão escolhido, então a origem declarada é a
+  // da tag dele - não a média das tags do time.
+  const ownProvenance = championTagProvenanceOf([tag]);
   const adiciona: string[] = [];
 
   for (const dimension of DIMENSIONS) {
@@ -394,7 +440,7 @@ function buildFit(
       tone: "POSITIVE",
       strength: null,
       confidence: null,
-      provenance: championTagProvenance
+      provenance: ownProvenance
     });
   }
 
@@ -425,7 +471,7 @@ function buildFit(
       tone: "WARNING",
       strength: null,
       confidence: null,
-      provenance: championTagProvenance
+      provenance: ownProvenance
     });
   }
 
@@ -452,7 +498,7 @@ function buildFit(
       tone: "POSITIVE",
       strength: null,
       confidence: null,
-      provenance: championTagProvenance
+      provenance: ownProvenance
     });
   }
 
@@ -500,6 +546,8 @@ function buildKnownRisks(
   }
 
   const signals: AnalysisSignal[] = [];
+  // O risco compara os dois times: a origem declarada cobre os dois lados.
+  const riskProvenance = championTagProvenanceOf([...allies.tags, ...enemies.tags]);
   const draftCompleto = enemies.knownCount >= TEAM_SIZE && allies.knownCount >= TEAM_SIZE;
 
   const pares: { enemy: CompositionDimension; ally: CompositionDimension; texto: string }[] = [
@@ -534,7 +582,7 @@ function buildKnownRisks(
       tone: "WARNING",
       strength: round(inimigo - aliado),
       confidence: null,
-      provenance: championTagProvenance,
+      provenance: riskProvenance,
       evidence: [
         `${enemies.taggedCount} inimigo(s) e ${allies.taggedCount} aliado(s) com perfil conhecido`
       ]
@@ -557,7 +605,7 @@ function buildKnownRisks(
           tone: "NEUTRAL",
           strength: null,
           confidence: null,
-          provenance: championTagProvenance
+          provenance: riskProvenance
         }
       ]
     };
@@ -744,7 +792,8 @@ export function generatePreGameAnalysis(
       selectedChampion: {
         championId: draft.selectedChampionId,
         championName: input.selectedChampionName,
-        role: draft.playerRole
+        role: draft.playerRole,
+        profileProvenance: input.selectedChampionTag?.provenance
       },
       summary,
       laneContext,

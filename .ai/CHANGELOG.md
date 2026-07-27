@@ -21,6 +21,25 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-07-27 18:40 — Proveniência das ChampionTag
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0008-proveniencia-champion-tags.md`
+
+As 9 dimensões de gameplay usadas pelo motor de draft e pelo pré-game são derivadas das classes
+da Data Dragon, mas não havia como saber de que versão da fonte, de que versão do algoritmo, nem
+o que era leitura de classe e o que era curadoria. O arquivo versionado virou um manifesto
+`{ metadata, champions }` com versão real da fonte, locale, recurso, versão do algoritmo e data
+de geração; a curadoria passou a ser registrada **por dimensão** (`review.overrides`, com motivo
+e data quando conhecidos), e o estado de revisão (`UNREVIEWED`/`PARTIALLY_REVIEWED`/`REVIEWED`) é
+derivado dessas chaves, nunca declarado à parte. Novo contrato `ChampionTagProvenance` reusa
+`DataProvenance` e **não tem campo numérico de confiança** — revisão não é calibração. O gerador
+grava a versão real, valida dimensões, detecta campeão novo/sumido e ganhou `champion-tags:check`
+(verifica sem reescrever); rodar duas vezes produz o arquivo byte a byte idêntico. Migration com
+7 colunas nullable: registro anterior fica sem proveniência (origem não informada), nunca
+classificado como derivado ou revisado. O fallback fixo `version: "seed"` foi removido, e o seed
+virou idempotente de verdade. **Nenhum valor de dimensão mudou** (medido: 0 alterações em 173
+campeões, 0 divergências entre arquivo e banco); scores do motor idênticos.
+54 testes novos (450 no total). Ver `docs/champion-tags.md`.
+
 ## 2026-07-27 14:20 — Pré-game real e derivado do draft atual
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0007-pregame-real-baseado-no-draft.md`
 

@@ -2,9 +2,11 @@ import type {
   AnalysisSection,
   AnalysisSignal,
   ChampionClassProfile,
+  ChampionTagProvenance,
   DraftState,
   PreGameAnalysis
 } from "@sparta/core";
+import type { ReactNode } from "react";
 import { summarizeEnemyDamageLean } from "@sparta/core";
 import { Shield } from "lucide-react";
 import { roleLabels } from "../app/labels";
@@ -266,7 +268,10 @@ function AnalysisBody({
         </p>
       </Card>
 
-      <SectionCard section={analysis.selectedChampionFit} />
+      <SectionCard
+        section={analysis.selectedChampionFit}
+        footer={<ProfileSourceNote provenance={analysis.selectedChampion.profileProvenance} />}
+      />
       <SectionCard section={analysis.knownRisks} />
       <SectionCard section={analysis.alliedComposition} />
       <SectionCard section={analysis.enemyComposition} />
@@ -288,8 +293,35 @@ function AnalysisBody({
   );
 }
 
+/**
+ * Origem do perfil de campeão usado na análise, num rodapé discreto.
+ *
+ * Fica **só aqui**, num lugar só: repetir "derivado das classes" em cada
+ * frase transformaria a ressalva em ruído, e destacá-la faria parecer
+ * estatística. Sem proveniência (perfil gravado antes da Etapa 8, ou
+ * campeão sem tag) o texto diz exatamente isso - não assume derivação.
+ */
+function ProfileSourceNote({ provenance }: { provenance?: ChampionTagProvenance }) {
+  const texto = !provenance
+    ? "Origem do perfil deste campeão não informada."
+    : provenance.reviewState === "REVIEWED"
+      ? "Perfil revisado especificamente para este campeão."
+      : provenance.reviewState === "PARTIALLY_REVIEWED"
+        ? `Perfil derivado das classes da Data Dragon, com ${provenance.reviewedDimensions.length} dimensão(ões) revisada(s).`
+        : "Perfil derivado das classes da Data Dragon, sem revisão específica deste campeão.";
+
+  const versao = provenance?.source.patch;
+
+  return (
+    <p style={{ marginTop: "var(--space-4)", color: "var(--text-tertiary)", fontSize: "var(--text-xs)" }}>
+      {texto}
+      {versao ? ` Fonte: champion.json ${versao}.` : ""}
+    </p>
+  );
+}
+
 /** Uma seção do contrato. Indisponível não vira card vazio: vira o motivo. */
-function SectionCard({ section }: { section: AnalysisSection }) {
+function SectionCard({ section, footer }: { section: AnalysisSection; footer?: ReactNode }) {
   const partial = section.status === "PARTIAL";
   // Seção sem leitura recua visualmente: com o draft ainda abrindo, três
   // cards de "ainda sem dado" com o mesmo peso afogariam o que já dá pra ler.
@@ -320,6 +352,7 @@ function SectionCard({ section }: { section: AnalysisSection }) {
           ))}
         </SignalChipList>
       )}
+      {footer}
     </Card>
   );
 }

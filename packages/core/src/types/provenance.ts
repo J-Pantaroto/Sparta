@@ -83,6 +83,8 @@ export interface DataProvenance {
   resource?: string;
   patch?: string;
   region?: string;
+  /** Idioma da fonte, quando ela é localizada ("pt_BR" na Data Dragon). */
+  locale?: string;
   /** Elo/tier da amostra, quando a fonte segmenta por isso. */
   tier?: string;
   /** Fila (ranked solo, flex, normal), quando a fonte segmenta por isso. */

@@ -258,3 +258,85 @@ describe("PreGameScreen", () => {
     expect(container.textContent ?? "").not.toMatch(/NaN|Infinity|undefined|\[object Object\]/);
   });
 });
+
+describe("PreGameScreen - origem do perfil (Etapa 8)", () => {
+  const provenance = (
+    reviewState: "UNREVIEWED" | "PARTIALLY_REVIEWED" | "REVIEWED",
+    reviewedDimensions: string[] = []
+  ) =>
+    ({
+      source: {
+        sourceType: "DERIVED",
+        sourceId: "data-dragon",
+        resource: "champion.json",
+        patch: "16.14.1",
+        locale: "pt_BR",
+        algorithmVersion: "champion-tag-derivation/1.0.0",
+        status: "AVAILABLE"
+      },
+      reviewState,
+      reviewedDimensions
+    }) as PreGameAnalysis["selectedChampion"]["profileProvenance"];
+
+  function comProveniencia(profileProvenance: PreGameAnalysis["selectedChampion"]["profileProvenance"]) {
+    const base = analysis();
+    return { ...base, selectedChampion: { ...base.selectedChampion, profileProvenance } };
+  }
+
+  it("perfil derivado é apresentado como derivado das classes, não como estatística", async () => {
+    fetchPreGameAnalysisMock.mockResolvedValue(comProveniencia(provenance("UNREVIEWED")));
+    renderScreen();
+
+    const nota = await screen.findByText(/derivado das classes da Data Dragon/i);
+    // A nota de origem não se apresenta como dado oficial da Riot.
+    expect(nota.textContent ?? "").not.toMatch(/oficial|Riot|estatística/i);
+  });
+
+  it("perfil parcialmente revisado informa quantas dimensões foram revisadas", async () => {
+    fetchPreGameAnalysisMock.mockResolvedValue(comProveniencia(provenance("PARTIALLY_REVIEWED", ["pickoff", "engage"])));
+    renderScreen();
+
+    expect(await screen.findByText(/com 2 dimensão\(ões\) revisada\(s\)/i)).toBeTruthy();
+  });
+
+  it("perfil revisado é apresentado como revisado especificamente", async () => {
+    fetchPreGameAnalysisMock.mockResolvedValue(comProveniencia(provenance("REVIEWED", ["pickoff"])));
+    renderScreen();
+
+    expect(await screen.findByText(/revisado especificamente para este campeão/i)).toBeTruthy();
+  });
+
+  it("sem proveniência, diz que a origem não foi informada em vez de assumir derivação", async () => {
+    fetchPreGameAnalysisMock.mockResolvedValue(comProveniencia(undefined));
+    renderScreen();
+
+    expect(await screen.findByText(/Origem do perfil deste campeão não informada/i)).toBeTruthy();
+    expect(screen.queryByText(/derivado das classes/i)).toBeNull();
+  });
+
+  it("a versão da fonte aparece quando conhecida e some quando ausente", async () => {
+    fetchPreGameAnalysisMock.mockResolvedValue(comProveniencia(provenance("UNREVIEWED")));
+    const { unmount } = render(
+      <PreGameScreen draft={draft()} ddragonVersion="16.14.1" sessionToken="token-1" />
+    );
+    expect(await screen.findByText(/champion\.json 16\.14\.1/)).toBeTruthy();
+    unmount();
+
+    const semVersao = provenance("UNREVIEWED");
+    fetchPreGameAnalysisMock.mockResolvedValue(
+      comProveniencia(semVersao ? { ...semVersao, source: { ...semVersao.source, patch: undefined } } : undefined)
+    );
+    render(<PreGameScreen draft={draft()} ddragonVersion="16.14.1" sessionToken="token-1" />);
+
+    await screen.findByText(/derivado das classes da Data Dragon/i);
+    expect(screen.queryByText(/champion\.json/)).toBeNull();
+  });
+
+  it("a origem aparece em um lugar só, não repetida em cada frase", async () => {
+    fetchPreGameAnalysisMock.mockResolvedValue(comProveniencia(provenance("UNREVIEWED")));
+    renderScreen();
+
+    await screen.findByText(/derivado das classes da Data Dragon/i);
+    expect(screen.getAllByText(/derivado das classes da Data Dragon/i)).toHaveLength(1);
+  });
+});

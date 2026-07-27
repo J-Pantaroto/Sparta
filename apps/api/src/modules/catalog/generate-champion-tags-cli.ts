@@ -1,4 +1,12 @@
-import { deriveChampionTag, mergeChampionTags, type ChampionClassProfile, type ChampionTag } from "@sparta/core";
+import {
+  buildChampionTagManifest,
+  CHAMPION_TAG_DERIVATION_VERSION,
+  deriveChampionTag,
+  parseChampionTagManifest,
+  serializeChampionTagManifest,
+  type ChampionClassProfile,
+  type ChampionTagManifest
+} from "@sparta/core";
 import { fetchDataDragonChampions, fetchDataDragonVersions } from "@sparta/riot";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -11,34 +19,43 @@ import { fileURLToPath } from "node:url";
  *
  * O arquivo continua versionado no git de proposito: assim o resultado da
  * derivacao e revisavel num diff, e nao um efeito colateral invisivel de
- * rodar o seed.
+ * rodar o seed. Desde a Etapa 8 ele e um **manifesto** com metadados
+ * (versao real da Data Dragon, locale, recurso, versao do algoritmo, data
+ * de geracao) em vez de um array plano sem origem nenhuma.
  *
- * Entradas marcadas com `"source": "manual"` sao PRESERVADAS - regenerar
- * nunca apaga curadoria. `source` existe so no JSON (nao e coluna do
- * banco); serve pra separar o que foi lido de classe do que alguem
- * revisou campeao a campeao.
+ * Curadoria e preservada **por dimensao**: uma entrada com
+ * `review.overrides.pickoff` mantem `pickoff` e recebe a derivacao
+ * atualizada nas outras oito. O formato anterior preservava a entrada
+ * inteira por `source: "manual"`, o que congelava dimensoes que ninguem
+ * tinha revisado.
  *
  *   pnpm --filter @sparta/api champion-tags:generate
+ *   pnpm --filter @sparta/api champion-tags:check
+ *
+ * O modo `--check` **nao escreve**: compara o arquivo com a fonte atual e
+ * sai com codigo 1 quando ele esta desatualizado. Serve pra saber se vale
+ * regenerar sem produzir um diff so pra descobrir.
  */
 
-type Source = "manual" | "derived";
-type SeedEntry = ChampionTag & { source: Source };
+const LOCALE = "pt_BR";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // apps/api/src/modules/catalog -> ... -> raiz do repo
 const SEED_FILE = path.join(__dirname, "..", "..", "..", "..", "..", "data", "seeds", "champion-tags.json");
 
-async function readExistingSeed(): Promise<SeedEntry[]> {
+async function readExistingManifest(): Promise<ChampionTagManifest> {
   try {
-    return JSON.parse(await readFile(SEED_FILE, "utf-8")) as SeedEntry[];
+    return parseChampionTagManifest(JSON.parse(await readFile(SEED_FILE, "utf-8")));
   } catch {
-    return [];
+    return { champions: [] };
   }
 }
 
 async function main() {
+  const checkOnly = process.argv.includes("--check");
+
   const [version] = await fetchDataDragonVersions();
-  const champions = await fetchDataDragonChampions(version, "pt_BR");
+  const champions = await fetchDataDragonChampions(version, LOCALE);
 
   const profiles: ChampionClassProfile[] = champions
     // Sem `info` nao ha o que derivar: melhor deixar o campeao de fora (o
@@ -54,27 +71,61 @@ async function main() {
       difficulty: champion.info!.difficulty
     }));
 
-  const existing = await readExistingSeed();
-  const curated = existing.filter((entry) => entry.source === "manual");
-  const derived = profiles.map(deriveChampionTag);
+  const previous = await readExistingManifest();
+  const { manifest, report } = buildChampionTagManifest({
+    derived: profiles.map(deriveChampionTag),
+    previous,
+    dataDragonVersion: version,
+    locale: LOCALE,
+    now: new Date().toISOString()
+  });
 
-  const merged = mergeChampionTags(derived, curated);
-  const curatedIds = new Set(curated.map((entry) => entry.championId));
-  const output: SeedEntry[] = merged.map((tag) => ({
-    ...tag,
-    source: curatedIds.has(tag.championId ?? -1) ? "manual" : "derived"
-  }));
+  if (report.validationIssues.length > 0) {
+    for (const issue of report.validationIssues) {
+      console.error(`Dimensao invalida: ${issue.championName} (${issue.championId}) ${issue.dimension} ${issue.problem}`);
+    }
+    throw new Error(`${report.validationIssues.length} dimensao(oes) fora do contrato - nada foi gravado.`);
+  }
 
-  await writeFile(SEED_FILE, `${JSON.stringify(output, null, 2)}\n`, "utf-8");
-
-  console.log(
-    `champion-tags.json regenerado a partir da versao ${version}: ` +
-      `${output.length} campeoes (${curated.length} curados a mao preservados, ` +
-      `${output.length - curated.length} derivados).`
-  );
+  for (const edit of report.unregisteredEdits) {
+    console.warn(
+      `Aviso: ${edit.championName}.${edit.dimension} difere do valor derivado sem override registrado - ` +
+        `sera devolvido ao valor derivado. Registre em "review.overrides" pra preservar.`
+    );
+  }
+  if (report.added.length > 0) console.log(`Campeoes novos na fonte: ${report.added.join(", ")}`);
+  if (report.removed.length > 0) console.log(`Campeoes que sumiram da fonte: ${report.removed.join(", ")}`);
   if (champions.length !== profiles.length) {
     console.warn(`${champions.length - profiles.length} campeoes ficaram de fora por nao trazerem "info".`);
   }
+
+  // Arquivo sem metadados (formato antigo) conta como desatualizado: nao da
+  // pra afirmar de que versao ele veio.
+  const desatualizado = !report.unchanged || previous.metadata === undefined;
+
+  if (checkOnly) {
+    if (desatualizado) {
+      console.error(
+        `champion-tags.json esta desatualizado. Arquivo: Data Dragon ` +
+          `${previous.metadata?.dataDragonVersion ?? "(ausente)"} / algoritmo ` +
+          `${previous.metadata?.algorithmVersion ?? "(ausente)"}. Fonte atual: ${version} / ` +
+          `${CHAMPION_TAG_DERIVATION_VERSION}. Rode champion-tags:generate.`
+      );
+      process.exitCode = 1;
+      return;
+    }
+    console.log(`champion-tags.json atualizado (Data Dragon ${version}, ${CHAMPION_TAG_DERIVATION_VERSION}).`);
+    return;
+  }
+
+  await writeFile(SEED_FILE, serializeChampionTagManifest(manifest), "utf-8");
+
+  console.log(
+    `champion-tags.json regenerado a partir da versao ${version} (${CHAMPION_TAG_DERIVATION_VERSION}): ` +
+      `${manifest.champions.length} campeoes, ${report.championsWithOverrides} com curadoria ` +
+      `(${report.preservedOverrides} dimensao(oes) preservada(s)).` +
+      (report.unchanged ? " Nada funcional mudou - a data de geracao foi mantida." : "")
+  );
 }
 
 main().catch((error) => {

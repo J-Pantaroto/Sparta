@@ -261,3 +261,86 @@ describe("guardas de time vazio", () => {
     expect(comAliado.risks.length).toBeGreaterThan(0);
   });
 });
+
+describe("motor de recomendacao - proveniencia nao muda resultado (Etapa 8)", () => {
+  const profile: PlayerProfile = {
+    id: "player-1",
+    account: { puuid: "p", gameName: "Zekerus", tagLine: "117", platformRegion: "br1", regionalRouting: "americas" },
+    preferredRoles: ["MID"],
+    championStats,
+    strengths: [],
+    weaknesses: [],
+    recentForm: { last10Score: 60, last20Score: 58, last50Score: 55, trend: "stable", confidence: "medium" }
+  };
+
+  const draft: DraftState = {
+    playerRole: "MID",
+    pickOrder: 3,
+    allies: [],
+    enemies: [],
+    bannedChampionIds: []
+  };
+
+  const compositionRules = {
+    minimumFrontline: 40,
+    minimumEngage: 40,
+    minimumWaveclear: 40,
+    preferDamageBalance: true
+  };
+
+  function recommend(championTags: ChampionTag[]) {
+    return recommendPicks({
+      draft,
+      player: profile,
+      championStats,
+      championTags,
+      matchups: [],
+      compositionRules,
+      patchMeta: null,
+      limit: 5
+    });
+  }
+
+  const provenance = {
+    source: {
+      sourceType: "DERIVED" as const,
+      sourceId: "data-dragon",
+      resource: "champion.json",
+      patch: "16.14.1",
+      locale: "pt_BR",
+      algorithmVersion: "champion-tag-derivation/1.0.0",
+      status: "AVAILABLE" as const
+    },
+    reviewState: "PARTIALLY_REVIEWED" as const,
+    reviewedDimensions: ["pickoff" as const]
+  };
+
+  it("scores e ordenacao sao identicos com e sem proveniencia anexada", () => {
+    const semProveniencia = recommend(tags);
+    const comProveniencia = recommend(tags.map((tag) => ({ ...tag, provenance })));
+
+    expect(comProveniencia).toEqual(semProveniencia);
+  });
+
+  it("estado de revisao nao entra em nenhuma metrica", () => {
+    const revisado = recommend(tags.map((tag) => ({ ...tag, provenance })));
+    const naoRevisado = recommend(
+      tags.map((tag) => ({ ...tag, provenance: { ...provenance, reviewState: "UNREVIEWED" as const, reviewedDimensions: [] } }))
+    );
+
+    expect(revisado[0].metrics).toEqual(naoRevisado[0].metrics);
+    expect(revisado[0].totalScore).toBe(naoRevisado[0].totalScore);
+  });
+
+  it("versao desatualizada da fonte nao altera o score", () => {
+    const atual = recommend(tags.map((tag) => ({ ...tag, provenance })));
+    const antiga = recommend(
+      tags.map((tag) => ({
+        ...tag,
+        provenance: { ...provenance, source: { ...provenance.source, patch: "15.1.1" } }
+      }))
+    );
+
+    expect(antiga[0].totalScore).toBe(atual[0].totalScore);
+  });
+});

@@ -1,3 +1,4 @@
+import type { ChampionTagProvenance } from "./champion-tag-provenance.js";
 import type { AvailabilityStatus } from "./provenance.js";
 import type { RecommendationMetric } from "./recommendation-metric.js";
 
@@ -45,6 +46,14 @@ export interface ChampionTag {
   waveclear: number;
   scaling: number;
   earlyPressure: number;
+  /**
+   * De onde estas dimensões vieram e quanto foi revisado (Etapa 8).
+   * **Opcional de propósito**: registro gravado antes daquela etapa não tem
+   * proveniência, e ausência aqui significa "origem não informada" — nunca
+   * "derivado" nem "revisado". Nenhum motor lê este campo; ele existe pra a
+   * interface poder dizer a verdade sobre o perfil que usou.
+   */
+  provenance?: ChampionTagProvenance;
 }
 
 /**
