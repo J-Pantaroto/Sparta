@@ -27,6 +27,7 @@ export default [
         HTMLImageElement: "readonly",
         HTMLButtonElement: "readonly",
         HTMLElement: "readonly",
+        HTMLSelectElement: "readonly",
         RequestInit: "readonly",
         Response: "readonly",
         __dirname: "readonly"

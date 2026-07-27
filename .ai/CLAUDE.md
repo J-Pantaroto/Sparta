@@ -67,6 +67,58 @@ métrica. Os estados PARTIAL/STALE/UNAVAILABLE **não** foram vistos no app real
 métrica os produz ainda; estão cobertos por teste de componente. Ver `docs/data-provenance.md`.
 24 testes novos (230 no total).
 
+### Etapa 6: posição desconhecida não vira MID
+
+Ausência de posição era convertida em `MID` em nove pontos do fluxo. O efeito não era cosmético:
+o Sparta consultava o histórico da posição errada, montava o pool errado e aplicava a tabela de
+pesos errada, tudo sem nenhum sinal disso na tela.
+
+**Representação escolhida**: `DraftState.playerRole?: Role` (opcional), não `null` nem
+`"UNKNOWN"` — o domínio já usa ausência opcional pro que não se aplica desde a Etapa 4, e um
+literal `"UNKNOWN"` poderia vazar pra dentro de um `Record<Role, ...>` e ser indexado como se
+fosse posição. `playerRoleSource?: "LCU" | "USER"` distingue detecção de escolha manual, e
+`ProvenanceSourceType` ganhou `USER_PROVIDED`: escolha do usuário não é observação do cliente
+nem dado oficial da Riot.
+
+| Local | Fallback removido |
+|---|---|
+| `App.tsx` | `playerRole: "MID"` no estado inicial |
+| `App.tsx` | `role: member.position ?? "MID"` em aliado/inimigo do LCU |
+| `ChampionSelectScreen` | `role: "MID"` no inimigo escolhido à mão |
+| `match-mapper.ts` | `TEAM_POSITION_TO_ROLE[...] ?? "MID"` no histórico Match-V5 |
+| `player-role.ts` | `Record<string, Role>` fazia o TS crer que sempre havia retorno |
+| `schemas.ts` | `playerRole` obrigatório — o cliente **tinha** que mandar algo |
+| Seletor da UI | `<Select>` sem valor vazio: o navegador pré-selecionava a 1ª opção (TOP) |
+
+1. **Mapeamento do LCU** — novo `toRole` rejeita `unselected`, `unknown`, string vazia, só
+   espaços e qualquer valor fora da tabela. Um vocabulário novo da Riot produz ausência, não MID.
+2. **Motor** — `recommendPicks` devolve `[]` antes de escolher pool ou pesos quando não há
+   posição. **Nenhum peso, threshold, fórmula ou ordenação mudou.**
+3. **API** — `POST /drafts/recommendations` responde **422** `PLAYER_ROLE_UNAVAILABLE` sem
+   consultar estatísticas. `playerRole` virou opcional no zod justamente pra o request poder
+   expressar "não identificada" e a API responder isso.
+4. **Cliente** — `fetchDraftRecommendations` lança `PlayerRoleUnavailableError` antes de enviar.
+   A dupla proteção é deliberada: uma API anterior a esta etapa aceitaria o request e usaria MID
+   internamente.
+5. **Persistência** — participante sem posição observada é descartado (mesma regra já usada pra
+   campeão fora do catálogo): a linha existiria sem conseguir dizer a que posição pertence, e
+   `MatchParticipant.role` alimenta as estatísticas por posição.
+6. **Estado obsoleto** — sair do champion select limpa a posição de origem `LCU` (escolha
+   `USER` sobrevive a um tick sem posição); trocar de posição **descarta os cards anteriores
+   antes** de exibir os novos — o `useAsyncData` preserva o último `data` durante o loading pra
+   evitar flicker, o que aqui significaria mostrar as recomendações do papel antigo como atuais.
+
+**Validado**: API real devolvendo 422 estruturado sem posição e Viego normalmente em JUNGLE.
+Electron real (CDP, Zekerus#117) em modo manual: seletor abrindo **vazio**, "Posição ainda não
+identificada" com 0 cards; JUNGLE → 1 card (Viego); trocar pra MID → **0 cards e Viego some**;
+voltar pra vazio → espera de novo. 0 `NaN`/`Infinity`/`undefined`.
+
+**Não validado**: a detecção real dentro de um champion select de verdade (precisa do League
+aberto) — mesmo limite das Fases 6c, 11 e 16; coberta por teste com fixture. E um desktop
+anterior a esta etapa continua enviando `MID` artificial, que a API não tem como distinguir de
+uma escolha real — limitação documentada, sem heurística pra adivinhar.
+29 testes novos (326). Ver `docs/data-provenance.md`.
+
 ### Etapa 5: participação em objetivos com dado real
 
 A Etapa 4 deixou `objectiveParticipation` honestamente indisponível. Esta etapa passa a

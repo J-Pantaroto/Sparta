@@ -88,3 +88,53 @@ describe("derivePlayerRole", () => {
     expect(derivePlayerRole(after)).toBe("TOP");
   });
 });
+
+describe("mapeamento de posição do LCU (Etapa 6)", () => {
+  function comPosicao(assignedPosition: unknown) {
+    return {
+      sessionExists: true,
+      localPlayerCellId: 1,
+      myTeam: [{ cellId: 1, championId: 0, assignedPosition }]
+    } as unknown as Parameters<typeof derivePlayerRole>[0];
+  }
+
+  it("mapeia os cinco valores reconhecidos", () => {
+    expect(derivePlayerRole(comPosicao("top"))).toBe("TOP");
+    expect(derivePlayerRole(comPosicao("jungle"))).toBe("JUNGLE");
+    expect(derivePlayerRole(comPosicao("middle"))).toBe("MID");
+    expect(derivePlayerRole(comPosicao("bottom"))).toBe("ADC");
+    expect(derivePlayerRole(comPosicao("utility"))).toBe("SUPPORT");
+  });
+
+  it("aceita as variações de caixa que o cliente usa", () => {
+    expect(derivePlayerRole(comPosicao("MIDDLE"))).toBe("MID");
+    expect(derivePlayerRole(comPosicao("Utility"))).toBe("SUPPORT");
+  });
+
+  // Cada um destes viraria MID se a tabela tivesse um fallback.
+  it.each([
+    ["unselected", "UNSELECTED"],
+    ["unknown", "UNKNOWN"],
+    ["string vazia", ""],
+    ["só espaços", "   "],
+    ["valor não reconhecido", "SUPPORT_ROAMING"],
+    ["campo ausente", undefined]
+  ])("%s produz posição ausente, nunca MID", (_rotulo, valor) => {
+    const role = derivePlayerRole(comPosicao(valor));
+    expect(role).toBeUndefined();
+    expect(role).not.toBe("MID");
+  });
+
+  it("sem sessão ou sem o jogador local fica ausente", () => {
+    expect(
+      derivePlayerRole({ sessionExists: false } as unknown as Parameters<typeof derivePlayerRole>[0])
+    ).toBeUndefined();
+    expect(
+      derivePlayerRole({
+        sessionExists: true,
+        localPlayerCellId: 9,
+        myTeam: [{ cellId: 1, championId: 0, assignedPosition: "middle" }]
+      } as unknown as Parameters<typeof derivePlayerRole>[0])
+    ).toBeUndefined();
+  });
+});

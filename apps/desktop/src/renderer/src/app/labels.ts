@@ -96,6 +96,7 @@ export const sourceTypeLabels: Record<ProvenanceSourceType, string> = {
   CALCULATED: "calculado do seu histórico",
   DERIVED: "derivado por algoritmo",
   INFERRED: "estimado",
+  USER_PROVIDED: "informado por você",
   CACHE: "de cache local"
 };
 

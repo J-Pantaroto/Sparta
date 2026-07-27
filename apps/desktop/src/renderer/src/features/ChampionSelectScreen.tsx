@@ -114,7 +114,9 @@ export function ChampionSelectScreen({
         ...current,
         enemies: [
           ...current.enemies,
-          { championId: champion.id, championName: champion.name, role: "MID" as const, team: "enemy" as const }
+          // Sem `role`: a escolha manual não diz em que posição o inimigo
+          // joga, e nenhum motor lê esse campo.
+          { championId: champion.id, championName: champion.name, team: "enemy" as const }
         ]
       };
     });
@@ -189,10 +191,22 @@ export function ChampionSelectScreen({
               {autoPlayerRole !== null ? (
                 <ReadOnlyValue>{roleLabels[autoPlayerRole]}</ReadOnlyValue>
               ) : (
-                <Select<Role>
-                  value={draft.playerRole}
-                  onChange={(role) => setDraft((current) => ({ ...current, playerRole: role }))}
-                  options={ROLES.map((role) => ({ value: role, label: roleLabels[role] }))}
+                /* Começa vazio: nenhuma posição vem pré-selecionada. A
+                   escolha é marcada como `USER` pra não se confundir com uma
+                   detecção do cliente. */
+                <Select<Role | "">
+                  value={draft.playerRole ?? ""}
+                  onChange={(role) =>
+                    setDraft((current) =>
+                      role === ""
+                        ? { ...current, playerRole: undefined, playerRoleSource: undefined }
+                        : { ...current, playerRole: role, playerRoleSource: "USER" }
+                    )
+                  }
+                  options={[
+                    { value: "" as const, label: "Selecione..." },
+                    ...ROLES.map((role) => ({ value: role, label: roleLabels[role] }))
+                  ]}
                   ariaLabel="Posição"
                 />
               )}
@@ -299,6 +313,16 @@ export function ChampionSelectScreen({
         )}
       </Card>
 
+      {!draft.playerRole ? (
+        <Card>
+          <EmptyState
+            icon={<Crosshair size={20} />}
+            title="Posição ainda não identificada"
+            description="Aguardando o League Client informar sua função. No modo manual, selecione uma posição para receber recomendações."
+          />
+        </Card>
+      ) : (
+        <>
       {recommendationsStatus === "loading" && (
         <Card>
           <Loading block label="Calculando recomendações..." />
@@ -310,7 +334,10 @@ export function ChampionSelectScreen({
         </Card>
       )}
 
-      {recommendations.length === 0 && recommendationsStatus !== "loading" ? (
+      {/* Durante o recálculo nada da posição anterior fica visível: o hook
+          preserva o último `data` pra evitar flicker, o que aqui significaria
+          exibir os cards do papel antigo como se fossem os atuais. */}
+      {recommendationsStatus === "loading" ? null : recommendations.length === 0 ? (
         <Card>
           <NoRecommendations
             role={draft.playerRole}
@@ -319,8 +346,7 @@ export function ChampionSelectScreen({
           />
         </Card>
       ) : (
-        recommendations.length > 0 && (
-          <Columns
+        <Columns
             asideFirst
             asideWidth="286px"
             aside={
@@ -439,7 +465,8 @@ export function ChampionSelectScreen({
               )
             }
           />
-        )
+      )}
+        </>
       )}
     </PageLayout>
   );

@@ -44,8 +44,15 @@ async function persistMatchParticipants(
   const knownChampionIds = new Set(existingChampions.map((champion) => champion.id));
   const riotAccountIdByPuuid = new Map(knownAccounts.map((account) => [account.puuid, account.id]));
 
-  const eligible = participants.filter((entry) => knownChampionIds.has(entry.summary.championId));
-  const skipped = participants.filter((entry) => !knownChampionIds.has(entry.summary.championId));
+  // Participante sem posição observada é descartado junto com o de campeão
+  // fora do catálogo, pelo mesmo motivo: a linha existiria sem conseguir
+  // dizer a que posição pertence, e `MatchParticipant.role` alimenta as
+  // estatísticas por posição. Gravar "MID" aqui era o falso fallback.
+  const usable = (entry: (typeof participants)[number]) =>
+    knownChampionIds.has(entry.summary.championId) && entry.summary.role !== undefined;
+
+  const eligible = participants.filter(usable);
+  const skipped = participants.filter((entry) => !usable(entry));
 
   if (eligible.length > 0) {
     await tx.matchParticipant.createMany({
@@ -54,7 +61,7 @@ async function persistMatchParticipants(
         riotAccountId: riotAccountIdByPuuid.get(summary.puuid) ?? null,
         puuid: summary.puuid,
         championId: summary.championId,
-        role: summary.role,
+        role: summary.role as string,
         teamId,
         won: summary.won,
         kills: summary.metrics.kills,

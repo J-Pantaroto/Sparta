@@ -51,7 +51,7 @@ export interface RiotMatchDto {
   };
 }
 
-const TEAM_POSITION_TO_ROLE: Record<string, Role> = {
+const TEAM_POSITION_TO_ROLE: Partial<Record<string, Role>> = {
   TOP: "TOP",
   JUNGLE: "JUNGLE",
   MIDDLE: "MID",
@@ -101,7 +101,10 @@ function mapParticipant(
   patch: string,
   teams: RiotMatchTeamDto[] | undefined
 ): MatchSummary {
-  const role = TEAM_POSITION_TO_ROLE[participant.teamPosition] ?? "MID";
+  // Sem `?? "MID"`: partida cujo `teamPosition` a Riot não informa (ou
+  // informa num vocabulário novo) sairia contabilizada nas estatísticas de
+  // MID do jogador. Fica ausente, e a persistência descarta a linha.
+  const role = TEAM_POSITION_TO_ROLE[participant.teamPosition];
   const cs = participant.totalMinionsKilled + participant.neutralMinionsKilled;
 
   const metrics: MatchPerformanceMetrics = {

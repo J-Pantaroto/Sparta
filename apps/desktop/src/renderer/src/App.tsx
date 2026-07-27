@@ -42,7 +42,10 @@ function SpartaApp() {
   const { splashUrl } = useFeaturedChampion();
   const [page, setPage] = useState<Page>("dashboard");
   const [draft, setDraft] = useState<DraftState>({
-    playerRole: "MID",
+    // Sem posição. Nada de `playerRole: "MID"`: até o LCU informar (ou o
+    // usuário escolher no modo manual), o Sparta não sabe a posição, e
+    // fingir que sabe produziria recomendações do papel errado.
+    playerRole: undefined,
     pickOrder: 1,
     allies: [],
     enemies: [],
@@ -55,9 +58,14 @@ function SpartaApp() {
   const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
   const [riotAccounts, setRiotAccounts] = useState<RiotAccountSummary[]>([]);
 
+  // Proteção centralizada: sem posição, a requisição nem sai. A API também
+  // recusa (`PLAYER_ROLE_UNAVAILABLE`), mas barrar aqui evita depender de a
+  // API estar na mesma versão do desktop. `useAsyncData` já descarta o
+  // resultado de uma execução anterior quando as dependências mudam, então
+  // trocar de posição não deixa a resposta antiga sobrescrever a nova.
   const recommendationsQuery = useAsyncData<PickRecommendation[]>(
     () =>
-      sessionToken
+      sessionToken && draft.playerRole
         ? fetchDraftRecommendations(sessionToken, draft).then((result) => result.recommendations)
         : undefined,
     [sessionToken, draft]
@@ -125,11 +133,36 @@ function SpartaApp() {
   }, [sessionStatus]);
 
   useEffect(() => {
-    if (autoPlayerRole === null) return;
+    // `null` significa "o LCU não informa posição agora" - pode ser fora do
+    // champion select, ou dentro dele antes da fila atribuir. Só sobrescreve
+    // a posição do draft quando ela veio do próprio LCU: uma escolha manual
+    // do usuário não é apagada por um tick sem posição.
+    if (autoPlayerRole === null) {
+      setDraft((current) =>
+        current.playerRoleSource === "LCU"
+          ? { ...current, playerRole: undefined, playerRoleSource: undefined }
+          : current
+      );
+      return;
+    }
     setDraft((current) =>
-      current.playerRole === autoPlayerRole ? current : { ...current, playerRole: autoPlayerRole }
+      current.playerRole === autoPlayerRole && current.playerRoleSource === "LCU"
+        ? current
+        : { ...current, playerRole: autoPlayerRole, playerRoleSource: "LCU" }
     );
   }, [autoPlayerRole]);
+
+  // Sair do champion select encerra a sessão observada: a posição detectada
+  // não pode sobreviver como se ainda fosse atual. Reentrar consulta o
+  // estado real do LCU de novo (`getLcuState` na montagem).
+  useEffect(() => {
+    if (champSelectActive) return;
+    setDraft((current) =>
+      current.playerRoleSource === "LCU"
+        ? { ...current, playerRole: undefined, playerRoleSource: undefined }
+        : current
+    );
+  }, [champSelectActive]);
 
   // Draft real (aliados, inimigos, banimentos) lido da sessao do LCU.
   // null fora do champion select - ai o preenchimento manual volta a valer.
@@ -182,11 +215,11 @@ function SpartaApp() {
     const toPick = (member: LcuDraftMember, team: "ally" | "enemy"): DraftPick => ({
       championId: member.championId,
       championName: championNames.get(member.championId) ?? String(member.championId),
-      // `role` e obrigatorio no tipo, mas nenhum motor le o papel de aliado
-      // ou inimigo (o confronto de rota vem de `enemyLaneChampionId`). Sem
-      // posicao atribuida pela fila, fica o mesmo placeholder ja usado no
-      // seletor manual.
-      role: member.position ?? "MID",
+      // Sem posição atribuída pela fila o campo fica ausente. Nenhum motor
+      // lê o papel de aliado ou inimigo (o confronto de rota vem de
+      // `enemyLaneChampionId`), e o placeholder "MID" anterior gravava
+      // posição falsa no request enviado à API.
+      role: member.position,
       team
     });
 

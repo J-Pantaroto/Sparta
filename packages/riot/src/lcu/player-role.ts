@@ -9,7 +9,7 @@ import type { LcuChampionSelectSnapshot } from "./read-only-client.js";
  * Exportado pra `draft-snapshot.ts` reusar na posicao dos outros jogadores
  * (aliados e inimigos), em vez de duplicar a tabela.
  */
-export const POSITION_TO_ROLE: Record<string, Role> = {
+export const POSITION_TO_ROLE: Partial<Record<string, Role>> = {
   top: "TOP",
   jungle: "JUNGLE",
   middle: "MID",
@@ -35,7 +35,23 @@ export function derivePlayerRole(snapshot: LcuChampionSelectSnapshot): Role | un
     return undefined;
   }
   const localMember = snapshot.myTeam.find((member) => member.cellId === snapshot.localPlayerCellId);
-  const position = localMember?.assignedPosition?.toLowerCase();
-  if (!position) return undefined;
+  return toRole(localMember?.assignedPosition);
+}
+
+/**
+ * Converte um `assignedPosition` do LCU em `Role`, ou `undefined`.
+ *
+ * `unselected` e `unknown` são valores que o próprio cliente usa quando
+ * ainda não atribuiu posição - tratá-los como qualquer outra string
+ * desconhecida basta, mas eles estão nomeados aqui pra deixar explícito
+ * que são casos esperados, não anomalia.
+ *
+ * Qualquer valor fora da tabela devolve `undefined`. **Nunca MID**: a Riot
+ * pode introduzir um vocabulário novo, e mapear o que não se conhece pro
+ * meio produziria recomendações da posição errada em silêncio.
+ */
+export function toRole(assignedPosition: string | undefined): Role | undefined {
+  const position = assignedPosition?.trim().toLowerCase();
+  if (!position || position === "unselected" || position === "unknown") return undefined;
   return POSITION_TO_ROLE[position];
 }

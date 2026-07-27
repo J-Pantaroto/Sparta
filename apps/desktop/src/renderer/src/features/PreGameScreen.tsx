@@ -77,7 +77,12 @@ export function PreGameScreen({ draft, ddragonVersion }: { draft: DraftState; dd
         variant="feature"
         eyebrow="Pré-game"
         title={ownChampion.name}
-        subtitle={`Preparação pro confronto em ${roleLabels[draft.playerRole]}.`}
+        subtitle={
+          // Sem posição identificada o texto não afirma uma - o Pré-game é
+          // aberto depois de confirmar o campeão, e a posição pode não ter
+          // sido informada.
+          draft.playerRole ? `Preparação pro confronto em ${roleLabels[draft.playerRole]}.` : "Preparação pro confronto."
+        }
         artUrl={heroSplash}
         aside={
           <ChampionAvatar
@@ -91,7 +96,7 @@ export function PreGameScreen({ draft, ddragonVersion }: { draft: DraftState; dd
         }
         meta={
           <InlineStats>
-            <InlineStat label="Posição" value={roleLabels[draft.playerRole]} />
+            <InlineStat label="Posição" value={draft.playerRole ? roleLabels[draft.playerRole] : "Não identificada"} />
             <InlineStat label="Inimigos revelados" value={`${enemyChampions.length}/${MAX_ENEMIES}`} />
             <InlineStat
               label="Perfil de dano inimigo"

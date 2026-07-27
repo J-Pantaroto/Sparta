@@ -168,7 +168,26 @@ export function fetchGrowthJourney(puuid: string) {
  * `metricDetails`. Sem esta normalizacao a tela quebra (medido durante a
  * Etapa 2). Nenhum componente precisa se defender disso por conta propria.
  */
+/**
+ * Erro de posição ausente. Existe como classe pra a tela distinguir isto de
+ * uma falha de rede - "ainda não sabemos sua posição" não é um erro técnico.
+ */
+export class PlayerRoleUnavailableError extends Error {
+  readonly code = "PLAYER_ROLE_UNAVAILABLE";
+  constructor() {
+    super("A posição do jogador ainda não foi identificada.");
+  }
+}
+
 export async function fetchDraftRecommendations(token: string, draft: DraftState) {
+  // Proteção central: a requisição não sai sem posição. A API também recusa
+  // (422 `PLAYER_ROLE_UNAVAILABLE`), mas uma API anterior a esta etapa
+  // aceitaria e usaria MID internamente - barrar aqui não depende de as duas
+  // versões andarem juntas.
+  if (!draft.playerRole) {
+    throw new PlayerRoleUnavailableError();
+  }
+
   const result = await request<{ recommendations: PickRecommendation[] }>("/drafts/recommendations", {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },

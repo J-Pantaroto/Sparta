@@ -31,6 +31,17 @@ export const draftsRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const payload = draftRecommendationRequestSchema.parse(request.body);
+
+    // Sem posicao a rota nao roda o motor. Assumir MID aqui produziria
+    // recomendacoes do papel errado sem nenhum sinal disso na resposta.
+    if (!payload.draft.playerRole) {
+      reply.code(422);
+      return {
+        code: "PLAYER_ROLE_UNAVAILABLE",
+        message: "A posição do jogador ainda não foi identificada."
+      };
+    }
+
     const riotAccount = await prisma.riotAccount.findFirst({ where: { userId } });
 
     let player: PlayerProfile;

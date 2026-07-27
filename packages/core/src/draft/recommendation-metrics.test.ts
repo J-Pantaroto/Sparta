@@ -203,3 +203,82 @@ describe("ensureRecommendationMetrics", () => {
     expect(ensureRecommendationMetrics(semNada)).toEqual([]);
   });
 });
+
+describe("posição ausente não vira MID (Etapa 6)", () => {
+  const tag: ChampionTag = {
+    championId: 10,
+    championName: "Candidato",
+    roles: ["MID"],
+    damageProfile: "AP",
+    tags: [],
+    blindSafety: 0.7,
+    difficulty: 0.5,
+    engage: 0.6,
+    peel: 0.3,
+    frontline: 0.2,
+    pickoff: 0.8,
+    waveclear: 0.5,
+    scaling: 0.6,
+    earlyPressure: 0.7
+  };
+
+  function statsMid(championId: number): PlayerChampionStats {
+    return {
+      championId,
+      championName: `Campeao${championId}`,
+      role: "MID",
+      games: 10,
+      wins: 6,
+      kills: 60,
+      deaths: 30,
+      assists: 70,
+      csPerMinute: 7,
+      goldPerMinute: 420,
+      damagePerMinute: 700,
+      visionScorePerMinute: 0.8,
+      killParticipation: 0.55,
+      objectiveParticipation: 0.4,
+      coverage: { killParticipation: availableCoverage(10), objectiveParticipation: availableCoverage(10) },
+      recentMatches: []
+    };
+  }
+
+  const entradaBase = {
+    player: { preferredRoles: ["MID"] } as unknown as PlayerProfile,
+    championStats: [statsMid(10), statsMid(11)],
+    championTags: [tag],
+    matchups: [],
+    compositionRules: {
+      minimumFrontline: 40,
+      minimumEngage: 40,
+      minimumWaveclear: 40,
+      preferDamageBalance: true
+    },
+    patchMeta: null
+  };
+
+  it("sem posição o motor não roda e não monta o pool de MID", () => {
+    const semPosicao = recommendPicks({
+      ...entradaBase,
+      draft: { pickOrder: 1, allies: [], enemies: [], bannedChampionIds: [] }
+    });
+    // O jogador só tem campeões de MID; um fallback devolveria os dois.
+    expect(semPosicao).toEqual([]);
+  });
+
+  it("MID real continua funcionando normalmente", () => {
+    const comPosicao = recommendPicks({
+      ...entradaBase,
+      draft: { playerRole: "MID", pickOrder: 1, allies: [], enemies: [], bannedChampionIds: [] }
+    });
+    expect(comPosicao.length).toBeGreaterThan(0);
+  });
+
+  it("posição diferente não puxa o histórico de MID", () => {
+    const jungle = recommendPicks({
+      ...entradaBase,
+      draft: { playerRole: "JUNGLE", pickOrder: 1, allies: [], enemies: [], bannedChampionIds: [] }
+    });
+    expect(jungle).toEqual([]);
+  });
+});

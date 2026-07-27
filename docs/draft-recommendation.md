@@ -89,3 +89,9 @@ base automatica em vez de competir com ela.
 `roles` sai vazio nas entradas derivadas porque a Data Dragon **nao publica rota**. Chutar
 (Marksman -> ADC, Mage -> MID) erraria em todo campeao flex, e nenhum motor consome
 `tag.roles` hoje - inventar o campo so criaria dado falso.
+
+## Posição ausente
+
+`DraftState.playerRole` é opcional desde a Etapa 6. Sem posição, `recommendPicks` devolve `[]`
+antes de montar o pool ou escolher a tabela de pesos, e a rota responde `422`
+`PLAYER_ROLE_UNAVAILABLE`. Ausência de posição não é MID — ver `docs/data-provenance.md`.

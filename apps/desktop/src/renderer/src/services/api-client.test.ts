@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
-import type { PlayerChampionStats } from "@sparta/core";
-import { ensureChampionStatsCoverage } from "./api-client";
+import { describe, expect, it, vi } from "vitest";
+import type { DraftState, PlayerChampionStats } from "@sparta/core";
+import { ensureChampionStatsCoverage, fetchDraftRecommendations, PlayerRoleUnavailableError } from "./api-client";
 
 /**
  * Compatibilidade com uma API anterior a Etapa 4: desktop e API sao
@@ -63,5 +63,29 @@ describe("ensureChampionStatsCoverage", () => {
     } as PlayerChampionStats;
     expect(ensureChampionStatsCoverage(novo)).toBe(novo);
     expect(ensureChampionStatsCoverage(novo).objectiveParticipation).toBe(0.42);
+  });
+});
+
+describe("guarda de posição no cliente da API (Etapa 6)", () => {
+  const draftSemPosicao = { pickOrder: 1, allies: [], enemies: [], bannedChampionIds: [] } as DraftState;
+
+  it("não envia a requisição sem posição", async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+
+    await expect(fetchDraftRecommendations("token", draftSemPosicao)).rejects.toBeInstanceOf(
+      PlayerRoleUnavailableError
+    );
+    // A protecao vale mesmo contra uma API anterior a esta etapa, que
+    // aceitaria o request e usaria MID internamente.
+    expect(fetchSpy).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
+  it("o erro carrega o código estável, não é falha técnica", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const erro = await fetchDraftRecommendations("token", draftSemPosicao).catch((e: unknown) => e);
+    expect((erro as PlayerRoleUnavailableError).code).toBe("PLAYER_ROLE_UNAVAILABLE");
+    vi.unstubAllGlobals();
   });
 });

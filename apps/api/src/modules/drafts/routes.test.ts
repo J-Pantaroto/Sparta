@@ -52,6 +52,70 @@ describe("drafts routes", () => {
     findPersonalLaneMatchupHistoryMock.mockResolvedValue([]);
   });
 
+  describe("posição ausente (Etapa 6)", () => {
+    const semPosicao = { draft: { pickOrder: 1, allies: [], enemies: [], bannedChampionIds: [] } };
+
+    it("responde 422 com código estável em vez de assumir MID", async () => {
+      getAuthenticatedUserIdMock.mockResolvedValue("user-1");
+      const app = await buildApp();
+
+      const response = await app.inject({ method: "POST", url: "/drafts/recommendations", payload: semPosicao });
+      const body = response.json();
+
+      expect(response.statusCode).toBe(422);
+      expect(body.code).toBe("PLAYER_ROLE_UNAVAILABLE");
+      expect(body.message).toMatch(/posição/i);
+      // Nao pode vazar detalhe interno.
+      expect(body.stack).toBeUndefined();
+      await app.close();
+    });
+
+    it("não consulta estatísticas nem monta pool sem posição", async () => {
+      getAuthenticatedUserIdMock.mockResolvedValue("user-1");
+      const app = await buildApp();
+
+      await app.inject({ method: "POST", url: "/drafts/recommendations", payload: semPosicao });
+
+      expect(riotAccountFindFirstMock).not.toHaveBeenCalled();
+      expect(findChampionStatsByPuuidMock).not.toHaveBeenCalled();
+      expect(findPersonalLaneMatchupHistoryMock).not.toHaveBeenCalled();
+      await app.close();
+    });
+
+    it("exige autenticação antes de avaliar a posição", async () => {
+      getAuthenticatedUserIdMock.mockResolvedValue(null);
+      const app = await buildApp();
+
+      const response = await app.inject({ method: "POST", url: "/drafts/recommendations", payload: semPosicao });
+
+      expect(response.statusCode).toBe(401);
+      await app.close();
+    });
+
+    it("aceita aliado/inimigo sem posição atribuída", async () => {
+      getAuthenticatedUserIdMock.mockResolvedValue("user-1");
+      riotAccountFindFirstMock.mockResolvedValue(null);
+      const app = await buildApp();
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/drafts/recommendations",
+        payload: {
+          draft: {
+            playerRole: "JUNGLE",
+            pickOrder: 1,
+            allies: [{ championId: 103, championName: "Ahri", team: "ally" }],
+            enemies: [],
+            bannedChampionIds: []
+          }
+        }
+      });
+
+      expect(response.statusCode).toBe(200);
+      await app.close();
+    });
+  });
+
   it("retorna 401 sem autenticacao", async () => {
     getAuthenticatedUserIdMock.mockResolvedValue(null);
     const app = await buildApp();

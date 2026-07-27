@@ -132,7 +132,12 @@ export interface MatchSummary {
   puuid: string;
   championId: number;
   championName: string;
-  role: Role;
+  /**
+   * Posição observada no Match-V5. Ausente quando o payload não informa
+   * `teamPosition` - a partida não é atribuída a nenhuma posição em vez de
+   * cair em MID.
+   */
+  role?: Role;
   won: boolean;
   durationSeconds: number;
   // Epoch ms de inicio da partida (Riot gameStartTimestamp) - usado pra
@@ -193,13 +198,36 @@ export interface MatchTimelineSummary {
 export interface DraftPick {
   championId: number;
   championName: string;
-  role: Role;
+  /**
+   * Posição do aliado/inimigo, quando a fila atribuiu uma. Ausente em blind
+   * pick e nas escolhas manuais - nenhum motor lê este campo hoje (o
+   * confronto de rota vem de `enemyLaneChampionId`), e preenchê-lo com um
+   * palpite gravaria posição falsa no request.
+   */
+  role?: Role;
   team: "ally" | "enemy";
   isPlayer?: boolean;
 }
 
+/**
+ * De onde veio a posição do jogador. Ausência de posição é a ausência do
+ * próprio campo - não existe origem "desconhecida".
+ */
+export type PlayerRoleSource =
+  /** Lida de `assignedPosition` na sessão de champion select do LCU. */
+  | "LCU"
+  /** Escolhida pelo usuário no modo manual/simulação. */
+  | "USER";
+
 export interface DraftState {
-  playerRole: Role;
+  /**
+   * **Opcional de propósito.** Ausente = a posição ainda não foi
+   * identificada, o que é diferente de MID. Sem ela o motor não monta pool,
+   * não escolhe tabela de pesos e não calcula matchup de rota.
+   */
+  playerRole?: Role;
+  /** Como `playerRole` foi obtida. Ausente junto com ela. */
+  playerRoleSource?: PlayerRoleSource;
   pickOrder: number;
   allies: DraftPick[];
   enemies: DraftPick[];

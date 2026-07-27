@@ -50,6 +50,13 @@ export function recommendPicks(input: {
   patchMeta: PatchMetaData | null;
   limit?: number;
 }): PickRecommendation[] {
+  // Sem posição não há pool, tabela de pesos nem confronto de rota que
+  // façam sentido. O motor devolve vazio em vez de escolher um papel: a
+  // rota `/drafts/recommendations` barra antes disso com
+  // `PLAYER_ROLE_UNAVAILABLE`, e esta guarda garante que nenhum outro
+  // chamador consiga rodar o motor com posição ausente.
+  if (!input.draft.playerRole) return [];
+
   const weights = selectWeights(input.draft);
   const banned = new Set(input.draft.bannedChampionIds);
   const picked = new Set([...input.draft.allies, ...input.draft.enemies].map((pick) => pick.championId));

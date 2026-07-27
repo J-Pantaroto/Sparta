@@ -342,3 +342,86 @@ precision` do Postgres, e aquela linha era reescrita a cada execução). Ao fina
 `PlayerChampionStats` das contas vinculadas — sem isso a métrica ficaria no `MatchParticipant`
 sem chegar ao perfil nem ao score até o próximo sync. O resumo é só de contagens; nenhum puuid
 ou payload é impresso.
+
+## Posição do jogador (Etapa 6)
+
+Posição ausente **não é MID**. Até a Etapa 6 vários pontos do fluxo convertiam "não sei" em
+`MID`, o que fazia o Sparta consultar o histórico da posição errada, montar o pool errado e
+aplicar a tabela de pesos errada — tudo em silêncio.
+
+### Representação
+
+`DraftState.playerRole?: Role` — **opcional**. Ausente significa "ainda não identificada". Foi
+escolhido em vez de `null` ou `"UNKNOWN"` porque o domínio já usa ausência opcional para o que
+não se aplica (`killParticipation?`, `csAt10?`, `objectiveParticipation?`), e um literal
+`"UNKNOWN"` poderia vazar para dentro de um `Record<Role, ...>` e ser indexado como se fosse
+uma posição.
+
+### Fontes possíveis
+
+`DraftState.playerRoleSource?: PlayerRoleSource` distingue as origens:
+
+| Valor | Significado |
+|---|---|
+| `"LCU"` | Lida de `assignedPosition` na sessão de champion select. |
+| `"USER"` | Escolhida à mão no modo manual/simulação. |
+| ausente | Sem posição. Não existe origem "desconhecida". |
+
+`ProvenanceSourceType` ganhou `USER_PROVIDED` pelo mesmo motivo: uma escolha manual não é
+observação do cliente nem dado oficial da Riot, e classificá-la como qualquer um dos dois
+apagaria a diferença entre "o League disse" e "o usuário disse".
+
+Posição observada no histórico Match-V5 é uma quarta coisa: vive em `MatchSummary.role`, também
+opcional, e nunca se mistura com a posição do draft atual.
+
+### Mapeamento do LCU
+
+| `assignedPosition` | Resultado |
+|---|---|
+| `top` / `jungle` | `TOP` / `JUNGLE` |
+| `middle` | `MID` |
+| `bottom` | `ADC` |
+| `utility` | `SUPPORT` |
+| `unselected`, `unknown`, string vazia, campo ausente | **ausente** |
+| qualquer outro valor | **ausente** |
+
+Um vocabulário novo da Riot produz ausência, nunca MID: mapear o desconhecido para o meio
+geraria recomendações da posição errada sem nenhum sinal disso.
+
+### Comportamento sem posição
+
+| Camada | Comportamento |
+|---|---|
+| Motor | `recommendPicks` devolve `[]` antes de escolher pool ou pesos. |
+| API | `POST /drafts/recommendations` responde **422** com `{"code":"PLAYER_ROLE_UNAVAILABLE"}`, sem consultar estatísticas. |
+| Cliente | `fetchDraftRecommendations` lança `PlayerRoleUnavailableError` — a requisição não sai. |
+| Interface | "Posição ainda não identificada", sem cards, sem loading infinito, sem erro técnico. |
+
+A proteção é dupla de propósito: o desktop barra antes de chamar (o que também protege contra
+uma API anterior a esta etapa, que aceitaria o request e usaria MID internamente), e a API
+recusa por conta própria.
+
+### Sessão e estado obsoleto
+
+- Sair do champion select limpa a posição cuja origem é `LCU`. Uma escolha `USER` não é apagada
+  por um tick sem posição do cliente.
+- Reentrar consulta o estado atual do LCU (`getLcuState` na montagem, desde a Fase 16).
+- Trocar de posição descarta os resultados anteriores **antes** de exibir os novos: o hook de
+  busca preserva o último `data` para evitar flicker, o que aqui significaria mostrar os cards
+  do papel antigo como se fossem atuais.
+- Resposta atrasada de uma posição anterior é ignorada (o `cancelled` do `useAsyncData` já
+  cobre isso quando as dependências mudam).
+
+### Limitação de clientes anteriores
+
+Um desktop anterior a esta etapa envia `playerRole: "MID"` mesmo sem ter identificado a
+posição, e **a API não tem como distinguir** esse MID artificial de uma escolha real. Nenhuma
+heurística foi criada para adivinhar: o que se garante é que a versão atual não produz mais o
+problema. Atualizar o desktop resolve.
+
+### Estado da validação com o LCU real
+
+A leitura de `assignedPosition` numa sessão de champion select **real** continua não validada —
+exige o cliente do League aberto e em champion select, indisponível neste ambiente. O
+mapeamento, o estado de espera, a seleção manual e a troca de posição foram validados no
+Electron real; a origem `LCU` está coberta por teste com fixture.

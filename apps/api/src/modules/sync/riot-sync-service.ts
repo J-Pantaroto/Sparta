@@ -113,7 +113,11 @@ export async function syncPlayerMatches(
         result.skippedParticipants.push({ matchId, puuid });
       }
 
-      touchedPairs.push({ championId: summary.championId, role: summary.role });
+      // Sem posição observada não há par (campeão, posição) a recalcular -
+      // o agregado ficaria numa posição inventada.
+      if (summary.role) {
+        touchedPairs.push({ championId: summary.championId, role: summary.role });
+      }
       result.imported += 1;
     } catch (error) {
       if (error instanceof RiotApiError && error.status === 429) {

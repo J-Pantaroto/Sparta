@@ -21,6 +21,17 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-07-26 17:30 — Posição desconhecida não vira mais MID
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0006-posicao-desconhecida-sem-fallback-mid.md`
+
+`DraftState.playerRole` virou opcional e ausência deixou de ser convertida em `MID` em nove
+pontos do fluxo (estado inicial do desktop, aliados/inimigos do LCU, inimigo manual, mapper do
+Match-V5, seletor da interface, schema da API). O motor devolve vazio sem posição, a rota
+responde `422 PLAYER_ROLE_UNAVAILABLE` sem consultar estatísticas, e o cliente barra antes de
+enviar. Nova `playerRoleSource` (`LCU`/`USER`) e `USER_PROVIDED` na proveniência distinguem
+detecção de escolha manual. Trocar de posição descarta os cards anteriores antes de mostrar os
+novos. 29 testes novos (326 no total).
+
 ## 2026-07-26 14:40 — Participação em objetivos a partir de dados reais
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0005-participacao-objetivos-real.md`
 

@@ -28,7 +28,20 @@
  * - `CACHE`      — cópia local de uma das origens acima; o campo
  *                  `collectedAt`/`expiresAt` é que diz se ainda vale.
  */
-export type ProvenanceSourceType = "OFFICIAL" | "OBSERVED" | "CALCULATED" | "DERIVED" | "INFERRED" | "CACHE";
+/**
+ * `USER_PROVIDED` entrou na Etapa 6: uma posição escolhida à mão no modo
+ * manual não é observação do cliente nem dado oficial da Riot, e tratá-la
+ * como qualquer um dos dois apagaria a diferença entre "o League disse" e
+ * "o usuário disse".
+ */
+export type ProvenanceSourceType =
+  | "OFFICIAL"
+  | "OBSERVED"
+  | "CALCULATED"
+  | "DERIVED"
+  | "INFERRED"
+  | "USER_PROVIDED"
+  | "CACHE";
 
 /**
  * Se o dado pode ser usado agora, e como.

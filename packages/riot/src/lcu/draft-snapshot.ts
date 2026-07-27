@@ -1,5 +1,5 @@
 import type { Role } from "@sparta/core";
-import { derivePlayerRole, POSITION_TO_ROLE } from "./player-role.js";
+import { derivePlayerRole, toRole } from "./player-role.js";
 import type { LcuChampionSelectSnapshot } from "./read-only-client.js";
 
 /** Um campeao ja revelado na sessao, do lado aliado ou inimigo. */
@@ -32,7 +32,7 @@ function toMember(member: { championId: number; assignedPosition?: string }): Lc
   const position = member.assignedPosition?.toLowerCase();
   return {
     championId: member.championId,
-    position: position ? POSITION_TO_ROLE[position] : undefined
+    position: toRole(position)
   };
 }
 
