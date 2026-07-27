@@ -116,7 +116,7 @@ listas de frases fixas (`allyStrengths`, `allyWeaknesses`, `enemyThreats`, `winC
 
 Sem migração, sem tabela nova, sem fonte externa nova, sem persistência (`DraftSession`/
 `PickRecommendation` seguem sem código). Ver `docs/pre-game-analysis.md`.
-58 testes novos (391 no total).
+70 testes novos (396 no total).
 
 ### Etapa 6: posição desconhecida não vira MID
 

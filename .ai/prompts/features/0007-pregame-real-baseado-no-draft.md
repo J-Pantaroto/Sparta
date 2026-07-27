@@ -253,9 +253,9 @@ nesta versão da API"). O formato antigo não é traduzido para o novo — não 
 
 ### Testes
 
-58 novos, 391 no total:
+70 novos, 396 no total:
 
-- `packages/core/src/draft/pre-game-analysis.test.ts` — 37: pré-requisitos, determinismo,
+- `packages/core/src/draft/pre-game-analysis.test.ts` — 49: pré-requisitos, determinismo,
   ausência de `NaN`/`Infinity`, draft parcial vs completo, jogador contado uma vez, reação a
   troca de aliado/inimigo, cobertura, confronto direto (com/sem amostra, 50 calculado, nunca
   global), proveniência `DERIVED`, linguagem sem conceitos não modelados, ausência das frases

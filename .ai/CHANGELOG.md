@@ -34,7 +34,7 @@ análise parcial com linguagem de parcialidade, nunca "o time não tem". `GLOBAL
 `META_STRENGTH` e interações entre campeões continuam explicitamente indisponíveis. O card estático
 do desktop foi removido, e uma resposta de API anterior é recusada em vez de exibida como análise.
 Deliberadamente **não** reusa `analyzeTeamComposition`, que devolve `0` em toda dimensão sem tags.
-58 testes novos (391 no total). Sem migração, sem persistência, sem fonte externa nova.
+70 testes novos (396 no total). Sem migração, sem persistência, sem fonte externa nova.
 Ver `docs/pre-game-analysis.md`.
 
 ## 2026-07-26 17:30 — Posição desconhecida não vira mais MID
