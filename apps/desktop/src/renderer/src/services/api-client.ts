@@ -1,4 +1,10 @@
 import { ensureRecommendationMetrics, unavailableCoverage, unknownCoverage } from "@sparta/core";
+import {
+  ExternalServiceError,
+  HTTP_TIMEOUTS,
+  fetchWithPolicy,
+  publicMessageForExternalError
+} from "@sparta/riot/http";
 import type {
   ChampionPerformanceScore,
   DraftState,
@@ -47,21 +53,41 @@ export class ApiError extends Error {
     message: string,
     public readonly status: number,
     /** Corpo da resposta, pra quem precisa do `code` estruturado do 422. */
-    public readonly payload?: unknown
+    public readonly payload?: unknown,
+    public readonly code?: string
   ) {
     super(message);
   }
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers
+  const response = await fetchWithPolicy(`${API_BASE_URL}${path}`, {
+    integration: "SPARTA_API",
+    timeoutMs: HTTP_TIMEOUTS.spartaApiMs,
+    idempotent: (options.method ?? "GET").toUpperCase() === "GET",
+    throwOnHttpError: false,
+    request: {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...options.headers
+      }
     }
   });
-  const body = await response.json().catch(() => null);
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch (cause) {
+    throw new ExternalServiceError({
+      code: "UPSTREAM_INVALID_RESPONSE",
+      integration: "SPARTA_API",
+      message: publicMessageForExternalError("UPSTREAM_INVALID_RESPONSE"),
+      status: response.status,
+      temporary: false,
+      retryable: false,
+      cause
+    });
+  }
 
   if (!response.ok) {
     const message =
@@ -70,7 +96,11 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
         : body && typeof body === "object" && "message" in body
           ? String((body as { message: unknown }).message)
           : "Falha na requisicao.";
-    throw new ApiError(message, response.status, body);
+    const code =
+      body && typeof body === "object" && "code" in body && typeof (body as { code?: unknown }).code === "string"
+        ? (body as { code: string }).code
+        : undefined;
+    throw new ApiError(message, response.status, body, code);
   }
 
   return body as T;

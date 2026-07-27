@@ -24,6 +24,21 @@ qualquer agente de IA que trabalhe neste repositório (Claude/Codex/Agents, todo
 
 ## Pendências desta sessão (ler primeiro)
 
+### Etapa 9: resiliência HTTP, erros externos e estados de cache
+
+Todas as chamadas ativas foram auditadas e documentadas em `docs/http-resilience.md`. A política
+compartilhada em `packages/riot/src/http/` agora concentra timeout, cancelamento, retry seguro,
+jitter, `Retry-After`, validação e erros sanitizados. Riot, Data Dragon, Community Dragon,
+assets, API local e LCU usam esse contrato.
+
+Cache persistido e no renderer distingue `MISS/FRESH/STALE/EXPIRED`, guarda datas reais e só
+serve stale por recurso. A fonte original permanece na proveniência (`OFFICIAL` não vira
+`CACHE`). Conta Riot/autenticação, LCU e draft atual nunca usam stale. O LCU tem estados
+específicos e limpa posição, ordem e draft imediatamente ao perder observação.
+
+Validado com 472 testes, typecheck dos quatro projetos TypeScript, lint e build de produção do
+Electron.
+
 Uma sessão anterior fez uma auditoria completa do repositório (real vs mock vs so-tipo), aprovou um plano de evolução em 5 épicos (Riot Sync, Player Intelligence, Draft Intelligence, Post-Game Coach, Growth Journey) e implementou todas as 5 fases, além de um refinamento visual do desktop e correções de infra/segurança. Uma sessão seguinte **conectou o desktop às rotas reais da API** (Dashboard/Perfil/Champion Select/Pós-game/nova tela Evolução, removendo `mock-data.ts`) e implementou as **Sub-fases 6a e 6b** (tela de Configurações + tema com campeão/skin real + configuração "quantas partidas analisar"). Uma sessão seguinte implementou a **Sub-fase 6c (ordem de pick automática via LCU)**, encerrando a Fase 6. Uma sessão seguinte implementou a **Fase 7 (auditoria e documentação dos algoritmos de scoring)**. Uma sessão seguinte implementou a **Fase 8 inteira** (Sub-fase 8a: motor de build de campeão + seletor de time inimigo; Sub-fase 8b: polimento visual do desktop) e validou tudo contra a conta real Zekerus#117. Essa validação real encontrou um bug real (corrigido, ver abaixo) e motivou o pedido desta sessão: **Fase 9 (linguagem visual real - badges/barras nas telas de análise)**, implementada em duas sub-fases (9a: componentes compartilhados + Dashboard + Champion Select; 9b: Perfil + Pós-game + Evolução), encerrando a Fase 9. A validação real da 9b encontrou mais um bug real (corrigido, ver abaixo). **Depois do merge da 9b, o usuário pediu explicitamente validação contra o app Electron real empacotado (não só o dev server aberto numa aba de navegador comum)** — essa validação descobriu e corrigiu um bug real grave e pré-existente (ver "Bug real corrigido: preload nunca carregava de verdade" abaixo), presente desde o início do projeto. Depois de abrir o app real pro usuário avaliar, ele deu **feedback de UX ao vivo** (capturas do próprio Sparta + referências de apps reais de LoL) que motivou a **Fase 10 (polimento de UX + robustez de ícones de campeão)**, com liberdade explícita do usuário pra usar outras fontes/APIs como fallback e não se limitar ao escopo inicial ("não é mais protótipo, é programa real"). Uma sessão seguinte configurou o **`gh` CLI autenticado** (instalado via winget, device flow) - PRs/merges/CI agora são feitos pelo terminal, não mais pelo navegador. Uma nova rodada de feedback do usuário (as mudanças visuais ainda pareciam pequenas, botões sem estilo, download de skin quebrado, Champion Select acessível livremente sem sessão real, falta de detecção de posição/lane, telas resumidas demais) motivou a **Fase 11 (detecção real de posição/lane via LCU + gating do Champion Select + correções de polimento)**. Depois do merge da 11, o usuário reportou que **o módulo de temas continuava instável, sem baixar nem aplicar o tema** - a investigação achou dois bugs reais e independentes (ver "Bug real corrigido: módulo de temas" logo abaixo), ambos corrigidos na **Fase 12**. Depois veio a **Fase 13** (o tema veste o app). A partir daí o usuário pediu uma **modernização completa de UI/UX** tendo Mobalytics, Blitz e iTero como referência de princípios - isso virou a **Fase 14**, implementada em seis subfases (A a F), uma por PR. Tudo isso **já está mergeado em `main`**.
 
 ### Etapa 2: contrato de origem, disponibilidade e confiança

@@ -9,3 +9,4 @@ export * from "./mappers/match-mapper.js";
 export * from "./mappers/timeline-mapper.js";
 export * from "./rate-limit/backoff.js";
 export * from "./rate-limit/riot-request.js";
+export * from "./http/index.js";

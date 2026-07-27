@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { HTTP_TIMEOUTS } from "@sparta/riot/http";
 import { championSplashUrl, championSquareUrl, communityDragonSplashUrl } from "../services/datadragon";
 
 interface SkinSplashProps {
@@ -31,10 +32,12 @@ export function SkinSplash({
 }: SkinSplashProps) {
   const [stage, setStage] = useState<0 | 1 | 2>(0);
   const [fallbackUrl, setFallbackUrl] = useState<string | undefined>();
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     setStage(0);
     setFallbackUrl(undefined);
+    setLoaded(false);
   }, [championKey, skinNum]);
 
   // Busca a URL da Community Dragon so quando a Data Dragon de fato falhou.
@@ -58,13 +61,26 @@ export function SkinSplash({
         ? fallbackUrl
         : championSquareUrl(championKey, ddragonVersion);
 
+  useEffect(() => {
+    if (loaded) return;
+    const timer = window.setTimeout(
+      () => setStage((current) => (current === 0 ? 1 : 2)),
+      HTTP_TIMEOUTS.remoteAssetMs
+    );
+    return () => window.clearTimeout(timer);
+  }, [src, loaded]);
+
   return (
     <img
       className={className}
       src={src}
       alt={alt}
       onClick={onClick}
-      onError={() => setStage((current) => (current === 0 ? 1 : 2))}
+      onLoad={() => setLoaded(true)}
+      onError={() => {
+        setLoaded(false);
+        setStage((current) => (current === 0 ? 1 : 2));
+      }}
     />
   );
 }

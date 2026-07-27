@@ -1,5 +1,6 @@
 import { HelpCircle, Plus } from "lucide-react";
 import { useEffect, useState } from "react";
+import { HTTP_TIMEOUTS } from "@sparta/riot/http";
 import { championSquareUrl, fetchAllChampions } from "../services/datadragon";
 import "./ChampionAvatar.css";
 
@@ -59,10 +60,12 @@ export function ChampionAvatar({
 }: ChampionAvatarProps) {
   const [resolvedSlug, setResolvedSlug] = useState<string | undefined>(slug);
   const [attempt, setAttempt] = useState(0);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     setResolvedSlug(slug);
     setAttempt(0);
+    setLoaded(false);
     if (slug) return;
     let cancelled = false;
     void loadCatalog(ddragonVersion).then((catalog) => {
@@ -72,6 +75,12 @@ export function ChampionAvatar({
       cancelled = true;
     };
   }, [championId, ddragonVersion, slug]);
+
+  useEffect(() => {
+    if (attempt >= 2 || loaded) return;
+    const timer = window.setTimeout(() => setAttempt((current) => current + 1), HTTP_TIMEOUTS.remoteAssetMs);
+    return () => window.clearTimeout(timer);
+  }, [attempt, loaded, resolvedSlug]);
 
   const className = [
     "sp-avatar",
@@ -99,7 +108,11 @@ export function ChampionAvatar({
       src={src}
       alt={alt}
       title={title ?? alt}
-      onError={() => setAttempt((current) => current + 1)}
+      onLoad={() => setLoaded(true)}
+      onError={() => {
+        setLoaded(false);
+        setAttempt((current) => current + 1);
+      }}
     />
   );
 }

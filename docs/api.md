@@ -18,6 +18,15 @@ Endpoints:
 
 Swagger UI fica em `/docs`.
 
+## Erros externos
+
+Falhas externas seguem `docs/http-resilience.md`. 401/403 da Riot viram
+`RIOT_CREDENTIAL_INVALID`, 429 vira `RIOT_RATE_LIMITED` e respeita `Retry-After`, 404 não é
+retentado e 502/503/504 só são retentados em GET, dentro do limite central.
+
+O corpo público é `{ code, message, integration, retryAfterMs? }` e nunca inclui URL, headers,
+token, payload ou stack.
+
 ## Integrações Riot em uso (backend)
 
 - **Account-V1** (`riot/account/v1/accounts/by-riot-id/{gameName}/{tagLine}`) — resolve Riot ID pra puuid real em `POST /players/link-riot-account`. Cacheado 24h (`ApiCacheEntry`).

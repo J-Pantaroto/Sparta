@@ -1,5 +1,10 @@
 # Riot Compliance
 
+Cada leitura LCU tem timeout de 1,5 s e motivo explícito para indisponibilidade. Não há cache
+stale: cliente fechado, lockfile inválido, conexão recusada, timeout, endpoint indisponível,
+saída do champion select ou payload inválido limpam imediatamente o draft. A senha do lockfile
+e o header Basic nunca entram em logs ou erros públicos.
+
 Princípios do Sparta:
 
 - Registrar o app no Riot Developer Portal antes de uso público.

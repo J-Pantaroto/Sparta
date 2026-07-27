@@ -1,14 +1,18 @@
 import { app, BrowserWindow, ipcMain } from "electron";
 import { mkdir, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
+import { URL } from "node:url";
 import {
   deriveDraftSnapshot,
   derivePickOrder,
   derivePlayerRole,
+  fetchWithPolicy,
+  HTTP_TIMEOUTS,
   isSameDraftSnapshot,
   LcuReadOnlyClient,
   type LcuDraftSnapshot,
-  type LcuGameflowPhase
+  type LcuGameflowPhase,
+  type LcuReadStatus
 } from "@sparta/riot";
 import type { Role } from "@sparta/core";
 
@@ -30,14 +34,26 @@ const GAMEFLOW_POLL_INTERVAL_MS = 2500;
  */
 function registerSkinDownloadHandler() {
   ipcMain.handle("sparta:download-skin", async (_event, url: string, fileName: string) => {
+    const parsedUrl = new URL(url);
+    const allowedHosts = new Set(["ddragon.leagueoflegends.com", "raw.communitydragon.org"]);
+    if (parsedUrl.protocol !== "https:" || !allowedHosts.has(parsedUrl.hostname)) {
+      throw new Error("Fonte de imagem não permitida.");
+    }
     // A CDN da Data Dragon (Akamai) responde 403 pra requisicoes sem
     // User-Agent - o fetch do processo main (Node/Electron) nao manda um por
     // padrao, entao o download quebrava (bug real reportado). Um UA de
     // navegador resolve.
-    const response = await fetch(url, {
-      headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Sparta-Desktop" }
+    const response = await fetchWithPolicy(url, {
+      integration: "REMOTE_ASSET",
+      timeoutMs: HTTP_TIMEOUTS.remoteAssetMs,
+      throwOnHttpError: true,
+      request: {
+        method: "GET",
+        headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Sparta-Desktop" }
+      }
     });
-    if (!response.ok) throw new Error(`Falha ao baixar a imagem (${response.status}).`);
+    const contentType = response.headers.get("content-type");
+    if (!contentType?.startsWith("image/")) throw new Error("A fonte externa não devolveu uma imagem válida.");
     const buffer = Buffer.from(await response.arrayBuffer());
 
     const safeName = basename(fileName);
@@ -45,7 +61,6 @@ function registerSkinDownloadHandler() {
     await mkdir(skinsDir, { recursive: true });
     await writeFile(join(skinsDir, safeName), buffer);
 
-    const contentType = response.headers.get("content-type") ?? "image/jpeg";
     return `data:${contentType};base64,${buffer.toString("base64")}`;
   });
 }
@@ -86,13 +101,14 @@ function createWindow() {
  * champion select) ficaria sem estado nenhum ate a proxima mudanca.
  */
 interface LcuState {
+  status: LcuReadStatus;
   phase: LcuGameflowPhase | null;
   pickOrder: number | null;
   playerRole: Role | null;
   draft: LcuDraftSnapshot | null;
 }
 
-let lcuState: LcuState = { phase: null, pickOrder: null, playerRole: null, draft: null };
+let lcuState: LcuState = { status: "CLIENT_CLOSED", phase: null, pickOrder: null, playerRole: null, draft: null };
 
 function registerLcuStateHandler() {
   ipcMain.handle("sparta:lcu-state", () => lcuState);
@@ -111,68 +127,77 @@ function startGameflowWatcher() {
     }
   }
 
-  setInterval(() => {
-    void client.getGameflowPhase().then(async (phase) => {
-      if (phase !== lastPhase) {
-        lastPhase = phase;
-        broadcast("sparta:gameflow-phase", phase);
-      }
-      lcuState = { ...lcuState, phase: lastPhase };
+  function clearObservedState(status: LcuReadStatus, phase: LcuGameflowPhase | null = null) {
+    if (lastPhase !== phase) {
+      lastPhase = phase;
+      broadcast("sparta:gameflow-phase", phase);
+    }
+    if (lastPickOrder !== null) broadcast("sparta:pick-order", null);
+    if (lastPlayerRole !== null) broadcast("sparta:player-role", null);
+    if (lastDraft !== undefined) broadcast("sparta:draft-snapshot", null);
+    lastPickOrder = null;
+    lastPlayerRole = null;
+    lastDraft = undefined;
+    lcuState = { status, phase, pickOrder: null, playerRole: null, draft: null };
+  }
 
-      if (phase !== "ChampSelect") {
-        if (lastPickOrder !== null) {
-          lastPickOrder = null;
-          broadcast("sparta:pick-order", null);
-        }
-        if (lastPlayerRole !== null) {
-          lastPlayerRole = null;
-          broadcast("sparta:player-role", null);
-        }
-        if (lastDraft !== undefined) {
-          lastDraft = undefined;
-          broadcast("sparta:draft-snapshot", null);
-        }
-        lcuState = { phase: lastPhase, pickOrder: null, playerRole: null, draft: null };
-        return;
-      }
+  async function poll() {
+    const phaseResult = await client.getGameflowPhase();
+    if (phaseResult.status !== "OK") {
+      clearObservedState(phaseResult.status);
+      return;
+    }
+    const phase = phaseResult.data;
+    if (phase !== lastPhase) {
+      lastPhase = phase;
+      broadcast("sparta:gameflow-phase", phase);
+    }
+    lcuState = { ...lcuState, status: "OK", phase: lastPhase };
 
-      const snapshot = await client.getChampionSelectSession();
-      // sessionExists pode piscar false momentaneamente durante a transicao
-      // pra ChampSelect - mantem o ultimo valor conhecido em vez de resetar
-      // pro manual a toa; derivePickOrder/derivePlayerRole ja voltam
-      // undefined nesse caso.
-      const pickOrder = derivePickOrder(snapshot) ?? lastPickOrder;
-      if (pickOrder !== lastPickOrder) {
-        lastPickOrder = pickOrder ?? null;
-        broadcast("sparta:pick-order", lastPickOrder);
-      }
+    if (phase !== "ChampSelect") {
+      clearObservedState("OUTSIDE_CHAMP_SELECT", phase);
+      return;
+    }
 
-      // Papel real do jogador - reler a cada tick ja reflete troca de lane
-      // pela ferramenta do cliente (assignedPosition muda), sem estado extra.
-      const playerRole = derivePlayerRole(snapshot) ?? lastPlayerRole;
-      if (playerRole !== lastPlayerRole) {
-        lastPlayerRole = playerRole ?? null;
-        broadcast("sparta:player-role", lastPlayerRole);
-      }
+    const sessionResult = await client.getChampionSelectSession();
+    if (sessionResult.status !== "OK") {
+      clearObservedState(sessionResult.status, phase);
+      return;
+    }
+    const snapshot = sessionResult.data;
+    const pickOrder = derivePickOrder(snapshot);
+    if (pickOrder !== lastPickOrder) {
+      lastPickOrder = pickOrder ?? null;
+      broadcast("sparta:pick-order", lastPickOrder);
+    }
 
-      // Aliados, inimigos e banimentos reais. So propaga quando muda de
-      // fato: o poll roda a cada 2.5s e a maior parte dos ticks e igual -
-      // sem a comparacao o renderer refaria a busca de recomendacoes a cada
-      // tick, porque `draft` entraria como dependencia nova.
-      const draft = deriveDraftSnapshot(snapshot) ?? lastDraft;
-      if (!isSameDraftSnapshot(draft, lastDraft)) {
-        lastDraft = draft;
-        broadcast("sparta:draft-snapshot", draft ?? null);
-      }
+    const playerRole = derivePlayerRole(snapshot);
+    if (playerRole !== lastPlayerRole) {
+      lastPlayerRole = playerRole ?? null;
+      broadcast("sparta:player-role", lastPlayerRole);
+    }
 
-      lcuState = {
-        phase: lastPhase,
-        pickOrder: lastPickOrder,
-        playerRole: lastPlayerRole,
-        draft: lastDraft ?? null
-      };
-    });
-  }, GAMEFLOW_POLL_INTERVAL_MS);
+    const draft = deriveDraftSnapshot(snapshot);
+    if (!isSameDraftSnapshot(draft, lastDraft)) {
+      lastDraft = draft;
+      broadcast("sparta:draft-snapshot", draft ?? null);
+    }
+
+    lcuState = {
+      status: "OK",
+      phase: lastPhase,
+      pickOrder: lastPickOrder,
+      playerRole: lastPlayerRole,
+      draft: lastDraft ?? null
+    };
+  }
+
+  function schedulePoll() {
+    void poll()
+      .catch(() => clearObservedState("ENDPOINT_UNAVAILABLE"))
+      .finally(() => globalThis.setTimeout(schedulePoll, GAMEFLOW_POLL_INTERVAL_MS));
+  }
+  schedulePoll();
 }
 
 void app.whenReady().then(() => {

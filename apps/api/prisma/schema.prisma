@@ -227,8 +227,9 @@ model ReplayImportJob {
 }
 
 model ApiCacheEntry {
-  key       String   @id
-  valueJson Json
-  expiresAt DateTime
-  createdAt DateTime @default(now())
+  key         String   @id
+  valueJson   Json
+  expiresAt   DateTime
+  collectedAt DateTime?
+  createdAt   DateTime @default(now())
 }

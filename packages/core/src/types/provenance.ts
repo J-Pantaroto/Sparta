@@ -11,6 +11,7 @@
  * ausente**. Nada aqui converte ausência em `0`, `50` ou qualquer outro
  * número — quem não tem dado declara que não tem.
  */
+import type { CacheMetadata } from "./cache.js";
 
 /**
  * De onde o dado veio. Não confundir com disponibilidade: um dado DERIVED
@@ -104,6 +105,11 @@ export interface DataProvenance {
   unavailableReason?: string;
   /** Por que está desatualizado. Só faz sentido com status STALE. */
   staleReason?: string;
+  /**
+   * Estado da cópia local, quando houver. Não substitui `sourceType`: dado
+   * oficial da Data Dragon servido stale continua `OFFICIAL`.
+   */
+  cache?: CacheMetadata;
 }
 
 /** Faixas usadas pra atravessar confiança numérica <-> categórica. */

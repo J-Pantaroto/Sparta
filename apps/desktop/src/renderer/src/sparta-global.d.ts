@@ -1,4 +1,4 @@
-import type { LcuDraftSnapshot, LcuGameflowPhase } from "@sparta/riot";
+import type { LcuDraftSnapshot, LcuGameflowPhase, LcuReadStatus } from "@sparta/riot";
 import type { Role } from "@sparta/core";
 
 export {};
@@ -15,6 +15,7 @@ declare global {
       onPlayerRole: (callback: (role: Role | null) => void) => () => void;
       /** Estado atual do LCU, pra quem monta depois do ultimo evento. */
       getLcuState: () => Promise<{
+        status: LcuReadStatus;
         phase: LcuGameflowPhase | null;
         pickOrder: number | null;
         playerRole: Role | null;

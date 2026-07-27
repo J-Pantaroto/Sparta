@@ -3,6 +3,8 @@ import rateLimit from "@fastify/rate-limit";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
 import Fastify from "fastify";
+import { ExternalServiceError } from "@sparta/riot";
+import { safeExternalErrorLog, sendExternalError } from "./http/external-error-response.js";
 import { authRoutes } from "./modules/auth/routes.js";
 import { draftsRoutes } from "./modules/drafts/routes.js";
 import { healthRoutes } from "./modules/health/routes.js";
@@ -54,6 +56,14 @@ export async function buildApp() {
   await app.register(draftsRoutes);
   await app.register(postgameRoutes);
   await app.register(replaysRoutes);
+
+  app.setErrorHandler((error, request, reply) => {
+    if (error instanceof ExternalServiceError) {
+      request.log.warn({ event: "external_request_failed", ...safeExternalErrorLog(error) });
+      return sendExternalError(reply, error);
+    }
+    return reply.send(error);
+  });
 
   return app;
 }

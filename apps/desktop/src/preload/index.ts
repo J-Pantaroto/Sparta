@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from "electron";
-import type { LcuDraftSnapshot, LcuGameflowPhase } from "@sparta/riot";
+import type { LcuDraftSnapshot, LcuGameflowPhase, LcuReadStatus } from "@sparta/riot";
 import type { Role } from "@sparta/core";
 
 contextBridge.exposeInMainWorld("sparta", {
@@ -54,6 +54,7 @@ contextBridge.exposeInMainWorld("sparta", {
    * dentro do champion select) usa isto pra nao comecar vazio.
    */
   getLcuState(): Promise<{
+    status: LcuReadStatus;
     phase: LcuGameflowPhase | null;
     pickOrder: number | null;
     playerRole: Role | null;

@@ -1,4 +1,9 @@
-import { fetchDataDragonChampions, fetchDataDragonVersions, type DataDragonChampion } from "@sparta/riot";
+import {
+  ExternalServiceError,
+  fetchDataDragonChampions,
+  fetchDataDragonVersions,
+  type DataDragonChampion
+} from "@sparta/riot";
 import {
   CHAMPION_TAG_DIMENSIONS,
   CHAMPION_TAG_SOURCE_ID,
@@ -6,34 +11,100 @@ import {
   type ChampionTag,
   type ChampionTagDimension,
   type ChampionTagProvenance,
+  type CacheMetadata,
+  type DataProvenance,
   type DamageProfile,
   type Role
 } from "@sparta/core";
 import { prisma } from "../../db/prisma.js";
-import { getCached, setCached } from "../../db/api-cache.js";
+import { readCache, setCached } from "../../db/api-cache.js";
 
 const DATA_DRAGON_LOCALE = "pt_BR";
 const VERSIONS_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const CHAMPIONS_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const DATA_DRAGON_STALE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
-async function getLatestVersion(): Promise<string> {
-  const cacheKey = "ddragon:versions";
-  const cached = await getCached<string[]>(cacheKey);
-  if (cached?.[0]) return cached[0];
-
-  const versions = await fetchDataDragonVersions();
-  await setCached(cacheKey, versions, VERSIONS_TTL_MS);
-  return versions[0];
+interface CachedResource<T> {
+  data: T;
+  cache: CacheMetadata;
 }
 
-async function getChampionsForVersion(version: string): Promise<DataDragonChampion[]> {
-  const cacheKey = `ddragon:champions:${version}:${DATA_DRAGON_LOCALE}`;
-  const cached = await getCached<DataDragonChampion[]>(cacheKey);
-  if (cached) return cached;
+async function getLatestVersion(): Promise<CachedResource<string>> {
+  const cacheKey = "ddragon:versions";
+  const cached = await readCache<string[]>(cacheKey, DATA_DRAGON_STALE_TTL_MS);
+  if (cached.metadata.state === "FRESH" && cached.value?.[0]) {
+    return { data: cached.value[0], cache: cached.metadata };
+  }
+  let versions: string[];
+  try {
+    versions = await fetchDataDragonVersions();
+  } catch (error) {
+    if (cached.metadata.state === "STALE" && cached.value?.[0]) {
+      return {
+        data: cached.value[0],
+        cache: {
+          ...cached.metadata,
+          servedAsFallback: true,
+          fallbackReason: error instanceof ExternalServiceError ? error.code : "UPSTREAM_UNAVAILABLE"
+        }
+      };
+    }
+    throw error;
+  }
+  await setCached(cacheKey, versions, VERSIONS_TTL_MS);
+  const collectedAt = new Date();
+  return {
+    data: versions[0],
+    cache: {
+      state: "FRESH",
+      collectedAt: collectedAt.toISOString(),
+      freshUntil: new Date(collectedAt.getTime() + VERSIONS_TTL_MS).toISOString(),
+      staleUntil: new Date(collectedAt.getTime() + VERSIONS_TTL_MS + DATA_DRAGON_STALE_TTL_MS).toISOString(),
+      ageMs: 0,
+      servedAsFallback: false
+    }
+  };
+}
 
-  const champions = await fetchDataDragonChampions(version, DATA_DRAGON_LOCALE);
+async function getChampionsForVersion(version: string): Promise<CachedResource<DataDragonChampion[]>> {
+  const cacheKey = `ddragon:champions:${version}:${DATA_DRAGON_LOCALE}`;
+  const cached = await readCache<DataDragonChampion[]>(cacheKey, DATA_DRAGON_STALE_TTL_MS);
+  if (cached.metadata.state === "FRESH" && cached.value) return { data: cached.value, cache: cached.metadata };
+  let champions: DataDragonChampion[];
+  try {
+    champions = await fetchDataDragonChampions(version, DATA_DRAGON_LOCALE);
+  } catch (error) {
+    if (cached.metadata.state === "STALE" && cached.value) {
+      return {
+        data: cached.value,
+        cache: {
+          ...cached.metadata,
+          servedAsFallback: true,
+          fallbackReason: error instanceof ExternalServiceError ? error.code : "UPSTREAM_UNAVAILABLE"
+        }
+      };
+    }
+    throw error;
+  }
   await setCached(cacheKey, champions, CHAMPIONS_TTL_MS);
-  return champions;
+  const collectedAt = new Date();
+  return {
+    data: champions,
+    cache: {
+      state: "FRESH",
+      collectedAt: collectedAt.toISOString(),
+      freshUntil: new Date(collectedAt.getTime() + CHAMPIONS_TTL_MS).toISOString(),
+      staleUntil: new Date(collectedAt.getTime() + CHAMPIONS_TTL_MS + DATA_DRAGON_STALE_TTL_MS).toISOString(),
+      ageMs: 0,
+      servedAsFallback: false
+    }
+  };
+}
+
+export interface CatalogSyncResult {
+  version: string;
+  count: number;
+  source: DataProvenance;
 }
 
 /**
@@ -42,9 +113,11 @@ async function getChampionsForVersion(version: string): Promise<DataDragonChampi
  * frontline, peel, etc.) nao existem no Data Dragon, entao continuam vindo
  * so do seed manual (`data/seeds/champion-tags.json`).
  */
-export async function syncChampionCatalog(): Promise<{ version: string; count: number }> {
-  const version = await getLatestVersion();
-  const champions = await getChampionsForVersion(version);
+export async function syncChampionCatalog(): Promise<CatalogSyncResult> {
+  const versionResource = await getLatestVersion();
+  const championsResource = await getChampionsForVersion(versionResource.data);
+  const version = versionResource.data;
+  const champions = championsResource.data;
 
   for (const champion of champions) {
     await prisma.champion.upsert({
@@ -66,7 +139,22 @@ export async function syncChampionCatalog(): Promise<{ version: string; count: n
     });
   }
 
-  return { version, count: champions.length };
+  const cache =
+    versionResource.cache.state === "STALE" ? versionResource.cache : championsResource.cache;
+  return {
+    version,
+    count: champions.length,
+    source: {
+      sourceType: "OFFICIAL",
+      sourceId: "riot-data-dragon",
+      resource: "versions.json + champion.json",
+      patch: version,
+      locale: DATA_DRAGON_LOCALE,
+      collectedAt: cache.collectedAt,
+      status: cache.state === "STALE" ? "STALE" : "AVAILABLE",
+      cache
+    }
+  };
 }
 
 /**

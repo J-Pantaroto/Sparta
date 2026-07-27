@@ -12,6 +12,7 @@ export * from "./draft/recommendation-metrics.js";
 export * from "./draft/champion-tag-manifest.js";
 export * from "./types/champion-tag-provenance.js";
 export * from "./types/provenance.js";
+export * from "./types/cache.js";
 export * from "./types/stat-coverage.js";
 export * from "./aggregation/objective-participation.js";
 export * from "./draft/pre-game-analysis.js";

@@ -1,5 +1,8 @@
 # Arquitetura
 
+Integrações HTTP compartilham taxonomia, timeout e retry em `packages/riot/src/http/`.
+Cache/stale é por recurso e carrega proveniência. Ver `.ai/specs/http-resilience.md`.
+
 Sparta usa monorepo pnpm para separar produto desktop, API, domínio compartilhado e serviços auxiliares.
 
 `packages/core` é a camada mais importante: ela não conhece Electron, Fastify, Prisma ou Riot API. Ali ficam tipos como `PlayerProfile`, `Champion`, `DraftState`, `PickRecommendation` e `PostGameAnalysis`, além dos algoritmos iniciais.

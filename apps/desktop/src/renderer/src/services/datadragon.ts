@@ -7,22 +7,148 @@
  * pacote compartilhado mudar.
  */
 
-import type { ChampionClassProfile, ItemSummary } from "@sparta/core";
+import type { CacheMetadata, ChampionClassProfile, ItemSummary } from "@sparta/core";
+import { ExternalServiceError, HTTP_TIMEOUTS, requestJson } from "@sparta/riot/http";
 
-export const FALLBACK_DATA_DRAGON_VERSION = "14.14.1";
+const CACHE_FRESH_MS = 7 * 24 * 60 * 60 * 1_000;
+const CACHE_STALE_MS = 30 * 24 * 60 * 60 * 1_000;
 
-export async function fetchLatestDataDragonVersion(): Promise<string> {
+interface StoredResource {
+  payload: unknown;
+  collectedAt: string;
+  freshUntil: string;
+  staleUntil: string;
+}
+
+export const DATA_DRAGON_CACHE_EVENT = "sparta:data-dragon-cache";
+const cacheMetadataByResource = new Map<string, CacheMetadata>();
+
+function aggregateCacheMetadata(): CacheMetadata {
+  const states = [...cacheMetadataByResource.values()];
+  return (
+    states.find((metadata) => metadata.state === "STALE") ??
+    states.find((metadata) => metadata.state === "EXPIRED") ??
+    states.find((metadata) => metadata.state === "MISS") ??
+    states[0] ?? { state: "MISS", servedAsFallback: false }
+  );
+}
+
+function recordCacheMetadata(cacheKey: string, metadata: CacheMetadata) {
+  cacheMetadataByResource.set(cacheKey, metadata);
+  globalThis.dispatchEvent?.(
+    new globalThis.CustomEvent<CacheMetadata>(DATA_DRAGON_CACHE_EVENT, { detail: aggregateCacheMetadata() })
+  );
+}
+
+export function getLastDataDragonCacheMetadata(): CacheMetadata {
+  return aggregateCacheMetadata();
+}
+
+interface CacheStorage {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+}
+
+function safeStorage(): CacheStorage | undefined {
   try {
-    const response = await fetch("https://ddragon.leagueoflegends.com/api/versions.json");
-    if (!response.ok) return FALLBACK_DATA_DRAGON_VERSION;
-    const versions = (await response.json()) as string[];
-    return versions[0] ?? FALLBACK_DATA_DRAGON_VERSION;
+    return typeof localStorage === "undefined" ? undefined : localStorage;
   } catch {
-    return FALLBACK_DATA_DRAGON_VERSION;
+    return undefined;
   }
 }
 
-export function championSquareUrl(championKey: string, version = FALLBACK_DATA_DRAGON_VERSION): string {
+async function cachedDataDragonJson<T>(
+  cacheKey: string,
+  url: string,
+  validate: (payload: unknown) => payload is T
+): Promise<T> {
+  const now = new Date();
+  const storage = safeStorage();
+  let stored: StoredResource | undefined;
+  try {
+    const raw = storage?.getItem(`sparta:http-cache:${cacheKey}`);
+    stored = raw ? (JSON.parse(raw) as StoredResource) : undefined;
+    if (
+      stored &&
+      validate(stored.payload) &&
+      Date.parse(stored.freshUntil) > now.getTime()
+    ) {
+      recordCacheMetadata(cacheKey, {
+        state: "FRESH",
+        collectedAt: stored.collectedAt,
+        freshUntil: stored.freshUntil,
+        staleUntil: stored.staleUntil,
+        ageMs: Math.max(0, now.getTime() - Date.parse(stored.collectedAt)),
+        servedAsFallback: false
+      });
+      return stored.payload;
+    }
+  } catch {
+    stored = undefined;
+  }
+
+  try {
+    const payload = await requestJson<T>(url, {
+      integration: "DATA_DRAGON",
+      timeoutMs: HTTP_TIMEOUTS.dataDragonMs,
+      validate
+    });
+    const collectedAt = new Date();
+    const entry: StoredResource = {
+      payload,
+      collectedAt: collectedAt.toISOString(),
+      freshUntil: new Date(collectedAt.getTime() + CACHE_FRESH_MS).toISOString(),
+      staleUntil: new Date(collectedAt.getTime() + CACHE_FRESH_MS + CACHE_STALE_MS).toISOString()
+    };
+    try {
+      storage?.setItem(`sparta:http-cache:${cacheKey}`, JSON.stringify(entry));
+    } catch {
+      // Falha do armazenamento local não invalida o payload recém-validado.
+    }
+    recordCacheMetadata(cacheKey, {
+      state: "FRESH",
+      collectedAt: entry.collectedAt,
+      freshUntil: entry.freshUntil,
+      staleUntil: entry.staleUntil,
+      ageMs: 0,
+      servedAsFallback: false
+    });
+    return payload;
+  } catch (error) {
+    if (stored && validate(stored.payload) && Date.parse(stored.staleUntil) > now.getTime()) {
+      recordCacheMetadata(cacheKey, {
+        state: "STALE",
+        collectedAt: stored.collectedAt,
+        freshUntil: stored.freshUntil,
+        staleUntil: stored.staleUntil,
+        ageMs: Math.max(0, now.getTime() - Date.parse(stored.collectedAt)),
+        servedAsFallback: true,
+        fallbackReason: error instanceof ExternalServiceError ? error.code : "NETWORK_UNAVAILABLE"
+      });
+      return stored.payload;
+    }
+    recordCacheMetadata(cacheKey, {
+      state: stored ? "EXPIRED" : "MISS",
+      servedAsFallback: false
+    });
+    throw error;
+  }
+}
+
+function isStringArray(payload: unknown): payload is string[] {
+  return Array.isArray(payload) && payload.length > 0 && payload.every((value) => typeof value === "string");
+}
+
+export async function fetchLatestDataDragonVersion(): Promise<string> {
+  const versions = await cachedDataDragonJson(
+    "versions",
+    "https://ddragon.leagueoflegends.com/api/versions.json",
+    isStringArray
+  );
+  return versions[0];
+}
+
+export function championSquareUrl(championKey: string, version: string): string {
   return `https://ddragon.leagueoflegends.com/cdn/${version}/img/champion/${championKey}.png`;
 }
 
@@ -50,9 +176,26 @@ const communityDragonCache = new Map<number, Promise<CommunityDragonChampion | n
 function loadCommunityDragonChampion(championId: number): Promise<CommunityDragonChampion | null> {
   let cached = communityDragonCache.get(championId);
   if (!cached) {
-    cached = fetch(`${COMMUNITY_DRAGON_BASE}/v1/champions/${championId}.json`)
-      .then((response) => (response.ok ? (response.json() as Promise<CommunityDragonChampion>) : null))
-      .catch(() => null);
+    cached = requestJson(`${COMMUNITY_DRAGON_BASE}/v1/champions/${championId}.json`, {
+      integration: "COMMUNITY_DRAGON",
+      timeoutMs: HTTP_TIMEOUTS.remoteAssetMs,
+      validate: (payload): payload is CommunityDragonChampion => {
+        if (typeof payload !== "object" || payload === null || Array.isArray(payload)) return false;
+        const skins = (payload as CommunityDragonChampion).skins;
+        return (
+          skins === undefined ||
+          (Array.isArray(skins) &&
+            skins.every(
+              (skin) =>
+                typeof skin.id === "number" &&
+                (skin.splashPath === undefined || typeof skin.splashPath === "string")
+            ))
+        );
+      }
+    }).catch(() => {
+      communityDragonCache.delete(championId);
+      return null;
+    });
     communityDragonCache.set(championId, cached);
   }
   return cached;
@@ -109,12 +252,8 @@ export interface DataDragonChampionSummary {
  * primeiro passo do seletor de tema (escolher qualquer campeao). Vem direto
  * do resumo publico da Data Dragon, sem passar pelo backend Sparta.
  */
-export async function fetchAllChampions(version = FALLBACK_DATA_DRAGON_VERSION): Promise<DataDragonChampionSummary[]> {
-  const response = await fetch(`https://ddragon.leagueoflegends.com/cdn/${version}/data/pt_BR/champion.json`);
-  if (!response.ok) return [];
-  // A Data Dragon inverte o nome dos campos: "id" e a string usada nas URLs
-  // (ex. "Aatrox"), "key" e o id numerico como string (ex. "266").
-  const payload = (await response.json()) as { data: Record<string, { id: string; key: string; name: string }> };
+export async function fetchAllChampions(version: string): Promise<DataDragonChampionSummary[]> {
+  const payload = await loadChampionCatalog(version);
   return Object.values(payload.data).map((champion) => ({
     key: champion.id,
     id: Number(champion.key),
@@ -128,12 +267,8 @@ export async function fetchAllChampions(version = FALLBACK_DATA_DRAGON_VERSION):
  * tabela curada `ChampionTag` (so 2 campeoes seedados hoje). Real, publico,
  * cobre os ~170 campeoes.
  */
-export async function fetchChampionClassProfiles(version = FALLBACK_DATA_DRAGON_VERSION): Promise<ChampionClassProfile[]> {
-  const response = await fetch(`https://ddragon.leagueoflegends.com/cdn/${version}/data/pt_BR/champion.json`);
-  if (!response.ok) return [];
-  const payload = (await response.json()) as {
-    data: Record<string, { key: string; name: string; tags: string[]; info: { attack: number; defense: number; magic: number; difficulty: number } }>;
-  };
+export async function fetchChampionClassProfiles(version: string): Promise<ChampionClassProfile[]> {
+  const payload = await loadChampionCatalog(version);
   return Object.values(payload.data).map((champion) => ({
     championId: Number(champion.key),
     championName: champion.name,
@@ -153,22 +288,8 @@ const ITEM_MAP_SUMMONERS_RIFT = "11";
  * pelos campeoes/skins (Fase 6a). Descarta consumiveis/trinkets/itens de
  * outros modos de jogo.
  */
-export async function fetchItemCatalog(version = FALLBACK_DATA_DRAGON_VERSION): Promise<ItemSummary[]> {
-  const response = await fetch(`https://ddragon.leagueoflegends.com/cdn/${version}/data/pt_BR/item.json`);
-  if (!response.ok) return [];
-  const payload = (await response.json()) as {
-    data: Record<
-      string,
-      {
-        name: string;
-        tags?: string[];
-        gold: { total: number; purchasable: boolean };
-        maps: Record<string, boolean>;
-        depth?: number;
-        into?: string[];
-      }
-    >;
-  };
+export async function fetchItemCatalog(version: string): Promise<ItemSummary[]> {
+  const payload = await cachedDataDragonJson(`items:${version}:pt_BR`, `https://ddragon.leagueoflegends.com/cdn/${version}/data/pt_BR/item.json`, isItemCatalog);
   return Object.entries(payload.data)
     .filter(([, item]) => item.gold.purchasable && item.maps[ITEM_MAP_SUMMONERS_RIFT])
     .map(([itemId, item]) => ({
@@ -181,7 +302,42 @@ export async function fetchItemCatalog(version = FALLBACK_DATA_DRAGON_VERSION): 
     }));
 }
 
-export function itemIconUrl(itemId: number, version = FALLBACK_DATA_DRAGON_VERSION): string {
+interface ItemCatalogPayload {
+    data: Record<
+      string,
+      {
+        name: string;
+        tags?: string[];
+        gold: { total: number; purchasable: boolean };
+        maps: Record<string, boolean>;
+        depth?: number;
+        into?: string[];
+      }
+    >;
+}
+
+function isItemCatalog(payload: unknown): payload is ItemCatalogPayload {
+  if (typeof payload !== "object" || payload === null || Array.isArray(payload)) return false;
+  const data = (payload as { data?: unknown }).data;
+  return (
+    typeof data === "object" &&
+    data !== null &&
+    !Array.isArray(data) &&
+    Object.values(data).length > 0 &&
+    Object.values(data).every(
+      (item) =>
+        typeof item === "object" &&
+        item !== null &&
+        typeof (item as { name?: unknown }).name === "string" &&
+        typeof (item as { gold?: { total?: unknown; purchasable?: unknown } }).gold?.total === "number" &&
+        typeof (item as { gold?: { total?: unknown; purchasable?: unknown } }).gold?.purchasable === "boolean" &&
+        typeof (item as { maps?: unknown }).maps === "object" &&
+        (item as { maps?: unknown }).maps !== null
+    )
+  );
+}
+
+export function itemIconUrl(itemId: number, version: string): string {
   return `https://ddragon.leagueoflegends.com/cdn/${version}/img/item/${itemId}.png`;
 }
 
@@ -198,13 +354,25 @@ export interface DataDragonSkin {
  */
 export async function fetchChampionSkins(
   championKey: string,
-  version = FALLBACK_DATA_DRAGON_VERSION,
+  version: string,
   championId?: number
 ): Promise<DataDragonSkin[]> {
-  const response = await fetch(`https://ddragon.leagueoflegends.com/cdn/${version}/data/pt_BR/champion/${championKey}.json`);
-  if (!response.ok) return [];
-  const payload = (await response.json()) as { data: Record<string, { skins: DataDragonSkin[] }> };
-  const skins = payload.data[championKey]?.skins ?? [];
+  const payload = await cachedDataDragonJson(
+    `skins:${version}:pt_BR:${championKey}`,
+    `https://ddragon.leagueoflegends.com/cdn/${version}/data/pt_BR/champion/${championKey}.json`,
+    isSkinCatalog
+  );
+  const champion = payload.data[championKey];
+  if (!champion) {
+    throw new ExternalServiceError({
+      code: "UPSTREAM_INVALID_RESPONSE",
+      integration: "DATA_DRAGON",
+      message: "O catálogo não contém o campeão solicitado.",
+      temporary: false,
+      retryable: false
+    });
+  }
+  const skins = champion.skins;
   if (championId === undefined) return skins;
 
   // Mantem os nomes em pt_BR da Data Dragon, mas usa a Community Dragon so
@@ -214,4 +382,74 @@ export async function fetchChampionSkins(
   const realSkinNums = await fetchRealSkinNums(championId);
   if (!realSkinNums) return skins;
   return skins.filter((skin) => realSkinNums.has(skin.num));
+}
+
+interface ChampionCatalogPayload {
+  data: Record<
+    string,
+    {
+      id: string;
+      key: string;
+      name: string;
+      tags: string[];
+      info: { attack: number; defense: number; magic: number; difficulty: number };
+    }
+  >;
+}
+
+function isChampionCatalog(payload: unknown): payload is ChampionCatalogPayload {
+  if (typeof payload !== "object" || payload === null || Array.isArray(payload)) return false;
+  const data = (payload as { data?: unknown }).data;
+  if (typeof data !== "object" || data === null || Array.isArray(data)) return false;
+  const values = Object.values(data);
+  return (
+    values.length > 0 &&
+    values.every(
+      (champion) =>
+        typeof champion === "object" &&
+        champion !== null &&
+        typeof (champion as { id?: unknown }).id === "string" &&
+        typeof (champion as { key?: unknown }).key === "string" &&
+        typeof (champion as { name?: unknown }).name === "string" &&
+        Array.isArray((champion as { tags?: unknown }).tags) &&
+        typeof (champion as { info?: unknown }).info === "object" &&
+        (champion as { info?: unknown }).info !== null &&
+        ["attack", "defense", "magic", "difficulty"].every(
+          (key) =>
+            typeof ((champion as { info: Record<string, unknown> }).info)[key] === "number"
+        )
+    )
+  );
+}
+
+function loadChampionCatalog(version: string): Promise<ChampionCatalogPayload> {
+  return cachedDataDragonJson(
+    `champions:${version}:pt_BR`,
+    `https://ddragon.leagueoflegends.com/cdn/${version}/data/pt_BR/champion.json`,
+    isChampionCatalog
+  );
+}
+
+function isSkinCatalog(payload: unknown): payload is { data: Record<string, { skins: DataDragonSkin[] }> } {
+  if (typeof payload !== "object" || payload === null || Array.isArray(payload)) return false;
+  const data = (payload as { data?: unknown }).data;
+  return (
+    typeof data === "object" &&
+    data !== null &&
+    !Array.isArray(data) &&
+    Object.values(data).every(
+      (champion) =>
+        typeof champion === "object" &&
+        champion !== null &&
+        Array.isArray((champion as { skins?: unknown }).skins) &&
+        (champion as { skins: unknown[] }).skins.every(
+          (skin) =>
+            typeof skin === "object" &&
+            skin !== null &&
+            typeof (skin as { num?: unknown }).num === "number" &&
+            typeof (skin as { name?: unknown }).name === "string" &&
+            typeof (skin as { chromas?: unknown }).chromas === "boolean"
+        )
+    )
+  );
 }

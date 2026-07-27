@@ -1,8 +1,8 @@
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { computeGrowthJourney, rankChampionPool, type RecentChampionMatch, type Role } from "@sparta/core";
-import { RiotApiError } from "@sparta/riot";
 import { prisma } from "../../db/prisma.js";
+import { safeExternalErrorLog } from "../../http/external-error-response.js";
 import { getAuthenticatedUserId } from "../auth/routes.js";
 import { findParticipationHistory } from "../matches/match-repository.js";
 import { findPostgameReportsByPuuid } from "../postgame/postgame-repository.js";
@@ -76,8 +76,7 @@ export const playersRoutes: FastifyPluginAsync = async (app) => {
         onInsightsFailed: (error) => {
           request.log.error({
             event: "riot_sync_insights_failed",
-            puuid: riotAccount.puuid,
-            message: error instanceof Error ? error.message : String(error)
+            ...safeExternalErrorLog(error)
           });
         }
       }
@@ -86,9 +85,7 @@ export const playersRoutes: FastifyPluginAsync = async (app) => {
     for (const failure of result.failed) {
       request.log.error({
         event: "riot_sync_match_failed",
-        puuid: riotAccount.puuid,
-        matchId: failure.matchId,
-        reason: failure.reason
+        code: failure.reason
       });
     }
 
@@ -210,8 +207,7 @@ export const playersRoutes: FastifyPluginAsync = async (app) => {
           onInsightsFailed: (error) => {
             request.log.error({
               event: "riot_sync_insights_failed",
-              puuid: riotAccount.puuid,
-              message: error instanceof Error ? error.message : String(error)
+              ...safeExternalErrorLog(error)
             });
           }
         }
@@ -219,8 +215,7 @@ export const playersRoutes: FastifyPluginAsync = async (app) => {
     } catch (error) {
       request.log.error({
         event: "riot_sync_after_settings_update_failed",
-        puuid: riotAccount.puuid,
-        message: error instanceof Error ? error.message : String(error)
+        ...safeExternalErrorLog(error)
       });
     }
 
@@ -241,25 +236,7 @@ export const playersRoutes: FastifyPluginAsync = async (app) => {
 
     const payload = linkRiotAccountSchema.parse(request.body);
 
-    let riotAccountInfo: { puuid: string; gameName: string; tagLine: string };
-    try {
-      riotAccountInfo = await lookupRiotAccount(payload.gameName, payload.tagLine);
-    } catch (error) {
-      const notFound = error instanceof RiotApiError && error.status === 404;
-      request.log.error({
-        event: "link_riot_account_failed",
-        gameName: payload.gameName,
-        tagLine: payload.tagLine,
-        status: error instanceof RiotApiError ? error.status : undefined,
-        message: error instanceof Error ? error.message : String(error)
-      });
-      reply.code(notFound ? 404 : 502);
-      return {
-        error: notFound
-          ? "Riot ID nao encontrado."
-          : "Nao foi possivel confirmar a conta Riot agora. Tente novamente em instantes."
-      };
-    }
+    const riotAccountInfo = await lookupRiotAccount(payload.gameName, payload.tagLine);
 
     const account = await prisma.riotAccount.upsert({
       where: { puuid: riotAccountInfo.puuid },

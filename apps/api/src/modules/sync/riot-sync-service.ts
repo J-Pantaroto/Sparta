@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import {
+  ExternalServiceError,
   RiotApiError,
   extractParticipantTeams,
   mapMatchToSummaries,
@@ -120,12 +121,15 @@ export async function syncPlayerMatches(
       }
       result.imported += 1;
     } catch (error) {
-      if (error instanceof RiotApiError && error.status === 429) {
-        result.failed.push({ matchId, reason: "Rate limit da Riot atingido durante o sync." });
+      if (error instanceof RiotApiError && error.code === "RIOT_RATE_LIMITED") {
+        result.failed.push({ matchId, reason: "RIOT_RATE_LIMITED" });
         result.stoppedEarly = "rate_limited";
         break;
       }
-      result.failed.push({ matchId, reason: error instanceof Error ? error.message : String(error) });
+      result.failed.push({
+        matchId,
+        reason: error instanceof ExternalServiceError ? error.code : "MATCH_PROCESSING_FAILED"
+      });
     }
   }
 

@@ -1,5 +1,12 @@
 # Origem, disponibilidade e confiança dos dados
 
+## Cache não substitui a origem
+
+`DataProvenance.cache` registra `MISS/FRESH/STALE/EXPIRED`, datas reais, idade e se a cópia foi
+servida como fallback. A fonte original permanece em `sourceType`: Data Dragon oficial servido
+stale continua `OFFICIAL`, com `status: STALE`. Entradas históricas sem data de coleta mantêm a
+data ausente. Ver `docs/http-resilience.md`.
+
 Contrato central que permite ao Sparta dizer **de onde um número veio** e **se ele existe**.
 
 ## O problema que ele resolve

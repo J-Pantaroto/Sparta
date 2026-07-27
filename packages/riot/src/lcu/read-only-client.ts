@@ -1,13 +1,28 @@
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import https from "node:https";
+import { HTTP_TIMEOUTS } from "../http/policy.js";
 
 export interface LcuConnectionInfo {
   port: number;
   password: string;
   protocol: "https";
 }
+
+export type LcuReadStatus =
+  | "OK"
+  | "CLIENT_CLOSED"
+  | "LOCKFILE_MISSING"
+  | "LOCKFILE_INVALID"
+  | "LOCAL_CREDENTIAL_INVALID"
+  | "CONNECTION_REFUSED"
+  | "REQUEST_TIMEOUT"
+  | "ENDPOINT_UNAVAILABLE"
+  | "OUTSIDE_CHAMP_SELECT"
+  | "INVALID_RESPONSE";
+
+export type LcuReadResult<T> = { status: "OK"; data: T } | { status: Exclude<LcuReadStatus, "OK"> };
 
 /**
  * Fase atual do gameflow do cliente League of Legends.
@@ -74,24 +89,55 @@ function resolveLockfilePath(): string | null {
   return DEFAULT_LOCKFILE_PATHS.find((candidate) => existsSync(candidate)) ?? null;
 }
 
-function readConnectionInfo(): LcuConnectionInfo | null {
+export function parseLcuLockfile(raw: string): LcuReadResult<LcuConnectionInfo> {
+  const parts = raw.trim().split(":");
+  const port = Number(parts[2]);
+  const password = parts[3];
+  if (!Number.isInteger(port) || port <= 0 || port > 65_535 || !password || parts[4] !== "https") {
+    return { status: "LOCKFILE_INVALID" };
+  }
+  return { status: "OK", data: { port, password, protocol: "https" } };
+}
+
+function missingLockfileStatus(): "CLIENT_CLOSED" | "LOCKFILE_MISSING" {
+  const custom = process.env.LEAGUE_CLIENT_PATH;
+  if (custom && existsSync(custom)) return "CLIENT_CLOSED";
+  return DEFAULT_LOCKFILE_PATHS.some((candidate) => existsSync(dirname(candidate)))
+    ? "CLIENT_CLOSED"
+    : "LOCKFILE_MISSING";
+}
+
+export function classifyLcuNetworkFailure(timedOut: boolean, code?: string): Exclude<LcuReadStatus, "OK"> {
+  if (timedOut) return "REQUEST_TIMEOUT";
+  return code === "ECONNREFUSED" ? "CONNECTION_REFUSED" : "ENDPOINT_UNAVAILABLE";
+}
+
+function readConnectionInfo(): LcuReadResult<LcuConnectionInfo> {
   const lockfilePath = resolveLockfilePath();
-  if (!lockfilePath) return null;
+  if (!lockfilePath) return { status: missingLockfileStatus() };
   try {
     // Formato do lockfile: processName:pid:port:password:protocol
     const raw = readFileSync(lockfilePath, "utf-8").trim();
-    const parts = raw.split(":");
-    const port = Number(parts[2]);
-    const password = parts[3];
-    if (!port || !password) return null;
-    return { port, password, protocol: "https" };
+    return parseLcuLockfile(raw);
   } catch {
-    return null;
+    return { status: "LOCKFILE_INVALID" };
   }
 }
 
-function requestLcu<T>(connection: LcuConnectionInfo, path: string): Promise<T | null> {
+function requestLcu<T>(
+  connection: LcuConnectionInfo,
+  path: string,
+  validate: (payload: unknown) => payload is T,
+  notFoundStatus: "ENDPOINT_UNAVAILABLE" | "OUTSIDE_CHAMP_SELECT"
+): Promise<LcuReadResult<T>> {
   return new Promise((resolve) => {
+    let settled = false;
+    let timedOut = false;
+    const finish = (result: LcuReadResult<T>) => {
+      if (settled) return;
+      settled = true;
+      resolve(result);
+    };
     const auth = Buffer.from(`riot:${connection.password}`).toString("base64");
     const request = https.request(
       {
@@ -109,21 +155,49 @@ function requestLcu<T>(connection: LcuConnectionInfo, path: string): Promise<T |
           body += chunk;
         });
         response.on("end", () => {
-          if (!response.statusCode || response.statusCode >= 400 || !body) {
-            resolve(null);
+          if (response.statusCode === 404) {
+            finish({ status: notFoundStatus });
+            return;
+          }
+          if (response.statusCode === 401 || response.statusCode === 403) {
+            finish({ status: "LOCAL_CREDENTIAL_INVALID" });
+            return;
+          }
+          if (!response.statusCode || response.statusCode >= 400) {
+            finish({ status: "ENDPOINT_UNAVAILABLE" });
+            return;
+          }
+          if (!body) {
+            finish({ status: "INVALID_RESPONSE" });
             return;
           }
           try {
-            resolve(JSON.parse(body) as T);
+            const payload: unknown = JSON.parse(body);
+            finish(validate(payload) ? { status: "OK", data: payload } : { status: "INVALID_RESPONSE" });
           } catch {
-            resolve(null);
+            finish({ status: "INVALID_RESPONSE" });
           }
         });
       }
     );
-    request.on("error", () => resolve(null));
+    request.setTimeout(HTTP_TIMEOUTS.lcuMs, () => {
+      timedOut = true;
+      request.destroy();
+      finish({ status: "REQUEST_TIMEOUT" });
+    });
+    request.on("error", (error: Error & { code?: string }) => {
+      finish({ status: classifyLcuNetworkFailure(timedOut, error.code) });
+    });
     request.end();
   });
+}
+
+function isGameflowPhase(payload: unknown): payload is LcuGameflowPhase {
+  return typeof payload === "string";
+}
+
+function isSession(payload: unknown): payload is Record<string, unknown> {
+  return typeof payload === "object" && payload !== null && !Array.isArray(payload);
 }
 
 /**
@@ -144,23 +218,26 @@ export class LcuReadOnlyClient {
     return resolveLockfilePath() !== null;
   }
 
-  async getGameflowPhase(): Promise<LcuGameflowPhase | null> {
+  async getGameflowPhase(): Promise<LcuReadResult<LcuGameflowPhase>> {
     const connection = readConnectionInfo();
-    if (!connection) return null;
-    return requestLcu<LcuGameflowPhase>(connection, "/lol-gameflow/v1/gameflow-phase");
+    if (connection.status !== "OK") return connection;
+    return requestLcu(connection.data, "/lol-gameflow/v1/gameflow-phase", isGameflowPhase, "ENDPOINT_UNAVAILABLE");
   }
 
-  async getChampionSelectSession(): Promise<LcuChampionSelectSnapshot> {
+  async getChampionSelectSession(): Promise<LcuReadResult<LcuChampionSelectSnapshot>> {
     const connection = readConnectionInfo();
-    if (!connection) return { sessionExists: false };
-    const session = await requestLcu<Record<string, unknown>>(connection, "/lol-champ-select/v1/session");
-    if (!session) return { sessionExists: false };
+    if (connection.status !== "OK") return connection;
+    const session = await requestLcu(connection.data, "/lol-champ-select/v1/session", isSession, "OUTSIDE_CHAMP_SELECT");
+    if (session.status !== "OK") return session;
     return {
-      sessionExists: true,
-      localPlayerCellId: session.localPlayerCellId as number | undefined,
-      actions: session.actions as LcuChampSelectAction[][] | undefined,
-      myTeam: session.myTeam as LcuChampSelectTeamMember[] | undefined,
-      theirTeam: session.theirTeam as LcuChampSelectTeamMember[] | undefined
+      status: "OK",
+      data: {
+        sessionExists: true,
+        localPlayerCellId: session.data.localPlayerCellId as number | undefined,
+        actions: session.data.actions as LcuChampSelectAction[][] | undefined,
+        myTeam: session.data.myTeam as LcuChampSelectTeamMember[] | undefined,
+        theirTeam: session.data.theirTeam as LcuChampSelectTeamMember[] | undefined
+      }
     };
   }
 }

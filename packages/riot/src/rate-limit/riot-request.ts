@@ -1,6 +1,11 @@
 import { RiotApiError } from "../errors/riot-api-error.js";
-
-const RETRYABLE_STATUSES = new Set([429, 502, 503, 504]);
+import {
+  ExternalServiceError,
+  HTTP_TIMEOUTS,
+  RIOT_GET_RETRY_POLICY,
+  requestJson,
+  type RetryPolicy
+} from "../http/index.js";
 
 /**
  * Requisicao HTTP para a Riot API com tratamento real de rate limit: so
@@ -13,29 +18,41 @@ const RETRYABLE_STATUSES = new Set([429, 502, 503, 504]);
 export async function requestWithRiotRateLimit<T>(
   url: string,
   apiKey: string,
-  options: { retries?: number; baseDelayMs?: number } = {}
+  options: {
+    retries?: number;
+    baseDelayMs?: number;
+    timeoutMs?: number;
+    validate?: (payload: unknown) => payload is T;
+    fetchImpl?: typeof fetch;
+    sleep?: (ms: number) => Promise<void>;
+    random?: () => number;
+  } = {}
 ): Promise<T> {
-  const retries = options.retries ?? 3;
-  const baseDelayMs = options.baseDelayMs ?? 250;
-
-  for (let attempt = 0; attempt <= retries; attempt += 1) {
-    const response = await fetch(url, { headers: { "X-Riot-Token": apiKey } });
-    if (response.ok) {
-      return (await response.json()) as T;
+  const retryPolicy: RetryPolicy = {
+    ...RIOT_GET_RETRY_POLICY,
+    maxAttempts: (options.retries ?? RIOT_GET_RETRY_POLICY.maxAttempts - 1) + 1,
+    baseDelayMs: options.baseDelayMs ?? RIOT_GET_RETRY_POLICY.baseDelayMs
+  };
+  try {
+    return await requestJson<T>(url, {
+      integration: "RIOT_API",
+      timeoutMs: options.timeoutMs ?? HTTP_TIMEOUTS.riotApiMs,
+      retryPolicy,
+      idempotent: true,
+      request: { method: "GET", headers: { "X-Riot-Token": apiKey } },
+      validate: options.validate,
+      fetchImpl: options.fetchImpl,
+      sleep: options.sleep,
+      random: options.random
+    });
+  } catch (error) {
+    if (error instanceof ExternalServiceError && error.status !== undefined && error.status >= 400) {
+      throw new RiotApiError(
+        error.message,
+        error.status,
+        error.retryAfterMs === undefined ? undefined : error.retryAfterMs / 1_000
+      );
     }
-
-    const retryAfterHeader = response.headers.get("retry-after");
-    const retryAfterSeconds = retryAfterHeader ? Number(retryAfterHeader) : undefined;
-    const error = new RiotApiError(`Riot API request failed with ${response.status}`, response.status, retryAfterSeconds);
-
-    const isRetryable = RETRYABLE_STATUSES.has(response.status);
-    if (!isRetryable || attempt === retries) {
-      throw error;
-    }
-
-    const delayMs = retryAfterSeconds !== undefined ? retryAfterSeconds * 1000 : baseDelayMs * 2 ** attempt;
-    await new Promise((resolve) => setTimeout(resolve, delayMs));
+    throw error;
   }
-
-  throw new RiotApiError(`Riot API request failed after ${retries} retries`, 0);
 }

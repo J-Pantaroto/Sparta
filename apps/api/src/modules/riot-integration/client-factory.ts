@@ -1,4 +1,4 @@
-import { RiotApiClient } from "@sparta/riot";
+import { ExternalServiceError, RiotApiClient, publicMessageForExternalError } from "@sparta/riot";
 import { loadEnv } from "../../config/env.js";
 
 let cachedClient: RiotApiClient | null = null;
@@ -13,7 +13,13 @@ export function getRiotApiClient(): RiotApiClient {
 
   const env = loadEnv();
   if (!env.RIOT_API_KEY) {
-    throw new Error("RIOT_API_KEY nao configurada. Defina a variavel de ambiente para usar integracoes reais da Riot API.");
+    throw new ExternalServiceError({
+      code: "INTEGRATION_NOT_CONFIGURED",
+      integration: "RIOT_API",
+      message: publicMessageForExternalError("INTEGRATION_NOT_CONFIGURED"),
+      temporary: false,
+      retryable: false
+    });
   }
 
   cachedClient = new RiotApiClient({

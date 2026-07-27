@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { fetchDataDragonChampions, fetchDataDragonVersions } from "@sparta/riot";
+import { readCache } from "../../db/api-cache.js";
 
 const { upsertMock, championTagFindManyMock } = vi.hoisted(() => ({
   upsertMock: vi.fn(),
@@ -9,7 +11,8 @@ vi.mock("../../db/prisma.js", () => ({
   prisma: { champion: { upsert: upsertMock }, championTag: { findMany: championTagFindManyMock } }
 }));
 
-vi.mock("@sparta/riot", () => ({
+vi.mock("@sparta/riot", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@sparta/riot")>()),
   fetchDataDragonVersions: vi.fn().mockResolvedValue(["14.14.1"]),
   fetchDataDragonChampions: vi.fn().mockResolvedValue([
     { key: "61", id: "Orianna", name: "Orianna", title: "a Donzela Mecânica", tags: ["Mage"] },
@@ -19,7 +22,10 @@ vi.mock("@sparta/riot", () => ({
 }));
 
 vi.mock("../../db/api-cache.js", () => ({
-  getCached: vi.fn().mockResolvedValue(null),
+  readCache: vi.fn().mockResolvedValue({
+    value: null,
+    metadata: { state: "MISS", servedAsFallback: false }
+  }),
   setCached: vi.fn().mockResolvedValue(undefined)
 }));
 
@@ -28,12 +34,31 @@ import { findAllChampionTags, syncChampionCatalog } from "./champion-repository.
 describe("champion-repository", () => {
   beforeEach(() => {
     upsertMock.mockClear();
+    vi.mocked(fetchDataDragonVersions).mockReset().mockResolvedValue(["14.14.1"]);
+    vi.mocked(fetchDataDragonChampions).mockReset().mockResolvedValue([
+      { key: "61", id: "Orianna", name: "Orianna", title: "a Donzela Mecânica", tags: ["Mage"] },
+      { key: "103", id: "Ahri", name: "Ahri", title: "a Raposa de Nove Caudas", tags: ["Mage", "Assassin"] },
+      { key: "266", id: "Aatrox", name: "Aatrox", title: "a Espada das Trevas", tags: ["Fighter"] }
+    ]);
+    vi.mocked(readCache).mockReset().mockResolvedValue({
+      value: null,
+      metadata: { state: "MISS", servedAsFallback: false }
+    });
   });
 
   it("mapeia key (id numerico) e id (slug) do Data Dragon para id/key do Sparta", async () => {
     const result = await syncChampionCatalog();
 
-    expect(result).toEqual({ version: "14.14.1", count: 3 });
+    expect(result).toMatchObject({
+      version: "14.14.1",
+      count: 3,
+      source: {
+        sourceType: "OFFICIAL",
+        sourceId: "riot-data-dragon",
+        status: "AVAILABLE",
+        cache: { state: "FRESH", servedAsFallback: false }
+      }
+    });
     expect(upsertMock).toHaveBeenCalledTimes(3);
     expect(upsertMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -169,5 +194,37 @@ describe("findAllChampionTags - proveniência (Etapa 8)", () => {
 
     const [tag] = await findAllChampionTags();
     expect(tag.provenance?.source.confidence).toBeUndefined();
+  });
+
+  it("serve catálogo stale validado somente quando a atualização externa falha e o marca", async () => {
+    const metadata = {
+      state: "STALE" as const,
+      collectedAt: "2026-07-20T12:00:00.000Z",
+      freshUntil: "2026-07-27T12:00:00.000Z",
+      staleUntil: "2026-08-26T12:00:00.000Z",
+      ageMs: 604_800_000,
+      servedAsFallback: false
+    };
+    vi.mocked(readCache)
+      .mockResolvedValueOnce({ value: ["14.14.1"], metadata })
+      .mockResolvedValueOnce({
+        value: [{ key: "61", id: "Orianna", name: "Orianna", title: "a Donzela Mecânica", tags: ["Mage"] }],
+        metadata
+      });
+    vi.mocked(fetchDataDragonVersions).mockRejectedValue(new Error("offline"));
+    vi.mocked(fetchDataDragonChampions).mockRejectedValue(new Error("offline"));
+
+    const result = await syncChampionCatalog();
+
+    expect(result).toMatchObject({
+      version: "14.14.1",
+      count: 1,
+      source: {
+        sourceType: "OFFICIAL",
+        status: "STALE",
+        collectedAt: "2026-07-20T12:00:00.000Z",
+        cache: { state: "STALE", servedAsFallback: true, fallbackReason: "UPSTREAM_UNAVAILABLE" }
+      }
+    });
   });
 });

@@ -3,12 +3,7 @@ import { RiotApiError } from "../errors/riot-api-error.js";
 import { requestWithRiotRateLimit } from "./riot-request.js";
 
 function jsonResponse(status: number, body: unknown, headers: Record<string, string> = {}) {
-  return {
-    ok: status >= 200 && status < 300,
-    status,
-    headers: { get: (name: string) => headers[name.toLowerCase()] ?? null },
-    json: async () => body
-  } as Response;
+  return new globalThis.Response(JSON.stringify(body), { status, headers });
 }
 
 describe("requestWithRiotRateLimit", () => {

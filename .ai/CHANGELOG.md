@@ -21,6 +21,17 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-07-27 20:04 — Resiliência HTTP, erros externos e estados de cache
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0009-resiliencia-http-cache.md`
+
+Todas as integrações ativas passaram a ter timeout e cancelamento explícitos, taxonomia central
+de erros sanitizados e retry limitado a operações idempotentes temporárias. Riot distingue
+credencial, rate limit, not found e payload inválido; Data Dragon não devolve mais versão fixa
+ou lista vazia em falha e ganhou cache `MISS/FRESH/STALE/EXPIRED` por recurso, preservando a
+origem oficial na proveniência. O renderer sinaliza catálogo stale, assets mantêm fallback
+isolado e o LCU distingue seus estados locais e limpa o draft quando perde a observação.
+27 testes novos (472 no total). Ver `docs/http-resilience.md`.
+
 ## 2026-07-27 18:40 — Proveniência das ChampionTag
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0008-proveniencia-champion-tags.md`
 

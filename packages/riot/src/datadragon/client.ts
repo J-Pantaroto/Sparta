@@ -14,25 +14,42 @@ export interface DataDragonChampion {
   info?: { attack: number; defense: number; magic: number; difficulty: number };
 }
 
-/**
- * Ultima versao conhecida do Data Dragon usada como fallback quando o
- * desktop nao consegue consultar `fetchDataDragonVersions` (ex.: sem rede
- * no momento do build). Mantenha alinhada com o patch atual quando possivel.
- */
-export const FALLBACK_DATA_DRAGON_VERSION = "14.14.1";
-
 export async function fetchDataDragonVersions(): Promise<string[]> {
-  const response = await fetch("https://ddragon.leagueoflegends.com/api/versions.json");
-  if (!response.ok) throw new Error(`Data Dragon versions request failed with ${response.status}`);
-  return (await response.json()) as string[];
+  return requestJson("https://ddragon.leagueoflegends.com/api/versions.json", {
+    integration: "DATA_DRAGON",
+    timeoutMs: HTTP_TIMEOUTS.dataDragonMs,
+    validate: (payload): payload is string[] =>
+      Array.isArray(payload) && payload.length > 0 && payload.every((version) => typeof version === "string")
+  });
 }
 
 export async function fetchDataDragonChampions(version: string, locale = "pt_BR"): Promise<DataDragonChampion[]> {
   const url = `https://ddragon.leagueoflegends.com/cdn/${version}/data/${locale}/champion.json`;
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`Data Dragon request failed with ${response.status}`);
-  const payload = (await response.json()) as { data: Record<string, DataDragonChampion> };
+  const payload = await requestJson<{ data: Record<string, DataDragonChampion> }>(url, {
+    integration: "DATA_DRAGON",
+    timeoutMs: HTTP_TIMEOUTS.dataDragonMs,
+    validate: isChampionCatalog
+  });
   return Object.values(payload.data);
+}
+
+function isChampionCatalog(payload: unknown): payload is { data: Record<string, DataDragonChampion> } {
+  if (typeof payload !== "object" || payload === null || Array.isArray(payload)) return false;
+  const data = (payload as { data?: unknown }).data;
+  if (typeof data !== "object" || data === null || Array.isArray(data)) return false;
+  const champions = Object.values(data);
+  return (
+    champions.length > 0 &&
+    champions.every(
+      (champion) =>
+        typeof champion === "object" &&
+        champion !== null &&
+        typeof (champion as DataDragonChampion).key === "string" &&
+        typeof (champion as DataDragonChampion).id === "string" &&
+        typeof (champion as DataDragonChampion).name === "string" &&
+        Array.isArray((champion as DataDragonChampion).tags)
+    )
+  );
 }
 
 /**
@@ -40,7 +57,7 @@ export async function fetchDataDragonChampions(version: string, locale = "pt_BR"
  * Dragon (ex.: "Orianna", "Ahri", "MonkeyKing" para Wukong), nao o nome
  * de exibicao.
  */
-export function championSquareUrl(championKey: string, version = FALLBACK_DATA_DRAGON_VERSION): string {
+export function championSquareUrl(championKey: string, version: string): string {
   return `https://ddragon.leagueoflegends.com/cdn/${version}/img/champion/${championKey}.png`;
 }
 
@@ -51,3 +68,4 @@ export function championSquareUrl(championKey: string, version = FALLBACK_DATA_D
 export function championSplashUrl(championKey: string, skinIndex = 0): string {
   return `https://ddragon.leagueoflegends.com/cdn/img/champion/splash/${championKey}_${skinIndex}.png`;
 }
+import { HTTP_TIMEOUTS, requestJson } from "../http/index.js";

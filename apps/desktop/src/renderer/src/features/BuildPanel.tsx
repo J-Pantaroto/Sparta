@@ -1,8 +1,8 @@
 import { recommendBuild, type ChampionClassProfile, type DraftState, type ItemSummary, type RecommendedItem } from "@sparta/core";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useAsyncData } from "../hooks/use-async-data";
 import { fetchChampionClassProfiles, fetchItemCatalog, itemIconUrl } from "../services/datadragon";
-import { Card, Loading, SectionHeader, SignalChip, SignalChipList } from "../ui";
+import { Card, ErrorState, Loading, SectionHeader, SignalChip, SignalChipList } from "../ui";
 import "./BuildPanel.css";
 
 interface BuildPanelProps {
@@ -43,6 +43,12 @@ export function BuildPanel({ confirmedChampion, enemies, ddragonVersion }: Build
         description="Ajustada ao que já foi revelado do time inimigo."
       />
       {loading && <Loading block label="Carregando itens..." />}
+      {(classProfiles.status === "error" || itemCatalog.status === "error") && (
+        <ErrorState
+          title="Catálogo de build indisponível"
+          description={classProfiles.error ?? itemCatalog.error ?? "Não foi possível carregar o catálogo."}
+        />
+      )}
       {build && (
         <div className="sp-build">
           {build.boots && <BuildSlot label="Botas" items={[build.boots]} ddragonVersion={ddragonVersion} />}
@@ -83,11 +89,17 @@ function BuildSlot({
       <div className="sp-build__items">
         {items.map((item) => (
           <span className="sp-item" key={item.itemId} title={item.reason}>
-            <img className="sp-item__icon" src={itemIconUrl(item.itemId, ddragonVersion)} alt="" />
+            <ItemIcon src={itemIconUrl(item.itemId, ddragonVersion)} />
             {item.name}
           </span>
         ))}
       </div>
     </div>
   );
+}
+
+function ItemIcon({ src }: { src: string }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return <span className="sp-item__icon" aria-hidden="true" />;
+  return <img className="sp-item__icon" src={src} alt="" onError={() => setFailed(true)} />;
 }

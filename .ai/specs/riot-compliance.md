@@ -1,5 +1,8 @@
 # Riot Compliance
 
+Cada leitura LCU tem timeout de 1,5 s e status explícito. O LCU nunca usa stale: qualquer perda
+de observação limpa o draft, e credenciais/headers nunca entram em logs ou erros públicos.
+
 Princípios do Sparta:
 
 - Registrar o app no Riot Developer Portal antes de uso público.

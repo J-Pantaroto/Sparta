@@ -1,4 +1,4 @@
-import type { DraftPick, DraftState, PickRecommendation, Role } from "@sparta/core";
+import type { CacheMetadata, DraftPick, DraftState, PickRecommendation, Role } from "@sparta/core";
 import type { LcuDraftMember, LcuDraftSnapshot } from "@sparta/riot";
 import { useEffect, useMemo, useState } from "react";
 import { navGroups, type Page } from "./app/navigation";
@@ -10,7 +10,13 @@ import {
   type RiotAccountSummary,
   type SessionUser
 } from "./services/api-client";
-import { fetchAllChampions, fetchLatestDataDragonVersion, type DataDragonChampionSummary } from "./services/datadragon";
+import {
+  fetchAllChampions,
+  fetchLatestDataDragonVersion,
+  DATA_DRAGON_CACHE_EVENT,
+  getLastDataDragonCacheMetadata,
+  type DataDragonChampionSummary
+} from "./services/datadragon";
 import { AuthScreen } from "./features/AuthScreen";
 import { ChampionSelectScreen } from "./features/ChampionSelectScreen";
 import { DashboardScreen } from "./features/DashboardScreen";
@@ -52,7 +58,12 @@ function SpartaApp() {
     bannedChampionIds: []
   });
 
-  const [ddragonVersion, setDdragonVersion] = useState<string>("14.14.1");
+  const [ddragonVersion, setDdragonVersion] = useState<string | null>(null);
+  const [ddragonError, setDdragonError] = useState<string | null>(null);
+  const [ddragonCache, setDdragonCache] = useState<CacheMetadata>({
+    state: "MISS",
+    servedAsFallback: false
+  });
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>("checking");
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
@@ -71,9 +82,27 @@ function SpartaApp() {
     [sessionToken, draft]
   );
 
-  // Versao real do Data Dragon (com fallback silencioso se offline).
+  function loadDataDragonVersion() {
+    setDdragonError(null);
+    void fetchLatestDataDragonVersion()
+      .then((version) => {
+        setDdragonVersion(version);
+        setDdragonCache(getLastDataDragonCacheMetadata());
+      })
+      .catch((error) => {
+        setDdragonError(error instanceof Error ? error.message : "Catálogo externo indisponível.");
+        setDdragonCache(getLastDataDragonCacheMetadata());
+      });
+  }
+
+  useEffect(loadDataDragonVersion, []);
+
   useEffect(() => {
-    void fetchLatestDataDragonVersion().then(setDdragonVersion);
+    const updateCacheState: Parameters<typeof globalThis.addEventListener>[1] = (event) => {
+      setDdragonCache((event as unknown as { detail: CacheMetadata }).detail);
+    };
+    globalThis.addEventListener(DATA_DRAGON_CACHE_EVENT, updateCacheState);
+    return () => globalThis.removeEventListener(DATA_DRAGON_CACHE_EVENT, updateCacheState);
   }, []);
 
   // Restaura sessao salva localmente, se existir.
@@ -200,7 +229,7 @@ function SpartaApp() {
   // renderer. Sem catalogo ainda, o merge espera - melhor um tick a mais do
   // que gravar "Campeao 64" como nome.
   const championCatalog = useAsyncData<DataDragonChampionSummary[]>(
-    () => fetchAllChampions(ddragonVersion),
+    () => (ddragonVersion ? fetchAllChampions(ddragonVersion) : undefined),
     [ddragonVersion]
   );
   const championNames = useMemo(() => {
@@ -208,6 +237,12 @@ function SpartaApp() {
     (championCatalog.data ?? []).forEach((champion) => names.set(champion.id, champion.name));
     return names;
   }, [championCatalog.data]);
+
+  useEffect(() => {
+    if (championCatalog.status === "success") {
+      setDdragonCache(getLastDataDragonCacheMetadata());
+    }
+  }, [championCatalog.status]);
 
   useEffect(() => {
     if (!autoDraft || championNames.size === 0) return;
@@ -290,6 +325,24 @@ function SpartaApp() {
     );
   }
 
+  if (!ddragonVersion) {
+    return (
+      <AuthLayout
+        splashUrl={splashUrl}
+        title="Catálogo de jogo"
+        subtitle={ddragonError ?? "Consultando a versão atual da Data Dragon..."}
+      >
+        {ddragonError ? (
+          <button type="button" className="sp-button sp-button--primary" onClick={loadDataDragonVersion}>
+            Tentar novamente
+          </button>
+        ) : (
+          <Loading label="Carregando catálogo oficial" />
+        )}
+      </AuthLayout>
+    );
+  }
+
   const account = riotAccounts[0];
 
   return (
@@ -321,6 +374,25 @@ function SpartaApp() {
         </Sidebar>
       }
     >
+      {ddragonCache.state === "STALE" && (
+        <div
+          role="status"
+          style={{
+            margin: "var(--space-4)",
+            padding: "var(--space-3)",
+            border: "1px solid var(--color-warning)",
+            borderRadius: "var(--radius-md)"
+          }}
+        >
+          Data Dragon indisponível: usando catálogo local desatualizado, coletado em{" "}
+          {ddragonCache.collectedAt ? new Date(ddragonCache.collectedAt).toLocaleString("pt-BR") : "data desconhecida"}.
+        </div>
+      )}
+      {championCatalog.status === "error" && (
+        <div role="alert" style={{ margin: "var(--space-4)", color: "var(--color-danger)" }}>
+          O catálogo de campeões está indisponível: {championCatalog.error}
+        </div>
+      )}
       {page === "dashboard" && (
         <DashboardScreen
           riotAccounts={riotAccounts}

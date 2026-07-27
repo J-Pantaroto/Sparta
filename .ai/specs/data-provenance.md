@@ -1,5 +1,9 @@
 # Origem, disponibilidade e confiança dos dados
 
+`DataProvenance.cache` registra estado e datas reais da cópia sem substituir `sourceType`.
+Data Dragon stale continua `OFFICIAL`, marcado `status: STALE`; data histórica ausente não é
+inventada. Ver `.ai/specs/http-resilience.md`.
+
 Contrato central que permite ao Sparta dizer **de onde um número veio** e **se ele existe**.
 
 ## O problema que ele resolve

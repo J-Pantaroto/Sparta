@@ -18,6 +18,12 @@ Endpoints:
 
 Swagger UI fica em `/docs`.
 
+## Erros externos
+
+Falhas externas seguem `.ai/specs/http-resilience.md`. A resposta pública contém apenas
+`code`, mensagem controlada, integração e `retryAfterMs` quando aplicável; nunca contém URL,
+headers, token, payload ou stack.
+
 ## Integrações Riot em uso (backend)
 
 - **Account-V1** (`riot/account/v1/accounts/by-riot-id/{gameName}/{tagLine}`) — resolve Riot ID pra puuid real em `POST /players/link-riot-account`. Cacheado 24h (`ApiCacheEntry`).
