@@ -22,6 +22,23 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-07-28 18:39 — Avaliação longitudinal e observabilidade do motor
+
+**Status:** IMPLEMENTADA · Prompt:
+`.ai/prompts/features/0023-avaliacao-longitudinal-observabilidade-motor.md`
+
+O Sparta agora agrega sob demanda uma observação por draft vinculado usando
+somente o snapshot vigente no lock-in, a escolha, a partida e a revisão
+pós-game persistidos. Principais, alternativas e escolhas fora do snapshot
+permanecem separadas; numeradores, denominadores, faixas versionadas,
+indisponibilidades e versões dos motores são explícitos. Contextos sem
+amostra ou sobreposição suficiente não são comparados, e vitória/derrota
+continua sendo fato observado, sem taxa de acerto, causalidade, contrafactual
+ou ajuste. Três rotas autenticadas e a tela “Histórico do motor” foram
+adicionadas sem nova tabela. Foram validados 731 testes dos quatro projetos,
+mais 2 testes do script raiz, typecheck, lint, formatação, build e navegação
+local sem erros de console. Implementação funcional: `6ef8f9e`.
+
 ## 2026-07-28 18:01 — Pós-game comparativo entre draft e partida
 
 **Status:** IMPLEMENTADA · Prompt:

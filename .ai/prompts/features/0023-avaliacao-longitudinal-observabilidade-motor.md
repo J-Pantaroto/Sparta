@@ -1,7 +1,7 @@
 ---
-status: PENDENTE
+status: IMPLEMENTADA
 solicitado_em: 2026-07-28 18:22
-implementado_em:
+implementado_em: 2026-07-28 18:39
 ---
 
 # Avaliação longitudinal e observabilidade do motor
@@ -57,3 +57,4 @@ implementado_em:
 - A navegação e o estado sem conta vinculada foram verificados no renderer
   local, sem erros de console. O estado preenchido foi validado pelo teste
   de componente porque o modo local não possui conta Riot vinculada.
+- Implementação funcional no commit `6ef8f9e`, enviado para `origin/main`.
