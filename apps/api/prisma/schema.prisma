@@ -92,6 +92,10 @@ model Match {
   matchId     String   @unique
   platform    String
   patch       String?
+  gameVersion String?
+  queueId     Int?
+  gameMode    String?
+  gameType    String?
   durationSeconds Int?
   startedAt   DateTime?
   rawJson      Json?
@@ -108,7 +112,7 @@ model MatchParticipant {
   riotAccountId          String?
   puuid                 String
   championId            Int
-  role                  String
+  role                  String?
   teamId                Int?
   won                   Boolean
   kills                 Int
@@ -127,6 +131,7 @@ model MatchParticipant {
   match                 Match @relation(fields: [matchId], references: [id])
   riotAccount           RiotAccount? @relation(fields: [riotAccountId], references: [id])
   champion              Champion @relation(fields: [championId], references: [id])
+  observation           MatchObservation?
 
   @@unique([matchId, puuid])
   @@index([puuid])
@@ -232,4 +237,94 @@ model ApiCacheEntry {
   expiresAt   DateTime
   collectedAt DateTime?
   createdAt   DateTime @default(now())
+}
+
+model MatchObservation {
+  id                              String   @id @default(uuid())
+  matchParticipantId              String   @unique
+  extractorVersion                String
+  teamPosition                    String?
+  individualPosition              String?
+  positionAssignedByMatchmaking   String?
+  normalizedRole                  String?
+  normalizedRoleSource            String?
+  assignedRole                    String?
+  positionDiverged                Boolean
+  positionStatus                  String
+  runesStatus                     String
+  primaryStyleId                  Int?
+  secondaryStyleId                Int?
+  createdAt                       DateTime @default(now())
+  updatedAt                       DateTime @updatedAt
+  matchParticipant                MatchParticipant @relation(fields: [matchParticipantId], references: [id], onDelete: Cascade)
+  itemSlots                       MatchItemSlot[]
+  runeSelections                  MatchRuneSelection[]
+  runeFragments                   MatchRuneFragment[]
+  summonerSpellSlots              MatchSummonerSpellSlot[]
+
+  @@index([normalizedRole])
+  @@index([extractorVersion])
+}
+
+model MatchItemSlot {
+  id                  String @id @default(uuid())
+  matchObservationId  String
+  slot                Int
+  state               String
+  itemId              Int?
+  itemName            String?
+  asset               String?
+  catalogVersion      String?
+  catalogStatus       String
+  matchObservation    MatchObservation @relation(fields: [matchObservationId], references: [id], onDelete: Cascade)
+
+  @@unique([matchObservationId, slot])
+  @@index([itemId])
+}
+
+model MatchRuneSelection {
+  id                  String @id @default(uuid())
+  matchObservationId  String
+  tree                String
+  slotOrder           Int
+  perkId              Int
+  perkName            String?
+  isKeystone          Boolean
+  catalogVersion      String?
+  catalogStatus       String
+  matchObservation    MatchObservation @relation(fields: [matchObservationId], references: [id], onDelete: Cascade)
+
+  @@unique([matchObservationId, tree, slotOrder])
+  @@index([perkId])
+}
+
+model MatchRuneFragment {
+  id                  String @id @default(uuid())
+  matchObservationId  String
+  slot                String
+  state               String
+  fragmentId          Int?
+  fragmentName        String?
+  catalogVersion      String?
+  catalogStatus       String
+  matchObservation    MatchObservation @relation(fields: [matchObservationId], references: [id], onDelete: Cascade)
+
+  @@unique([matchObservationId, slot])
+  @@index([fragmentId])
+}
+
+model MatchSummonerSpellSlot {
+  id                  String @id @default(uuid())
+  matchObservationId  String
+  slot                Int
+  state               String
+  spellId             Int?
+  spellName           String?
+  asset               String?
+  catalogVersion      String?
+  catalogStatus       String
+  matchObservation    MatchObservation @relation(fields: [matchObservationId], references: [id], onDelete: Cascade)
+
+  @@unique([matchObservationId, slot])
+  @@index([spellId])
 }

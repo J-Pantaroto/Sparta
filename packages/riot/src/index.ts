@@ -6,6 +6,7 @@ export * from "./lcu/pick-order.js";
 export * from "./lcu/draft-snapshot.js";
 export * from "./lcu/player-role.js";
 export * from "./mappers/match-mapper.js";
+export * from "./mappers/match-observation-mapper.js";
 export * from "./mappers/timeline-mapper.js";
 export * from "./rate-limit/backoff.js";
 export * from "./rate-limit/riot-request.js";

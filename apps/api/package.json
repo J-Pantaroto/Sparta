@@ -17,7 +17,8 @@
     "champion-tags:generate": "tsx src/modules/catalog/generate-champion-tags-cli.ts",
     "champion-tags:check": "tsx src/modules/catalog/generate-champion-tags-cli.ts --check",
     "backfill:match-participants": "tsx src/modules/matches/backfill-participants-cli.ts",
-    "backfill:objective-participation": "tsx src/modules/matches/backfill-objective-participation-cli.ts"
+    "backfill:objective-participation": "tsx src/modules/matches/backfill-objective-participation-cli.ts",
+    "backfill:match-observations": "tsx src/modules/matches/backfill-match-observations-cli.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.0.1",

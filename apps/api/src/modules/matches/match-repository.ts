@@ -1,6 +1,8 @@
 import type { Prisma } from "@prisma/client";
 import type { MatchSummary, MatchTimelineSummary, Role } from "@sparta/core";
 import { prisma } from "../../db/prisma.js";
+import { persistMatchObservationsInTransaction } from "./match-observation-repository.js";
+import type { RiotMatchDto } from "@sparta/riot";
 
 export async function findExistingMatchIds(matchIds: string[]): Promise<Set<string>> {
   if (matchIds.length === 0) return new Set();
@@ -44,12 +46,8 @@ async function persistMatchParticipants(
   const knownChampionIds = new Set(existingChampions.map((champion) => champion.id));
   const riotAccountIdByPuuid = new Map(knownAccounts.map((account) => [account.puuid, account.id]));
 
-  // Participante sem posição observada é descartado junto com o de campeão
-  // fora do catálogo, pelo mesmo motivo: a linha existiria sem conseguir
-  // dizer a que posição pertence, e `MatchParticipant.role` alimenta as
-  // estatísticas por posição. Gravar "MID" aqui era o falso fallback.
   const usable = (entry: (typeof participants)[number]) =>
-    knownChampionIds.has(entry.summary.championId) && entry.summary.role !== undefined;
+    knownChampionIds.has(entry.summary.championId);
 
   const eligible = participants.filter(usable);
   const skipped = participants.filter((entry) => !usable(entry));
@@ -61,7 +59,7 @@ async function persistMatchParticipants(
         riotAccountId: riotAccountIdByPuuid.get(summary.puuid) ?? null,
         puuid: summary.puuid,
         championId: summary.championId,
-        role: summary.role as string,
+        role: summary.role ?? null,
         teamId,
         won: summary.won,
         kills: summary.metrics.kills,
@@ -141,6 +139,12 @@ export async function persistMatch(input: PersistMatchInput): Promise<PersistMat
     });
 
     const { skippedParticipantPuuids } = await persistMatchParticipants(tx, match.id, participants);
+    await persistMatchObservationsInTransaction(
+      tx,
+      match.id,
+      platform,
+      rawMatch as unknown as RiotMatchDto
+    );
 
     await tx.matchTimeline.upsert({
       where: { matchId: match.id },
@@ -263,7 +267,7 @@ export async function findMatchDetail(matchId: string, puuid: string): Promise<M
   if (!match) return null;
 
   const own = match.participants.find((participant) => participant.puuid === puuid);
-  if (!own) return null;
+  if (!own || !own.role) return null;
 
   const enemy = match.participants.find(
     (participant) =>
@@ -345,7 +349,7 @@ export interface ParticipationRecord {
  */
 export async function findParticipationHistory(puuid: string, limit?: number): Promise<ParticipationRecord[]> {
   const rows = await prisma.matchParticipant.findMany({
-    where: { puuid },
+    where: { puuid, role: { not: null } },
     include: { match: true, champion: true },
     orderBy: { match: { startedAt: "desc" } },
     ...(limit !== undefined ? { take: limit } : {})
@@ -355,7 +359,7 @@ export async function findParticipationHistory(puuid: string, limit?: number): P
     matchId: row.match.matchId,
     championId: row.championId,
     championName: row.champion.name,
-    role: row.role,
+    role: row.role as string,
     won: row.won,
     kills: row.kills,
     deaths: row.deaths,

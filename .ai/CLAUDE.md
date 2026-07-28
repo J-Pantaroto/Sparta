@@ -1,5 +1,27 @@
 # Sparta - Contexto para Continuidade
 
+## Etapa 10: observações reais de partida
+
+Os `rawJson` Match-V5 agora são reprocessados por
+`match-observation/1.0.0` em entidades relacionais: sete slots finais de
+item, seleções e fragmentos de runa, dois slots de feitiço e posição
+observada. ID zero é slot vazio; ID desconhecido continua preservado; ausência
+não vira lista vazia, zero ou MID.
+
+A auditoria real encontrou quatro divergências entre matchmaking e os campos
+observados. A política usa `teamPosition`, depois `individualPosition`; a
+atribuição de matchmaking permanece separada e auditável. Isso representa
+somente a posição pessoal do jogador com o campeão naquela partida e não
+altera `ChampionTag.roles`, scores, pool ou elegibilidade global.
+
+Migration `20260728010000_match_observations`, backfill local idempotente,
+rota autenticada `GET /matches/:matchId/observation` e card factual no
+pós-game. No banco real: 22 partidas/220 participantes na primeira execução e
+zero atualizações na segunda; 1.540 slots de item, 1.320 perks, 660 fragmentos
+e 440 feitiços, sem duplicatas. Não havia catálogo local de itens/runas/spells,
+então nomes ficaram indisponíveis e os IDs foram preservados. Detalhes em
+`docs/match-observations.md`.
+
 Este arquivo é um handoff para outro agente de desenvolvimento continuar o projeto Sparta sem precisar redescobrir a base inteira.
 
 ## Convenções deste repositório (ler antes de qualquer feature nova)

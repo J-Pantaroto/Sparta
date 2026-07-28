@@ -1,12 +1,36 @@
 import { computeObjectiveParticipation } from "@sparta/core";
-import type { MatchPerformanceMetrics, MatchSummary, Role, TeamNeutralObjectiveKills } from "@sparta/core";
+import type {
+  MatchPerformanceMetrics,
+  MatchSummary,
+  Role,
+  TeamNeutralObjectiveKills
+} from "@sparta/core";
 
 export interface RiotMatchParticipantDto {
   puuid: string;
   championId: number;
   championName: string;
   teamId: number;
-  teamPosition: string;
+  teamPosition?: string;
+  individualPosition?: string;
+  positionAssignedByMatchmaking?: string;
+  item0?: number;
+  item1?: number;
+  item2?: number;
+  item3?: number;
+  item4?: number;
+  item5?: number;
+  item6?: number;
+  summoner1Id?: number;
+  summoner2Id?: number;
+  perks?: {
+    statPerks?: { offense?: number; flex?: number; defense?: number };
+    styles?: {
+      description?: string;
+      style?: number;
+      selections?: { perk?: number; var1?: number; var2?: number; var3?: number }[];
+    }[];
+  };
   win: boolean;
   kills: number;
   deaths: number;
@@ -46,6 +70,9 @@ export interface RiotMatchDto {
     gameDuration: number;
     gameVersion: string;
     gameStartTimestamp: number;
+    queueId?: number;
+    gameMode?: string;
+    gameType?: string;
     participants: RiotMatchParticipantDto[];
     teams?: RiotMatchTeamDto[];
   };
@@ -101,10 +128,12 @@ function mapParticipant(
   patch: string,
   teams: RiotMatchTeamDto[] | undefined
 ): MatchSummary {
-  // Sem `?? "MID"`: partida cujo `teamPosition` a Riot não informa (ou
-  // informa num vocabulário novo) sairia contabilizada nas estatísticas de
-  // MID do jogador. Fica ausente, e a persistência descarta a linha.
-  const role = TEAM_POSITION_TO_ROLE[participant.teamPosition];
+  // Sem `?? "MID"`: quando nenhum dos dois campos observados é reconhecido,
+  // a posição fica ausente. A linha continua persistida com role nula para
+  // auditoria, mas não entra nas estatísticas agrupadas por posição.
+  const role =
+    TEAM_POSITION_TO_ROLE[participant.teamPosition ?? ""] ??
+    TEAM_POSITION_TO_ROLE[participant.individualPosition ?? ""];
   const cs = participant.totalMinionsKilled + participant.neutralMinionsKilled;
 
   const metrics: MatchPerformanceMetrics = {
@@ -176,14 +205,21 @@ export function mapMatchToSummaries(raw: RiotMatchDto): MatchSummary[] {
  * Info minima de time por participante, usada pelo timeline-mapper para
  * calcular goldDiffAt15 (precisa saber quem esta em cada time).
  */
-export function extractParticipantTeams(raw: RiotMatchDto): { participantId: number; puuid: string; teamId: number }[] {
+export function extractParticipantTeams(
+  raw: RiotMatchDto
+): { participantId: number; puuid: string; teamId: number }[] {
   return raw.metadata.participants
     .map((puuid, index) => {
       const participant = raw.info.participants.find((entry) => entry.puuid === puuid);
       // Sem `teamId` a entrada fica de fora: o `?? 0` anterior criava um
       // time fantasma (a Riot usa 100/200), e esse time entrava na conta de
       // aliados/inimigos do goldDiffAt15 como se fosse real.
-      return participant?.teamId === undefined ? undefined : { participantId: index + 1, puuid, teamId: participant.teamId };
+      return participant?.teamId === undefined
+        ? undefined
+        : { participantId: index + 1, puuid, teamId: participant.teamId };
     })
-    .filter((entry): entry is { participantId: number; puuid: string; teamId: number } => entry !== undefined);
+    .filter(
+      (entry): entry is { participantId: number; puuid: string; teamId: number } =>
+        entry !== undefined
+    );
 }

@@ -46,7 +46,10 @@ const tx = {
   champion: { findMany: championFindManyMock },
   riotAccount: { findMany: riotAccountFindManyMock },
   match: { upsert: matchUpsertMock },
-  matchParticipant: { createMany: matchParticipantCreateManyMock, updateMany: matchParticipantUpdateManyMock },
+  matchParticipant: {
+    createMany: matchParticipantCreateManyMock,
+    updateMany: matchParticipantUpdateManyMock
+  },
   matchTimeline: { upsert: matchTimelineUpsertMock }
 };
 
@@ -116,7 +119,11 @@ describe("match-repository", () => {
     const createManyArg = matchParticipantCreateManyMock.mock.calls[0][0];
     expect(createManyArg.skipDuplicates).toBe(true);
     expect(createManyArg.data).toHaveLength(1);
-    expect(createManyArg.data[0]).toMatchObject({ puuid: "puuid-tracked", riotAccountId: "acc-1", teamId: 100 });
+    expect(createManyArg.data[0]).toMatchObject({
+      puuid: "puuid-tracked",
+      riotAccountId: "acc-1",
+      teamId: 100
+    });
   });
 
   it("resolve riotAccountId pra qualquer participante que seja uma conta Sparta conhecida, nao so o rastreado", async () => {
@@ -131,11 +138,37 @@ describe("match-repository", () => {
       { summary: summary({ puuid: "puuid-outro-usuario-sparta", championId: 157 }), teamId: 200 }
     ];
 
-    await persistMatch({ platform: "br1", trackedPuuid: "puuid-tracked", participants, timeline, rawMatch: {} });
+    await persistMatch({
+      platform: "br1",
+      trackedPuuid: "puuid-tracked",
+      participants,
+      timeline,
+      rawMatch: {}
+    });
 
     const createManyArg = matchParticipantCreateManyMock.mock.calls[0][0];
-    const other = createManyArg.data.find((row: { puuid: string }) => row.puuid === "puuid-outro-usuario-sparta");
+    const other = createManyArg.data.find(
+      (row: { puuid: string }) => row.puuid === "puuid-outro-usuario-sparta"
+    );
     expect(other.riotAccountId).toBe("acc-2");
+  });
+
+  it("preserva participante sem posição com role nula, sem inventar MID", async () => {
+    championFindManyMock.mockResolvedValue([{ id: 61 }]);
+    riotAccountFindManyMock.mockResolvedValue([{ id: "acc-1", puuid: "puuid-tracked" }]);
+
+    await persistMatch({
+      platform: "br1",
+      trackedPuuid: "puuid-tracked",
+      participants: [{ summary: summary({ role: undefined }), teamId: 100 }],
+      timeline,
+      rawMatch: {}
+    });
+
+    expect(matchParticipantCreateManyMock.mock.calls[0][0].data[0]).toMatchObject({
+      puuid: "puuid-tracked",
+      role: null
+    });
   });
 
   it("usa upsert (nao create) pra Match e MatchTimeline, tolerando reprocessar a mesma partida", async () => {
@@ -150,8 +183,12 @@ describe("match-repository", () => {
       rawMatch: {}
     });
 
-    expect(matchUpsertMock).toHaveBeenCalledWith(expect.objectContaining({ where: { matchId: "m1" }, update: {} }));
-    expect(matchTimelineUpsertMock).toHaveBeenCalledWith(expect.objectContaining({ where: { matchId: "match-db-id" }, update: {} }));
+    expect(matchUpsertMock).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { matchId: "m1" }, update: {} })
+    );
+    expect(matchTimelineUpsertMock).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { matchId: "match-db-id" }, update: {} })
+    );
   });
 
   it("lanca erro se o puuid rastreado nao estiver na lista de participantes", async () => {
@@ -217,7 +254,13 @@ describe("match-repository", () => {
   describe("findMatchesMissingParticipants", () => {
     it("inclui partidas com menos de 10 participantes", async () => {
       matchFindManyMock.mockResolvedValue([
-        { id: "m1", matchId: "riot-m1", rawJson: {}, _count: { participants: 3 }, participants: [{ teamId: 100 }] }
+        {
+          id: "m1",
+          matchId: "riot-m1",
+          rawJson: {},
+          _count: { participants: 3 },
+          participants: [{ teamId: 100 }]
+        }
       ]);
 
       const result = await findMatchesMissingParticipants();
@@ -257,7 +300,13 @@ describe("match-repository", () => {
 
     it("ignora partidas sem rawJson (nao ha como reconstruir os participantes)", async () => {
       matchFindManyMock.mockResolvedValue([
-        { id: "m4", matchId: "riot-m4", rawJson: null, _count: { participants: 1 }, participants: [{ teamId: null }] }
+        {
+          id: "m4",
+          matchId: "riot-m4",
+          rawJson: null,
+          _count: { participants: 1 },
+          participants: [{ teamId: null }]
+        }
       ]);
 
       expect(await findMatchesMissingParticipants()).toEqual([]);
@@ -318,8 +367,19 @@ describe("match-repository", () => {
         },
         participants: [
           participantRow(),
-          participantRow({ puuid: "puuid-enemy", championId: 157, teamId: 200, won: false, champion: { name: "Yasuo" } }),
-          participantRow({ puuid: "puuid-jungle-aliado", role: "JUNGLE", teamId: 100, champion: { name: "Vi" } })
+          participantRow({
+            puuid: "puuid-enemy",
+            championId: 157,
+            teamId: 200,
+            won: false,
+            champion: { name: "Yasuo" }
+          }),
+          participantRow({
+            puuid: "puuid-jungle-aliado",
+            role: "JUNGLE",
+            teamId: 100,
+            champion: { name: "Vi" }
+          })
         ]
       });
 
@@ -347,7 +407,12 @@ describe("match-repository", () => {
         timeline: null,
         participants: [
           participantRow({ teamId: null }),
-          participantRow({ puuid: "puuid-enemy", championId: 157, teamId: null, champion: { name: "Yasuo" } })
+          participantRow({
+            puuid: "puuid-enemy",
+            championId: 157,
+            teamId: null,
+            champion: { name: "Yasuo" }
+          })
         ]
       });
 
@@ -398,7 +463,7 @@ describe("match-repository", () => {
       await findParticipationHistory("puuid-1");
 
       expect(matchParticipantFindManyMock).toHaveBeenCalledWith({
-        where: { puuid: "puuid-1" },
+        where: { puuid: "puuid-1", role: { not: null } },
         include: { match: true, champion: true },
         orderBy: { match: { startedAt: "desc" } }
       });
@@ -410,7 +475,7 @@ describe("match-repository", () => {
       await findParticipationHistory("puuid-1", 50);
 
       expect(matchParticipantFindManyMock).toHaveBeenCalledWith({
-        where: { puuid: "puuid-1" },
+        where: { puuid: "puuid-1", role: { not: null } },
         include: { match: true, champion: true },
         orderBy: { match: { startedAt: "desc" } },
         take: 50

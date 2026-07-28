@@ -143,8 +143,8 @@ export interface MatchSummary {
   championName: string;
   /**
    * Posição observada no Match-V5. Ausente quando o payload não informa
-   * `teamPosition` - a partida não é atribuída a nenhuma posição em vez de
-   * cair em MID.
+   * `teamPosition` nem `individualPosition` - a partida não é atribuída a
+   * nenhuma posição em vez de cair em MID.
    */
   role?: Role;
   won: boolean;

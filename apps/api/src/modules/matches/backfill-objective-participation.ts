@@ -80,7 +80,9 @@ export async function backfillObjectiveParticipation(): Promise<ObjectiveBackfil
       });
 
       for (const participant of participants) {
-        const rawParticipant = raw.info?.participants?.find((entry) => entry.puuid === participant.puuid);
+        const rawParticipant = raw.info?.participants?.find(
+          (entry) => entry.puuid === participant.puuid
+        );
 
         const observation = computeObjectiveParticipation({
           takedowns: rawParticipant?.challenges,
@@ -139,13 +141,17 @@ async function recomputeAggregatesForLinkedAccounts(): Promise<number> {
 
   for (const account of accounts) {
     const pairs = await prisma.matchParticipant.findMany({
-      where: { puuid: account.puuid },
+      where: { puuid: account.puuid, role: { not: null } },
       select: { championId: true, role: true },
       distinct: ["championId", "role"]
     });
     if (pairs.length === 0) continue;
 
-    await recomputeChampionStats(account.id, account.puuid, pairs);
+    await recomputeChampionStats(
+      account.id,
+      account.puuid,
+      pairs.map((pair) => ({ championId: pair.championId, role: pair.role! }))
+    );
     recomputed += 1;
   }
 

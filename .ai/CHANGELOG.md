@@ -9,6 +9,7 @@ Ao concluir uma feature: adicionar uma entrada nova **no topo** deste arquivo, n
 
 ```markdown
 ## AAAA-MM-DD HH:MM — Título curto da feature
+
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/NNNN-slug.md` (quando existir um)
 
 Descrição de 1-3 linhas: o que mudou e por quê.
@@ -21,7 +22,19 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-07-27 21:15 — Observações reais de build, runas, feitiços e posição
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0010-observacoes-build-runas-feiticos-posicoes.md`
+
+Itens finais, runas, fragmentos, feitiços, posição e contexto Match-V5 passaram a ter contrato
+e persistência relacional versionada, preservando ordem, IDs, ausência e divergências. A API
+autenticada e o pós-game consomem os fatos sem transformá-los em recomendação ou elegibilidade
+global. Backfill local: 22 partidas/220 participantes na primeira execução e zero atualizações
+na segunda, sem chamadas externas nem duplicatas. 16 testes novos; ver
+`docs/match-observations.md`.
+
 ## 2026-07-27 20:04 — Resiliência HTTP, erros externos e estados de cache
+
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0009-resiliencia-http-cache.md`
 
 Todas as integrações ativas passaram a ter timeout e cancelamento explícitos, taxonomia central
@@ -33,6 +46,7 @@ isolado e o LCU distingue seus estados locais e limpa o draft quando perde a obs
 27 testes novos (472 no total). Ver `docs/http-resilience.md`.
 
 ## 2026-07-27 18:40 — Proveniência das ChampionTag
+
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0008-proveniencia-champion-tags.md`
 
 As 9 dimensões de gameplay usadas pelo motor de draft e pelo pré-game são derivadas das classes
@@ -52,6 +66,7 @@ campeões, 0 divergências entre arquivo e banco); scores do motor idênticos.
 54 testes novos (450 no total). Ver `docs/champion-tags.md`.
 
 ## 2026-07-27 14:20 — Pré-game real e derivado do draft atual
+
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0007-pregame-real-baseado-no-draft.md`
 
 `POST /drafts/pre-game-analysis` era a última rota estática do produto: devolvia quatro listas de
@@ -68,6 +83,7 @@ Deliberadamente **não** reusa `analyzeTeamComposition`, que devolve `0` em toda
 Ver `docs/pre-game-analysis.md`.
 
 ## 2026-07-26 17:30 — Posição desconhecida não vira mais MID
+
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0006-posicao-desconhecida-sem-fallback-mid.md`
 
 `DraftState.playerRole` virou opcional e ausência deixou de ser convertida em `MID` em nove
@@ -79,6 +95,7 @@ detecção de escolha manual. Trocar de posição descarta os cards anteriores a
 novos. 29 testes novos (326 no total).
 
 ## 2026-07-26 14:40 — Participação em objetivos a partir de dados reais
+
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0005-participacao-objetivos-real.md`
 
 `objectiveParticipation` passa a ser calculado do Match-V5 já persistido: dragões e barões que
@@ -90,6 +107,7 @@ objetivo neutro fica indisponível, não `0%`. Novo backfill local idempotente q
 0,85 → 1,0. 37 testes novos (301 no total).
 
 ## 2026-07-26 11:55 — Ausência versus zero nas estatísticas
+
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0004-ausencia-versus-zero-estatisticas.md`
 
 Auditoria e correção do fluxo de estatísticas pra que `0` signifique zero medido e ausência
@@ -101,6 +119,7 @@ legítima, e agregação de coleção vazia. Nova `StatCoverage` com amostra tot
 35 testes novos (264 no total); migration sem alterar dado existente.
 
 ## 2026-07-25 14:15 — Meta e matchup indisponíveis sem dados reais
+
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0003-meta-matchup-indisponiveis.md`
 
 Separa matchup pessoal de global, elimina os fallbacks falsos de `50` para matchup/meta e
@@ -108,6 +127,7 @@ normaliza o score somente com sinais disponíveis. A Champion Select mostra a co
 por candidato; compatibilidade com respostas antigas continua sem inventar evidência.
 
 ## 2026-07-25 15:52 — Contrato de origem, disponibilidade e confiança dos dados
+
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0002-contrato-origem-disponibilidade.md`
 
 Cria o contrato central (`DataProvenance`, `AvailabilityStatus`, `RecommendationMetric` com
@@ -118,6 +138,7 @@ um defeito achado na validação real: o desktop quebrava contra uma API anterio
 24 testes novos, incluindo a primeira suíte de componente do renderer (jsdom).
 
 ## 2026-07-25 12:05 — Estrutura de prompts/features, changelog e specs em `.ai/`
+
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0001-estrutura-prompts-changelog-specs.md`
 
 Cria `.ai/prompts/features/` (rastreamento de pedidos de feature com cabeçalho de status),
@@ -128,6 +149,7 @@ necessário/possível. Sem teste automatizado próprio — é convenção de pro
 executável.
 
 ## 2026-07-25 11:44 — Unificação de `.ai` via links simbólicos
+
 **Status:** IMPLEMENTADA
 
 `.claude`, `.codex` e `.agents` viram links simbólicos apontando pra `.ai`, que passa a ser a
@@ -135,6 +157,7 @@ executável.
 `CLAUDE.md`, `README.md`, `SPARTA_CODEX_INSTRUCTIONS.md` e `launch.json` movidos pra dentro.
 
 ## 2026-07-25 03:36 — Fase 16: draft real via League Client
+
 **Status:** IMPLEMENTADA · PR #31 (`feat/lcu-draft-import-16`)
 
 `deriveDraftSnapshot` deriva aliados, inimigos, banimentos e o campeão do jogador a partir da
@@ -143,6 +166,7 @@ limitação real: o watcher só transmitia eventos quando o valor mudava, deixan
 abrir o app já em champion select.
 
 ## 2026-07-25 00:58 — Fase 15: `ChampionTag` derivado pra todo o roster
+
 **Status:** IMPLEMENTADA · PR #30 (`feat/champion-tags-derived-15`)
 
 `deriveChampionTag` deriva as 9 dimensões do `ChampionTag` a partir de `tags`/`info` da Data
@@ -151,6 +175,7 @@ seed (nunca atualizava um campeão já gravado) e um bug de sinergia de aliados 
 expansão do roster.
 
 ## 2026-07-24 23:07 — Subfase 14F: polimento, acessibilidade e validação final (encerra a Fase 14)
+
 **Status:** IMPLEMENTADA · PR #29 (`feat/ui-polish-a11y-14f`)
 
 Migra as telas de autenticação pro design system novo, remove `styles/global.css` e os aliases
@@ -158,12 +183,14 @@ legados de token. Validação final medida no Electron real em 4 resoluções, f
 `prefers-reduced-motion` e offline com tema baixado.
 
 ## 2026-07-24 22:54 — Subfase 14E: Configurações e galeria de temas
+
 **Status:** IMPLEMENTADA · PR #28 (`feat/ui-settings-theme-14e`)
 
 Novo `ThemeGallery` com prévia grande da splash art e amostras da cor extraída, substituindo o
 grid técnico anterior. Configurações ganha abas (`Tabs`) pras duas seções.
 
 ## 2026-07-24 22:45 — Subfase 14D: Pós-game e Evolução
+
 **Status:** IMPLEMENTADA · PR #27 (`feat/ui-postgame-growth-14d`)
 
 Pós-game ganha rail de cards selecionáveis e hierarquia real de relatório (veredito, prioridade
@@ -171,6 +198,7 @@ de melhoria, razão + valor absoluto). Evolução agrupa por direção (piorando
 comparação) em vez de repetir "Estável".
 
 ## 2026-07-24 22:38 — Subfase 14C: Champion Select e Pré-game
+
 **Status:** IMPLEMENTADA · PR #26 (`feat/ui-draft-workspace-14c`)
 
 Champion Select vira workspace de decisão (barra de sessão, rail de recomendações compactas,
@@ -178,6 +206,7 @@ painel de detalhe com as 8 métricas). Corrige bug real de estado obsoleto em cl
 grid de inimigos (closure antigo sobrescrevendo seleções).
 
 ## 2026-07-24 22:29 — Subfase 14B: Dashboard e Perfil
+
 **Status:** IMPLEMENTADA · PR #25 (`feat/ui-dashboard-profile-14b`)
 
 Dashboard ganha herói com números agregados reais e faixa das últimas 10 partidas. Perfil ganha
@@ -185,6 +214,7 @@ filtro por posição, busca, ordenação e painel de detalhe fixo com as 8 médi
 de score. Corrige breakpoint de 2 colunas que nunca disparava no viewport padrão do Electron.
 
 ## 2026-07-24 22:20 — Subfase 14A: fundação do design system
+
 **Status:** IMPLEMENTADA · PR #24 (`feat/ui-foundation-14a`)
 
 Novo design system em `apps/desktop/src/renderer/src/ui/` (tokens, base, 16 componentes),
@@ -193,6 +223,7 @@ Novo design system em `apps/desktop/src/renderer/src/ui/` (tokens, base, 16 comp
 causavam bugs de cor em cascata.
 
 ## 2026-07-24 17:40 — Fase 13: o tema veste o app
+
 **Status:** IMPLEMENTADA · PR #23 (`feat/theme-identity-13`)
 
 Filtra chromas do seletor de skins usando a Community Dragon (o campo `chromas` da Data Dragon
@@ -201,6 +232,7 @@ em runtime nos tokens `--color-accent*`, com splash de fundo nas 5 telas princip
 que bloqueava silenciosamente todo fallback de Community Dragon desde a Fase 10.
 
 ## 2026-07-24 16:07 — Fix: módulo de temas (splash nunca carregava nem aplicava)
+
 **Status:** IMPLEMENTADA · PR #22 (`fix/theme-module-12`)
 
 Dois bugs reais independentes desde a Sub-fase 6a: `championSplashUrl` montava `.png` (a CDN só
@@ -208,6 +240,7 @@ serve `.jpg`, 403 em tudo) e `file://` era bloqueado pelo Chromium a partir da o
 do renderer. Handler IPC passa a devolver data URL; novo fallback via Community Dragon.
 
 ## 2026-07-23 19:04 — Fase 11: detecção de posição/lane + gating do Champion Select
+
 **Status:** IMPLEMENTADA · PR #21 (`feat/lane-detection-11`)
 
 `derivePlayerRole` lê `assignedPosition` do LCU (já tipado desde a Fase 6c, nunca consumido).
@@ -215,6 +248,7 @@ Corrige bug real: `draft.playerRole` estava hardcoded em `"MID"` pra todo mundo.
 ganha gating por sessão real (com opção de simular manualmente) e seletor manual de posição.
 
 ## 2026-07-23 18:16 — Fase 10: polimento de UX a partir do feedback ao vivo do usuário
+
 **Status:** IMPLEMENTADA · PR #20 (`feat/ux-polish-10`)
 
 Novo `WeaknessTrend.hasComparison` distingue "estável de verdade" de "ainda sem 2º bloco pra
@@ -222,6 +256,7 @@ comparar". Novo `ChampionIcon.tsx` com 3 estágios de fallback (Data Dragon → 
 placeholder), corrigindo ícones quebrados que dependiam do `championName` cru da Riot.
 
 ## 2026-07-23 14:44 — Fix: preload nunca carregava de verdade (`window.sparta` sempre indefinido)
+
 **Status:** IMPLEMENTADA · PR #19 (`fix/preload-cjs-loading`)
 
 Bug real presente desde o início do projeto, achado validando contra o Electron real via CDP: o
@@ -230,6 +265,7 @@ forçando build do preload pra CommonJS real (`.cjs`). Todo recurso dependente d
 nunca tinha funcionado em nenhuma sessão anterior.
 
 ## 2026-07-23 13:54 — Subfase 9b: Perfil, Pós-game e Evolução (encerra a Fase 9)
+
 **Status:** IMPLEMENTADA · PR #18 (`feat/visual-scoring-9b`)
 
 `ScoreBadge`/`StatBar`/`SignalChip` aplicados às 3 telas restantes. Novo prop `invert` em
@@ -237,24 +273,28 @@ nunca tinha funcionado em nenhuma sessão anterior.
 `ScoreBadge` (regra CSS genérica de `span` vencendo por ordem de arquivo).
 
 ## 2026-07-23 13:37 — Subfase 9a: `ScoreBadge`/`StatBar`/`SignalChip` + Dashboard + Champion Select
+
 **Status:** IMPLEMENTADA · PR #17 (`feat/visual-scoring-9a`)
 
 Primeira linguagem visual real de score (anel `conic-gradient`, barra horizontal, chips de
 sinal), sem lib de gráfico. Remove o card "Princípio do produto" do Dashboard.
 
 ## 2026-07-23 09:39 — Fix: card de skin com nome/botão sobrepostos
+
 **Status:** IMPLEMENTADA · PR #16 (`fix/skin-picker-overlap`)
 
 Card do passo 2 do seletor de skin reusava uma classe com `line-height: 0` feita pra outro grid,
 colapsando o texto. Nova classe própria `.skin-picker-card`.
 
 ## 2026-07-23 08:59 — Subfase 8b: polimento visual do desktop
+
 **Status:** IMPLEMENTADA · PR #15 (`feat/visual-polish-8b`)
 
 Componentes `Loading`/`GridSkeleton` substituem texto solto de carregamento. Pré-game ganha
 ícone/splash do campeão confirmado + inimigos conhecidos + resumo de inclinação de dano.
 
 ## 2026-07-23 08:43 — Subfase 8a: motor de build de campeão + seletor de time inimigo
+
 **Status:** IMPLEMENTADA · PR #14 (`feat/build-recommendation-8a`)
 
 Novo motor puro `recommendBuild` usa `tags`/`info` da Data Dragon (cobre ~170 campeões) em vez
@@ -262,6 +302,7 @@ da tabela curada `ChampionTag` (só 2 na época). Seletor real de até 5 inimigo
 inline no Champion Select.
 
 ## 2026-07-22 21:25 — Fase 7: auditoria e documentação dos algoritmos de scoring
+
 **Status:** IMPLEMENTADA · PR #13 (`feat/scoring-audit-phase7`)
 
 Corrige duas inconsistências reais (`DEATHS_BAD_VALUE` divergente entre 4 call sites, literal
@@ -269,18 +310,21 @@ Corrige duas inconsistências reais (`DEATHS_BAD_VALUE` divergente entre 4 call 
 raciocínio de design em `docs/scoring-model.md`/`docs/draft-recommendation.md`.
 
 ## 2026-07-22 20:39 — Sub-fase 6c: ordem de pick automática via LCU
+
 **Status:** IMPLEMENTADA · PR #12 (`feat/lcu-pick-order-6c`)
 
 `derivePickOrder` conta picks completos de aliados antes da própria ação, substituindo o input
 manual 1-5 quando o League Client está aberto em champion select real.
 
 ## 2026-07-22 20:27 — Sub-fase 6b: "quantas partidas analisar" + fix de CORS
+
 **Status:** IMPLEMENTADA · PR #11 (`feat/match-analysis-limit-6b`)
 
 Nova config pessoal `matchAnalysisLimit` (20/50/100/personalizado). Corrige bug real de CORS:
 `@fastify/cors` sem `methods` explícito bloqueava todo `PUT` no preflight silenciosamente.
 
 ## 2026-07-22 15:51 — Sub-fase 6a: tela de Configurações + tema com campeão/skin real
+
 **Status:** IMPLEMENTADA · PR #10 (`feat/settings-theme-skins-6a`)
 
 Substitui a lista fixa de 12 campeões curados por escolha livre de qualquer campeão/skin via
@@ -288,6 +332,7 @@ Data Dragon, com download real pro disco (primeiro uso de IPC request/response d
 bug real de campos `id`/`key` invertidos no `champion.json`.
 
 ## 2026-07-22 15:06 — Desktop conectado às rotas reais da API
+
 **Status:** IMPLEMENTADA · PR #9 (`feat/desktop-real-data-wiring`)
 
 Dashboard/Perfil/Champion Select trocam `mock-data.ts` (2 campeões hardcoded) por dado real via
@@ -295,6 +340,7 @@ novo `api-client.ts` + `use-async-data.ts`. Novas telas Pós-game e Evolução. 
 removido.
 
 ## 2026-07-22 14:29 — Fase 5: Growth Journey
+
 **Status:** IMPLEMENTADA · PR #8 (`feat/growth-journey-phase5`)
 
 `computeWeaknessTrends` compara blocos de `PostgameReport` já persistidos pra detectar tendência
@@ -302,6 +348,7 @@ de melhora/piora por ponto fraco — primeira fase do projeto sem nenhuma migra�
 derivada de dado já salvo pela Fase 4.
 
 ## 2026-07-22 01:58 — Fase 4: Post-Game Coach
+
 **Status:** IMPLEMENTADA · PR #7 (`feat/postgame-coach-phase4`)
 
 `generatePostGameAnalysis` religa `POST /postgame/analyze`/`GET /postgame/:matchId` com dado
@@ -309,6 +356,7 @@ real (antes 100% mock, aceitava performance inventada pelo próprio cliente). Pe
 `PostgameReport` via upsert.
 
 ## 2026-07-21 23:16 — Fase 3: Draft Intelligence
+
 **Status:** IMPLEMENTADA · PR #6 (`feat/draft-intelligence-phase3`)
 
 Corrige bloqueio real: `persistMatch` só gravava o participante rastreado, descartando os outros
@@ -316,18 +364,21 @@ Corrige bloqueio real: `persistMatch` só gravava o participante rastreado, desc
 com matchups/tags reais. Backfill retroativo dos participantes faltantes.
 
 ## 2026-07-21 21:20 — Fase 2: Player Intelligence
+
 **Status:** IMPLEMENTADA · PR #5 (`feat/player-intelligence-phase2`)
 
 `computeRecentForm`/`derivePlayerStrengthsWeaknesses` calculam forma recente e pontos
 fortes/fracos reais a partir do histórico agregado, persistidos a cada sync.
 
 ## 2026-07-21 18:46 — Refinamento visual do desktop
+
 **Status:** IMPLEMENTADA · PR #4 (`feat/desktop-visual-refresh`)
 
 Fonte unificada (Manrope), paleta migrada pra CSS custom properties, transições e animações de
 entrada — antes o app não tinha nenhuma transição.
 
 ## 2026-07-21 17:54 — Fase 1: Riot Sync
+
 **Status:** IMPLEMENTADA · PR #3 (`feat/riot-sync-phase1`)
 
 Catálogo real de campeões via Data Dragon, `RiotApiClient` conectado de verdade (antes existia
@@ -335,11 +386,13 @@ mas nunca era chamado), mapeadores puros Match-V5, sync incremental real, agrega
 `PlayerChampionStats`. Primeira fase que tira o produto do mock em todo o backend.
 
 ## 2026-07-21 17:38 — Fix: imports ESM/NodeNext da API
+
 **Status:** IMPLEMENTADA · PR #1 (`fix/api-esm-nodenext-imports`)
 
 Correção de infraestrutura anterior à Fase 1.
 
 ## 2026-07-21 17:37 — Fix: hardening de segurança
+
 **Status:** IMPLEMENTADA · PR #2 (`fix/security-hardening`)
 
 Correção de infraestrutura anterior à Fase 1.

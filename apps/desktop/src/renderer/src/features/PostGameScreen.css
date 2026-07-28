@@ -87,6 +87,25 @@
   gap: var(--space-4) var(--space-5);
 }
 
+.sp-observation {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.sp-observation__values {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.sp-observation__muted {
+  margin-top: var(--space-2);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
 /* Ação prática pra próxima partida - numerada, não uma lista de emoji. */
 .sp-tip {
   display: flex;

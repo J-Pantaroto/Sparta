@@ -9,6 +9,7 @@ import type {
   ChampionPerformanceScore,
   DraftState,
   GrowthJourney,
+  MatchLoadoutObservation,
   PickRecommendation,
   PlayerChampionStats,
   PlayerStrength,
@@ -308,6 +309,12 @@ export function analyzePostgame(token: string, matchId: string) {
 
 export function fetchPostgameReport(token: string, matchId: string) {
   return request<PostGameAnalysis>(`/postgame/${encodeURIComponent(matchId)}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
+export function fetchMatchObservation(token: string, matchId: string) {
+  return request<MatchLoadoutObservation>(`/matches/${encodeURIComponent(matchId)}/observation`, {
     headers: { Authorization: `Bearer ${token}` }
   });
 }

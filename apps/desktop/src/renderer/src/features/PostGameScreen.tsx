@@ -1,6 +1,7 @@
 import {
   calculateKda,
   roleBaselines,
+  type MatchLoadoutObservation,
   type MatchPerformanceMetrics,
   type PostGameAnalysis,
   type RecentChampionMatch
@@ -13,6 +14,7 @@ import {
   analyzePostgame,
   ApiError,
   fetchPostgameReport,
+  fetchMatchObservation,
   fetchRecentMatches,
   type RiotAccountSummary
 } from "../services/api-client";
@@ -51,12 +53,17 @@ interface PostGameScreenProps {
  * toa a cada clique. "Reanalisar" chama o POST direto, pro caso de mais
  * histórico ter sido sincronizado desde a primeira análise.
  */
-export function PostGameScreen({ riotAccounts, sessionToken, ddragonVersion }: PostGameScreenProps) {
+export function PostGameScreen({
+  riotAccounts,
+  sessionToken,
+  ddragonVersion
+}: PostGameScreenProps) {
   const account = riotAccounts[0];
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
   const [report, setReport] = useState<PostGameAnalysis | null>(null);
   const [reportStatus, setReportStatus] = useState<"idle" | "loading" | "error">("idle");
   const [reportError, setReportError] = useState<string | null>(null);
+  const [observation, setObservation] = useState<MatchLoadoutObservation | null>(null);
 
   const matches = useAsyncData<{ puuid: string; matches: RecentChampionMatch[] }>(
     () => (account ? fetchRecentMatches(account.puuid, 10) : undefined),
@@ -70,6 +77,10 @@ export function PostGameScreen({ riotAccounts, sessionToken, ddragonVersion }: P
   async function openMatch(matchId: string) {
     if (!sessionToken) return;
     setSelectedMatchId(matchId);
+    setObservation(null);
+    void fetchMatchObservation(sessionToken, matchId)
+      .then(setObservation)
+      .catch(() => setObservation(null));
     setReportStatus("loading");
     setReportError(null);
     try {
@@ -81,11 +92,17 @@ export function PostGameScreen({ riotAccounts, sessionToken, ddragonVersion }: P
           setReport(await analyzePostgame(sessionToken, matchId));
           setReportStatus("idle");
         } catch (analyzeError) {
-          setReportError(analyzeError instanceof Error ? analyzeError.message : "Não foi possível analisar a partida.");
+          setReportError(
+            analyzeError instanceof Error
+              ? analyzeError.message
+              : "Não foi possível analisar a partida."
+          );
           setReportStatus("error");
         }
       } else {
-        setReportError(error instanceof Error ? error.message : "Não foi possível carregar o relatório.");
+        setReportError(
+          error instanceof Error ? error.message : "Não foi possível carregar o relatório."
+        );
         setReportStatus("error");
       }
     }
@@ -99,7 +116,9 @@ export function PostGameScreen({ riotAccounts, sessionToken, ddragonVersion }: P
       setReport(await analyzePostgame(sessionToken, selectedMatchId));
       setReportStatus("idle");
     } catch (error) {
-      setReportError(error instanceof Error ? error.message : "Não foi possível reanalisar a partida.");
+      setReportError(
+        error instanceof Error ? error.message : "Não foi possível reanalisar a partida."
+      );
       setReportStatus("error");
     }
   }
@@ -156,7 +175,9 @@ export function PostGameScreen({ riotAccounts, sessionToken, ddragonVersion }: P
           aside={
             <div className="sp-matchlist">
               {matchList.map((match) => {
-                const champion = catalog.data?.find((candidate) => candidate.id === match.championId);
+                const champion = catalog.data?.find(
+                  (candidate) => candidate.id === match.championId
+                );
                 return (
                   <InteractiveCard
                     key={match.matchId}
@@ -165,7 +186,9 @@ export function PostGameScreen({ riotAccounts, sessionToken, ddragonVersion }: P
                     onClick={() => void openMatch(match.matchId)}
                     label={`Analisar partida de ${champion?.name ?? match.championId}`}
                   >
-                    <span className={`sp-match__result${match.won ? " sp-match__result--won" : ""}`} />
+                    <span
+                      className={`sp-match__result${match.won ? " sp-match__result--won" : ""}`}
+                    />
                     <div className="sp-match">
                       <ChampionAvatar
                         championId={match.championId}
@@ -174,7 +197,9 @@ export function PostGameScreen({ riotAccounts, sessionToken, ddragonVersion }: P
                         alt={champion?.name ?? `Campeão ${match.championId}`}
                       />
                       <span style={{ minWidth: 0 }}>
-                        <strong className="sp-match__name">{champion?.name ?? `Campeão ${match.championId}`}</strong>
+                        <strong className="sp-match__name">
+                          {champion?.name ?? `Campeão ${match.championId}`}
+                        </strong>
                         <span className="sp-match__meta">
                           {match.won ? "Vitória" : "Derrota"} · {roleLabels[match.role]}
                         </span>
@@ -207,19 +232,27 @@ export function PostGameScreen({ riotAccounts, sessionToken, ddragonVersion }: P
                   inline
                   description={reportError ?? undefined}
                   actions={
-                    <Button variant="secondary" icon={<RefreshCw size={14} />} onClick={() => void reanalyze()}>
+                    <Button
+                      variant="secondary"
+                      icon={<RefreshCw size={14} />}
+                      onClick={() => void reanalyze()}
+                    >
                       Tentar de novo
                     </Button>
                   }
                 />
               </Card>
             ) : (
-              report && selectedMatch && (
+              report &&
+              selectedMatch && (
                 <MatchReport
                   report={report}
                   match={selectedMatch}
-                  champion={catalog.data?.find((candidate) => candidate.id === selectedMatch.championId)}
+                  champion={catalog.data?.find(
+                    (candidate) => candidate.id === selectedMatch.championId
+                  )}
                   ddragonVersion={ddragonVersion}
+                  observation={observation}
                   onReanalyze={() => void reanalyze()}
                 />
               )
@@ -245,12 +278,14 @@ function MatchReport({
   match,
   champion,
   ddragonVersion,
+  observation,
   onReanalyze
 }: {
   report: PostGameAnalysis;
   match: RecentChampionMatch;
   champion?: DataDragonChampionSummary;
   ddragonVersion: string;
+  observation: MatchLoadoutObservation | null;
   onReanalyze: () => void;
 }) {
   const baseline = roleBaselines[match.role];
@@ -260,7 +295,12 @@ function MatchReport({
   // lado - só a razão esconde o número real, que é o que o jogador
   // reconhece da partida.
   const ratios = [
-    { label: "KDA", ratio: kda / baseline.kda, absolute: kda.toFixed(2), reference: baseline.kda.toString() },
+    {
+      label: "KDA",
+      ratio: kda / baseline.kda,
+      absolute: kda.toFixed(2),
+      reference: baseline.kda.toString()
+    },
     {
       label: "CS/min",
       ratio: report.metrics.csPerMinute / baseline.cs,
@@ -294,7 +334,14 @@ function MatchReport({
   return (
     <div style={{ display: "grid", gap: "var(--space-4)" }}>
       <Card tone="feature">
-        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-4)", marginBottom: "var(--space-4)" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "var(--space-4)",
+            marginBottom: "var(--space-4)"
+          }}
+        >
           <ChampionAvatar
             championId={match.championId}
             slug={champion?.key}
@@ -303,8 +350,17 @@ function MatchReport({
             alt={champion?.name ?? `Campeão ${match.championId}`}
           />
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: "flex", gap: "var(--space-2)", marginBottom: "var(--space-2)", flexWrap: "wrap" }}>
-              <Badge tone={match.won ? "positive" : "negative"}>{match.won ? "Vitória" : "Derrota"}</Badge>
+            <div
+              style={{
+                display: "flex",
+                gap: "var(--space-2)",
+                marginBottom: "var(--space-2)",
+                flexWrap: "wrap"
+              }}
+            >
+              <Badge tone={match.won ? "positive" : "negative"}>
+                {match.won ? "Vitória" : "Derrota"}
+              </Badge>
               <Badge tone="neutral" square>
                 {roleLabels[match.role]}
               </Badge>
@@ -326,6 +382,8 @@ function MatchReport({
         </div>
         <ObjectiveParticipationLine metrics={report.metrics} />
       </Card>
+
+      {observation && <MatchObservationCard observation={observation} />}
 
       {priority && (
         <Card>
@@ -384,7 +442,10 @@ function MatchReport({
 
       {report.tips.length > 0 && (
         <Card>
-          <SectionHeader title="Para a próxima partida" description="Ações práticas, na ordem de impacto." />
+          <SectionHeader
+            title="Para a próxima partida"
+            description="Ações práticas, na ordem de impacto."
+          />
           <div style={{ display: "grid", gap: "var(--space-2)" }}>
             {report.tips.map((tip, index) => (
               <div className="sp-tip" key={tip}>
@@ -402,6 +463,107 @@ function MatchReport({
         </Button>
       </div>
     </div>
+  );
+}
+
+function observedId(name: string | undefined, id: number | undefined) {
+  return name ?? (id === undefined ? "Indisponível" : `ID ${id}`);
+}
+
+function MatchObservationCard({ observation }: { observation: MatchLoadoutObservation }) {
+  const role = observation.position.normalizedRole;
+  const source =
+    observation.position.normalizedRoleSource === "TEAM_POSITION"
+      ? "teamPosition"
+      : observation.position.normalizedRoleSource === "INDIVIDUAL_POSITION"
+        ? "individualPosition"
+        : undefined;
+  const primary = observation.runes.selections.filter((rune) => rune.tree === "PRIMARY");
+  const secondary = observation.runes.selections.filter((rune) => rune.tree === "SECONDARY");
+
+  return (
+    <Card>
+      <SectionHeader
+        title="Dados observados da partida"
+        description={`Patch ${observation.context.patch ?? "indisponível"} · fila ${
+          observation.context.queueId ?? "indisponível"
+        }`}
+      />
+      <div className="sp-observation">
+        <div>
+          <strong>Itens utilizados</strong>
+          <div className="sp-observation__values">
+            {observation.items.map((item) => (
+              <Badge key={item.slot} tone="neutral">
+                {item.state === "EMPTY"
+                  ? `Slot ${item.slot + 1}: vazio`
+                  : item.state === "UNAVAILABLE"
+                    ? `Slot ${item.slot + 1}: indisponível`
+                    : `Slot ${item.slot + 1}: ${observedId(item.enrichment.name, item.itemId)}`}
+              </Badge>
+            ))}
+          </div>
+        </div>
+        <div>
+          <strong>Runas utilizadas</strong>
+          {observation.runes.status === "UNAVAILABLE" ? (
+            <p className="sp-observation__muted">Runas indisponíveis no payload.</p>
+          ) : (
+            <>
+              <p className="sp-observation__muted">
+                Primária{" "}
+                {observation.runes.primaryStyleId
+                  ? `ID ${observation.runes.primaryStyleId}`
+                  : "indisponível"}
+                :{" "}
+                {primary.map((rune) => observedId(rune.enrichment.name, rune.perkId)).join(" · ") ||
+                  "seleções indisponíveis"}
+              </p>
+              <p className="sp-observation__muted">
+                Secundária{" "}
+                {observation.runes.secondaryStyleId
+                  ? `ID ${observation.runes.secondaryStyleId}`
+                  : "indisponível"}
+                :{" "}
+                {secondary
+                  .map((rune) => observedId(rune.enrichment.name, rune.perkId))
+                  .join(" · ") || "seleções indisponíveis"}
+              </p>
+              <p className="sp-observation__muted">
+                Fragmentos:{" "}
+                {observation.runes.fragments
+                  .map(
+                    (fragment) =>
+                      `${fragment.slot.toLowerCase()} ${observedId(fragment.enrichment.name, fragment.fragmentId)}`
+                  )
+                  .join(" · ")}
+              </p>
+            </>
+          )}
+        </div>
+        <div>
+          <strong>Feitiços utilizados</strong>
+          <div className="sp-observation__values">
+            {observation.summonerSpells.map((spell) => (
+              <Badge key={spell.slot} tone="neutral">
+                Slot {spell.slot}: {observedId(spell.enrichment.name, spell.spellId)}
+              </Badge>
+            ))}
+          </div>
+        </div>
+        <div>
+          <strong>Posição observada</strong>
+          <p className="sp-observation__muted">
+            {role ? roleLabels[role] : "Indisponível"}
+            {source ? ` · fonte ${source}` : ""}
+            {observation.position.positionAssignedByMatchmaking
+              ? ` · matchmaking ${observation.position.positionAssignedByMatchmaking}`
+              : ""}
+            {observation.position.diverged ? " · campos divergentes preservados" : ""}
+          </p>
+        </div>
+      </div>
+    </Card>
   );
 }
 

@@ -12,3 +12,4 @@ Leitura recomendada:
 - `champion-tags.md` para a origem, derivação e revisão dos perfis de campeão.
 - `data-provenance.md` para origem, disponibilidade e confiança dos dados.
 - `database.md` para o schema inicial.
+- `match-observations.md` para itens, runas, feitiços e posições observados em cada partida.
