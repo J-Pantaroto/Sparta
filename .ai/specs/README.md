@@ -22,6 +22,7 @@ Snapshot gerado em: 2026-07-25 (atualizado em 2026-07-27).
 - `draft-recommendation.md` — motor de recomendação de draft.
 - `player-champion-pool.md` — pool pessoal por posição, origens, API e contrato 5+3.
 - `champion-execution-risk.md` — dificuldade oficial, evidência pessoal e risco de execução.
+- `champion-capabilities.md` — capacidades rastreadas até passivas, habilidades e metadados oficiais.
 - `github.md` — configuração de repositório/CI.
 - `postgame-analysis.md` — análise pós-game.
 - `pre-game-analysis.md` — análise pré-game derivada do draft atual.

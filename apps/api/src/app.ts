@@ -12,6 +12,7 @@ import { playersRoutes } from "./modules/players/routes.js";
 import { postgameRoutes } from "./modules/postgame/routes.js";
 import { replaysRoutes } from "./modules/replays/routes.js";
 import { matchesRoutes } from "./modules/matches/routes.js";
+import { catalogRoutes } from "./modules/catalog/routes.js";
 
 // Origens permitidas a chamar a API. O app empacotado carrega o renderer via
 // file:// e o Chromium envia Origin "null" nesse caso; localhost:5173 e o
@@ -56,6 +57,7 @@ export async function buildApp() {
   await app.register(draftsRoutes);
   await app.register(postgameRoutes);
   await app.register(matchesRoutes);
+  await app.register(catalogRoutes);
   await app.register(replaysRoutes);
 
   app.setErrorHandler((error, request, reply) => {

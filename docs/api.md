@@ -30,6 +30,11 @@ As recomendações atuais também carregam `CHAMPION_DIFFICULTY`,
 anterior sem esses campos é adaptada para `UNAVAILABLE`, sem neutros
 artificiais. Ver `docs/champion-execution-risk.md`.
 
+`GET /catalog/champions/:championId/capabilities` expõe o perfil técnico
+rastreável da Etapa 14, com evidências por passiva/habilidade, dimensões
+indisponíveis, versões e cobertura. A rota é somente consulta e não alimenta
+ranking ou pré-game. Ver `docs/champion-capabilities.md`.
+
 ## Erros externos
 
 Falhas externas seguem `docs/http-resilience.md`. 401/403 da Riot viram

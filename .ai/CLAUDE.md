@@ -1,5 +1,27 @@
 # Sparta - Contexto para Continuidade
 
+## Etapa 14: capacidades rastreáveis dos campeões
+
+`ChampionCapabilityProfile` é um catálogo técnico separado de `ChampionTag`.
+O extrator `champion-capability-extraction/1.0.0` lê somente os recursos
+completos oficiais `champion/{championKey}.json` da Data Dragon 16.14.1 em
+`pt_BR`, preservando passiva/habilidade, ID, nome, trecho oficial, regra,
+versão, locale, disponibilidade e cobertura.
+
+As 23 dimensões existem independentemente. A versão atual só disponibiliza
+presença textual explícita de controle, mobilidade, proteção e o
+`stats.attackrange` objetivo; ausência de termo fica `UNAVAILABLE`, nunca
+`false`. Hard CC não cria confiabilidade, dash não cria engage, escudo/cura
+não cria peel e classe Tank não cria frontline.
+
+O manifesto revisável `data/seeds/champion-capabilities.json` cobre 173
+campeões. Cobertura média de 19,15% é apenas proporção de dimensões utilizáveis
+e não entra em score. Geração/verificação:
+`champion-capabilities:generate`/`champion-capabilities:check`. Consulta:
+`GET /catalog/champions/:championId/capabilities`. Ranking, recomendações,
+pré-game e as nove dimensões de `ChampionTag` permanecem inalterados. Ver
+`docs/champion-capabilities.md`.
+
 ## Etapa 13: dificuldade e risco pessoal de execução
 
 O ranking preserva `info.difficulty` da Data Dragon como fato oficial 0-10,

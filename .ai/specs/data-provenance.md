@@ -106,6 +106,15 @@ rate ou desempenho. Sem campo oficial, dificuldade e risco ficam
 `UNAVAILABLE` e não alteram o score. Ver
 `docs/champion-execution-risk.md`.
 
+### Capacidades rastreáveis (Etapa 14)
+
+O texto de passivas/habilidades e `stats.attackrange` têm origem oficial na
+Data Dragon. A capacidade extraída é `CALCULATED`, com patch, locale e versão
+do algoritmo; cada evidência conserva ID, nome, trecho oficial e regra.
+Ausência textual fica `UNAVAILABLE`, nunca `false`. Cobertura informa apenas
+quantas das 23 dimensões têm informação utilizável e não participa de score.
+Ver `docs/champion-capabilities.md`.
+
 ## Confiança: dois formatos
 
 O domínio tem `Confidence` categórico (`"low"`/`"medium"`/`"high"`) desde a Fase 2, exibido ao

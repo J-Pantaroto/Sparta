@@ -148,6 +148,11 @@ derivado/curável. A Etapa 13 não o promoveu a dado oficial: preservou
 produzir `CHAMPION_DIFFICULTY` e `EXECUTION_RISK`. Ver
 `docs/champion-execution-risk.md`.
 
+O `ChampionCapabilityProfile` da Etapa 14 também é um conceito separado. Ele
+preserva evidências textuais específicas de passivas/habilidades e nunca copia
+ou sobrescreve as nove dimensões de `ChampionTag`. Conflitos ficam preservados
+para uma análise futura. Ver `docs/champion-capabilities.md`.
+
 ## Como revisar um campeão
 
 1. Abra `data/seeds/champion-tags.json` e ache a entrada.

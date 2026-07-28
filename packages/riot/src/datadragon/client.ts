@@ -14,6 +14,24 @@ export interface DataDragonChampion {
   info?: { attack: number; defense: number; magic: number; difficulty: number };
 }
 
+export interface DataDragonChampionSpell {
+  id: string;
+  name: string;
+  description?: string;
+  tooltip?: string;
+}
+
+export interface DataDragonChampionDetails extends DataDragonChampion {
+  passive?: {
+    name: string;
+    description?: string;
+  };
+  spells: DataDragonChampionSpell[];
+  stats?: {
+    attackrange?: number;
+  };
+}
+
 export async function fetchDataDragonVersions(): Promise<string[]> {
   return requestJson("https://ddragon.leagueoflegends.com/api/versions.json", {
     integration: "DATA_DRAGON",
@@ -33,6 +51,34 @@ export async function fetchDataDragonChampions(version: string, locale = "pt_BR"
   return Object.values(payload.data);
 }
 
+/**
+ * Recurso oficial completo por campeão. Diferente de `champion.json`, este
+ * arquivo inclui passiva, habilidades e metadados necessários para extração
+ * rastreável de capacidades.
+ */
+export async function fetchDataDragonChampionDetails(
+  version: string,
+  championKey: string,
+  locale = "pt_BR"
+): Promise<DataDragonChampionDetails> {
+  const encodedKey = encodeURIComponent(championKey);
+  const url =
+    `https://ddragon.leagueoflegends.com/cdn/${version}/data/${locale}/` +
+    `champion/${encodedKey}.json`;
+  const payload = await requestJson<{
+    data: Record<string, DataDragonChampionDetails>;
+  }>(url, {
+    integration: "DATA_DRAGON",
+    timeoutMs: HTTP_TIMEOUTS.dataDragonMs,
+    validate: (candidate): candidate is {
+      data: Record<string, DataDragonChampionDetails>;
+    } =>
+      isChampionDetailsPayload(candidate) &&
+      candidate.data[championKey]?.id === championKey
+  });
+  return payload.data[championKey]!;
+}
+
 function isChampionCatalog(payload: unknown): payload is { data: Record<string, DataDragonChampion> } {
   if (typeof payload !== "object" || payload === null || Array.isArray(payload)) return false;
   const data = (payload as { data?: unknown }).data;
@@ -48,6 +94,39 @@ function isChampionCatalog(payload: unknown): payload is { data: Record<string, 
         typeof (champion as DataDragonChampion).id === "string" &&
         typeof (champion as DataDragonChampion).name === "string" &&
         Array.isArray((champion as DataDragonChampion).tags)
+    )
+  );
+}
+
+function isChampionDetailsPayload(payload: unknown): payload is {
+  data: Record<string, DataDragonChampionDetails>;
+} {
+  if (typeof payload !== "object" || payload === null || Array.isArray(payload)) {
+    return false;
+  }
+  const data = (payload as { data?: unknown }).data;
+  if (typeof data !== "object" || data === null || Array.isArray(data)) {
+    return false;
+  }
+  const champions = Object.values(data);
+  return (
+    champions.length === 1 &&
+    champions.every(
+      (champion) =>
+        typeof champion === "object" &&
+        champion !== null &&
+        typeof (champion as DataDragonChampionDetails).key === "string" &&
+        typeof (champion as DataDragonChampionDetails).id === "string" &&
+        typeof (champion as DataDragonChampionDetails).name === "string" &&
+        Array.isArray((champion as DataDragonChampionDetails).tags) &&
+        Array.isArray((champion as DataDragonChampionDetails).spells) &&
+        (champion as DataDragonChampionDetails).spells.every(
+          (spell) =>
+            typeof spell === "object" &&
+            spell !== null &&
+            typeof spell.id === "string" &&
+            typeof spell.name === "string"
+        )
     )
   );
 }

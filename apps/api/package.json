@@ -16,6 +16,8 @@
     "catalog:sync": "tsx src/modules/catalog/sync-catalog-cli.ts",
     "champion-tags:generate": "tsx src/modules/catalog/generate-champion-tags-cli.ts",
     "champion-tags:check": "tsx src/modules/catalog/generate-champion-tags-cli.ts --check",
+    "champion-capabilities:generate": "tsx src/modules/catalog/generate-champion-capabilities-cli.ts",
+    "champion-capabilities:check": "tsx src/modules/catalog/generate-champion-capabilities-cli.ts --check",
     "backfill:match-participants": "tsx src/modules/matches/backfill-participants-cli.ts",
     "backfill:objective-participation": "tsx src/modules/matches/backfill-objective-participation-cli.ts",
     "backfill:match-observations": "tsx src/modules/matches/backfill-match-observations-cli.ts"
