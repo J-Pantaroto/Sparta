@@ -1,7 +1,7 @@
 ---
-status: EM_ANDAMENTO
+status: IMPLEMENTADA
 solicitado_em: 2026-07-28 17:22
-implementado_em:
+implementado_em: 2026-07-28 17:39
 ---
 
 # Vincular drafts persistidos às partidas Match-V5
@@ -30,7 +30,9 @@ implementado_em:
 ## Notas de implementação
 
 - Contrato `draft-match-link/1.0.0`, estados explícitos, evidências e revisões imutáveis.
+- Implementação funcional no commit `4851c09`, enviado para `origin/main`.
 - `gameId` observado via LCU read-only; `matchId` é preenchido somente pelo reconciliador.
 - Estratégia secundária exige conjunto forte e candidato único; não há score nem desempate.
 - Backfill protegido percorre apenas sessões existentes e o sync trata reconciliação como best-effort.
 - Migração preserva vínculos legados não confiáveis em `legacyLinkedMatchId`.
+- Validados 700 testes, typecheck dos quatro projetos, lint e geração Prisma.

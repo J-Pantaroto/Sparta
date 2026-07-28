@@ -22,6 +22,21 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-07-28 17:39 — Vínculo auditável entre drafts e Match-V5
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0021-vinculo-draft-match-v5.md`
+
+Sessões reais de draft agora são reconciliadas deterministicamente com
+partidas Match-V5. O `gameId` observado pelo LCU tem precedência permanente;
+sem ele, somente o conjunto completo de evidências fortes e um candidato
+único pode vincular. Pendência, ambiguidade, insuficiência e dodge permanecem
+estados explícitos. O vínculo é transacional, idempotente, versionado e
+auditável por revisões; o backfill protegido não cria sessões e falhas não
+invalidam o sync. O desktop não envia `matchId` para concluir uma sessão, e o
+histórico abre o pós-game vinculado sem avaliar acerto ou causalidade da
+recomendação. Foram validados 700 testes, typecheck dos quatro projetos,
+lint e geração Prisma. Implementação funcional: `4851c09`.
+
 ## 2026-07-28 17:02 — Impacto teórico rastreável das mudanças do patch
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0020-impacto-teorico-patch.md`
