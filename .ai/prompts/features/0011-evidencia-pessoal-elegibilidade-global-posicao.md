@@ -1,7 +1,7 @@
 ---
-status: PENDENTE
+status: IMPLEMENTADA
 solicitado_em: 2026-07-27 21:30
-implementado_em:
+implementado_em: 2026-07-27 21:47
 ---
 
 # Evidência pessoal e elegibilidade global por posição

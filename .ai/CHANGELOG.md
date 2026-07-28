@@ -22,6 +22,18 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-07-27 21:47 — Evidência pessoal separada de elegibilidade global
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0011-evidencia-pessoal-elegibilidade-global-posicao.md`
+
+Experiência do jogador por campeão/posição agora agrega exclusivamente as observações Match-V5
+normalizadas, com amostra, V/D, última partida, patches, filas, filtros e proveniência.
+Elegibilidade global permanece explicitamente indisponível (`eligible: null`), sem inferência
+por Smite, classes, frequência ou curadoria. `ChampionTag.roles` ficou vazio nos 173 campeões,
+com pool e scores invariantes; API, pós-jogo e compatibilidade legada usam conceitos distintos.
+12 testes novos; validação real encontrou 8 partidas Vel'Koz/SUPPORT em duas filas e zero
+Vel'Koz/MID, sem fallback. Ver `docs/champion-role-evidence.md`.
+
 ## 2026-07-27 21:15 — Observações reais de build, runas, feitiços e posição
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0010-observacoes-build-runas-feiticos-posicoes.md`
