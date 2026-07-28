@@ -17,6 +17,7 @@ import type { PlayerChampionPoolCandidate } from "../types/player-champion-pool.
 import { createChampionDifficultyEvidence } from "./execution-risk.js";
 import { aggregatePersonalLoadoutEvidence } from "../aggregation/personal-loadout-evidence.js";
 import type { MatchLoadoutObservation } from "../types/match-observation.js";
+import { defaultGlobalStatisticsProvider } from "../global/global-statistics-provider.js";
 
 const championStats: PlayerChampionStats[] = [
   {
@@ -214,6 +215,43 @@ describe("recommendation engine", () => {
         dataCoverage
       }))
     );
+  });
+
+  it("provider global padrão indisponível não altera ranking, score ou cobertura", async () => {
+    const input = {
+      draft: {
+        playerRole: "MID" as const,
+        pickOrder: 1,
+        allies: [],
+        enemies: [],
+        bannedChampionIds: []
+      },
+      player,
+      championStats,
+      championTags: tags,
+      matchups: [],
+      compositionRules: {
+        minimumFrontline: 35,
+        minimumEngage: 35,
+        minimumWaveclear: 35,
+        preferDamageBalance: true
+      },
+      patchMeta: null
+    };
+    const before = recommendPicks(input);
+
+    const global = await defaultGlobalStatisticsProvider.getChampionRoleStatistics({
+      championId: 61,
+      patch: "16.14",
+      role: "MID",
+      queueId: 420,
+      region: null,
+      tier: null
+    });
+    const after = recommendPicks(input);
+
+    expect(global.status).toBe("UNAVAILABLE");
+    expect(after).toEqual(before);
   });
 
   it("detects composition risks", () => {

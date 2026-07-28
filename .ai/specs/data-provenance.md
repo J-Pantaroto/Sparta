@@ -1,5 +1,18 @@
 # Origem, disponibilidade e confiança dos dados
 
+## Contratos globais sem fonte (Etapa 18)
+
+`GlobalStatisticContext` torna obrigatórios patch, posição, fila, amostra,
+fornecedor, dataset, versão do adapter e datas; região e elo aparecem como
+valor ou `null`, nunca como inferência. Cada `GlobalStructuredMetric` repete a
+proveniência e força `value: null` quando `UNAVAILABLE`. Cache é apenas
+transporte e não substitui fornecedor/dataset.
+
+O provider padrão não acessa rede nem histórico pessoal. Matchup global, meta,
+builds globais e elegibilidade global continuam indisponíveis. A candidata
+documentada é agregação própria após Production Key e plano de coleta
+aprovados; ver `docs/adr/0002-global-meta-source.md`.
+
 ## Loadouts pessoais (Etapa 17)
 
 Itens, perks, fragmentos, feitiços, patch, fila, resultado e data continuam

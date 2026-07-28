@@ -14,4 +14,9 @@ O LCU distingue cliente fechado, lockfile ausente/inválido, credencial local in
 recusada, timeout, endpoint indisponível, fora do champion select e payload inválido. Perder a
 observação limpa o draft.
 
+`UnavailableGlobalStatisticsProvider` é o provider global padrão e não faz
+HTTP, não lê credencial e não usa cache. TTL, stale, concorrência, retry e
+invalidação futuros estão definidos no ADR
+`docs/adr/0002-global-meta-source.md`, mas continuam inativos.
+
 Ver o inventário, a matriz completa e o contrato da API em `docs/http-resilience.md`.

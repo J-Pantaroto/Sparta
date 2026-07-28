@@ -1,5 +1,23 @@
 # Sparta - Contexto para Continuidade
 
+## Etapa 18: decisão e contrato da fonte global de meta
+
+Decisão registrada como `SELF_AGGREGATION_CANDIDATE`: a candidata para o meta
+de partidas ranqueadas é agregação própria sobre APIs oficiais da Riot,
+somente depois de Production Key, uso estatístico, retenção, população do
+piloto, privacidade e orçamento serem explicitamente aprovados. GRID,
+PandaScore e Abios têm ofertas legítimas de esports, mas não representam a
+ladder segmentada por elo/região/fila. Scraping foi rejeitado.
+
+O core expõe `GlobalStatisticsProvider`, contratos
+`global-statistics-contract/1.0.0` e o provider operacional padrão
+`UnavailableGlobalStatisticsProvider`. Ele não faz I/O, não lê ambiente, não
+usa fixtures e devolve valor `null`, amostra 0 e contexto explícito.
+Elegibilidade continua `eligible: null`, sem thresholds. `GLOBAL_MATCHUP`,
+`META_STRENGTH`, taxas e loadouts globais permanecem indisponíveis; nenhum
+ranking, score, risco, estratégia ou snapshot foi alterado. Ver
+`docs/adr/0002-global-meta-source.md`.
+
 ## Etapa 17: inteligência pessoal de builds, runas e feitiços
 
 `aggregatePersonalLoadoutEvidence` (`personal-loadout-evidence/1.0.0`) agrega

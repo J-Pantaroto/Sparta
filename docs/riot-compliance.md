@@ -18,6 +18,19 @@ Princípios do Sparta:
 - Tratar LCU como integração local e read-only no MVP.
 - Documentar qualquer endpoint LCU antes de habilitar uso real.
 
+## Decisão sobre meta global (Etapa 18)
+
+A agregação própria via Riot API é apenas
+`SELF_AGGREGATION_CANDIDATE`. Uma Personal Key não sustentará coleta global.
+Antes de qualquer piloto são exigidos registro/atualização do produto,
+Production Key que cubra explicitamente esse uso, confirmação de retenção e
+exposição dos agregados, plano de amostragem, privacidade e orçamento.
+
+Nenhum endpoint adicional está ativo nesta etapa. `LEAGUE-V4` e o uso
+amostral de `MATCH-V5` são somente arquitetura futura documentada no ADR
+`docs/adr/0002-global-meta-source.md`; não devem ser adicionados ao cliente
+nem chamados sem aprovação explícita.
+
 ## Endpoints Riot API em uso (backend)
 
 `RIOT_API_KEY` existe só no backend (`apps/api`), nunca no desktop/renderer — consistente com o princípio acima. Implementados em `packages/riot/src/clients/riot-api-client.ts` (`RiotApiClient`), chamados só por `apps/api/src/modules/riot-integration/` e `apps/api/src/modules/sync/`:

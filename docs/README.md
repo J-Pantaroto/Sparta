@@ -19,3 +19,4 @@ Leitura recomendada:
 - `database.md` para o schema inicial.
 - `match-observations.md` para itens, runas, feitiços e posições observados em cada partida.
 - `personal-loadout-evidence.md` para a agregação pessoal desses loadouts por campeão e posição.
+- `adr/0002-global-meta-source.md` para a decisão da fonte global, os contratos neutros de fornecedor e as condições de aprovação.

@@ -15,6 +15,15 @@
 Não há outra chamada HTTP ativa em jobs, scripts ou no serviço Python. O inventário deve ser
 atualizado quando uma integração for adicionada.
 
+## Fonte global planejada, ainda inativa
+
+`UnavailableGlobalStatisticsProvider` é o provider global padrão e não
+realiza HTTP, não lê credencial e não usa cache. A política futura de TTL,
+stale, chave, concorrência, retry e invalidação por patch está definida no
+ADR `docs/adr/0002-global-meta-source.md`, mas não foi ativada porque nenhuma
+fonte recebeu aprovação. Quando houver adapter real, ele deve entrar no
+inventário acima e reutilizar esta política compartilhada.
+
 ## Política compartilhada
 
 `packages/riot/src/http/` concentra:
