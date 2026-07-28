@@ -23,7 +23,8 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@sparta/core": "workspace:*"
+    "@sparta/core": "workspace:*",
+    "cheerio": "1.0.0"
   },
   "devDependencies": {
     "@types/node": "^24.0.10"

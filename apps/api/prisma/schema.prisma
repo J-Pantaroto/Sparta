@@ -321,6 +321,61 @@ model ApiCacheEntry {
   createdAt   DateTime @default(now())
 }
 
+/// Identidade lógica de uma nota oficial: patch + locale + URL oficial.
+/// O conteúdo mutável vive em revisões imutáveis.
+model PatchRelease {
+  id          String   @id @default(uuid())
+  patch       String
+  locale      String
+  sourceUrl   String
+  createdAt   DateTime @default(now())
+  revisions   PatchReleaseRevision[]
+  attempts    PatchImportAttempt[]
+
+  @@unique([patch, locale, sourceUrl])
+  @@index([patch, locale])
+}
+
+/// Evidência oficial imutável de uma versão da página. Uma edição posterior
+/// da Riot cria outra revisão; nunca atualiza changesJson ou sourceHash.
+model PatchReleaseRevision {
+  id             String   @id @default(uuid())
+  patchReleaseId String
+  revision       Int
+  sourceHash     String
+  title          String
+  publishedAt    DateTime?
+  collectedAt    DateTime
+  parserVersion  String
+  status         String
+  changesJson    Json
+  provenanceJson Json
+  createdAt      DateTime @default(now())
+  patchRelease   PatchRelease @relation(fields: [patchReleaseId], references: [id], onDelete: Cascade)
+
+  @@unique([patchReleaseId, revision])
+  @@unique([patchReleaseId, sourceHash])
+  @@index([sourceHash])
+}
+
+/// Resultado sanitizado de cada tentativa controlada. Falhas ficam separadas
+/// das revisões válidas para nunca fabricar um release vazio.
+model PatchImportAttempt {
+  id             String   @id @default(uuid())
+  patchReleaseId String?
+  patch          String
+  locale         String
+  sourceUrl      String
+  attemptedAt    DateTime @default(now())
+  status         String
+  errorCode      String?
+  cacheState     String?
+  patchRelease   PatchRelease? @relation(fields: [patchReleaseId], references: [id], onDelete: SetNull)
+
+  @@index([patch, locale, attemptedAt])
+  @@index([patchReleaseId, attemptedAt])
+}
+
 model MatchObservation {
   id                              String   @id @default(uuid())
   matchParticipantId              String   @unique

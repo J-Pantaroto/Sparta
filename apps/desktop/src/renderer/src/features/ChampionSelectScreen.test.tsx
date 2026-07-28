@@ -1,19 +1,21 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
-import type { DraftState, PickRecommendation } from "@sparta/core";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { DraftState, PatchRelease, PickRecommendation } from "@sparta/core";
 import { ChampionSelectScreen } from "./ChampionSelectScreen";
 
 const apiMocks = vi.hoisted(() => ({
   fetchPlayerPool: vi.fn(),
   addPlayerPoolEntry: vi.fn(),
-  disablePlayerPoolEntry: vi.fn()
+  disablePlayerPoolEntry: vi.fn(),
+  fetchPatchRelease: vi.fn()
 }));
 
 vi.mock("../services/api-client", () => ({
   fetchPlayerProfile: () => new Promise(() => {}),
   fetchPlayerPool: apiMocks.fetchPlayerPool,
   addPlayerPoolEntry: apiMocks.addPlayerPoolEntry,
-  disablePlayerPoolEntry: apiMocks.disablePlayerPoolEntry
+  disablePlayerPoolEntry: apiMocks.disablePlayerPoolEntry,
+  fetchPatchRelease: apiMocks.fetchPatchRelease
 }));
 vi.mock("../services/datadragon", () => ({
   fetchAllChampions: () => Promise.resolve([]),
@@ -47,6 +49,26 @@ const recomendacaoMid = {
   metricDetails: [],
   dataCoverage: 1
 } as unknown as PickRecommendation;
+
+const releaseSemMudancas: PatchRelease = {
+  patch: "26.14",
+  title: "Notas da Atualização 26.14",
+  locale: "pt_BR",
+  publishedAt: "2026-07-14T18:00:00.000Z",
+  collectedAt: "2026-07-28T18:00:00.000Z",
+  sourceUrl:
+    "https://www.leagueoflegends.com/pt-br/news/game-updates/league-of-legends-patch-26-14-notes/",
+  sourceHash: "hash",
+  parserVersion: "parser/1",
+  revision: 1,
+  status: "AVAILABLE",
+  changes: [],
+  provenance: { sourceType: "OFFICIAL", status: "AVAILABLE" }
+};
+
+beforeEach(() => {
+  apiMocks.fetchPatchRelease.mockResolvedValue(releaseSemMudancas);
+});
 
 function renderScreen(draft: Partial<DraftState>, recommendations: PickRecommendation[] = []) {
   const setDraft = vi.fn();
@@ -403,5 +425,57 @@ describe("dificuldade e risco na Champion Select (Etapa 13)", () => {
     expect(
       screen.getByTitle("Dificuldade geral baixa e nenhuma partida observada nesta posição.")
     ).toBeDefined();
+  });
+});
+
+describe("Patch Intelligence na Champion Select (Etapa 19)", () => {
+  it("mostra a mudança como contexto secundário, com evidência e aviso de meta", async () => {
+    apiMocks.fetchPatchRelease.mockResolvedValue({
+      ...releaseSemMudancas,
+      status: "PARTIAL",
+      changes: [
+        {
+          id: "orianna-q",
+          entityType: "CHAMPION",
+          entityId: 61,
+          entityName: "Orianna",
+          entityResolution: { status: "RESOLVED" },
+          changeType: "BUFF",
+          affectedComponent: "Q – Comando: Atacar",
+          officialSummary: "Vamos fortalecer Orianna neste patch.",
+          officialDetails: ["Dano: 10 ⇒ 12"],
+          structuredChanges: [
+            {
+              label: "Dano",
+              previousValue: "10",
+              newValue: "12",
+              numericPreviousValue: 10,
+              numericNewValue: 12,
+              numericDelta: 2,
+              status: "AVAILABLE"
+            }
+          ],
+          status: "AVAILABLE",
+          provenance: { sourceType: "OFFICIAL", status: "AVAILABLE" }
+        }
+      ]
+    } satisfies PatchRelease);
+
+    renderScreen({ playerRole: "MID", playerRoleSource: "USER", patch: "16.14.1" }, [
+      recomendacaoMid
+    ]);
+
+    expect(await screen.findByText("Patch 26.14")).toBeDefined();
+    expect(apiMocks.fetchPatchRelease).toHaveBeenCalledWith("26.14");
+    expect(screen.getAllByText("Buff oficial neste patch").length).toBeGreaterThan(0);
+    expect(screen.getByText("Q – Comando: Atacar")).toBeDefined();
+    expect(screen.getByText("Antes: 10 · Agora: 12")).toBeDefined();
+    expect(
+      screen.getByText(/Mudança oficial não representa força observada no meta/)
+    ).toBeDefined();
+    expect(screen.getByRole("link", { name: "Fonte oficial" }).getAttribute("href")).toBe(
+      releaseSemMudancas.sourceUrl
+    );
+    expect(screen.getByText("Por que este pick")).toBeDefined();
   });
 });

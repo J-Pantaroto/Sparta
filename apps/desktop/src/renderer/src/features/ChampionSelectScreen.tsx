@@ -1,6 +1,7 @@
 import {
   type DraftState,
   type PickRecommendation,
+  type PatchChange,
   type PlayerChampionPoolEntry,
   type PlayerChampionPoolRoleSummary,
   type RecommendationPoolSummary,
@@ -22,6 +23,7 @@ import { useAsyncData } from "../hooks/use-async-data";
 import {
   addPlayerPoolEntry,
   disablePlayerPoolEntry,
+  fetchPatchRelease,
   fetchPlayerPool,
   type RiotAccountSummary
 } from "../services/api-client";
@@ -54,6 +56,7 @@ import {
 } from "../ui";
 import { BuildPanel } from "./BuildPanel";
 import { PersonalLoadoutHistory } from "./PersonalLoadoutHistory";
+import { PatchSummary } from "./PatchSummary";
 import "./ChampionSelectScreen.css";
 
 const MAX_ENEMIES = 5;
@@ -127,6 +130,8 @@ export function ChampionSelectScreen({
         : undefined,
     [sessionToken, draft.playerRole, poolRevision]
   );
+  const officialPatch = officialPatchFromGameVersion(draft.patch);
+  const patch = useAsyncData(() => fetchPatchRelease(officialPatch), [officialPatch]);
 
   // A recomendação #1 muda conforme o draft evolui; sem seleção explícita, o
   // detalhe acompanha o topo da lista em vez de ficar preso num campeão que
@@ -136,6 +141,11 @@ export function ChampionSelectScreen({
     allRecommendations.find((recommendation) => recommendation.championId === selectedId) ??
     recommendations[0] ??
     alternatives[0];
+  const patchChangesFor = (championId: number) =>
+    patch.data?.changes.filter(
+      (change) => change.entityType === "CHAMPION" && change.entityId === championId
+    ) ?? [];
+  const selectedPatchChanges = selected ? patchChangesFor(selected.championId) : [];
 
   useEffect(() => {
     if (selectedId !== null && !allRecommendations.some((item) => item.championId === selectedId)) {
@@ -399,6 +409,8 @@ export function ChampionSelectScreen({
         )}
       </Card>
 
+      {patch.data && <PatchSummary release={patch.data} />}
+
       {draft.playerRole && sessionToken && (
         <Card>
           <SectionHeader
@@ -555,6 +567,11 @@ export function ChampionSelectScreen({
                               {strategicCompactSummary(recommendation)}
                             </span>
                           )}
+                          {patchIndicator(patchChangesFor(recommendation.championId)) && (
+                            <span className="sp-rec__patch">
+                              {patchIndicator(patchChangesFor(recommendation.championId))!.label}
+                            </span>
+                          )}
                         </span>
                         <ScoreBadge score={recommendation.totalScore} size="xs" />
                       </div>
@@ -599,6 +616,14 @@ export function ChampionSelectScreen({
                                   {strategicCompactSummary(recommendation)}
                                 </span>
                               )}
+                              {patchIndicator(patchChangesFor(recommendation.championId)) && (
+                                <span className="sp-rec__patch">
+                                  {
+                                    patchIndicator(patchChangesFor(recommendation.championId))!
+                                      .label
+                                  }
+                                </span>
+                              )}
                             </span>
                             <ScoreBadge score={recommendation.totalScore} size="xs" />
                           </div>
@@ -634,10 +659,52 @@ export function ChampionSelectScreen({
                             )}
                             <Badge tone="neutral">{poolSourceLabel(selected)}</Badge>
                             <Badge tone="neutral">{personalGamesLabel(selected)}</Badge>
+                            {patchIndicator(selectedPatchChanges) && (
+                              <Badge tone={patchIndicator(selectedPatchChanges)!.tone}>
+                                {patchIndicator(selectedPatchChanges)!.label}
+                              </Badge>
+                            )}
                           </div>
                         </div>
                         <ScoreBadge score={selected.totalScore} size="lg" />
                       </div>
+
+                      {selectedPatchChanges.length > 0 && patch.data && (
+                        <div className="sp-patch-detail">
+                          <SectionHeader
+                            title="Mudanças oficiais neste patch"
+                            description="Informação editorial da Riot, separada dos sinais usados pelo ranking."
+                          />
+                          {selectedPatchChanges.map((change) => (
+                            <article key={change.id} className="sp-patch-change">
+                              <strong>{change.affectedComponent ?? change.entityName}</strong>
+                              {change.officialSummary && <p>{change.officialSummary}</p>}
+                              <ul>
+                                {change.officialDetails.map((detail, index) => {
+                                  const delta = change.structuredChanges[index];
+                                  return (
+                                    <li key={`${change.id}-${index}`}>
+                                      {detail}
+                                      {delta?.previousValue !== undefined &&
+                                        delta.newValue !== undefined && (
+                                          <span>
+                                            Antes: {delta.previousValue} · Agora: {delta.newValue}
+                                          </span>
+                                        )}
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                            </article>
+                          ))}
+                          <p className="sp-patch-detail__warning">
+                            Mudança oficial não representa força observada no meta.{" "}
+                            <a href={patch.data.sourceUrl} target="_blank" rel="noreferrer">
+                              Fonte oficial
+                            </a>
+                          </p>
+                        </div>
+                      )}
 
                       <SectionHeader
                         title="Por que este pick"
@@ -869,4 +936,25 @@ function strategicChampionNames(champions: StrategicChampionReference[]): string
   return champions.length > 0
     ? champions.map((champion) => champion.championName).join(", ")
     : "nenhum revelado";
+}
+
+function officialPatchFromGameVersion(patch?: string): string | undefined {
+  const match = patch?.match(/^(\d{1,2})\.(\d{1,2})/);
+  if (!match) return undefined;
+  const major = Number(match[1]);
+  const officialMajor = major >= 15 && major < 20 ? major + 10 : major;
+  return `${officialMajor}.${Number(match[2])}`;
+}
+
+function patchIndicator(
+  changes: PatchChange[]
+): { label: string; tone: "positive" | "negative" | "warning" | "neutral" } | undefined {
+  const types = new Set(changes.map((change) => change.changeType));
+  if (types.has("ADJUSTMENT") || (types.has("BUFF") && types.has("NERF"))) {
+    return { label: "Ajustado neste patch", tone: "warning" };
+  }
+  if (types.has("BUFF")) return { label: "Buff oficial neste patch", tone: "positive" };
+  if (types.has("NERF")) return { label: "Nerf oficial neste patch", tone: "negative" };
+  if (types.has("BUGFIX")) return { label: "Correção oficial neste patch", tone: "neutral" };
+  return undefined;
 }

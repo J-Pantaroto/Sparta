@@ -17,6 +17,8 @@ import type {
   GlobalChampionRoleEligibility,
   GrowthJourney,
   MatchLoadoutObservation,
+  PatchRelease,
+  PatchReleaseSummary,
   PersonalLoadoutEvidence,
   PickRecommendation,
   PlayerChampionPoolEntry,
@@ -498,6 +500,20 @@ export function fetchSettings(token: string) {
   return request<{ matchAnalysisLimit: number }>("/players/settings", {
     headers: { Authorization: `Bearer ${token}` }
   });
+}
+
+export function fetchPatchRelease(patch?: string, locale = "pt_BR") {
+  const path = patch ? `/patches/${encodeURIComponent(patch)}` : "/patches/current";
+  return request<PatchRelease>(`${path}?locale=${encodeURIComponent(locale)}`);
+}
+
+export function fetchPatchReleases(locale = "pt_BR") {
+  return request<{
+    status: "AVAILABLE" | "UNAVAILABLE";
+    locale: string;
+    releases: PatchReleaseSummary[];
+    unavailableReason?: string;
+  }>(`/patches?locale=${encodeURIComponent(locale)}`);
 }
 
 export function updateSettings(token: string, matchAnalysisLimit: number) {
