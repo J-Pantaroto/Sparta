@@ -18,6 +18,8 @@ import type {
   GlobalChampionRoleEligibility,
   GrowthJourney,
   MatchLoadoutObservation,
+  LongitudinalRecommendationReport,
+  LongitudinalReportFilters,
   PatchRelease,
   PatchReleaseSummary,
   PersonalLoadoutEvidence,
@@ -236,6 +238,32 @@ export function fetchRecentMatches(puuid: string, limit = 10) {
 export function fetchGrowthJourney(puuid: string) {
   return request<{ puuid: string } & GrowthJourney>(
     `/players/${encodeURIComponent(puuid)}/growth-journey`
+  );
+}
+
+export function fetchRecommendationObservability(
+  token: string,
+  playerId: string,
+  filters: Omit<LongitudinalReportFilters, "playerId"> = {}
+) {
+  const query = new globalThis.URLSearchParams();
+  if (filters.from) query.set("from", filters.from);
+  if (filters.to) query.set("to", filters.to);
+  if (filters.patches?.length) query.set("patch", filters.patches.join(","));
+  if (filters.queueIds?.length) query.set("queueId", filters.queueIds.join(","));
+  if (filters.roles?.length) query.set("role", filters.roles.join(","));
+  if (filters.championIds?.length) query.set("championId", filters.championIds.join(","));
+  if (filters.selectionGroups?.length) query.set("group", filters.selectionGroups.join(","));
+  for (const [dimension, versions] of Object.entries(filters.algorithmVersions ?? {})) {
+    if (versions.length === 0) continue;
+    query.set("algorithmDimension", dimension);
+    query.set("algorithmVersion", versions.join(","));
+    break;
+  }
+  const suffix = query.size > 0 ? `?${query.toString()}` : "";
+  return request<LongitudinalRecommendationReport>(
+    `/players/${encodeURIComponent(playerId)}/recommendation-observability${suffix}`,
+    { headers: { Authorization: `Bearer ${token}` } }
   );
 }
 

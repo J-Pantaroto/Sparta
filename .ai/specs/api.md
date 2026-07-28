@@ -1,5 +1,15 @@
 # API
 
+Etapa 23:
+
+- `GET /players/:playerId/recommendation-observability`;
+- `GET /players/:playerId/recommendation-observability/versions`;
+- `GET /players/:playerId/recommendation-observability/roles/:role`;
+- filtros de período, patch, fila, posição, campeão, grupo e versões são
+  aplicados antes da agregação;
+- consultas são autenticadas e isoladas pela conta Riot do path;
+- o cliente não envia agregados, conclusões ou métricas prontas.
+
 Etapa 20:
 
 - `GET /patches/:patch/impacts` expõe interpretações teóricas versionadas;

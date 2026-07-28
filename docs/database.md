@@ -1,5 +1,13 @@
 # Database
 
+A Etapa 23 não adiciona tabela. Os agregados longitudinais são reconstruídos
+sob demanda a partir de `DraftSession`, do `RecommendationSnapshot` vigente
+no lock-in, de `PersistedRecommendation`, `MatchParticipant`,
+`MatchObservation` e da revisão mais recente de
+`DraftPostGameComparisonRevision`. Isso evita uma segunda fonte histórica,
+reflete novos vínculos sem reescrever registros e mantém uma observação por
+sessão.
+
 O schema Prisma inicial está em `apps/api/prisma/schema.prisma`.
 
 Tabelas principais:

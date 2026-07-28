@@ -1,5 +1,18 @@
 # Origem, disponibilidade e confiança dos dados
 
+## Observabilidade longitudinal (Etapa 23)
+
+O relatório longitudinal é `CALCULATED` sobre registros históricos
+imutáveis. Contagem observada não é confiança, calibração, chance de vitória
+ou qualidade causal. Cada ausência permanece independente: snapshot, rank,
+score, cobertura, risco, posição, patch, fila, data e comparação pós-game
+possuem numerador e denominador próprios.
+
+Faixas de score, cobertura e risco apenas agrupam valores já persistidos e
+carregam versão própria. Versões de algoritmo são dimensões, nunca
+preenchimentos retroativos. Escolha `NOT_IN_SNAPSHOT` permanece sem métricas
+que não existiam no draft. Ver `docs/recommendation-observability.md`.
+
 ## Impacto teórico do patch (Etapa 20)
 
 `PatchChange` permanece `OFFICIAL`. `TheoreticalPatchImpact` é `DERIVED` pelo

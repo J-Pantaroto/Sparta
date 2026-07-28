@@ -4,6 +4,7 @@ import {
   ensureChampionStatsCoverage,
   fetchDraftRecommendations,
   fetchPersonalLoadoutEvidence,
+  fetchRecommendationObservability,
   PlayerRoleUnavailableError
 } from "./api-client";
 
@@ -244,6 +245,32 @@ describe("compatibilidade do histórico pessoal agregado (Etapa 17)", () => {
     expect(result.runePages).toEqual([]);
     expect(result.summonerSpellSets).toEqual([]);
     expect(result.unavailableReason).toMatch(/versão da API/i);
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("observabilidade longitudinal (Etapa 23)", () => {
+  it("envia somente filtros, nunca agregados prontos", async () => {
+    const fetchSpy = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ status: "UNAVAILABLE", sampleSize: 0 }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      })
+    );
+    vi.stubGlobal("fetch", fetchSpy);
+
+    await fetchRecommendationObservability("token", "puuid-1", {
+      roles: ["JUNGLE"],
+      patches: ["26.14"],
+      selectionGroups: ["PRIMARY"]
+    });
+
+    const url = String(fetchSpy.mock.calls[0][0]);
+    expect(url).toContain("/players/puuid-1/recommendation-observability?");
+    expect(url).toContain("role=JUNGLE");
+    expect(url).toContain("patch=26.14");
+    expect(url).toContain("group=PRIMARY");
+    expect(url).not.toMatch(/wins|scoreBands|sampleSize/);
     vi.unstubAllGlobals();
   });
 });

@@ -1,5 +1,14 @@
 # Origem, disponibilidade e confiança dos dados
 
+## Observabilidade longitudinal (Etapa 23)
+
+Agregados são `CALCULATED` sobre a sessão, o snapshot vigente no lock-in, a
+partida e o relatório pós-game persistidos. Cada indisponibilidade tem
+contagem própria; zero real continua disponível. Faixas não são calibração e
+versões antigas não recebem métricas atuais. Escolha fora do snapshot
+permanece sem score ou rank retroativos. Ver
+`.ai/specs/recommendation-observability.md`.
+
 ## Comparação pós-game do draft (Etapa 22)
 
 O relatório separa evidência anterior (`DraftSession` e snapshot imutável) de

@@ -1,5 +1,20 @@
 # API
 
+Etapa 23:
+
+- `GET /players/:playerId/recommendation-observability` expõe o relatório
+  longitudinal descritivo;
+- `GET /players/:playerId/recommendation-observability/versions` preserva a
+  segmentação central por versões;
+- `GET /players/:playerId/recommendation-observability/roles/:role` fixa o
+  recorte de posição;
+- filtros opcionais cobrem período, patch, fila, posição, campeão, grupo e
+  versão, sempre antes do cálculo de numeradores e denominadores;
+- `displaySampleThreshold` é configurável e explicitamente apenas um limite
+  de apresentação;
+- o `playerId` precisa pertencer ao usuário autenticado e o cliente nunca
+  envia agregados prontos.
+
 Base local: `http://localhost:3333`.
 
 Endpoints:

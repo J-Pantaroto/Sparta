@@ -1,5 +1,12 @@
 # Arquitetura
 
+A observabilidade longitudinal segue a mesma separação: o contrato e a
+agregação determinística vivem em `packages/core`, a API seleciona a sessão,
+o snapshot vigente no lock-in, a partida e a revisão pós-game dentro da conta
+autenticada, e o desktop apenas apresenta contagens. O relatório é calculado
+sob demanda sobre os históricos imutáveis; não existe cache ou tabela
+longitudinal nesta etapa. Ver `docs/recommendation-observability.md`.
+
 O impacto teórico de patch segue a separação estrutural do Sparta: o
 algoritmo puro vive em `packages/core`, a API combina a revisão oficial com o
 manifesto de capacidades e o desktop apenas apresenta o resultado. A consulta

@@ -33,6 +33,7 @@ export * from "./types/champion-role-evidence.js";
 export * from "./types/player-champion-pool.js";
 export * from "./postgame/post-game-analysis.js";
 export * from "./postgame/draft-postgame-comparison.js";
+export * from "./observability/recommendation-observability.js";
 export * from "./global/global-statistics.js";
 export * from "./global/global-statistics-provider.js";
 export * from "./patch/patch-intelligence.js";

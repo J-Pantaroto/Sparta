@@ -1,5 +1,28 @@
 # Sparta - Contexto para Continuidade
 
+## Etapa 23: avaliação longitudinal e observabilidade do motor
+
+`buildLongitudinalRecommendationReport`
+(`recommendation-observability/1.0.0`) agrega sob demanda uma observação por
+`DraftSession` vinculada com segurança ao Match-V5. A API seleciona somente o
+snapshot vigente no `lockedInAt`; snapshots substituídos ou criados depois
+dele não entram. Não há tabela longitudinal: os registros imutáveis continuam
+a única fonte de verdade.
+
+O relatório preserva grupos `PRIMARY`, `ALTERNATIVE` e `NOT_IN_SNAPSHOT`,
+rank, score, cobertura, risco, posição analisada/observada, patch, fila,
+resultado e versões. Contagens mantêm numerador, denominador e amostra; zero
+real permanece disponível e cada ausência é independente. Faixas de leitura
+são versionadas e não calibradas.
+
+As versões de recomendação, estratégia, risco e pós-game permanecem
+segmentadas. Amostra pequena ou ausência de sobreposição de patch, posição,
+grupo ou pool torna a comparação direta indisponível. Vitória e derrota nunca
+viram acerto/erro, causalidade ou ajuste. Rotas autenticadas:
+`GET /players/:playerId/recommendation-observability`, `/versions` e
+`/roles/:role`. O desktop ganhou “Histórico do motor”. Ver
+`docs/recommendation-observability.md`.
+
 ## Etapa 20: impacto teórico das mudanças do patch
 
 `TheoreticalPatchImpact` (`theoretical-patch-impact/1.0.0`) interpreta cada

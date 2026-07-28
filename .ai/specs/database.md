@@ -1,5 +1,10 @@
 # Database
 
+A Etapa 23 não cria tabela nem cache. A observabilidade é reconstruída sob
+demanda sobre `DraftSession`, o snapshot vigente no lock-in, a recomendação
+escolhida, a partida e a revisão pós-game mais recente. Novos vínculos entram
+na consulta sem reescrever o histórico.
+
 O schema Prisma inicial está em `apps/api/prisma/schema.prisma`.
 
 Tabelas principais:

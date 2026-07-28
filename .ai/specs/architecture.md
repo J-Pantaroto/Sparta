@@ -1,5 +1,10 @@
 # Arquitetura
 
+A observabilidade longitudinal é agregada no `packages/core`, resolvida sobre
+históricos imutáveis e isolados por conta na API e somente apresentada no
+desktop. Não cria tabela ou cache concorrente e não executa o motor. Ver
+`.ai/specs/recommendation-observability.md`.
+
 O impacto teórico é calculado no `packages/core`, combinado com capacidades
 pela API e apenas apresentado pelo desktop. A consulta permanece fora do
 motor de recomendação.

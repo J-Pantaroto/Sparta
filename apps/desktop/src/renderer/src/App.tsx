@@ -37,6 +37,7 @@ import { ChampionSelectScreen } from "./features/ChampionSelectScreen";
 import { DashboardScreen } from "./features/DashboardScreen";
 import { DraftHistoryScreen } from "./features/DraftHistoryScreen";
 import { GrowthJourneyScreen } from "./features/GrowthJourneyScreen";
+import { MotorHistoryScreen } from "./features/MotorHistoryScreen";
 import { LinkRiotAccountScreen } from "./features/LinkRiotAccountScreen";
 import { PostGameScreen } from "./features/PostGameScreen";
 import { PreGameScreen } from "./features/PreGameScreen";
@@ -597,6 +598,9 @@ function SpartaApp() {
         />
       )}
       {page === "growth" && <GrowthJourneyScreen riotAccounts={riotAccounts} />}
+      {page === "motor" && (
+        <MotorHistoryScreen riotAccounts={riotAccounts} sessionToken={sessionToken} />
+      )}
       {page === "settings" && (
         <SettingsScreen ddragonVersion={ddragonVersion} sessionToken={sessionToken} />
       )}
