@@ -22,6 +22,22 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-07-28 17:02 — Impacto teórico rastreável das mudanças do patch
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0020-impacto-teorico-patch.md`
+
+Mudanças oficiais agora geram interpretações teóricas determinísticas por
+dimensão, com direção, magnitude somente para escalares comparáveis,
+evidências, capacidades relacionadas, cobertura e indisponibilidades
+explícitas. Compensações permanecem mistas, bugfix não ganha direção
+automática e ausência de capacidade não cria inferência. API, resumo do
+patch, pool pessoal e Champion Select apresentam o contexto fora do motor de
+recomendação. Na revisão real 26.14, 3 de 10 campeões alterados tiveram sinais
+seguros e 18 unidades permaneceram indisponíveis. Foram validados 690 testes
+TypeScript, 1 Python, typecheck, lint, builds, determinismo e a API Docker.
+Score, ranking, pesos, risco, matchup, snapshots e `META_STRENGTH` continuam
+inalterados. Implementação funcional: `9cb0d3c`.
+
 ## 2026-07-28 16:35 — Patch Intelligence oficial e auditável
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0019-patch-intelligence-riot.md`

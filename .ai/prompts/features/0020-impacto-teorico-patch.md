@@ -1,7 +1,7 @@
 ---
-status: EM_ANDAMENTO
+status: IMPLEMENTADA
 solicitado_em: 2026-07-28 16:46
-implementado_em:
+implementado_em: 2026-07-28 17:02
 ---
 
 # Impacto teórico das mudanças do patch
@@ -31,4 +31,23 @@ implementado_em:
 
 ## Notas de implementação
 
-(preenchido durante/depois da implementação)
+Implementada no commit funcional `9cb0d3c`.
+
+- Contrato e algoritmo puro `theoretical-patch-impact/1.0.0`, com 22
+  dimensões estratégicas mais `UNCLASSIFIED`, direção, magnitude opcional,
+  evidência oficial/capacidade, cobertura, revisão, hash e proveniência.
+- Direção deriva da relação semântica com o escalar; `changeType` não decide.
+  Compensações permanecem separadas ou `MIXED`; bugfix e ambiguidade ficam
+  `UNKNOWN`; ausência de capacidade não cria capacidade nova.
+- Magnitude documentada somente para escalares comparáveis na mesma unidade:
+  `<10% MINOR`, `10%-25% MODERATE`, `>25% MAJOR`.
+- Novas consultas `/patches/:patch/impacts` e
+  `/patches/:patch/champions/:championId` com `theoreticalImpact`.
+- Resumo do patch, pool pessoal e detalhe secundário do Champion Select
+  apresentam o contexto em uma chamada própria, fora do motor.
+- Validação real da revisão 1 do patch 26.14: 10 campeões alterados, três com
+  sinais seguros, 18 unidades indisponíveis; duas respostas consecutivas
+  foram byte a byte idênticas.
+- Bateria final: 690 testes TypeScript, 1 Python, typecheck, lint, build e API
+  Docker. Nenhum `patchPowerScore`; score, ranking, pesos, pool, risco,
+  matchup, snapshots e `META_STRENGTH` permanecem inalterados.
