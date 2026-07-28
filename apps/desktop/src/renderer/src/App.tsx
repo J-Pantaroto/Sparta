@@ -13,6 +13,8 @@ import {
   fetchDraftRecommendations,
   fetchSession,
   SESSION_TOKEN_KEY,
+  type DraftPersistenceInfo,
+  type DraftSessionIdentity,
   type RiotAccountSummary,
   type SessionUser
 } from "./services/api-client";
@@ -26,6 +28,7 @@ import {
 import { AuthScreen } from "./features/AuthScreen";
 import { ChampionSelectScreen } from "./features/ChampionSelectScreen";
 import { DashboardScreen } from "./features/DashboardScreen";
+import { DraftHistoryScreen } from "./features/DraftHistoryScreen";
 import { GrowthJourneyScreen } from "./features/GrowthJourneyScreen";
 import { LinkRiotAccountScreen } from "./features/LinkRiotAccountScreen";
 import { PostGameScreen } from "./features/PostGameScreen";
@@ -36,6 +39,16 @@ import { FeaturedChampionProvider, useFeaturedChampion } from "./theme/featured-
 import { AppShell, AuthLayout, Loading, PlayerSummary, Sidebar, SidebarGroup, SidebarNavItem } from "./ui";
 
 type SessionStatus = "checking" | "auth" | "link-account" | "ready";
+
+/**
+ * Chave técnica opaca da sessão de draft. Aleatória de propósito: qualquer
+ * derivação de campeão, posição ou horário poderia unir duas sessões
+ * diferentes ou reaproveitar a anterior, que é exatamente o que a Etapa 16
+ * proíbe.
+ */
+function newDraftSessionKey(): string {
+  return `cs-${globalThis.crypto.randomUUID()}`;
+}
 
 export function App() {
   return (
@@ -75,18 +88,30 @@ function SpartaApp() {
   const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
   const [riotAccounts, setRiotAccounts] = useState<RiotAccountSummary[]>([]);
   const [poolRevision, setPoolRevision] = useState(0);
+  /**
+   * Identidade da sessão de draft (Etapa 16). Nasce ao **entrar** no champion
+   * select (ou ao iniciar a simulação manual) e é descartada ao sair - não
+   * deriva de campeão nem de horário, então duas sessões nunca colidem e uma
+   * entrada nova jamais reaproveita a anterior. `null` = nada é persistido, e
+   * a análise continua funcionando igual.
+   */
+  const [draftSession, setDraftSession] = useState<DraftSessionIdentity | null>(null);
 
   // Proteção centralizada: sem posição, a requisição nem sai. A API também
   // recusa (`PLAYER_ROLE_UNAVAILABLE`), mas barrar aqui evita depender de a
   // API estar na mesma versão do desktop. `useAsyncData` já descarta o
   // resultado de uma execução anterior quando as dependências mudam, então
   // trocar de posição não deixa a resposta antiga sobrescrever a nova.
-  const recommendationsQuery = useAsyncData<DraftRecommendationResponse>(
+  const recommendationsQuery = useAsyncData<DraftRecommendationResponse & { persistence?: DraftPersistenceInfo }>(
     () =>
       sessionToken && draft.playerRole
-        ? fetchDraftRecommendations(sessionToken, draft)
+        ? fetchDraftRecommendations(
+            sessionToken,
+            draft,
+            draftSession ?? undefined
+          )
         : undefined,
-    [sessionToken, draft, poolRevision]
+    [sessionToken, draft, poolRevision, draftSession]
   );
 
   function loadDataDragonVersion() {
@@ -141,9 +166,23 @@ function SpartaApp() {
       const active = phase === "ChampSelect";
       setChampSelectActive(active);
       if (active) setPage("select");
+      // Entrar cria uma chave nova; sair descarta. Nunca reaproveita.
+      setDraftSession((current) =>
+        active ? (current ?? { sessionKey: newDraftSessionKey(), source: "LCU" }) : null
+      );
     });
     return unsubscribe;
   }, [sessionStatus]);
+
+  /**
+   * Modo manual: a simulação também vira sessão persistida, marcada como
+   * `USER`. Uma sessão manual **nunca** é apresentada como observada pelo
+   * cliente do League.
+   */
+  useEffect(() => {
+    if (champSelectActive || !draft.playerRole || draftSession) return;
+    setDraftSession({ sessionKey: newDraftSessionKey(), source: "USER" });
+  }, [champSelectActive, draft.playerRole, draftSession]);
 
   // Ordem de pick real derivada da sessao do LCU. null sem cliente do
   // League (dev/testing) - o controle manual continua funcionando.
@@ -434,6 +473,7 @@ function SpartaApp() {
       {page === "postgame" && (
         <PostGameScreen riotAccounts={riotAccounts} sessionToken={sessionToken} ddragonVersion={ddragonVersion} />
       )}
+      {page === "drafts" && <DraftHistoryScreen sessionToken={sessionToken} />}
       {page === "growth" && <GrowthJourneyScreen riotAccounts={riotAccounts} />}
       {page === "settings" && <SettingsScreen ddragonVersion={ddragonVersion} sessionToken={sessionToken} />}
     </AppShell>

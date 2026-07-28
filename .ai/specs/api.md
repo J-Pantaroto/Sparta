@@ -14,6 +14,7 @@ Endpoints:
 - `GET /players/pool?role=MID` (autenticado) — materializa observações pessoais e consulta o pool explícito por posição, com contagens para todas as posições
 - `POST /players/pool` (autenticado) — adiciona `{ championId, role }` como `USER_PROVIDED`; idempotente e sem aceitar origem enviada pelo cliente
 - `PATCH /players/pool/:championId` (autenticado) — desabilita entrada manual com `{ role, enabled: false }`; não altera observações reais
+- `GET /drafts/sessions`, `GET /drafts/sessions/active`, `GET /drafts/sessions/:id`, `GET /drafts/sessions/:id/snapshots`, `POST /drafts/sessions/:id/lock-in`, `POST /drafts/sessions/:id/status` (autenticadas) — sessões de draft persistidas. Ver `docs/draft-persistence.md`
 - `POST /drafts/recommendations` (autenticado) — motor real (`@sparta/core`) sobre o pool consolidado. Retorna até cinco principais, três alternativas e `poolSummary`; mantém temporariamente o alias legado `recommendations`
 - `POST /drafts/pre-game-analysis` (autenticado) — real, derivado do draft atual pelo motor puro `generatePreGameAnalysis` (`@sparta/core`). Responde `422` `PLAYER_ROLE_UNAVAILABLE` sem posição e `422` `SELECTED_CHAMPION_UNAVAILABLE` sem campeão confirmado (ou com campeão fora do catálogo). Ver `docs/pre-game-analysis.md`
 - `POST /postgame/analyze`, `GET /postgame/:matchId` — mock
@@ -41,9 +42,12 @@ campeão confirmado. Ver `docs/champion-capabilities.md` e
 
 ## Erros externos
 
-Falhas externas seguem `.ai/specs/http-resilience.md`. A resposta pública contém apenas
-`code`, mensagem controlada, integração e `retryAfterMs` quando aplicável; nunca contém URL,
-headers, token, payload ou stack.
+Falhas externas seguem `docs/http-resilience.md`. 401/403 da Riot viram
+`RIOT_CREDENTIAL_INVALID`, 429 vira `RIOT_RATE_LIMITED` e respeita `Retry-After`, 404 não é
+retentado e 502/503/504 só são retentados em GET, dentro do limite central.
+
+O corpo público é `{ code, message, integration, retryAfterMs? }` e nunca inclui URL, headers,
+token, payload ou stack.
 
 ## Integrações Riot em uso (backend)
 

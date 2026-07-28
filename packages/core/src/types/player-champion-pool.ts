@@ -29,6 +29,13 @@ export interface RankedPoolRecommendation extends PickRecommendation {
   poolProvenance: DataProvenance;
   personalGames: number;
   limitations: string[];
+  /**
+   * Pesos depois da normalização por disponibilidade, exatamente os que
+   * produziram `totalScore`. Exposto na Etapa 16 para o snapshot poder
+   * preservar como a nota foi formada - **nenhum cálculo mudou**, o valor já
+   * existia dentro do motor e só não saía.
+   */
+  effectiveWeights: Record<string, number>;
 }
 
 export interface RecommendationPoolSummary {

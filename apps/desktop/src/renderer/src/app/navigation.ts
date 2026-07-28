@@ -1,6 +1,14 @@
-import { Activity, BarChart3, Crosshair, Gauge, Settings, Shield, TrendingUp, type LucideIcon } from "lucide-react";
+import { Activity, BarChart3, Crosshair, Gauge, History, Settings, Shield, TrendingUp, type LucideIcon } from "lucide-react";
 
-export type Page = "dashboard" | "profile" | "select" | "pregame" | "postgame" | "growth" | "settings";
+export type Page =
+  | "dashboard"
+  | "profile"
+  | "select"
+  | "pregame"
+  | "postgame"
+  | "drafts"
+  | "growth"
+  | "settings";
 
 interface NavEntry {
   page: Page;
@@ -28,7 +36,8 @@ export const navGroups: { label: string; items: NavEntry[] }[] = [
     items: [
       { page: "select", label: "Champion Select", icon: Crosshair },
       { page: "pregame", label: "Pré-game", icon: Shield },
-      { page: "postgame", label: "Pós-game", icon: BarChart3 }
+      { page: "postgame", label: "Pós-game", icon: BarChart3 },
+      { page: "drafts", label: "Histórico de drafts", icon: History }
     ]
   },
   {

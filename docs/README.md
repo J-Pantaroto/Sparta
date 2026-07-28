@@ -14,6 +14,7 @@ Leitura recomendada:
 - `draft-strategic-analysis.md` para o motor 5×5 compartilhado pelo ranking e pelo pré-game.
 - `pre-game-analysis.md` para a análise pré-game derivada do draft atual.
 - `champion-tags.md` para a origem, derivação e revisão dos perfis de campeão.
+- `draft-persistence.md` para as sessões de draft e os snapshots de recomendação.
 - `data-provenance.md` para origem, disponibilidade e confiança dos dados.
 - `database.md` para o schema inicial.
 - `match-observations.md` para itens, runas, feitiços e posições observados em cada partida.

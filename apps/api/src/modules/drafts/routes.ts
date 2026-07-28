@@ -1,15 +1,37 @@
 import type { FastifyPluginAsync } from "fastify";
 import {
   aggregateMatchupData,
+  buildCanonicalSnapshotInput,
+  CHAMPION_TAG_DERIVATION_VERSION,
+  DRAFT_STRATEGIC_ANALYSIS_VERSION,
+  EXECUTION_RISK_VERSION,
   generatePreGameAnalysis,
+  RECOMMENDATION_ENGINE_VERSION,
   recommendFromPersonalPool,
+  summarizeKnownDraftState,
+  THREAT_RESPONSE_MODEL_VERSION,
+  toPersistedRecommendations,
+  type ChampionTag,
   type MatchupData,
   type PlayerChampionStats
 } from "@sparta/core";
 import {
-  draftRecommendationRequestSchema,
+  draftRecommendationRequestSchemaWithSession,
+  draftSessionLockInSchema,
+  draftSessionTransitionSchema,
   preGameAnalysisRequestSchema
 } from "../../routes/schemas.js";
+import {
+  describeSelectedChampion,
+  findActiveDraftSession,
+  findDraftSession,
+  findLatestSnapshot,
+  listDraftSessions,
+  listSnapshots,
+  persistRecommendationSnapshot,
+  transitionDraftSession,
+  upsertActiveDraftSession
+} from "./draft-session-repository.js";
 import { compositionRules } from "../../config/composition-rules.js";
 import { prisma } from "../../db/prisma.js";
 import { getAuthenticatedUserId } from "../auth/routes.js";
@@ -33,7 +55,7 @@ export const draftsRoutes: FastifyPluginAsync = async (app) => {
       return { error: "Nao autenticado." };
     }
 
-    const payload = draftRecommendationRequestSchema.parse(request.body);
+    const payload = draftRecommendationRequestSchemaWithSession.parse(request.body);
 
     // Sem posicao a rota nao roda o motor. Assumir MID aqui produziria
     // recomendacoes do papel errado sem nenhum sinal disso na resposta.
@@ -84,8 +106,26 @@ export const draftsRoutes: FastifyPluginAsync = async (app) => {
       patchMeta: null,
       evaluatedAt: new Date().toISOString()
     });
+    /**
+     * Persistencia (Etapa 16). E **efeito colateral** da orquestracao: roda
+     * depois de a analise estar pronta, nunca antes, e qualquer falha aqui
+     * devolve `FAILED` sem tocar no resultado que ja vai pro Champion Select.
+     * Sem `session` no payload nada e gravado - o cliente que nao identifica a
+     * sessao continua recebendo recomendacao normalmente.
+     */
+    const persistence = await persistDraftAnalysis({
+      session: payload.session,
+      draft: payload.draft,
+      riotAccountId: riotAccount?.id,
+      pool: personalPool.entries,
+      championTags,
+      capabilityProfiles,
+      result
+    });
+
     return {
       ...result,
+      persistence,
       // Alias de transição para clientes anteriores à Etapa 12. Nunca inclui
       // alternativas nem inventa candidatos.
       recommendations: result.primaryRecommendations
@@ -193,4 +233,307 @@ export const draftsRoutes: FastifyPluginAsync = async (app) => {
 
     return result.analysis;
   });
+  /**
+   * Sessao de draft ainda em andamento da conta autenticada. Sempre filtrada
+   * por conta - nao existe leitura de sessao de outro jogador.
+   */
+  app.get("/drafts/sessions/active", async (request, reply) => {
+    const account = await resolveAccount(request, reply);
+    if (!account) return { error: "Nao autenticado." };
+
+    const session = await findActiveDraftSession(account.id);
+    if (!session) return { session: null };
+
+    const snapshot = await findLatestSnapshot(session.id);
+    return { session, latestSnapshotId: snapshot?.id ?? null };
+  });
+
+  /** Historico recente de drafts da propria conta. */
+  app.get("/drafts/sessions", async (request, reply) => {
+    const account = await resolveAccount(request, reply);
+    if (!account) return { error: "Nao autenticado." };
+
+    const query = request.query as { limit?: string };
+    const limit = query.limit ? Number.parseInt(query.limit, 10) : 20;
+    return { sessions: await listDraftSessions(account.id, Number.isFinite(limit) ? limit : 20) };
+  });
+
+  /** Detalhe de uma sessao, com a comparacao da escolha e o estado do vinculo. */
+  app.get("/drafts/sessions/:sessionId", async (request, reply) => {
+    const account = await resolveAccount(request, reply);
+    if (!account) return { error: "Nao autenticado." };
+
+    const { sessionId } = request.params as { sessionId: string };
+    const session = await findDraftSession(account.id, sessionId);
+    if (!session) {
+      reply.code(404);
+      return { error: "Sessao nao encontrada." };
+    }
+
+    const [snapshot, selectedChampion] = await Promise.all([
+      findLatestSnapshot(session.id),
+      describeSelectedChampion(account.id, session.id)
+    ]);
+
+    return {
+      session,
+      latestSnapshot: snapshot,
+      selectedChampion,
+      matchLink: session.linkedMatchId
+        ? { state: "LINKED" as const, matchId: session.linkedMatchId }
+        : {
+            state: "UNLINKED" as const,
+            reason: "Nenhum identificador de partida confiavel foi observado para esta sessao."
+          }
+    };
+  });
+
+  /** Todos os snapshots da sessao, do mais recente para o mais antigo. */
+  app.get("/drafts/sessions/:sessionId/snapshots", async (request, reply) => {
+    const account = await resolveAccount(request, reply);
+    if (!account) return { error: "Nao autenticado." };
+
+    const { sessionId } = request.params as { sessionId: string };
+    const snapshots = await listSnapshots(account.id, sessionId);
+    if (snapshots === null) {
+      reply.code(404);
+      return { error: "Sessao nao encontrada." };
+    }
+    return { snapshots };
+  });
+
+  /**
+   * Registra o campeao confirmado. Guarda o fato e a posicao dele no ranking
+   * daquele snapshot **sem julgar** a escolha: fora do ranking e registrado
+   * como fora do ranking, nao como erro.
+   */
+  app.post("/drafts/sessions/:sessionId/lock-in", async (request, reply) => {
+    const account = await resolveAccount(request, reply);
+    if (!account) return { error: "Nao autenticado." };
+
+    const { sessionId } = request.params as { sessionId: string };
+    const payload = draftSessionLockInSchema.parse(request.body);
+
+    const result = await transitionDraftSession({
+      riotAccountId: account.id,
+      sessionId,
+      status: "LOCKED_IN",
+      selectedChampionId: payload.championId
+    });
+
+    if (!result.ok) {
+      reply.code(result.reason === "NOT_FOUND" ? 404 : 409);
+      return {
+        code: result.reason,
+        message:
+          result.reason === "NOT_FOUND"
+            ? "Sessao nao encontrada."
+            : "A sessao ja foi encerrada e nao aceita mais alteracoes."
+      };
+    }
+
+    return {
+      session: result.session,
+      selectedChampion: await describeSelectedChampion(account.id, sessionId)
+    };
+  });
+
+  /**
+   * Transicao explicita de ciclo de vida (`IN_GAME`, `COMPLETED`,
+   * `ABANDONED`). `COMPLETED` exige `matchId`: sem identificador confiavel a
+   * sessao nao e concluida, fica onde estava.
+   */
+  app.post("/drafts/sessions/:sessionId/status", async (request, reply) => {
+    const account = await resolveAccount(request, reply);
+    if (!account) return { error: "Nao autenticado." };
+
+    const { sessionId } = request.params as { sessionId: string };
+    const payload = draftSessionTransitionSchema.parse(request.body);
+
+    if (payload.status === "COMPLETED" && !payload.matchId) {
+      reply.code(422);
+      return {
+        code: "MATCH_LINK_UNAVAILABLE",
+        message: "Concluir a sessao exige o identificador da partida."
+      };
+    }
+
+    const result = await transitionDraftSession({
+      riotAccountId: account.id,
+      sessionId,
+      status: payload.status,
+      ...(payload.matchId ? { linkedMatchId: payload.matchId } : {})
+    });
+
+    if (!result.ok) {
+      reply.code(result.reason === "NOT_FOUND" ? 404 : 409);
+      return {
+        code: result.reason,
+        message:
+          result.reason === "NOT_FOUND"
+            ? "Sessao nao encontrada."
+            : "Transicao de estado nao permitida a partir do estado atual."
+      };
+    }
+
+    return { session: result.session };
+  });
 };
+
+/** Conta Riot do usuario autenticado, ou `null` com a resposta ja marcada. */
+async function resolveAccount(
+  request: Parameters<typeof getAuthenticatedUserId>[0],
+  reply: { code: (status: number) => unknown }
+): Promise<{ id: string; puuid: string } | null> {
+  const userId = await getAuthenticatedUserId(request);
+  if (!userId) {
+    reply.code(401);
+    return null;
+  }
+  const account = await prisma.riotAccount.findFirst({ where: { userId } });
+  if (!account) {
+    reply.code(404);
+    return null;
+  }
+  return { id: account.id, puuid: account.puuid };
+}
+
+/**
+ * Versoes de catalogo que sustentaram a analise. So declara a versao quando
+ * **todas** as tags concordam - com perfis de versoes diferentes, anunciar uma
+ * delas atribuiria ao conjunto uma origem que ele nao tem (mesma regra da
+ * Etapa 8).
+ */
+function catalogVersionsOf(
+  championTags: readonly ChampionTag[],
+  capabilityProfiles: readonly { algorithmVersion?: string }[]
+): Record<string, string> {
+  const versions: Record<string, string> = {};
+
+  const patches = new Set(
+    championTags.map((tag) => tag.provenance?.source.patch).filter((patch): patch is string => !!patch)
+  );
+  // Uma unica versao E todas as tags declarando-a: com uma tag sem versao nao
+  // da pra afirmar a versao do conjunto.
+  if (patches.size === 1 && championTags.every((tag) => tag.provenance?.source.patch !== undefined)) {
+    versions.dataDragon = [...patches][0];
+  }
+
+  const capabilityVersions = new Set(
+    capabilityProfiles
+      .map((profile) => profile.algorithmVersion)
+      .filter((version): version is string => !!version)
+  );
+  if (capabilityVersions.size === 1) {
+    versions.championCapabilities = [...capabilityVersions][0];
+  }
+
+  return versions;
+}
+
+/** Versoes de algoritmo que produziram esta execucao. */
+function algorithmVersionsOf(): Record<string, string> {
+  return {
+    recommendationEngine: RECOMMENDATION_ENGINE_VERSION,
+    championTagDerivation: CHAMPION_TAG_DERIVATION_VERSION,
+    executionRisk: EXECUTION_RISK_VERSION,
+    draftStrategy: DRAFT_STRATEGIC_ANALYSIS_VERSION,
+    threatResponseModel: THREAT_RESPONSE_MODEL_VERSION
+  };
+}
+
+export type DraftPersistenceStatus =
+  /** Snapshot novo gravado. */
+  | "SAVED"
+  /** Nada mudou desde o ultimo snapshot - nenhuma escrita. */
+  | "UNCHANGED"
+  /** O cliente nao identificou a sessao; nada foi gravado, e isso e normal. */
+  | "NOT_TRACKED"
+  /** O banco falhou. A analise ao vivo segue valida. */
+  | "FAILED";
+
+export interface DraftPersistenceResult {
+  status: DraftPersistenceStatus;
+  sessionId?: string;
+  snapshotId?: string;
+}
+
+/**
+ * Grava sessao + snapshot como efeito colateral da analise.
+ *
+ * Envolvido inteiro em try/catch: **nenhuma falha de persistencia pode
+ * derrubar o Champion Select**. O erro sobe como `FAILED` sanitizado, sem
+ * stack trace nem detalhe do banco.
+ */
+async function persistDraftAnalysis(input: {
+  session?: { sessionKey: string; source: "LCU" | "USER"; queueId?: number; gameVersion?: string };
+  draft: Parameters<typeof summarizeKnownDraftState>[0];
+  riotAccountId?: string;
+  pool: readonly { championId: number; championName: string; role: string; source: string; enabled: boolean }[];
+  championTags: readonly ChampionTag[];
+  capabilityProfiles: readonly { algorithmVersion?: string }[];
+  result: { primaryRecommendations: readonly never[] | readonly unknown[]; alternatives: readonly unknown[] };
+}): Promise<DraftPersistenceResult> {
+  if (!input.session || !input.riotAccountId) return { status: "NOT_TRACKED" };
+
+  try {
+    const role = input.draft.playerRole;
+    if (!role) return { status: "NOT_TRACKED" };
+
+    const session = await upsertActiveDraftSession({
+      riotAccountId: input.riotAccountId,
+      externalSessionId: input.session.sessionKey,
+      source: input.session.source,
+      role,
+      // Ausencia de origem da posicao no modo manual e "USER", nunca "LCU".
+      roleSource: input.draft.playerRoleSource ?? "USER",
+      knownDraft: summarizeKnownDraftState(input.draft),
+      ...(input.draft.selectedChampionId !== undefined
+        ? { selectedChampionId: input.draft.selectedChampionId }
+        : {}),
+      ...(input.session.queueId !== undefined ? { queueId: input.session.queueId } : {}),
+      ...(input.session.gameVersion ? { gameVersion: input.session.gameVersion } : {}),
+      ...(input.draft.patch ? { patch: input.draft.patch } : {})
+    });
+
+    const canonicalInput = buildCanonicalSnapshotInput({
+      draft: input.draft,
+      pool: input.pool.map((entry) => ({
+        championId: entry.championId,
+        championName: entry.championName,
+        role: entry.role as never,
+        source: entry.source as never,
+        enabled: entry.enabled
+      })),
+      catalogVersions: catalogVersionsOf(input.championTags, input.capabilityProfiles),
+      algorithmVersions: algorithmVersionsOf()
+    });
+    if (!canonicalInput) return { status: "NOT_TRACKED", sessionId: session.id };
+
+    const recommendations = toPersistedRecommendations({
+      primaryRecommendations: input.result.primaryRecommendations as never,
+      alternatives: input.result.alternatives as never
+    });
+    const coverage =
+      recommendations.length === 0
+        ? 0
+        : recommendations.reduce((total, entry) => total + entry.dataCoverage, 0) / recommendations.length;
+
+    const persisted = await persistRecommendationSnapshot({
+      draftSessionId: session.id,
+      canonicalInput,
+      algorithmVersions: canonicalInput.algorithmVersions,
+      dataCoverage: coverage,
+      recommendations
+    });
+
+    if (persisted.status === "FAILED") return { status: "FAILED", sessionId: session.id };
+    return {
+      status: persisted.status === "CREATED" ? "SAVED" : "UNCHANGED",
+      sessionId: session.id,
+      snapshotId: persisted.snapshotId
+    };
+  } catch {
+    return { status: "FAILED" };
+  }
+}

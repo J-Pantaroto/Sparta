@@ -237,7 +237,29 @@ export class PlayerRoleUnavailableError extends Error {
   }
 }
 
-export async function fetchDraftRecommendations(token: string, draft: DraftState) {
+/**
+ * Identidade da sessão de draft (Etapa 16). A chave é gerada pelo cliente ao
+ * **entrar** no champion select e descartada ao sair - não deriva de campeão
+ * nem de horário, então uma entrada nova nunca reaproveita a sessão anterior.
+ */
+export interface DraftSessionIdentity {
+  sessionKey: string;
+  source: "LCU" | "USER";
+}
+
+export type DraftPersistenceStatus = "SAVED" | "UNCHANGED" | "NOT_TRACKED" | "FAILED";
+
+export interface DraftPersistenceInfo {
+  status: DraftPersistenceStatus;
+  sessionId?: string;
+  snapshotId?: string;
+}
+
+export async function fetchDraftRecommendations(
+  token: string,
+  draft: DraftState,
+  session?: DraftSessionIdentity
+) {
   // Proteção central: a requisição não sai sem posição. A API também recusa
   // (422 `PLAYER_ROLE_UNAVAILABLE`), mas uma API anterior a esta etapa
   // aceitaria e usaria MID internamente - barrar aqui não depende de as duas
@@ -247,11 +269,16 @@ export async function fetchDraftRecommendations(token: string, draft: DraftState
   }
 
   const result = await request<
-    Partial<DraftRecommendationResponse> & { recommendations?: PickRecommendation[] }
+    Partial<DraftRecommendationResponse> & {
+      recommendations?: PickRecommendation[];
+      persistence?: DraftPersistenceInfo;
+    }
   >("/drafts/recommendations", {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ draft })
+    // Sem `session` a análise roda igual e nada é gravado: a persistência
+    // nunca é pré-requisito da recomendação.
+    body: JSON.stringify(session ? { draft, session } : { draft })
   });
 
   const normalize = (recommendations: PickRecommendation[]) =>
@@ -261,6 +288,7 @@ export async function fetchDraftRecommendations(token: string, draft: DraftState
     }));
   if (Array.isArray(result.primaryRecommendations)) {
     return {
+      persistence: result.persistence ?? { status: "NOT_TRACKED" as const },
       primaryRecommendations: normalize(result.primaryRecommendations),
       alternatives: normalize(result.alternatives ?? []),
       poolSummary: result.poolSummary ?? {
@@ -270,11 +298,13 @@ export async function fetchDraftRecommendations(token: string, draft: DraftState
         alternativeCount: 0,
         status: result.primaryRecommendations.length > 0 ? "PARTIAL" : "UNAVAILABLE"
       }
-    } as DraftRecommendationResponse;
+    } as DraftRecommendationResponse & { persistence: DraftPersistenceInfo };
   }
 
   const legacy = normalize(result.recommendations ?? []);
   return {
+    // API anterior à Etapa 16 não persiste nada - e dizer isso é honesto.
+    persistence: { status: "NOT_TRACKED" as const },
     primaryRecommendations: legacy,
     alternatives: [],
     poolSummary: {
@@ -418,4 +448,84 @@ export function updateSettings(token: string, matchAnalysisLimit: number) {
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify({ matchAnalysisLimit })
   });
+}
+
+/** Sessão de draft persistida, como a API a devolve. */
+export interface DraftSessionSummary {
+  id: string;
+  source: "LCU" | "USER";
+  status: "ACTIVE" | "LOCKED_IN" | "IN_GAME" | "COMPLETED" | "ABANDONED";
+  role: Role;
+  roleSource: "LCU" | "USER";
+  selectedChampionId: number | null;
+  startedAt: string;
+  updatedAt: string;
+  lockedInAt: string | null;
+  completedAt: string | null;
+  linkedMatchId: string | null;
+  knownDraft: {
+    allies: { championId: number; championName: string; role?: Role }[];
+    enemies: { championId: number; championName: string; role?: Role }[];
+    bannedChampionIds: number[];
+    banSideKnown: boolean;
+    directOpponentChampionId?: number;
+    unknownAllyPicks: number;
+    unknownEnemyPicks: number;
+  };
+}
+
+export interface PersistedSnapshot {
+  id: string;
+  inputHash: string;
+  dataCoverage: number;
+  algorithmVersions: Record<string, string>;
+  createdAt: string;
+  supersededAt: string | null;
+  recommendations: {
+    championId: number;
+    championName: string;
+    rank: number;
+    group: "PRIMARY" | "ALTERNATIVE";
+    totalScore: number;
+    dataCoverage: number;
+    poolSource: string;
+    personalGames: number;
+    category: string;
+  }[];
+}
+
+export interface DraftSessionDetail {
+  session: DraftSessionSummary;
+  latestSnapshot: PersistedSnapshot | null;
+  selectedChampion: {
+    championId: number;
+    state: "RANKED" | "NOT_IN_SNAPSHOT" | "NO_SNAPSHOT";
+    rank?: number;
+    group?: "PRIMARY" | "ALTERNATIVE";
+  } | null;
+  matchLink: { state: "LINKED" | "UNLINKED"; matchId?: string; reason?: string };
+}
+
+export function fetchDraftSessions(token: string, limit = 20) {
+  return request<{ sessions: DraftSessionSummary[] }>(`/drafts/sessions?limit=${limit}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
+export function fetchDraftSessionDetail(token: string, sessionId: string) {
+  return request<DraftSessionDetail>(`/drafts/sessions/${encodeURIComponent(sessionId)}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
+/** Registra o campeão confirmado na sessão. Não emite julgamento nenhum. */
+export function lockInDraftSession(token: string, sessionId: string, championId: number) {
+  return request<{ session: DraftSessionSummary; selectedChampion: DraftSessionDetail["selectedChampion"] }>(
+    `/drafts/sessions/${encodeURIComponent(sessionId)}/lock-in`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ championId })
+    }
+  );
 }

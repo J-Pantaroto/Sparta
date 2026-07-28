@@ -348,7 +348,10 @@ export function recommendFromPersonalPool(input: {
           status: "AVAILABLE"
         },
         personalGames,
-        limitations
+        limitations,
+        // Mesmos pesos que acabaram de produzir `totalScore` - exposto pra o
+        // snapshot da Etapa 16 poder preservar como a nota foi formada.
+        effectiveWeights: { ...normalizedWeights }
       } satisfies RankedPoolRecommendation;
     })
     .sort((left, right) => right.totalScore - left.totalScore || left.championId - right.championId)

@@ -1,5 +1,43 @@
 # Sparta - Contexto para Continuidade
 
+## Etapa 16: persistência de drafts e recomendações
+
+`DraftSession` e `PickRecommendation` existiam no schema desde o início e **nunca tiveram uma
+linha de código** que lesse ou escrevesse nelas (0 linhas no banco real). As formas antigas não
+sustentavam esta etapa — `draftStateJson` era blob sem contrato, sem ciclo de vida, sem origem,
+sem vínculo com partida; e as recomendações penduravam direto na sessão, sem execução imutável
+entre as duas. Foram substituídas (migration `20260728120000`), sem migração de dados.
+
+`DraftSession` passa a ter `source` (`LCU`/`USER`), `status`, `roleSource`, `knownDraftJson`
+(contrato estruturado, **não** o payload bruto do LCU), `externalSessionId` e `linkedMatchId`.
+`RecommendationSnapshot` + `PersistedRecommendation` guardam cada execução com `inputHash`,
+input canônico, versões, cobertura e todos os candidatos com ranking, grupo, pesos efetivos,
+métricas estruturadas, motivos, limitações e análise estratégica.
+
+**Identidade**: o LCU não expõe id estável de sessão, então a chave técnica é gerada pelo desktop
+ao *entrar* no champion select e descartada ao sair — não deriva de campeão nem de horário, e uma
+entrada nova nunca reaproveita a anterior.
+
+**Dedup**: o hash SHA-256 do input canônico ignora ordem de arrays, instante da análise e campos
+de interface. Medido na API real: `SAVED` → `UNCHANGED` (mesmo input, zero escrita) → `SAVED`
+(inimigo revelado). O anterior recebe `supersededAt` e nunca é reescrito; tudo numa transação.
+
+**Ciclo de vida** com transições explícitas: sessão encerrada não volta para `ACTIVE` (medido:
+abandonar → 200, lock-in depois → 409), e `COMPLETED` exige `matchId` (sem ele, 422
+`MATCH_LINK_UNAVAILABLE`). Vínculo só por identificador confiável; nunca por campeão, horário,
+resultado ou posição. **Nenhum draft retroativo foi criado a partir do Match-V5.**
+
+**Escolha sem julgamento**: `RANKED` / `NOT_IN_SNAPSHOT` / `NO_SNAPSHOT`. Medido: confirmar um
+campeão fora do ranking grava `NOT_IN_SNAPSHOT`, sem classificar como erro.
+
+**Falha não derruba nada**: a gravação é efeito colateral pós-análise; erro devolve
+`persistence: FAILED` sanitizado com a recomendação inteira intacta.
+
+Os pesos efetivos passaram a sair do motor (`effectiveWeights`) — o valor já existia dentro de
+`recommendFromPersonalPool`, só não era exposto. **Nenhum peso, threshold ou fórmula mudou.**
+Nova tela "Histórico de drafts" (mínima e factual, sem avaliação de acerto). Ver
+`docs/draft-persistence.md`.
+
 ## Etapa 15: análise estratégica do draft 5×5
 
 `analyzeDraftStrategy` (`draft-strategy/1.0.0`) é o único motor estratégico

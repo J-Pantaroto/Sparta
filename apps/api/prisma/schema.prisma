@@ -30,6 +30,7 @@ model RiotAccount {
   profile         PlayerProfile?
   matches         MatchParticipant[]
   championPool    PlayerChampionPoolEntry[]
+  draftSessions   DraftSession[]
 
   @@index([puuid])
 }
@@ -204,31 +205,88 @@ model PlayerChampionStats {
   @@index([championId])
 }
 
+/// Sessao real de champion select. Substitui o modelo anterior (Etapa 16),
+/// que era codigo morto: tinha um `draftStateJson` sem contrato e nenhum
+/// campo de ciclo de vida, origem ou vinculo com partida.
 model DraftSession {
-  id                    String   @id @default(uuid())
-  puuid                 String
-  patch                 String?
-  playerRole            String
-  pickOrder             Int
-  draftStateJson         Json
-  selectedChampionId     Int?
-  createdAt             DateTime @default(now())
-  recommendations        PickRecommendation[]
+  id                 String   @id @default(uuid())
+  /// Conta Riot dona da sessao. O acesso e sempre filtrado por ela.
+  riotAccountId      String
+  /// "LCU" ou "USER". Sessao manual nunca e apresentada como observada.
+  source             String
+  /// ACTIVE | LOCKED_IN | IN_GAME | COMPLETED | ABANDONED
+  status             String
+  role               String
+  /// "LCU" ou "USER" - como a posicao foi obtida.
+  roleSource         String
+  queueId            Int?
+  gameVersion        String?
+  patch              String?
+  selectedChampionId Int?
+  /// Estado conhecido do draft (aliados, inimigos, bans, adversario direto,
+  /// picks desconhecidos). Contrato estruturado - NAO e o payload bruto do LCU.
+  knownDraftJson     Json
+  startedAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  lockedInAt         DateTime?
+  completedAt        DateTime?
+  /// Chave tecnica da sessao do lado do cliente. Unica por conta: uma nova
+  /// entrada no champion select gera outra chave e portanto outra sessao.
+  externalSessionId  String?
+  /// `Match.matchId` do Match-V5. So preenchido com identificador confiavel.
+  linkedMatchId      String?
+  riotAccount        RiotAccount @relation(fields: [riotAccountId], references: [id])
+  snapshots          RecommendationSnapshot[]
 
-  @@index([puuid])
+  @@unique([riotAccountId, externalSessionId])
+  @@index([riotAccountId, status])
+  @@index([linkedMatchId])
 }
 
-model PickRecommendation {
-  id              String   @id @default(uuid())
-  draftSessionId  String
-  championId      Int
-  totalScore      Float
-  confidence      String
-  category        String
-  snapshotJson    Json
-  createdAt       DateTime @default(now())
-  draftSession    DraftSession @relation(fields: [draftSessionId], references: [id])
+/// Execucao imutavel do motor de recomendacao. Snapshot novo so nasce quando
+/// o input canonico muda; o anterior nunca e reescrito.
+model RecommendationSnapshot {
+  id               String   @id @default(uuid())
+  draftSessionId   String
+  /// SHA-256 da serializacao canonica do input. Nao depende de ordem de
+  /// array nem do instante da analise.
+  inputHash        String
+  /// Input canonico completo, pra o snapshot ser auditavel sozinho.
+  canonicalInputJson Json
+  algorithmVersionsJson Json
+  dataCoverage     Float
+  createdAt        DateTime @default(now())
+  /// Quando um snapshot posterior passou a valer. Nulo enquanto e o atual.
+  supersededAt     DateTime?
+  draftSession     DraftSession @relation(fields: [draftSessionId], references: [id], onDelete: Cascade)
+  recommendations  PersistedRecommendation[]
 
+  @@unique([draftSessionId, inputHash])
+  @@index([draftSessionId, createdAt])
+}
+
+/// Um candidato dentro de um snapshot. Guarda o que sustentou a posicao dele,
+/// nao so o score agregado.
+model PersistedRecommendation {
+  id            String   @id @default(uuid())
+  snapshotId    String
+  championId    Int
+  championName  String
+  rank          Int
+  /// PRIMARY | ALTERNATIVE
+  recGroup      String
+  totalScore    Float
+  dataCoverage  Float
+  poolSource    String
+  personalGames Int
+  category      String
+  confidence    String?
+  /// Metricas estruturadas, pesos efetivos, motivos, alertas, limitacoes,
+  /// proveniencia e analise estrategica daquele instante.
+  detailJson    Json
+  snapshot      RecommendationSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+
+  @@unique([snapshotId, championId])
   @@index([championId])
 }
 

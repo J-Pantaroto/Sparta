@@ -22,6 +22,21 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-07-28 13:10 — Persistência de drafts e recomendações
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0016-persistencia-drafts-recomendacoes.md`
+
+Sessões reais de champion select e snapshots imutáveis das recomendações passam a ser
+persistidos, preparando a comparação futura com a partida. `DraftSession`/`PickRecommendation`
+(código morto desde o início, 0 linhas no banco) foram substituídos por `DraftSession` com ciclo
+de vida + `RecommendationSnapshot` + `PersistedRecommendation`. Snapshot novo só nasce quando o
+hash do input canônico muda — o hash ignora ordem de arrays, instante da análise e campos de
+interface, o que impede duplicata por tick do LCU. O anterior é marcado como substituído e nunca
+reescrito. Falha de persistência devolve `FAILED` sanitizado sem derrubar o Champion Select.
+Vínculo com Match-V5 só com identificador confiável; sem ele a sessão permanece honestamente sem
+vínculo. Escolha fora do ranking é registrada como fato, sem julgamento. Ranking, pesos e fórmulas
+inalterados. 62 testes novos (626 no total). Ver `docs/draft-persistence.md`.
+
+
 ## 2026-07-28 01:37 — Análise estratégica do draft 5×5
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0015-analise-estrategica-draft-5x5.md`

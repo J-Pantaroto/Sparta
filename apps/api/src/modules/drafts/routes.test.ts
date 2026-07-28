@@ -8,7 +8,16 @@ const {
   findAllChampionTagsMock,
   findChampionNamesByIdsMock,
   findPersonalLaneMatchupHistoryMock,
-  findPlayerPoolMock
+  findPlayerPoolMock,
+  upsertActiveDraftSessionMock,
+  persistRecommendationSnapshotMock,
+  findActiveDraftSessionMock,
+  findDraftSessionMock,
+  listDraftSessionsMock,
+  listSnapshotsMock,
+  findLatestSnapshotMock,
+  transitionDraftSessionMock,
+  describeSelectedChampionMock
 } = vi.hoisted(() => ({
   getAuthenticatedUserIdMock: vi.fn(),
   riotAccountFindFirstMock: vi.fn(),
@@ -17,7 +26,28 @@ const {
   findAllChampionTagsMock: vi.fn(),
   findChampionNamesByIdsMock: vi.fn(),
   findPersonalLaneMatchupHistoryMock: vi.fn(),
-  findPlayerPoolMock: vi.fn()
+  findPlayerPoolMock: vi.fn(),
+  upsertActiveDraftSessionMock: vi.fn(),
+  persistRecommendationSnapshotMock: vi.fn(),
+  findActiveDraftSessionMock: vi.fn(),
+  findDraftSessionMock: vi.fn(),
+  listDraftSessionsMock: vi.fn(),
+  listSnapshotsMock: vi.fn(),
+  findLatestSnapshotMock: vi.fn(),
+  transitionDraftSessionMock: vi.fn(),
+  describeSelectedChampionMock: vi.fn()
+}));
+
+vi.mock("./draft-session-repository.js", () => ({
+  upsertActiveDraftSession: upsertActiveDraftSessionMock,
+  persistRecommendationSnapshot: persistRecommendationSnapshotMock,
+  findActiveDraftSession: findActiveDraftSessionMock,
+  findDraftSession: findDraftSessionMock,
+  listDraftSessions: listDraftSessionsMock,
+  listSnapshots: listSnapshotsMock,
+  findLatestSnapshot: findLatestSnapshotMock,
+  transitionDraftSession: transitionDraftSessionMock,
+  describeSelectedChampion: describeSelectedChampionMock
 }));
 
 vi.mock("../auth/routes.js", () => ({
@@ -414,5 +444,284 @@ describe("drafts routes", () => {
       expect(body.dataCoverage).toBeGreaterThan(0);
       await app.close();
     });
+  });
+});
+
+describe("persistência de draft (Etapa 16)", () => {
+  const sessaoAtiva = {
+    id: "sessao-1",
+    riotAccountId: "conta-1",
+    source: "LCU",
+    status: "ACTIVE",
+    role: "JUNGLE",
+    roleSource: "LCU",
+    queueId: null,
+    gameVersion: null,
+    patch: null,
+    selectedChampionId: null,
+    knownDraft: {
+      allies: [],
+      enemies: [],
+      bannedChampionIds: [],
+      banSideKnown: false,
+      unknownAllyPicks: 5,
+      unknownEnemyPicks: 5
+    },
+    startedAt: "2026-07-28T10:00:00.000Z",
+    updatedAt: "2026-07-28T10:00:00.000Z",
+    lockedInAt: null,
+    completedAt: null,
+    externalSessionId: "chave-tecnica-1234",
+    linkedMatchId: null
+  };
+
+  const draftBase = {
+    playerRole: "JUNGLE",
+    pickOrder: 1,
+    allies: [],
+    enemies: [],
+    bannedChampionIds: []
+  };
+  const comSessao = {
+    draft: draftBase,
+    session: { sessionKey: "chave-tecnica-1234", source: "LCU" }
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    findAllChampionTagsMock.mockResolvedValue([]);
+    findPersonalLaneMatchupHistoryMock.mockResolvedValue([]);
+    findPlayerPoolMock.mockResolvedValue({ entries: [], roleSummaries: [] });
+    getAuthenticatedUserIdMock.mockResolvedValue("user-1");
+    riotAccountFindFirstMock.mockResolvedValue({
+      id: "conta-1",
+      puuid: "puuid-1",
+      gameName: "Zekerus",
+      tagLine: "117",
+      platformRegion: "br1",
+      regionalRouting: "americas"
+    });
+    upsertActiveDraftSessionMock.mockResolvedValue(sessaoAtiva);
+    persistRecommendationSnapshotMock.mockResolvedValue({ status: "CREATED", snapshotId: "snap-1" });
+  });
+
+  it("sem identificação de sessão, nada é gravado e a análise sai normal", async () => {
+    const app = await buildApp();
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/drafts/recommendations",
+      payload: { draft: draftBase }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().persistence).toEqual({ status: "NOT_TRACKED" });
+    expect(upsertActiveDraftSessionMock).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("com sessão identificada, grava e informa o snapshot", async () => {
+    const app = await buildApp();
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/drafts/recommendations",
+      payload: comSessao
+    });
+    const body = response.json();
+
+    expect(body.persistence).toEqual({
+      status: "SAVED",
+      sessionId: "sessao-1",
+      snapshotId: "snap-1"
+    });
+    expect(upsertActiveDraftSessionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        externalSessionId: "chave-tecnica-1234",
+        source: "LCU",
+        role: "JUNGLE"
+      })
+    );
+    await app.close();
+  });
+
+  it("input inalterado não grava de novo", async () => {
+    persistRecommendationSnapshotMock.mockResolvedValue({ status: "UNCHANGED", snapshotId: "snap-1" });
+    const app = await buildApp();
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/drafts/recommendations",
+      payload: comSessao
+    });
+
+    expect(response.json().persistence.status).toBe("UNCHANGED");
+    await app.close();
+  });
+
+  it("falha de persistência NÃO derruba a recomendação", async () => {
+    persistRecommendationSnapshotMock.mockResolvedValue({ status: "FAILED" });
+    const app = await buildApp();
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/drafts/recommendations",
+      payload: comSessao
+    });
+    const body = response.json();
+
+    expect(response.statusCode).toBe(200);
+    expect(body.persistence.status).toBe("FAILED");
+    expect(body.poolSummary).toBeTruthy();
+    expect(Array.isArray(body.primaryRecommendations)).toBe(true);
+    await app.close();
+  });
+
+  it("exceção na gravação também não derruba, e não vaza detalhe interno", async () => {
+    upsertActiveDraftSessionMock.mockRejectedValue(new Error("connection refused em 10.0.0.5:5432"));
+    const app = await buildApp();
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/drafts/recommendations",
+      payload: comSessao
+    });
+    const body = response.json();
+
+    expect(response.statusCode).toBe(200);
+    expect(body.persistence).toEqual({ status: "FAILED" });
+    expect(JSON.stringify(body)).not.toMatch(/connection refused/i);
+    expect(JSON.stringify(body)).not.toMatch(/5432/);
+    await app.close();
+  });
+
+  it("sessão manual é gravada como USER, nunca como LCU", async () => {
+    const app = await buildApp();
+
+    await app.inject({
+      method: "POST",
+      url: "/drafts/recommendations",
+      payload: {
+        draft: { ...draftBase, playerRoleSource: "USER" },
+        session: { sessionKey: "chave-manual-99", source: "USER" }
+      }
+    });
+
+    expect(upsertActiveDraftSessionMock).toHaveBeenCalledWith(
+      expect.objectContaining({ source: "USER", roleSource: "USER" })
+    );
+    await app.close();
+  });
+
+  it("usuário sem conta Riot vinculada não grava sessão", async () => {
+    riotAccountFindFirstMock.mockResolvedValue(null);
+    const app = await buildApp();
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/drafts/recommendations",
+      payload: comSessao
+    });
+
+    expect(response.json().persistence.status).toBe("NOT_TRACKED");
+    expect(upsertActiveDraftSessionMock).not.toHaveBeenCalled();
+    await app.close();
+  });
+});
+
+describe("consultas de sessão (Etapa 16)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getAuthenticatedUserIdMock.mockResolvedValue("user-1");
+    riotAccountFindFirstMock.mockResolvedValue({ id: "conta-1", puuid: "puuid-1" });
+    findActiveDraftSessionMock.mockResolvedValue(null);
+    findDraftSessionMock.mockResolvedValue(null);
+    listDraftSessionsMock.mockResolvedValue([]);
+    listSnapshotsMock.mockResolvedValue(null);
+    findLatestSnapshotMock.mockResolvedValue(null);
+    describeSelectedChampionMock.mockResolvedValue(null);
+  });
+
+  it("exige autenticação", async () => {
+    getAuthenticatedUserIdMock.mockResolvedValue(null);
+    const app = await buildApp();
+
+    for (const url of ["/drafts/sessions", "/drafts/sessions/active", "/drafts/sessions/x"]) {
+      const response = await app.inject({ method: "GET", url });
+      expect(response.statusCode).toBe(401);
+    }
+    await app.close();
+  });
+
+  it("a consulta é sempre filtrada pela conta do próprio jogador", async () => {
+    const app = await buildApp();
+
+    await app.inject({ method: "GET", url: "/drafts/sessions/sessao-de-outro" });
+
+    expect(findDraftSessionMock).toHaveBeenCalledWith("conta-1", "sessao-de-outro");
+    await app.close();
+  });
+
+  it("sessão de outro jogador responde 404, não o conteúdo dela", async () => {
+    findDraftSessionMock.mockResolvedValue(null);
+    const app = await buildApp();
+
+    const response = await app.inject({ method: "GET", url: "/drafts/sessions/sessao-de-outro" });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json().session).toBeUndefined();
+    await app.close();
+  });
+
+  it("sessão sem vínculo é apresentada como não vinculada, com motivo", async () => {
+    findDraftSessionMock.mockResolvedValue({
+      id: "sessao-1",
+      riotAccountId: "conta-1",
+      status: "LOCKED_IN",
+      linkedMatchId: null,
+      selectedChampionId: 234
+    });
+    const app = await buildApp();
+
+    const body = (await app.inject({ method: "GET", url: "/drafts/sessions/sessao-1" })).json();
+
+    expect(body.matchLink.state).toBe("UNLINKED");
+    expect(body.matchLink.reason).toBeTruthy();
+    expect(body.matchLink.matchId).toBeUndefined();
+    await app.close();
+  });
+
+  it("concluir sem identificador de partida é recusado", async () => {
+    const app = await buildApp();
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/drafts/sessions/sessao-1/status",
+      payload: { status: "COMPLETED" }
+    });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json().code).toBe("MATCH_LINK_UNAVAILABLE");
+    expect(transitionDraftSessionMock).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("transição inválida responde 409 sem alterar a sessão", async () => {
+    transitionDraftSessionMock.mockResolvedValue({
+      ok: false,
+      reason: "INVALID_TRANSITION",
+      currentStatus: "ABANDONED"
+    });
+    const app = await buildApp();
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/drafts/sessions/sessao-1/lock-in",
+      payload: { championId: 234 }
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json().code).toBe("INVALID_TRANSITION");
+    await app.close();
   });
 });
