@@ -4,13 +4,19 @@ import type { PatchRelease } from "@sparta/core";
 const mocks = vi.hoisted(() => ({
   findRelease: vi.fn(),
   listReleases: vi.fn(),
-  findFailure: vi.fn()
+  findFailure: vi.fn(),
+  findCapabilityProfile: vi.fn(),
+  findAllCapabilityProfiles: vi.fn()
 }));
 
 vi.mock("./patch-repository.js", () => ({
   findPatchRelease: mocks.findRelease,
   listPatchReleases: mocks.listReleases,
   findLatestPatchFailure: mocks.findFailure
+}));
+vi.mock("../catalog/champion-capability-repository.js", () => ({
+  findChampionCapabilityProfile: mocks.findCapabilityProfile,
+  findAllChampionCapabilityProfiles: mocks.findAllCapabilityProfiles
 }));
 
 import { buildApp } from "../../app.js";
@@ -62,6 +68,8 @@ describe("consultas de Patch Intelligence", () => {
     mocks.listReleases.mockResolvedValue([]);
     mocks.findRelease.mockResolvedValue(null);
     mocks.findFailure.mockResolvedValue(null);
+    mocks.findCapabilityProfile.mockResolvedValue(undefined);
+    mocks.findAllCapabilityProfiles.mockResolvedValue([]);
   });
 
   it("distingue catálogo sem release de uma lista válida vazia de mudanças", async () => {
@@ -136,7 +144,12 @@ describe("consultas de Patch Intelligence", () => {
       championId: 103,
       entityChanged: false,
       changes: [],
-      release: { status: "PARTIAL" }
+      release: { status: "PARTIAL" },
+      theoreticalImpact: {
+        entityChanged: false,
+        signals: [],
+        patchChangeIds: []
+      }
     });
     await app.close();
   });
@@ -150,8 +163,64 @@ describe("consultas de Patch Intelligence", () => {
     });
     expect(response.json()).toMatchObject({
       entityChanged: true,
-      changes: [{ entityName: "Orianna", changeType: "BUFF" }]
+      changes: [{ entityName: "Orianna", changeType: "BUFF" }],
+      theoreticalImpact: {
+        status: "UNAVAILABLE",
+        signals: [],
+        unavailableSignals: [{ direction: "UNKNOWN" }]
+      }
     });
+    await app.close();
+  });
+
+  it("expõe impactos teóricos versionados sem criar score de força", async () => {
+    mocks.findRelease.mockResolvedValue({
+      ...release,
+      status: "AVAILABLE",
+      changes: [
+        {
+          ...release.changes[0],
+          changeType: "NERF",
+          officialDetails: ["Tempo de Recarga: 10 ⇒ 8"],
+          structuredChanges: [
+            {
+              label: "Tempo de Recarga",
+              previousValue: "10",
+              newValue: "8",
+              numericPreviousValue: 10,
+              numericNewValue: 8,
+              numericDelta: -2,
+              status: "AVAILABLE"
+            }
+          ]
+        }
+      ]
+    });
+    const app = await buildApp();
+    const response = await app.inject({
+      method: "GET",
+      url: "/patches/26.14/impacts"
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      patch: "26.14",
+      status: "AVAILABLE",
+      algorithmVersion: "theoretical-patch-impact/1.0.0",
+      impacts: [
+        {
+          championId: 61,
+          coverage: 1,
+          signals: [
+            {
+              dimension: "COOLDOWN",
+              direction: "POSITIVE",
+              magnitude: "MODERATE"
+            }
+          ]
+        }
+      ]
+    });
+    expect(response.body).not.toMatch(/patchPowerScore|META_STRENGTH|totalScore/);
     await app.close();
   });
 });

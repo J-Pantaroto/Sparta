@@ -1,5 +1,13 @@
+import {
+  analyzeTheoreticalPatchImpact,
+  analyzeTheoreticalPatchImpacts
+} from "@sparta/core";
 import type { FastifyPluginAsync, FastifyReply } from "fastify";
 import { z } from "zod";
+import {
+  findAllChampionCapabilityProfiles,
+  findChampionCapabilityProfile
+} from "../catalog/champion-capability-repository.js";
 import { findLatestPatchFailure, findPatchRelease, listPatchReleases } from "./patch-repository.js";
 
 const localeQuery = z.object({
@@ -85,6 +93,13 @@ export const patchesRoutes: FastifyPluginAsync = async (app) => {
     const changes = release.changes.filter(
       (change) => change.entityType === "CHAMPION" && change.entityId === championId
     );
+    const capabilityProfile =
+      changes.length > 0 ? await findChampionCapabilityProfile(championId) : undefined;
+    const theoreticalImpact = analyzeTheoreticalPatchImpact({
+      release,
+      championId,
+      capabilityProfile
+    });
     return {
       release: {
         patch: release.patch,
@@ -102,8 +117,18 @@ export const patchesRoutes: FastifyPluginAsync = async (app) => {
       },
       championId,
       entityChanged: changes.length > 0,
-      changes
+      changes,
+      theoreticalImpact
     };
+  });
+
+  app.get("/patches/:patch/impacts", async (request, reply) => {
+    const { patch } = patchParams.parse(request.params);
+    const { locale } = localeQuery.parse(request.query);
+    const release = await findPatchRelease(patch, locale);
+    if (!release) return unavailablePatch(reply, patch, locale);
+    const capabilityProfiles = await findAllChampionCapabilityProfiles();
+    return analyzeTheoreticalPatchImpacts({ release, capabilityProfiles });
   });
 
   app.get("/patches/:patch", async (request, reply) => {

@@ -1,5 +1,11 @@
 # API
 
+Etapa 20:
+
+- `GET /patches/:patch/impacts` expõe interpretações teóricas versionadas;
+- `GET /patches/:patch/champions/:championId` inclui `theoreticalImpact`;
+- nenhum dos dois participa de `POST /drafts/recommendations`.
+
 Base local: `http://localhost:3333`.
 
 Endpoints:

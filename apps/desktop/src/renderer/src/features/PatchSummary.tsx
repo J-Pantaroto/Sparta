@@ -1,8 +1,13 @@
-import { summarizePatchRelease, type PatchRelease } from "@sparta/core";
+import {
+  summarizePatchRelease,
+  type PatchRelease,
+  type TheoreticalPatchImpactCollection
+} from "@sparta/core";
 import { Badge, Card, SectionHeader } from "../ui";
 
 interface PatchSummaryProps {
   release: PatchRelease;
+  theoreticalImpacts?: TheoreticalPatchImpactCollection | null;
 }
 
 function displayDate(value: string | null): string {
@@ -10,8 +15,15 @@ function displayDate(value: string | null): string {
   return new Intl.DateTimeFormat("pt-BR", { dateStyle: "long" }).format(new Date(value));
 }
 
-export function PatchSummary({ release }: PatchSummaryProps) {
+export function PatchSummary({ release, theoreticalImpacts }: PatchSummaryProps) {
   const summary = summarizePatchRelease(release);
+  const interpretedSignals =
+    theoreticalImpacts?.impacts.reduce((total, impact) => total + impact.signals.length, 0) ?? 0;
+  const unavailableSignals =
+    theoreticalImpacts?.impacts.reduce(
+      (total, impact) => total + impact.unavailableSignals.length,
+      0
+    ) ?? 0;
   return (
     <Card>
       <SectionHeader
@@ -31,6 +43,18 @@ export function PatchSummary({ release }: PatchSummaryProps) {
         <Badge tone="neutral">{summary.counts.changedItems} itens alterados</Badge>
         <Badge tone="neutral">{summary.counts.changedRunes} runas alteradas</Badge>
       </div>
+      {theoreticalImpacts && (
+        <div className="sp-patch-summary__impact">
+          <strong>Leitura teórica separada</strong>
+          <span className="sp-patch-summary__impact-detail">
+            {theoreticalImpacts.impacts.length} campeões analisados · {interpretedSignals} dimensões
+            interpretadas
+            {unavailableSignals > 0
+              ? ` · ${unavailableSignals} unidades permanecem indisponíveis`
+              : ""}
+          </span>
+        </div>
+      )}
       <p className="sp-patch-summary__source">
         <a href={release.sourceUrl} target="_blank" rel="noreferrer">
           Ver notas oficiais da Riot

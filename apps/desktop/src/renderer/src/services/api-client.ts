@@ -31,7 +31,8 @@ import type {
   PreGameAnalysis,
   RecentChampionMatch,
   RecentForm,
-  Role
+  Role,
+  TheoreticalPatchImpactCollection
 } from "@sparta/core";
 
 export const SESSION_TOKEN_KEY = "sparta:token";
@@ -514,6 +515,12 @@ export function fetchPatchReleases(locale = "pt_BR") {
     releases: PatchReleaseSummary[];
     unavailableReason?: string;
   }>(`/patches?locale=${encodeURIComponent(locale)}`);
+}
+
+export function fetchTheoreticalPatchImpacts(patch: string, locale = "pt_BR") {
+  return request<TheoreticalPatchImpactCollection>(
+    `/patches/${encodeURIComponent(patch)}/impacts?locale=${encodeURIComponent(locale)}`
+  );
 }
 
 export function updateSettings(token: string, matchAnalysisLimit: number) {

@@ -1,5 +1,9 @@
 # Arquitetura
 
+O impacto teórico é calculado no `packages/core`, combinado com capacidades
+pela API e apenas apresentado pelo desktop. A consulta permanece fora do
+motor de recomendação.
+
 Integrações HTTP compartilham taxonomia, timeout e retry em `packages/riot/src/http/`.
 Cache/stale é por recurso e carrega proveniência. Ver `.ai/specs/http-resilience.md`.
 

@@ -1,5 +1,33 @@
 # Sparta - Contexto para Continuidade
 
+## Etapa 20: impacto teórico das mudanças do patch
+
+`TheoreticalPatchImpact` (`theoretical-patch-impact/1.0.0`) interpreta cada
+unidade estruturada da revisão oficial por campeão, preservando dimensão,
+direção, magnitude opcional, explicação, evidência, indisponibilidade,
+cobertura, IDs, revisão, hash e versões. A mudança da Etapa 19 continua
+`OFFICIAL`; a relação teórica é `DERIVED`; `META_STRENGTH` continua
+`UNAVAILABLE`.
+
+O algoritmo puro usa somente `PatchChange`, escalares anterior/novo e
+capacidades rastreáveis da mesma habilidade na Etapa 14. Não lê win rate,
+histórico pessoal, regras por campeão ou `changeType` como direção. Bugfix
+fica `UNKNOWN`; texto, séries e ausência de capacidade ficam indisponíveis;
+compensações permanecem separadas ou `MIXED`. Magnitude só compara o mesmo
+escalar: `<10% MINOR`, `10%-25% MODERATE`, `>25% MAJOR`.
+
+Consultas: `GET /patches/:patch/impacts` e o campo `theoreticalImpact` em
+`GET /patches/:patch/champions/:championId`. Resumo do patch, pool pessoal e
+detalhe secundário do Champion Select apresentam o contexto fora de
+`POST /drafts/recommendations`.
+
+Validação real da revisão 1 do patch 26.14: 10 campeões alterados, três com
+sinais seguros (Corki e Yunara em `SCALING`, Jayce em `MOBILITY`) e 18
+unidades indisponíveis. Garen preserva o nerf oficial, mas fica sem impacto
+teórico seguro. Nenhum score de força foi criado. Score, pesos, ranking,
+pool, risco, matchup, snapshots e meta continuam inalterados. Ver
+`docs/theoretical-patch-impact.md`.
+
 ## Etapa 19: Patch Intelligence com notas oficiais da Riot
 
 `PatchRelease`, `PatchChange` e `StructuredPatchDelta`

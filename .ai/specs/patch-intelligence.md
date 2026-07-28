@@ -1,5 +1,9 @@
 # Patch Intelligence
 
+Desde a Etapa 20, a evidência factual deste módulo também pode alimentar a
+interpretação `DERIVED` e separada de
+`.ai/specs/theoretical-patch-impact.md`.
+
 Fonte de verdade: `docs/patch-intelligence.md`.
 
 ## Contrato operacional

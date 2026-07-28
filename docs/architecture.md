@@ -1,5 +1,11 @@
 # Arquitetura
 
+O impacto teórico de patch segue a separação estrutural do Sparta: o
+algoritmo puro vive em `packages/core`, a API combina a revisão oficial com o
+manifesto de capacidades e o desktop apenas apresenta o resultado. A consulta
+ocorre fora do motor de recomendação; ver
+`docs/theoretical-patch-impact.md`.
+
 Integrações HTTP compartilham taxonomia, timeout e política de retry em
 `packages/riot/src/http/`. Cache e stale fallback são decisões por recurso e carregam metadados
 de proveniência. Ver `docs/http-resilience.md`.

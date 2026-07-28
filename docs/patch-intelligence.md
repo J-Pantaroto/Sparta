@@ -12,6 +12,10 @@ O contrato `patch-intelligence/1.0.0` fica em
 proveniência `OFFICIAL`, URL, patch, locale, datas, hash, versão do parser e
 estado de disponibilidade.
 
+Desde a Etapa 20, uma interpretação `DERIVED` opcional consome este contrato
+factual sem modificá-lo. Ela permanece documentada separadamente em
+`docs/theoretical-patch-impact.md`.
+
 ## Fonte e coleta
 
 O coletor aceita somente HTTPS nos hosts `www.leagueoflegends.com` e
@@ -111,6 +115,10 @@ Estados válidos são `AVAILABLE`, `PARTIAL` e `STALE`. Ausência usa
 
 Na consulta por campeão, `changes: []` só aparece ao lado de um release válido
 e de `entityChanged: false`.
+
+A Etapa 20 acrescenta `GET /patches/:patch/impacts?locale=pt_BR` e inclui
+`theoreticalImpact` na consulta por campeão. O release oficial continua
+inalterado e separado dessa interpretação.
 
 ## Interface e invariantes
 

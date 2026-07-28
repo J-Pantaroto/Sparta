@@ -7,7 +7,8 @@ const apiMocks = vi.hoisted(() => ({
   fetchPlayerPool: vi.fn(),
   addPlayerPoolEntry: vi.fn(),
   disablePlayerPoolEntry: vi.fn(),
-  fetchPatchRelease: vi.fn()
+  fetchPatchRelease: vi.fn(),
+  fetchTheoreticalPatchImpacts: vi.fn()
 }));
 
 vi.mock("../services/api-client", () => ({
@@ -15,7 +16,8 @@ vi.mock("../services/api-client", () => ({
   fetchPlayerPool: apiMocks.fetchPlayerPool,
   addPlayerPoolEntry: apiMocks.addPlayerPoolEntry,
   disablePlayerPoolEntry: apiMocks.disablePlayerPoolEntry,
-  fetchPatchRelease: apiMocks.fetchPatchRelease
+  fetchPatchRelease: apiMocks.fetchPatchRelease,
+  fetchTheoreticalPatchImpacts: apiMocks.fetchTheoreticalPatchImpacts
 }));
 vi.mock("../services/datadragon", () => ({
   fetchAllChampions: () => Promise.resolve([]),
@@ -67,7 +69,23 @@ const releaseSemMudancas: PatchRelease = {
 };
 
 beforeEach(() => {
+  vi.clearAllMocks();
   apiMocks.fetchPatchRelease.mockResolvedValue(releaseSemMudancas);
+  apiMocks.fetchPlayerPool.mockResolvedValue({ entries: [], roleSummaries: [] });
+  apiMocks.fetchTheoreticalPatchImpacts.mockResolvedValue({
+    patch: "26.14",
+    locale: "pt_BR",
+    patchRevision: 1,
+    sourceHash: "hash",
+    status: "UNAVAILABLE",
+    impacts: [],
+    algorithmVersion: "theoretical-patch-impact/1.0.0",
+    provenance: {
+      sourceType: "DERIVED",
+      algorithmVersion: "theoretical-patch-impact/1.0.0",
+      status: "UNAVAILABLE"
+    }
+  });
 });
 
 function renderScreen(draft: Partial<DraftState>, recommendations: PickRecommendation[] = []) {
@@ -477,5 +495,190 @@ describe("Patch Intelligence na Champion Select (Etapa 19)", () => {
       releaseSemMudancas.sourceUrl
     );
     expect(screen.getByText("Por que este pick")).toBeDefined();
+  });
+});
+
+describe("impacto teórico do patch na Champion Select (Etapa 20)", () => {
+  it("mostra dimensão, direção, magnitude, evidência e limitação global fora do ranking", async () => {
+    apiMocks.fetchPatchRelease.mockResolvedValue({
+      ...releaseSemMudancas,
+      changes: [
+        {
+          id: "orianna-q",
+          entityType: "CHAMPION",
+          entityId: 61,
+          entityName: "Orianna",
+          entityResolution: { status: "RESOLVED" },
+          changeType: "NERF",
+          affectedComponent: "Q – Comando: Atacar",
+          officialSummary: "Mudança oficial.",
+          officialDetails: ["Tempo de Recarga: 10 ⇒ 8"],
+          structuredChanges: [
+            {
+              label: "Tempo de Recarga",
+              previousValue: "10",
+              newValue: "8",
+              numericPreviousValue: 10,
+              numericNewValue: 8,
+              numericDelta: -2,
+              status: "AVAILABLE"
+            }
+          ],
+          status: "AVAILABLE",
+          provenance: { sourceType: "OFFICIAL", status: "AVAILABLE" }
+        }
+      ]
+    } satisfies PatchRelease);
+    apiMocks.fetchTheoreticalPatchImpacts.mockResolvedValue({
+      patch: "26.14",
+      locale: "pt_BR",
+      patchRevision: 1,
+      sourceHash: "hash",
+      status: "AVAILABLE",
+      algorithmVersion: "theoretical-patch-impact/1.0.0",
+      provenance: {
+        sourceType: "DERIVED",
+        algorithmVersion: "theoretical-patch-impact/1.0.0",
+        status: "AVAILABLE"
+      },
+      impacts: [
+        {
+          patch: "26.14",
+          championId: 61,
+          patchRevision: 1,
+          sourceHash: "hash",
+          entityChanged: true,
+          status: "AVAILABLE",
+          coverage: 1,
+          patchChangeIds: ["orianna-q"],
+          algorithmVersion: "theoretical-patch-impact/1.0.0",
+          provenance: {
+            sourceType: "DERIVED",
+            algorithmVersion: "theoretical-patch-impact/1.0.0",
+            status: "AVAILABLE"
+          },
+          unavailableSignals: [],
+          signals: [
+            {
+              dimension: "COOLDOWN",
+              direction: "POSITIVE",
+              magnitude: "MODERATE",
+              status: "AVAILABLE",
+              explanation:
+                "Tempo de Recarga mudou de 10 para 8. Isso pode aumentar a frequência teórica de uso do Q.",
+              supportingChangeIds: ["orianna-q"],
+              evidence: [
+                {
+                  patchChangeId: "orianna-q",
+                  affectedComponent: "Q – Comando: Atacar",
+                  structuredChangeIndex: 0,
+                  label: "Tempo de Recarga",
+                  previousValue: "10",
+                  newValue: "8",
+                  relationship: "DIRECT",
+                  officialProvenance: {
+                    sourceType: "OFFICIAL",
+                    status: "AVAILABLE"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    });
+
+    renderScreen({ playerRole: "MID", playerRoleSource: "USER", patch: "16.14.1" }, [
+      recomendacaoMid
+    ]);
+
+    expect(await screen.findByText("Impacto teórico do patch")).toBeDefined();
+    expect(apiMocks.fetchTheoreticalPatchImpacts).toHaveBeenCalledWith("26.14");
+    expect(screen.getByText("Cooldown")).toBeDefined();
+    expect(screen.getByText("Possível efeito positivo")).toBeDefined();
+    expect(screen.getByText("Magnitude moderada")).toBeDefined();
+    expect(screen.getByText(/Tempo de Recarga \(10 → 8\)/)).toBeDefined();
+    expect(screen.getByText(/Dados globais pós-patch ainda indisponíveis/)).toBeDefined();
+    expect(screen.getByText("Por que este pick")).toBeDefined();
+    expect(screen.queryByText(/tier|chance de vitória|subiu no ranking/i)).toBeNull();
+  });
+
+  it("associa campeões alterados ao pool somente como contexto informativo", async () => {
+    apiMocks.fetchPlayerPool.mockResolvedValue({
+      entries: [
+        {
+          playerId: "puuid-1",
+          championId: 61,
+          championName: "Orianna",
+          role: "MID",
+          source: "PERSONAL_OBSERVED",
+          enabled: true,
+          createdAt: "2026-07-28T18:00:00.000Z",
+          updatedAt: "2026-07-28T18:00:00.000Z",
+          provenance: { sourceType: "OBSERVED", status: "AVAILABLE" }
+        }
+      ],
+      roleSummaries: [
+        {
+          role: "MID",
+          enabledCandidates: 1,
+          observedCandidates: 1,
+          userProvidedCandidates: 0
+        }
+      ]
+    });
+    apiMocks.fetchTheoreticalPatchImpacts.mockResolvedValue({
+      patch: "26.14",
+      locale: "pt_BR",
+      patchRevision: 1,
+      sourceHash: "hash",
+      status: "UNAVAILABLE",
+      algorithmVersion: "theoretical-patch-impact/1.0.0",
+      provenance: { sourceType: "DERIVED", status: "UNAVAILABLE" },
+      impacts: [
+        {
+          patch: "26.14",
+          championId: 61,
+          patchRevision: 1,
+          sourceHash: "hash",
+          entityChanged: true,
+          status: "UNAVAILABLE",
+          coverage: 0,
+          signals: [],
+          unavailableSignals: [],
+          patchChangeIds: ["orianna-q"],
+          algorithmVersion: "theoretical-patch-impact/1.0.0",
+          provenance: { sourceType: "DERIVED", status: "UNAVAILABLE" }
+        }
+      ]
+    });
+
+    render(
+      <ChampionSelectScreen
+        draft={{
+          playerRole: "MID",
+          playerRoleSource: "USER",
+          patch: "16.14.1",
+          pickOrder: 1,
+          allies: [],
+          enemies: [],
+          bannedChampionIds: []
+        }}
+        setDraft={vi.fn()}
+        autoPickOrder={null}
+        autoPlayerRole={null}
+        champSelectActive
+        recommendations={[recomendacaoMid]}
+        recommendationsStatus="idle"
+        noAccountLinked={false}
+        ddragonVersion="16.14.1"
+        riotAccounts={[]}
+        sessionToken="token"
+        draftAutoFilled={false}
+      />
+    );
+
+    expect(await screen.findByText(/1 campeão do seu pool recebeu/)).toBeDefined();
+    expect(screen.getByText(/contexto teórico permanece separado do seu histórico pessoal/)).toBeDefined();
   });
 });

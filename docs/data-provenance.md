@@ -1,5 +1,13 @@
 # Origem, disponibilidade e confiança dos dados
 
+## Impacto teórico do patch (Etapa 20)
+
+`PatchChange` permanece `OFFICIAL`. `TheoreticalPatchImpact` é `DERIVED` pelo
+algoritmo `theoretical-patch-impact/1.0.0`, com revisão, hash, IDs das
+mudanças, capacidades relacionadas, cobertura e indisponibilidades. Ele não
+é observação estatística e não preenche `META_STRENGTH`. Ver
+`docs/theoretical-patch-impact.md`.
+
 ## Contratos globais sem fonte (Etapa 18)
 
 `GlobalStatisticContext` torna obrigatórios patch, posição, fila, amostra,

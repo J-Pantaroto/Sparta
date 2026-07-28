@@ -1,5 +1,11 @@
 # Origem, disponibilidade e confiança dos dados
 
+## Impacto teórico do patch (Etapa 20)
+
+Mudança oficial permanece `OFFICIAL`; interpretação por dimensão é
+`DERIVED` em `theoretical-patch-impact/1.0.0`; impacto estatístico observado
+continua `META_STRENGTH: UNAVAILABLE`.
+
 ## Contratos globais sem fonte (Etapa 18)
 
 `GlobalStatisticContext` torna obrigatórios patch, posição, fila, amostra,

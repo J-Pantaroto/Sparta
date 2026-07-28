@@ -25,6 +25,7 @@ import {
   disablePlayerPoolEntry,
   fetchPatchRelease,
   fetchPlayerPool,
+  fetchTheoreticalPatchImpacts,
   type RiotAccountSummary
 } from "../services/api-client";
 import type { DataDragonChampionSummary } from "../services/datadragon";
@@ -58,6 +59,7 @@ import { BuildPanel } from "./BuildPanel";
 import { PersonalLoadoutHistory } from "./PersonalLoadoutHistory";
 import { PatchSummary } from "./PatchSummary";
 import "./ChampionSelectScreen.css";
+import { TheoreticalPatchImpactPanel } from "./TheoreticalPatchImpactPanel";
 
 const MAX_ENEMIES = 5;
 
@@ -132,6 +134,10 @@ export function ChampionSelectScreen({
   );
   const officialPatch = officialPatchFromGameVersion(draft.patch);
   const patch = useAsyncData(() => fetchPatchRelease(officialPatch), [officialPatch]);
+  const theoreticalImpacts = useAsyncData(
+    () => (officialPatch ? fetchTheoreticalPatchImpacts(officialPatch) : undefined),
+    [officialPatch]
+  );
 
   // A recomendação #1 muda conforme o draft evolui; sem seleção explícita, o
   // detalhe acompanha o topo da lista em vez de ficar preso num campeão que
@@ -146,6 +152,21 @@ export function ChampionSelectScreen({
       (change) => change.entityType === "CHAMPION" && change.entityId === championId
     ) ?? [];
   const selectedPatchChanges = selected ? patchChangesFor(selected.championId) : [];
+  const selectedTheoreticalImpact = selected
+    ? theoreticalImpacts.data?.impacts.find(
+        (impact) => impact.championId === selected.championId
+      )
+    : undefined;
+  const changedPoolChampions = new Set(
+    theoreticalImpacts.data?.impacts
+      .filter((impact) => impact.entityChanged)
+      .map((impact) => impact.championId) ?? []
+  );
+  const changedPoolCount = new Set(
+    (pool.data?.entries ?? [])
+      .filter((entry) => entry.enabled && changedPoolChampions.has(entry.championId))
+      .map((entry) => entry.championId)
+  ).size;
 
   useEffect(() => {
     if (selectedId !== null && !allRecommendations.some((item) => item.championId === selectedId)) {
@@ -409,7 +430,9 @@ export function ChampionSelectScreen({
         )}
       </Card>
 
-      {patch.data && <PatchSummary release={patch.data} />}
+      {patch.data && (
+        <PatchSummary release={patch.data} theoreticalImpacts={theoreticalImpacts.data} />
+      )}
 
       {draft.playerRole && sessionToken && (
         <Card>
@@ -436,6 +459,14 @@ export function ChampionSelectScreen({
               </Badge>
             ))}
           </div>
+          {changedPoolCount > 0 && (
+            <p className="sp-pool-patch-context">
+              {changedPoolCount}{" "}
+              {changedPoolCount === 1 ? "campeão do seu pool recebeu" : "campeões do seu pool receberam"}{" "}
+              mudanças oficiais neste patch. O contexto teórico permanece separado do seu
+              histórico pessoal.
+            </p>
+          )}
           {pool.status === "loading" && <Loading block label="Atualizando pool..." />}
           {poolError && <ErrorState inline description={poolError} />}
           <div className="sp-pool-list">
@@ -704,6 +735,10 @@ export function ChampionSelectScreen({
                             </a>
                           </p>
                         </div>
+                      )}
+
+                      {selectedTheoreticalImpact && (
+                        <TheoreticalPatchImpactPanel impact={selectedTheoreticalImpact} />
                       )}
 
                       <SectionHeader

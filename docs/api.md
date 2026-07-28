@@ -4,6 +4,9 @@ Base local: `http://localhost:3333`.
 
 Endpoints:
 
+- `GET /patches`, `GET /patches/current`, `GET /patches/:patch` — releases oficiais importados e revisionados da Riot
+- `GET /patches/:patch/impacts` — interpretações teóricas versionadas por campeão, sem score de força
+- `GET /patches/:patch/champions/:championId` — mudanças oficiais do campeão e `theoreticalImpact` separado
 - `GET /health`
 - `POST /auth/register`, `POST /auth/login`, `GET /auth/me`
 - `GET /players/:riotName/:tagLine/profile` — real, le `RiotAccount`/`PlayerChampionStats` persistidos
@@ -46,6 +49,10 @@ pré-game pelo motor `analyzeDraftStrategy`. As recomendações carregam
 `strategicAnalysis` por candidato; o pré-game devolve o mesmo contrato para o
 campeão confirmado. Ver `docs/champion-capabilities.md` e
 `docs/draft-strategic-analysis.md`.
+
+O impacto teórico de patch é calculado fora do motor de recomendação e usa
+somente Patch Intelligence + capacidades rastreáveis da mesma habilidade.
+Ver `docs/theoretical-patch-impact.md`.
 
 ## Erros externos
 
