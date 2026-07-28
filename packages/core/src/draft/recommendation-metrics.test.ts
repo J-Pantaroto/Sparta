@@ -150,8 +150,8 @@ describe("recommendPicks com o contrato novo", () => {
   it("entrega métricas estruturadas por candidato", () => {
     expect(recomendacoes.length).toBeGreaterThan(1);
     recomendacoes.forEach((recomendacao) => {
-      expect(recomendacao.metricDetails.length).toBe(9);
-      expect(new Set(recomendacao.metricDetails.map((metric) => metric.key)).size).toBe(9);
+      expect(recomendacao.metricDetails.length).toBe(12);
+      expect(new Set(recomendacao.metricDetails.map((metric) => metric.key)).size).toBe(12);
     });
   });
 
@@ -181,7 +181,7 @@ describe("ensureRecommendationMetrics", () => {
     // Cenário medido na validação da Etapa 2: desktop novo contra API
     // anterior ao contrato. Sem isso a tela quebrava inteira.
     const metricas = ensureRecommendationMetrics(recomendacaoAntiga);
-    expect(metricas).toHaveLength(9);
+    expect(metricas).toHaveLength(12);
     expect(metricas.find((metric) => metric.key === "PERSONAL_PERFORMANCE")!.value).toBe(52.2);
     expect(metricas.find((metric) => metric.key === "PERSONAL_MATCHUP")!.value).toBeNull();
     expect(metricas.find((metric) => metric.key === "META_STRENGTH")!.value).toBeNull();
@@ -193,9 +193,16 @@ describe("ensureRecommendationMetrics", () => {
       metricDetails: [unavailableMetric("LANE_MATCHUP", "Sem fonte")]
     };
     const metricas = ensureRecommendationMetrics(jaEstruturada);
-    expect(metricas).toHaveLength(1);
+    expect(metricas).toHaveLength(4);
     expect(metricas[0].key).toBe("PERSONAL_MATCHUP");
     expect(metricas[0].value).toBeNull();
+    expect(metricas.slice(1)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: "PERSONAL_EXPERIENCE", value: null }),
+        expect.objectContaining({ key: "CHAMPION_DIFFICULTY", value: null }),
+        expect.objectContaining({ key: "EXECUTION_RISK", value: null })
+      ])
+    );
   });
 
   it("devolve lista vazia (não valores inventados) quando não há nada", () => {

@@ -60,6 +60,7 @@ export function MetricRow({ metric, label, sourceLabel }: MetricRowProps) {
         }
         value={value}
         value_label={Math.round(value).toString()}
+        invert={metric.key === "EXECUTION_RISK"}
       />
       {isStale && metric.staleReason && <span className="sp-metric__reason">{metric.staleReason}</span>}
       {metric.explanation && <span className="sp-metric__reason">{metric.explanation}</span>}

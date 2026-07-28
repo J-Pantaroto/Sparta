@@ -54,6 +54,11 @@ model Champion {
   title       String?
   roles       String[]
   version     String?
+  // `info.difficulty` oficial da Data Dragon (Etapa 13), separado de
+  // ChampionTag.difficulty, que pertence ao perfil estratégico derivado.
+  dataDragonDifficulty Int?
+  difficultyNormalized Float?
+  difficultyNormalizationAlgorithmVersion String?
   tags        ChampionTag?
   participants MatchParticipant[]
   playerStats PlayerChampionStats[]

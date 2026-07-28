@@ -1,4 +1,5 @@
 import type { ChampionClassProfile, ChampionTag, DamageProfile } from "../types/domain.js";
+import { createChampionDifficultyEvidence } from "./execution-risk.js";
 
 /**
  * Deriva os atributos de gameplay do Sparta (`ChampionTag`) a partir do
@@ -190,6 +191,7 @@ export function deriveChampionTag(profile: ChampionClassProfile): ChampionTag {
     tags: buildDescriptiveTags(classes, values),
     blindSafety: round2(clamp01(combined.blind - difficulty * DIFFICULTY_BLIND_PENALTY)),
     difficulty: round2(difficulty),
+    officialDifficulty: createChampionDifficultyEvidence(profile.difficulty),
     engage: round2(values.engage),
     peel: round2(values.peel),
     frontline: round2(values.frontline),

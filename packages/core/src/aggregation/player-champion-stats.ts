@@ -15,6 +15,7 @@ export interface MatchParticipationRecord {
   visionScorePerMinute: number;
   killParticipation: number | null;
   objectiveParticipation: number | null;
+  observedAt?: string;
 }
 
 const RECENT_MATCHES_LIMIT = 20;
@@ -108,7 +109,8 @@ export function aggregatePlayerChampionStats(
     damagePerMinute: match.damagePerMinute,
     visionScorePerMinute: match.visionScorePerMinute,
     killParticipation: match.killParticipation,
-    objectiveParticipation: match.objectiveParticipation
+    objectiveParticipation: match.objectiveParticipation,
+    observedAt: match.observedAt
   }));
 
   const killParticipation = averageAvailable(

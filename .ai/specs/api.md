@@ -25,6 +25,11 @@ O contrato e as regras de origem do pool estão em
 `docs/player-champion-pool.md`. `PATCH` está explicitamente liberado no CORS
 para o desktop; a allowlist de origens permanece restrita.
 
+As recomendações atuais também carregam `CHAMPION_DIFFICULTY`,
+`PERSONAL_EXPERIENCE` e `EXECUTION_RISK` em `metricDetails`. Resposta
+anterior sem esses campos é adaptada para `UNAVAILABLE`, sem neutros
+artificiais. Ver `docs/champion-execution-risk.md`.
+
 ## Erros externos
 
 Falhas externas seguem `.ai/specs/http-resilience.md`. A resposta pública contém apenas

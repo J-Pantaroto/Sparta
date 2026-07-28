@@ -521,6 +521,12 @@ export function ChampionSelectScreen({
                         <span className="sp-rec__category">
                           {poolSourceLabel(recommendation)} · {personalGamesLabel(recommendation)}
                         </span>
+                        <span
+                          className="sp-rec__category"
+                          title={executionRiskExplanation(recommendation)}
+                        >
+                          {executionRiskCompactLabel(recommendation)}
+                        </span>
                       </span>
                       <ScoreBadge score={recommendation.totalScore} size="xs" />
                     </div>
@@ -550,6 +556,12 @@ export function ChampionSelectScreen({
                             <strong className="sp-rec__name">{recommendation.championName}</strong>
                             <span className="sp-rec__category">
                               {poolSourceLabel(recommendation)} · {personalGamesLabel(recommendation)}
+                            </span>
+                            <span
+                              className="sp-rec__category"
+                              title={executionRiskExplanation(recommendation)}
+                            >
+                              {executionRiskCompactLabel(recommendation)}
                             </span>
                           </span>
                           <ScoreBadge score={recommendation.totalScore} size="xs" />
@@ -593,7 +605,7 @@ export function ChampionSelectScreen({
 
                     <SectionHeader
                       title="Por que este pick"
-                      description="Cada dimensão vale 0 a 100 e entra no score com o peso do cenário de draft atual."
+                      description="Os sinais do draft formam o score base; o risco pessoal aplica somente uma penalização limitada e explicada."
                     />
                     {Number.isFinite(selected.dataCoverage) && (
                       <p className="sp-recdetail__coverage">
@@ -672,4 +684,32 @@ function personalGamesLabel(recommendation: PickRecommendation): string {
   if (games === undefined) return "Amostra não informada";
   if (games === 0) return "Sem histórico pessoal";
   return `${games} ${games === 1 ? "partida observada" : "partidas observadas"}`;
+}
+
+function executionRiskCompactLabel(
+  recommendation: PickRecommendation
+): string {
+  const difficulty = recommendation.metricDetails.find(
+    (metric) => metric.key === "CHAMPION_DIFFICULTY"
+  );
+  const risk = recommendation.metricDetails.find(
+    (metric) => metric.key === "EXECUTION_RISK"
+  );
+  const difficultyLabel =
+    difficulty?.value === null || difficulty?.value === undefined
+      ? "Dificuldade indisponível"
+      : `Dificuldade ${Math.round(difficulty.value)}`;
+  const riskLabel =
+    risk?.value === null || risk?.value === undefined
+      ? "risco indisponível"
+      : `risco ${Math.round(risk.value)}`;
+  return `${difficultyLabel} · ${riskLabel}`;
+}
+
+function executionRiskExplanation(
+  recommendation: PickRecommendation
+): string | undefined {
+  return recommendation.metricDetails.find(
+    (metric) => metric.key === "EXECUTION_RISK"
+  )?.explanation;
 }

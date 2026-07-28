@@ -99,6 +99,16 @@ Construtores (`availableMetric`, `unavailableMetric`, `staleMetric`) garantem o 
 A lista de chaves é aberta: métricas de build/runa e de pré/pós-game entram sem alterar o
 contrato.
 
+### Dificuldade e risco implementados (Etapa 13)
+
+`CHAMPION_DIFFICULTY` preserva em `sourceValue` o `info.difficulty` 0-10
+com proveniência `OFFICIAL`; o valor exibido 0-100 é `CALCULATED` pela
+normalização versionada do Sparta. `PERSONAL_EXPERIENCE` usa somente amostra
+e recência. `EXECUTION_RISK` é `DERIVED` dessas duas fontes, nunca de win
+rate ou desempenho. Sem campo oficial, dificuldade e risco ficam
+`UNAVAILABLE` e não alteram o score. Ver
+`docs/champion-execution-risk.md`.
+
 ## Confiança: dois formatos
 
 O domínio tem `Confidence` categórico (`"low"`/`"medium"`/`"high"`) desde a Fase 2, exibido ao

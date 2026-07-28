@@ -9,6 +9,7 @@ import {
 } from "./recommendation-engine.js";
 import type { ChampionTag, DraftState, PlayerChampionStats, PlayerProfile } from "../types/domain.js";
 import type { PlayerChampionPoolCandidate } from "../types/player-champion-pool.js";
+import { createChampionDifficultyEvidence } from "./execution-risk.js";
 
 const championStats: PlayerChampionStats[] = [
   {
@@ -632,5 +633,192 @@ describe("pool pessoal e cinco recomendacoes (Etapa 12)", () => {
     expect(ids).not.toContain(101);
     expect(result.poolSummary.totalCandidates).toBe(7);
     expect(result.poolSummary.evaluatedCandidates).toBe(5);
+  });
+});
+
+describe("dificuldade e risco pessoal no ranking (Etapa 13)", () => {
+  const draft: DraftState = {
+    playerRole: "MID",
+    pickOrder: 3,
+    allies: [],
+    enemies: [],
+    bannedChampionIds: []
+  };
+  const compositionRules = {
+    minimumFrontline: 40,
+    minimumEngage: 40,
+    minimumWaveclear: 40,
+    preferDamageBalance: true
+  };
+  const baseTag: ChampionTag = {
+    ...tags[0],
+    roles: [],
+    blindSafety: 0.7
+  };
+  const pool: PlayerChampionPoolCandidate[] = [
+    {
+      championId: 200,
+      championName: "Difícil",
+      role: "MID",
+      source: "USER_PROVIDED",
+      enabled: true
+    },
+    {
+      championId: 201,
+      championName: "Simples",
+      role: "MID",
+      source: "USER_PROVIDED",
+      enabled: true
+    }
+  ];
+  const riskTags: ChampionTag[] = [
+    {
+      ...baseTag,
+      championId: 200,
+      championName: "Difícil",
+      officialDifficulty: createChampionDifficultyEvidence(10)
+    },
+    {
+      ...baseTag,
+      championId: 201,
+      championName: "Simples",
+      officialDifficulty: createChampionDifficultyEvidence(2)
+    }
+  ];
+
+  function recommend(
+    candidates = pool,
+    stats: PlayerChampionStats[] = []
+  ) {
+    return recommendFromPersonalPool({
+      draft,
+      candidates,
+      championStats: stats,
+      championTags: riskTags,
+      matchups: [],
+      compositionRules,
+      patchMeta: null,
+      evaluatedAt: "2026-07-28T12:00:00.000Z"
+    });
+  }
+
+  it("opções estrategicamente iguais são diferenciadas pelo risco limitado", () => {
+    const result = recommend();
+    const simple = result.primaryRecommendations.find(
+      (entry) => entry.championId === 201
+    )!;
+    const difficult = result.primaryRecommendations.find(
+      (entry) => entry.championId === 200
+    )!;
+
+    expect(simple.totalScore).toBeGreaterThan(difficult.totalScore);
+    expect(
+      simple.metricDetails.find(
+        (metric) => metric.key === "CHAMPION_DIFFICULTY"
+      )?.value
+    ).toBe(20);
+    expect(
+      difficult.metricDetails.find(
+        (metric) => metric.key === "EXECUTION_RISK"
+      )?.value
+    ).toBe(100);
+    expect(difficult.warnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "execution_risk" })
+      ])
+    );
+  });
+
+  it("experiência reduz o risco sem alterar a dificuldade oficial", () => {
+    const noHistory = recommend().primaryRecommendations.find(
+      (entry) => entry.championId === 200
+    )!;
+    const experiencedStats: PlayerChampionStats = {
+      ...championStats[0],
+      championId: 200,
+      championName: "Difícil",
+      games: 20,
+      recentMatches: [
+        {
+          matchId: "BR1_13",
+          championId: 200,
+          role: "MID",
+          won: true,
+          kills: 4,
+          deaths: 2,
+          assists: 8,
+          csPerMinute: 7,
+          goldPerMinute: 420,
+          damagePerMinute: 700,
+          visionScorePerMinute: 0.8,
+          killParticipation: 0.55,
+          objectiveParticipation: 0.4,
+          observedAt: "2026-07-27T12:00:00.000Z"
+        }
+      ]
+    };
+    const experienced = recommend(pool, [experiencedStats])
+      .primaryRecommendations.find((entry) => entry.championId === 200)!;
+
+    const metric = (
+      recommendation: typeof experienced,
+      key: "CHAMPION_DIFFICULTY" | "EXECUTION_RISK"
+    ) => recommendation.metricDetails.find((entry) => entry.key === key)?.value;
+    expect(metric(experienced, "CHAMPION_DIFFICULTY")).toBe(
+      metric(noHistory, "CHAMPION_DIFFICULTY")
+    );
+    expect(metric(experienced, "EXECUTION_RISK")).toBeLessThan(
+      metric(noHistory, "EXECUTION_RISK")!
+    );
+  });
+
+  it("ordem de entrada não altera score individual com risco disponível", () => {
+    const forward = recommend(pool);
+    const reverse = recommend([...pool].reverse());
+    const scoreById = (result: ReturnType<typeof recommend>) =>
+      Object.fromEntries(
+        result.primaryRecommendations.map((entry) => [
+          entry.championId,
+          entry.totalScore
+        ])
+      );
+
+    expect(scoreById(reverse)).toEqual(scoreById(forward));
+  });
+
+  it("principais e alternativas recebem o mesmo contrato de dificuldade e risco", () => {
+    const candidates = Array.from({ length: 8 }, (_, index) => ({
+      championId: 300 + index,
+      championName: `Candidato ${index}`,
+      role: "MID" as const,
+      source: "USER_PROVIDED" as const,
+      enabled: true
+    }));
+    const result = recommendFromPersonalPool({
+      draft,
+      candidates,
+      championStats: [],
+      championTags: candidates.map((candidate) => ({
+        ...baseTag,
+        championId: candidate.championId,
+        championName: candidate.championName,
+        officialDifficulty: createChampionDifficultyEvidence(5)
+      })),
+      matchups: [],
+      compositionRules,
+      patchMeta: null
+    });
+
+    for (const recommendation of [
+      ...result.primaryRecommendations,
+      ...result.alternatives
+    ]) {
+      expect(recommendation.metricDetails).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ key: "CHAMPION_DIFFICULTY", value: 50 }),
+          expect.objectContaining({ key: "EXECUTION_RISK", value: 50 })
+        ])
+      );
+    }
   });
 });

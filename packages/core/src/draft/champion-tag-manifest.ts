@@ -1,4 +1,5 @@
 import type { ChampionTag, DamageProfile, Role } from "../types/domain.js";
+import type { ChampionDifficultyEvidence } from "../types/champion-difficulty.js";
 import {
   CHAMPION_TAG_DIMENSIONS,
   CHAMPION_TAG_NUMERIC_DIMENSIONS,
@@ -8,6 +9,7 @@ import {
   type ChampionTagProvenance
 } from "../types/champion-tag-provenance.js";
 import { CHAMPION_TAG_DERIVATION_VERSION } from "./champion-tag-derivation.js";
+import { CHAMPION_DIFFICULTY_NORMALIZATION_VERSION } from "./execution-risk.js";
 
 /**
  * Leitura, montagem e validação do arquivo versionado de `ChampionTag`
@@ -52,6 +54,7 @@ export interface ChampionTagManifestMetadata {
   locale?: string;
   sourceResource?: string;
   algorithmVersion?: string;
+  difficultyNormalizationAlgorithmVersion?: string;
   /** ISO 8601. Só muda quando o conteúdo funcional muda. */
   generatedAt?: string;
 }
@@ -65,6 +68,8 @@ export interface ChampionTagManifestEntry {
   tags: string[];
   blindSafety: number;
   difficulty: number;
+  dataDragonDifficultyOriginal?: number;
+  dataDragonDifficultyNormalized?: number;
   engage: number;
   peel: number;
   frontline: number;
@@ -103,6 +108,14 @@ function readEntry(raw: unknown): ChampionTagManifestEntry | null {
     tags: Array.isArray(raw.tags) ? (raw.tags as string[]) : [],
     blindSafety: Number(raw.blindSafety),
     difficulty: Number(raw.difficulty),
+    dataDragonDifficultyOriginal:
+      typeof raw.dataDragonDifficultyOriginal === "number"
+        ? raw.dataDragonDifficultyOriginal
+        : undefined,
+    dataDragonDifficultyNormalized:
+      typeof raw.dataDragonDifficultyNormalized === "number"
+        ? raw.dataDragonDifficultyNormalized
+        : undefined,
     engage: Number(raw.engage),
     peel: Number(raw.peel),
     frontline: Number(raw.frontline),
@@ -149,6 +162,10 @@ export function parseChampionTagManifest(raw: unknown): ChampionTagManifest {
         locale: typeof raw.metadata.locale === "string" ? raw.metadata.locale : undefined,
         sourceResource: typeof raw.metadata.sourceResource === "string" ? raw.metadata.sourceResource : undefined,
         algorithmVersion: typeof raw.metadata.algorithmVersion === "string" ? raw.metadata.algorithmVersion : undefined,
+        difficultyNormalizationAlgorithmVersion:
+          typeof raw.metadata.difficultyNormalizationAlgorithmVersion === "string"
+            ? raw.metadata.difficultyNormalizationAlgorithmVersion
+            : undefined,
         generatedAt: typeof raw.metadata.generatedAt === "string" ? raw.metadata.generatedAt : undefined
       }
     : undefined;
@@ -205,6 +222,7 @@ export function toChampionTags(manifest: ChampionTagManifest): ChampionTag[] {
     tags: entry.tags,
     blindSafety: entry.blindSafety,
     difficulty: entry.difficulty,
+    officialDifficulty: entryDifficultyEvidence(entry, manifest.metadata),
     engage: entry.engage,
     peel: entry.peel,
     frontline: entry.frontline,
@@ -214,6 +232,45 @@ export function toChampionTags(manifest: ChampionTagManifest): ChampionTag[] {
     earlyPressure: entry.earlyPressure,
     provenance: entryProvenance(entry, manifest.metadata)
   }));
+}
+
+function entryDifficultyEvidence(
+  entry: ChampionTagManifestEntry,
+  metadata: ChampionTagManifestMetadata | undefined
+): ChampionDifficultyEvidence | undefined {
+  const originalValue = entry.dataDragonDifficultyOriginal;
+  const normalizedValue = entry.dataDragonDifficultyNormalized;
+  const algorithmVersion =
+    metadata?.difficultyNormalizationAlgorithmVersion;
+  if (
+    originalValue === undefined ||
+    normalizedValue === undefined ||
+    algorithmVersion === undefined ||
+    !Number.isFinite(originalValue) ||
+    originalValue < 0 ||
+    originalValue > 10 ||
+    !Number.isFinite(normalizedValue) ||
+    normalizedValue < 0 ||
+    normalizedValue > 100
+  ) {
+    return undefined;
+  }
+
+  return {
+    originalValue,
+    originalScale: { min: 0, max: 10 },
+    normalizedValue,
+    normalizationAlgorithmVersion: algorithmVersion,
+    provenance: {
+      sourceType: "OFFICIAL",
+      sourceId: CHAMPION_TAG_SOURCE_ID,
+      resource: `${metadata?.sourceResource ?? CHAMPION_TAG_SOURCE_RESOURCE}#info.difficulty`,
+      patch: metadata?.dataDragonVersion,
+      locale: metadata?.locale,
+      collectedAt: metadata?.generatedAt,
+      status: "AVAILABLE"
+    }
+  };
 }
 
 export interface ChampionTagValidationIssue {
@@ -282,6 +339,8 @@ function normalizeEntry(entry: ChampionTagManifestEntry): ChampionTagManifestEnt
     tags: entry.tags,
     blindSafety: entry.blindSafety,
     difficulty: entry.difficulty,
+    dataDragonDifficultyOriginal: entry.dataDragonDifficultyOriginal,
+    dataDragonDifficultyNormalized: entry.dataDragonDifficultyNormalized,
     engage: entry.engage,
     peel: entry.peel,
     frontline: entry.frontline,
@@ -352,6 +411,8 @@ export function buildChampionTagManifest(
       tags: tag.tags,
       blindSafety: tag.blindSafety,
       difficulty: tag.difficulty,
+      dataDragonDifficultyOriginal: tag.officialDifficulty?.originalValue,
+      dataDragonDifficultyNormalized: tag.officialDifficulty?.normalizedValue,
       engage: tag.engage,
       peel: tag.peel,
       frontline: tag.frontline,
@@ -402,7 +463,9 @@ export function buildChampionTagManifest(
     functionalEquals(champions, input.previous.champions.map(normalizeEntry)) &&
     input.previous.metadata?.dataDragonVersion === input.dataDragonVersion &&
     input.previous.metadata?.locale === input.locale &&
-    input.previous.metadata?.algorithmVersion === CHAMPION_TAG_DERIVATION_VERSION;
+    input.previous.metadata?.algorithmVersion === CHAMPION_TAG_DERIVATION_VERSION &&
+    input.previous.metadata?.difficultyNormalizationAlgorithmVersion ===
+      CHAMPION_DIFFICULTY_NORMALIZATION_VERSION;
 
   return {
     manifest: {
@@ -411,6 +474,8 @@ export function buildChampionTagManifest(
         locale: input.locale,
         sourceResource: CHAMPION_TAG_SOURCE_RESOURCE,
         algorithmVersion: CHAMPION_TAG_DERIVATION_VERSION,
+        difficultyNormalizationAlgorithmVersion:
+          CHAMPION_DIFFICULTY_NORMALIZATION_VERSION,
         // Nada funcional mudou: mantém a data anterior. Sem isso, rodar o
         // gerador de novo produziria um diff só de timestamp.
         generatedAt: unchanged ? (input.previous.metadata?.generatedAt ?? input.now) : input.now

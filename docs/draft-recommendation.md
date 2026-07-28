@@ -38,6 +38,16 @@ foi recalibrado; o score de candidato observado já elegível permanece
 invariante. Detalhes de persistência, API e compatibilidade:
 `docs/player-champion-pool.md`.
 
+## Dificuldade e risco pessoal (Etapa 13)
+
+`CHAMPION_DIFFICULTY` usa exclusivamente o `info.difficulty` oficial
+preservado no catálogo, separado de `ChampionTag.difficulty`.
+`PERSONAL_EXPERIENCE` mede somente amostra e recência; não lê win rate, KDA
+ou score de desempenho. `EXECUTION_RISK` combina dificuldade e essa
+evidência e aplica, depois do score base, uma penalização limitada a oito
+pontos. Sem dificuldade, a penalização é zero e o score anterior fica
+invariante. Fórmula, versões e limites: `docs/champion-execution-risk.md`.
+
 ## Pesos por cenário (`selectWeights`)
 
 Três tabelas de peso, cada uma somando 1.0 (invariante testada em `recommendation-engine.test.ts`):

@@ -75,7 +75,8 @@ export const draftsRoutes: FastifyPluginAsync = async (app) => {
       championTags,
       matchups,
       compositionRules,
-      patchMeta: null
+      patchMeta: null,
+      evaluatedAt: new Date().toISOString()
     });
     return {
       ...result,

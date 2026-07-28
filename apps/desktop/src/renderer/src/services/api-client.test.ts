@@ -71,6 +71,20 @@ describe("compatibilidade do contrato de recomendacoes (Etapa 12)", () => {
     expect(result.alternatives).toEqual([]);
     expect(result.primaryRecommendations[0]).not.toHaveProperty("poolSource");
     expect(result.poolSummary.shortageReason).toMatch(/API/i);
+    expect(result.primaryRecommendations[0].metricDetails).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          key: "CHAMPION_DIFFICULTY",
+          value: null,
+          status: "UNAVAILABLE"
+        }),
+        expect.objectContaining({
+          key: "EXECUTION_RISK",
+          value: null,
+          status: "UNAVAILABLE"
+        })
+      ])
+    );
     vi.unstubAllGlobals();
   });
 

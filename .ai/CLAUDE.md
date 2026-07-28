@@ -1,5 +1,27 @@
 # Sparta - Contexto para Continuidade
 
+## Etapa 13: dificuldade e risco pessoal de execução
+
+O ranking preserva `info.difficulty` da Data Dragon como fato oficial 0-10,
+com patch, recurso e valor original, e o normaliza linearmente para 0-100 pelo
+algoritmo `champion-difficulty-normalization/1.0.0`. Esse dado vive nas colunas
+próprias de `Champion` e é exposto por `ChampionTag.officialDifficulty`,
+separado da dimensão estratégica e curável `ChampionTag.difficulty`. Ausência
+continua `UNAVAILABLE`; não existe dificuldade média ou neutra substituta.
+
+`PERSONAL_EXPERIENCE` usa somente quantidade de partidas na posição e recência
+observada. `EXECUTION_RISK` combina essa evidência com a dificuldade oficial,
+sem usar win rate ou desempenho, e pode descontar no máximo 8 pontos do score
+base. Candidato manual sem histórico continua elegível e recebe risco baseado
+na dificuldade mais a ausência conhecida de partidas. Sem dificuldade, o
+risco não altera score nem ordem.
+
+Os três sinais aparecem em `metricDetails`, na recomendação principal e nas
+alternativas. Respostas antigas recebem campos `UNAVAILABLE`, nunca valores
+inventados. Migration `20260728033000_champion_execution_risk`; 173/173
+campeões do manifesto e do Postgres possuem valor bruto e normalizado. Fórmulas
+e limites em `docs/champion-execution-risk.md`.
+
 ## Etapa 12: pool pessoal por posição e cinco recomendações
 
 O Champion Select usa um pool explícito por conta Riot, campeão e posição:

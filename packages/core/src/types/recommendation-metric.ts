@@ -67,6 +67,16 @@ export interface RecommendationMetric {
   /** `null` quando a confiança não é conhecida (≠ confiança baixa). */
   confidence: ConfidenceScore | null;
   provenance?: DataProvenance;
+  /**
+   * Valor bruto que originou a métrica normalizada, quando precisa ser
+   * preservado separadamente. Ex.: `info.difficulty` 8/10 da Data Dragon
+   * antes da normalização 80/100 do Sparta.
+   */
+  sourceValue?: {
+    value: number;
+    scale?: { min: number; max: number };
+    provenance: DataProvenance;
+  };
   /** Explicação curta exibível ao jogador. */
   explanation?: string;
   /** Só faz sentido com status UNAVAILABLE. */
@@ -80,6 +90,7 @@ interface AvailableMetricInput {
   value: number;
   confidence?: ConfidenceScore;
   provenance?: DataProvenance;
+  sourceValue?: RecommendationMetric["sourceValue"];
   explanation?: string;
   /** Amostra/entrada incompleta - usável, mas com ressalva. */
   partial?: boolean;
@@ -96,6 +107,7 @@ export function availableMetric(input: AvailableMetricInput): RecommendationMetr
     status: input.partial ? "PARTIAL" : "AVAILABLE",
     confidence: input.confidence ?? null,
     ...(input.provenance ? { provenance: input.provenance } : {}),
+    ...(input.sourceValue ? { sourceValue: input.sourceValue } : {}),
     ...(input.explanation ? { explanation: input.explanation } : {})
   };
 }

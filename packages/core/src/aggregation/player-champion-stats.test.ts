@@ -93,11 +93,19 @@ describe("aggregatePlayerChampionStats", () => {
   });
 
   it("recentMatches respeita o limite de 20 e preserva a ordem recebida (mais recente primeiro)", () => {
-    const matches = Array.from({ length: 25 }, (_, index) => match({ matchId: `m${index}` }));
+    const matches = Array.from({ length: 25 }, (_, index) =>
+      match({
+        matchId: `m${index}`,
+        observedAt: `2026-07-${String(28 - Math.min(index, 27)).padStart(2, "0")}T12:00:00.000Z`
+      })
+    );
     const stats = aggregatePlayerChampionStats(61, "Orianna", "MID", matches)!;
 
     expect(stats.recentMatches).toHaveLength(20);
     expect(stats.recentMatches[0].matchId).toBe("m0");
+    expect(stats.recentMatches[0].observedAt).toBe(
+      "2026-07-28T12:00:00.000Z"
+    );
     expect(stats.recentMatches[19].matchId).toBe("m19");
   });
 

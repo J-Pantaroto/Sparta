@@ -7,7 +7,10 @@ import {
 import {
   CHAMPION_TAG_DIMENSIONS,
   CHAMPION_TAG_SOURCE_ID,
+  CHAMPION_DIFFICULTY_NORMALIZATION_VERSION,
+  createChampionDifficultyEvidence,
   deriveReviewState,
+  normalizeChampionDifficulty,
   type ChampionTag,
   type ChampionTagDimension,
   type ChampionTagProvenance,
@@ -125,7 +128,16 @@ export async function syncChampionCatalog(): Promise<CatalogSyncResult> {
         key: champion.id,
         name: champion.name,
         title: champion.title,
-        version
+        version,
+        dataDragonDifficulty: champion.info?.difficulty ?? null,
+        difficultyNormalized:
+          champion.info?.difficulty === undefined
+            ? null
+            : normalizeChampionDifficulty(champion.info.difficulty),
+        difficultyNormalizationAlgorithmVersion:
+          champion.info?.difficulty === undefined
+            ? null
+            : CHAMPION_DIFFICULTY_NORMALIZATION_VERSION
       },
       create: {
         id: Number(champion.key),
@@ -133,7 +145,16 @@ export async function syncChampionCatalog(): Promise<CatalogSyncResult> {
         name: champion.name,
         title: champion.title,
         roles: [],
-        version
+        version,
+        dataDragonDifficulty: champion.info?.difficulty ?? null,
+        difficultyNormalized:
+          champion.info?.difficulty === undefined
+            ? null
+            : normalizeChampionDifficulty(champion.info.difficulty),
+        difficultyNormalizationAlgorithmVersion:
+          champion.info?.difficulty === undefined
+            ? null
+            : CHAMPION_DIFFICULTY_NORMALIZATION_VERSION
       }
     });
   }
@@ -225,23 +246,53 @@ export async function findChampionNamesByIds(ids: number[]): Promise<Map<number,
 export async function findAllChampionTags(): Promise<ChampionTag[]> {
   const rows = await prisma.championTag.findMany({ include: { champion: true } });
 
-  return rows.map((row) => ({
-    provenance: toChampionTagProvenance(row),
-    championId: row.championId,
-    championName: row.champion.name,
-    // Campo legado de Champion não possui origem global aprovada. Um
-    // ChampionTag nunca o promove a elegibilidade por posição.
-    roles: [],
-    damageProfile: row.damageProfile as DamageProfile,
-    tags: row.tags,
-    blindSafety: row.blindSafety,
-    difficulty: row.difficulty,
-    engage: row.engage,
-    peel: row.peel,
-    frontline: row.frontline,
-    pickoff: row.pickoff,
-    waveclear: row.waveclear,
-    scaling: row.scaling,
-    earlyPressure: row.earlyPressure
-  }));
+  return rows.map((row) => {
+    const difficulty =
+      row.champion.dataDragonDifficulty === null
+        ? undefined
+        : createChampionDifficultyEvidence(
+            row.champion.dataDragonDifficulty,
+            {
+              patch:
+                row.champion.version ??
+                row.dataDragonVersion ??
+                undefined,
+              locale: row.locale ?? undefined,
+              resource: "champion.json#info.difficulty",
+              collectedAt: row.generatedAt?.toISOString()
+            }
+          );
+    const officialDifficulty =
+      difficulty &&
+      row.champion.difficultyNormalized !== null &&
+      row.champion.difficultyNormalizationAlgorithmVersion !== null
+        ? {
+            ...difficulty,
+            normalizedValue: row.champion.difficultyNormalized,
+            normalizationAlgorithmVersion:
+              row.champion.difficultyNormalizationAlgorithmVersion
+          }
+        : undefined;
+
+    return {
+      provenance: toChampionTagProvenance(row),
+      championId: row.championId,
+      championName: row.champion.name,
+      // Campo legado de Champion não possui origem global aprovada. Um
+      // ChampionTag nunca o promove a elegibilidade por posição.
+      roles: [],
+      damageProfile: row.damageProfile as DamageProfile,
+      tags: row.tags,
+      blindSafety: row.blindSafety,
+      difficulty: row.difficulty,
+      officialDifficulty,
+      engage: row.engage,
+      peel: row.peel,
+      frontline: row.frontline,
+      pickoff: row.pickoff,
+      waveclear: row.waveclear,
+      scaling: row.scaling,
+      earlyPressure: row.earlyPressure
+    };
+  });
 }

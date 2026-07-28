@@ -335,6 +335,7 @@ export interface ParticipationRecord {
   visionScorePerMinute: number;
   killParticipation: number | null;
   objectiveParticipation: number | null;
+  observedAt?: string;
 }
 
 /**
@@ -369,6 +370,7 @@ export async function findParticipationHistory(puuid: string, limit?: number): P
     damagePerMinute: row.damagePerMinute,
     visionScorePerMinute: row.visionScorePerMinute,
     killParticipation: row.killParticipation,
-    objectiveParticipation: row.objectiveParticipation
+    objectiveParticipation: row.objectiveParticipation,
+    observedAt: row.match.startedAt?.toISOString()
   }));
 }

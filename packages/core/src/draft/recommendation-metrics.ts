@@ -2,6 +2,7 @@ import type { Confidence, MatchupData, PickRecommendation, Role } from "../types
 import type { DataProvenance } from "../types/provenance.js";
 import { toConfidenceScore } from "../types/provenance.js";
 import { availableMetric, unavailableMetric, type RecommendationMetric } from "../types/recommendation-metric.js";
+import type { ExecutionRiskAssessment } from "./execution-risk.js";
 
 /**
  * Adaptador ÚNICO entre os números que o motor calcula hoje
@@ -50,6 +51,7 @@ export function toRecommendationMetrics(
     personalMatchup?: MatchupData;
     playerRole?: Role;
     enemyLaneKnown?: boolean;
+    executionRisk?: ExecutionRiskAssessment;
   } = {}
 ): RecommendationMetric[] {
   const personalConfidence = confidence === undefined ? undefined : toConfidenceScore(confidence);
@@ -135,7 +137,22 @@ export function toRecommendationMetrics(
           value: metrics.compositionFit,
           provenance: championTagProvenance
         }),
-    unavailableMetric("META_STRENGTH", "Dados estatísticos do meta deste patch ainda não estão disponíveis.")
+    unavailableMetric("META_STRENGTH", "Dados estatísticos do meta deste patch ainda não estão disponíveis."),
+    context.executionRisk?.familiarityMetric ??
+      unavailableMetric(
+        "PERSONAL_EXPERIENCE",
+        "A resposta não informa evidência pessoal para esta posição."
+      ),
+    context.executionRisk?.difficultyMetric ??
+      unavailableMetric(
+        "CHAMPION_DIFFICULTY",
+        "A resposta não informa a dificuldade do catálogo."
+      ),
+    context.executionRisk?.riskMetric ??
+      unavailableMetric(
+        "EXECUTION_RISK",
+        "A resposta não informa risco pessoal de execução."
+      )
   ];
 }
 
@@ -165,11 +182,34 @@ type MaybeStructured = Pick<PickRecommendation, "metrics"> & {
  */
 export function ensureRecommendationMetrics(recommendation: MaybeStructured): RecommendationMetric[] {
   if (Array.isArray(recommendation.metricDetails) && recommendation.metricDetails.length > 0) {
-    return recommendation.metricDetails.map((metric) =>
+    const normalized = recommendation.metricDetails.map((metric) =>
       metric.key === "LANE_MATCHUP"
         ? unavailableMetric("PERSONAL_MATCHUP", "Dados legados de matchup não têm proveniência suficiente.")
         : metric
     );
+    const required: {
+      key: RecommendationMetric["key"];
+      reason: string;
+    }[] = [
+      {
+        key: "PERSONAL_EXPERIENCE",
+        reason: "A resposta anterior não informa evidência pessoal estruturada."
+      },
+      {
+        key: "CHAMPION_DIFFICULTY",
+        reason: "A resposta anterior não informa a dificuldade do catálogo."
+      },
+      {
+        key: "EXECUTION_RISK",
+        reason: "A resposta anterior não informa risco pessoal de execução."
+      }
+    ];
+    for (const entry of required) {
+      if (!normalized.some((metric) => metric.key === entry.key)) {
+        normalized.push(unavailableMetric(entry.key, entry.reason));
+      }
+    }
+    return normalized;
   }
   if (!recommendation.metrics) return [];
   return toRecommendationMetrics(recommendation.metrics, recommendation.confidence);

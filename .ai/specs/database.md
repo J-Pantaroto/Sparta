@@ -38,3 +38,9 @@ timestamps auditáveis. A origem observada é derivada das `MatchObservation`
 normalizadas; desabilitar uma entrada manual não remove partidas,
 participantes ou observações. Draft e ranking não são persistidos pela Etapa
 12. Ver `docs/player-champion-pool.md`.
+
+`Champion` preserva o `info.difficulty` oficial da Data Dragon em
+`dataDragonDifficulty`, junto do valor 0-100 e da versão do algoritmo de
+normalização. Esses campos são nullable e não substituem
+`ChampionTag.difficulty`, que continua sendo uma dimensão estratégica
+derivada/curável. Ver `docs/champion-execution-risk.md`.

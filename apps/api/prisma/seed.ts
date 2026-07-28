@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import {
+  CHAMPION_DIFFICULTY_NORMALIZATION_VERSION,
   entryProvenance,
   parseChampionTagManifest,
   type ChampionTagManifestEntry,
@@ -94,13 +95,32 @@ async function main() {
      */
     await prisma.champion.upsert({
       where: { id: entry.championId },
-      update: { roles: [] },
+      update: {
+        roles: [],
+        ...(manifest.metadata?.dataDragonVersion
+          ? { version: manifest.metadata.dataDragonVersion }
+          : {}),
+        dataDragonDifficulty: entry.dataDragonDifficultyOriginal ?? null,
+        difficultyNormalized: entry.dataDragonDifficultyNormalized ?? null,
+        difficultyNormalizationAlgorithmVersion:
+          entry.dataDragonDifficultyOriginal === undefined
+            ? null
+            : (manifest.metadata?.difficultyNormalizationAlgorithmVersion ??
+              CHAMPION_DIFFICULTY_NORMALIZATION_VERSION)
+      },
       create: {
         id: entry.championId,
         key: entry.championName,
         name: entry.championName,
         roles: [],
-        version: manifest.metadata?.dataDragonVersion ?? null
+        version: manifest.metadata?.dataDragonVersion ?? null,
+        dataDragonDifficulty: entry.dataDragonDifficultyOriginal ?? null,
+        difficultyNormalized: entry.dataDragonDifficultyNormalized ?? null,
+        difficultyNormalizationAlgorithmVersion:
+          entry.dataDragonDifficultyOriginal === undefined
+            ? null
+            : (manifest.metadata?.difficultyNormalizationAlgorithmVersion ??
+              CHAMPION_DIFFICULTY_NORMALIZATION_VERSION)
       }
     });
 

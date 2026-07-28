@@ -15,7 +15,7 @@ vi.mock("@sparta/riot", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@sparta/riot")>()),
   fetchDataDragonVersions: vi.fn().mockResolvedValue(["14.14.1"]),
   fetchDataDragonChampions: vi.fn().mockResolvedValue([
-    { key: "61", id: "Orianna", name: "Orianna", title: "a Donzela Mecânica", tags: ["Mage"] },
+    { key: "61", id: "Orianna", name: "Orianna", title: "a Donzela Mecânica", tags: ["Mage"], info: { attack: 4, defense: 3, magic: 9, difficulty: 7 } },
     { key: "103", id: "Ahri", name: "Ahri", title: "a Raposa de Nove Caudas", tags: ["Mage", "Assassin"] },
     { key: "266", id: "Aatrox", name: "Aatrox", title: "a Espada das Trevas", tags: ["Fighter"] }
   ])
@@ -36,7 +36,7 @@ describe("champion-repository", () => {
     upsertMock.mockClear();
     vi.mocked(fetchDataDragonVersions).mockReset().mockResolvedValue(["14.14.1"]);
     vi.mocked(fetchDataDragonChampions).mockReset().mockResolvedValue([
-      { key: "61", id: "Orianna", name: "Orianna", title: "a Donzela Mecânica", tags: ["Mage"] },
+      { key: "61", id: "Orianna", name: "Orianna", title: "a Donzela Mecânica", tags: ["Mage"], info: { attack: 4, defense: 3, magic: 9, difficulty: 7 } },
       { key: "103", id: "Ahri", name: "Ahri", title: "a Raposa de Nove Caudas", tags: ["Mage", "Assassin"] },
       { key: "266", id: "Aatrox", name: "Aatrox", title: "a Espada das Trevas", tags: ["Fighter"] }
     ]);
@@ -63,7 +63,16 @@ describe("champion-repository", () => {
     expect(upsertMock).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 61 },
-        create: expect.objectContaining({ id: 61, key: "Orianna", name: "Orianna", roles: [] })
+        create: expect.objectContaining({
+          id: 61,
+          key: "Orianna",
+          name: "Orianna",
+          roles: [],
+          dataDragonDifficulty: 7,
+          difficultyNormalized: 70,
+          difficultyNormalizationAlgorithmVersion:
+            "champion-difficulty-normalization/1.0.0"
+        })
       })
     );
     expect(upsertMock).toHaveBeenCalledWith(
@@ -78,7 +87,14 @@ describe("champion-repository", () => {
 describe("findAllChampionTags - proveniência (Etapa 8)", () => {
   const linhaBase = {
     championId: 266,
-    champion: { name: "Aatrox", roles: [] },
+    champion: {
+      name: "Aatrox",
+      roles: [],
+      version: null,
+      dataDragonDifficulty: null,
+      difficultyNormalized: null,
+      difficultyNormalizationAlgorithmVersion: null
+    },
     damageProfile: "AD",
     tags: ["fighter"],
     blindSafety: 0.6,
@@ -137,6 +153,38 @@ describe("findAllChampionTags - proveniência (Etapa 8)", () => {
     expect(tag.provenance?.source.locale).toBe("pt_BR");
     expect(tag.provenance?.source.algorithmVersion).toBe("champion-tag-derivation/1.0.0");
     expect(tag.provenance?.reviewState).toBe("UNREVIEWED");
+  });
+
+  it("serve dificuldade oficial separada da dimensão estratégica", async () => {
+    championTagFindManyMock.mockResolvedValue([
+      {
+        ...linhaBase,
+        ...semProveniencia,
+        difficulty: 0.25,
+        champion: {
+          ...linhaBase.champion,
+          version: "16.14.1",
+          dataDragonDifficulty: 8,
+          difficultyNormalized: 80,
+          difficultyNormalizationAlgorithmVersion:
+            "champion-difficulty-normalization/1.0.0"
+        }
+      }
+    ]);
+
+    const [tag] = await findAllChampionTags();
+
+    expect(tag.difficulty).toBe(0.25);
+    expect(tag.officialDifficulty).toMatchObject({
+      originalValue: 8,
+      normalizedValue: 80,
+      normalizationAlgorithmVersion:
+        "champion-difficulty-normalization/1.0.0",
+      provenance: {
+        sourceType: "OFFICIAL",
+        patch: "16.14.1"
+      }
+    });
   });
 
   it("estado é recalculado da lista persistida, não copiado da coluna", async () => {

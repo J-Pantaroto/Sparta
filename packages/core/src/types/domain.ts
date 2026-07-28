@@ -1,4 +1,5 @@
 import type { ChampionTagProvenance } from "./champion-tag-provenance.js";
+import type { ChampionDifficultyEvidence } from "./champion-difficulty.js";
 import type { AvailabilityStatus } from "./provenance.js";
 import type { RecommendationMetric } from "./recommendation-metric.js";
 
@@ -39,6 +40,11 @@ export interface ChampionTag {
   tags: string[];
   blindSafety: number;
   difficulty: number;
+  /**
+   * `info.difficulty` oficial preservado separadamente da dimensão
+   * estratégica acima, que pode ser derivada ou revisada.
+   */
+  officialDifficulty?: ChampionDifficultyEvidence;
   engage: number;
   peel: number;
   frontline: number;
@@ -126,6 +132,8 @@ export interface RecentChampionMatch {
   /** `null` quando a partida não trouxe o dado - nunca coagido pra 0. */
   killParticipation: number | null;
   objectiveParticipation: number | null;
+  /** Data real da partida, quando conhecida, usada apenas como evidência de recência. */
+  observedAt?: string;
 }
 
 export interface RecentForm {

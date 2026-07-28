@@ -61,6 +61,8 @@ const METADATA = {
   locale: "pt_BR",
   sourceResource: "champion.json",
   algorithmVersion: CHAMPION_TAG_DERIVATION_VERSION,
+  difficultyNormalizationAlgorithmVersion:
+    "champion-difficulty-normalization/1.0.0",
   generatedAt: NOW
 };
 

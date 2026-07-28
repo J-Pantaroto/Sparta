@@ -1,5 +1,9 @@
 import { MEDIUM_CONFIDENCE_GAMES, scoreChampionPerformance } from "../scoring/champion-performance.js";
 import { toRecommendationMetrics } from "./recommendation-metrics.js";
+import {
+  assessExecutionRisk,
+  type ExecutionRiskAssessment
+} from "./execution-risk.js";
 import type {
   ChampionTag,
   CompositionRules,
@@ -54,13 +58,15 @@ export function recommendPicks(input: {
   compositionRules: CompositionRules;
   patchMeta: PatchMetaData | null;
   limit?: number;
+  evaluatedAt?: string;
 }): PickRecommendation[] {
   // Sem posição não há pool, tabela de pesos nem confronto de rota que
   // façam sentido. O motor devolve vazio em vez de escolher um papel: a
   // rota `/drafts/recommendations` barra antes disso com
   // `PLAYER_ROLE_UNAVAILABLE`, e esta guarda garante que nenhum outro
   // chamador consiga rodar o motor com posição ausente.
-  if (!input.draft.playerRole) return [];
+  const playerRole = input.draft.playerRole;
+  if (!playerRole) return [];
 
   const weights = selectWeights(input.draft);
   const banned = new Set(input.draft.bannedChampionIds);
@@ -68,7 +74,7 @@ export function recommendPicks(input: {
   const enemyLaneChampionId = input.draft.enemyLaneChampionId;
 
   return input.championStats
-    .filter((stats) => stats.role === input.draft.playerRole)
+    .filter((stats) => stats.role === playerRole)
     .filter((stats) => !banned.has(stats.championId) && !picked.has(stats.championId))
     .map((stats) => {
       const personal = scoreChampionPerformance(stats);
@@ -78,7 +84,7 @@ export function recommendPicks(input: {
       const personalMatchup = findPersonalMatchup(
         stats.championId,
         enemyLaneChampionId,
-        input.draft.playerRole,
+        playerRole,
         input.matchups
       );
       const composition = analyzeTeamComposition(input.draft, input.championTags, tag);
@@ -90,6 +96,12 @@ export function recommendPicks(input: {
       const blindSafety = (tag?.blindSafety ?? 0.5) * 100;
       const recentForm = personal.components.recent ?? 50;
       const compositionFit = calculateCompositionFit(tag, composition, input.compositionRules);
+      const executionRisk = assessExecutionRisk({
+        difficulty: tag?.officialDifficulty,
+        stats,
+        role: playerRole,
+        evaluatedAt: input.evaluatedAt
+      });
 
       const metrics = {
         personalPerformance: personal.score,
@@ -112,15 +124,19 @@ export function recommendPicks(input: {
         compositionFit: true,
         meta: false
       });
-      const totalScore = round(
+      const baseScore = round(
         (Object.keys(normalizedWeights) as MetricKey[]).reduce(
           (score, key) => score + (metrics[key] ?? 0) * normalizedWeights[key],
           0
         )
       );
+      const totalScore = round(clamp(baseScore - executionRisk.scorePenalty));
 
       const reasons = buildReasons(stats, metrics, composition);
-      const warnings = buildWarnings(stats, metrics, composition);
+      const warnings = [
+        ...buildWarnings(stats, metrics, composition),
+        ...buildExecutionRiskWarnings(executionRisk)
+      ];
 
       return {
         championId: stats.championId,
@@ -135,8 +151,9 @@ export function recommendPicks(input: {
         metrics,
         metricDetails: toRecommendationMetrics(metrics, personal.confidence, {
           personalMatchup,
-          playerRole: input.draft.playerRole,
-          enemyLaneKnown: enemyLaneChampionId !== undefined
+          playerRole,
+          enemyLaneKnown: enemyLaneChampionId !== undefined,
+          executionRisk
         })
       } satisfies PickRecommendation;
     })
@@ -162,6 +179,7 @@ export function recommendFromPersonalPool(input: {
   matchups: MatchupData[];
   compositionRules: CompositionRules;
   patchMeta: PatchMetaData | null;
+  evaluatedAt?: string;
 }): DraftRecommendationResponse {
   const role = input.draft.playerRole;
   if (!role) return emptyPoolResponse(0, "A posição do jogador ainda não foi identificada.");
@@ -216,6 +234,12 @@ export function recommendFromPersonalPool(input: {
           : null,
         meta: null
       };
+      const executionRisk = assessExecutionRisk({
+        difficulty: tag?.officialDifficulty,
+        stats,
+        role,
+        evaluatedAt: input.evaluatedAt
+      });
       const availability: MetricAvailability = {
         personalPerformance: metrics.personalPerformance !== null,
         recentForm: metrics.recentForm !== null,
@@ -227,12 +251,13 @@ export function recommendFromPersonalPool(input: {
         meta: false
       };
       const { normalizedWeights, dataCoverage } = normalizeAvailableWeights(weights, availability);
-      const totalScore = round(
+      const baseScore = round(
         (Object.keys(normalizedWeights) as MetricKey[]).reduce(
           (score, key) => score + (metrics[key] ?? 0) * normalizedWeights[key],
           0
         )
       );
+      const totalScore = round(clamp(baseScore - executionRisk.scorePenalty));
       const personalGames = stats?.games ?? 0;
       const limitations = buildPoolLimitations(
         candidate,
@@ -252,12 +277,16 @@ export function recommendFromPersonalPool(input: {
         dataCoverage,
         category: selectCategory(input.draft, metrics, hasPersonalPerformance),
         reasons: buildPoolReasons(candidate, stats, metrics, composition),
-        warnings: buildPoolWarnings(limitations, metrics, composition),
+        warnings: [
+          ...buildPoolWarnings(limitations, metrics, composition),
+          ...buildExecutionRiskWarnings(executionRisk)
+        ],
         metrics,
         metricDetails: toRecommendationMetrics(metrics, confidence, {
           personalMatchup,
           playerRole: role,
-          enemyLaneKnown: enemyLaneChampionId !== undefined
+          enemyLaneKnown: enemyLaneChampionId !== undefined,
+          executionRisk
         }),
         rank: 0,
         poolSource: candidate.source,
@@ -433,6 +462,26 @@ function buildPoolWarnings(
     });
   }
   return warnings;
+}
+
+function buildExecutionRiskWarnings(
+  assessment: ExecutionRiskAssessment
+): RecommendationReason[] {
+  if (
+    assessment.scorePenalty <= 0 ||
+    assessment.riskMetric.value === null ||
+    !assessment.riskMetric.explanation
+  ) {
+    return [];
+  }
+  return [
+    {
+      code: "execution_risk",
+      label: "Risco pessoal estimado",
+      detail: assessment.riskMetric.explanation,
+      impact: -assessment.scorePenalty
+    }
+  ];
 }
 
 export function analyzeTeamComposition(

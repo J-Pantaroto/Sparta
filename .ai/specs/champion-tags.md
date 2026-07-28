@@ -141,6 +141,13 @@ A versão do `Champion` criado pelo seed vem do manifesto. A versão anterior gr
   "Perfil derivado das classes da Data Dragon, sem revisão específica deste campeão. Fonte:
   champion.json 16.14.1." Repetir isso em cada frase transformaria a ressalva em ruído.
 
+`ChampionTag.difficulty` continua pertencendo a este perfil
+derivado/curável. A Etapa 13 não o promoveu a dado oficial: preservou
+`info.difficulty` separadamente no catálogo `Champion` e o expõe como
+`ChampionTag.officialDifficulty` para
+produzir `CHAMPION_DIFFICULTY` e `EXECUTION_RISK`. Ver
+`docs/champion-execution-risk.md`.
+
 ## Como revisar um campeão
 
 1. Abra `data/seeds/champion-tags.json` e ache a entrada.

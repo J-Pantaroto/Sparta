@@ -267,3 +267,91 @@ describe("pool pessoal na selecao de campeoes (Etapa 12)", () => {
     ).toBeDefined();
   });
 });
+
+describe("dificuldade e risco na Champion Select (Etapa 13)", () => {
+  it("mostra dificuldade, risco, amostra e motivo em principais e alternativas", () => {
+    const main = {
+      ...recomendacaoMid,
+      personalGames: 8,
+      poolSource: "PERSONAL_OBSERVED",
+      metricDetails: [
+        {
+          key: "CHAMPION_DIFFICULTY",
+          value: 80,
+          status: "AVAILABLE",
+          confidence: null,
+          explanation:
+            "Valor original 8/10 da Data Dragon; normalizado linearmente pelo Sparta."
+        },
+        {
+          key: "EXECUTION_RISK",
+          value: 62,
+          status: "AVAILABLE",
+          confidence: null,
+          explanation:
+            "Dificuldade geral elevada, compensada por 8 partidas observadas nesta posição."
+        }
+      ]
+    } as unknown as PickRecommendation;
+    const alternative = {
+      ...main,
+      championId: 103,
+      championName: "Ahri",
+      personalGames: 0,
+      poolSource: "USER_PROVIDED",
+      metricDetails: [
+        {
+          key: "CHAMPION_DIFFICULTY",
+          value: 30,
+          status: "AVAILABLE",
+          confidence: null
+        },
+        {
+          key: "EXECUTION_RISK",
+          value: 30,
+          status: "AVAILABLE",
+          confidence: null,
+          explanation:
+            "Dificuldade geral baixa e nenhuma partida observada nesta posição."
+        }
+      ]
+    } as unknown as PickRecommendation;
+
+    render(
+      <ChampionSelectScreen
+        draft={{
+          playerRole: "MID",
+          pickOrder: 1,
+          allies: [],
+          enemies: [],
+          bannedChampionIds: []
+        }}
+        setDraft={vi.fn()}
+        autoPickOrder={null}
+        autoPlayerRole={null}
+        champSelectActive
+        recommendations={[main]}
+        alternatives={[alternative]}
+        recommendationsStatus="idle"
+        noAccountLinked={false}
+        ddragonVersion="16.14.1"
+        riotAccounts={[]}
+        draftAutoFilled={false}
+      />
+    );
+
+    expect(screen.getByText("Dificuldade 80 · risco 62")).toBeDefined();
+    expect(screen.getByText("Dificuldade 30 · risco 30")).toBeDefined();
+    expect(screen.getAllByText(/8 partidas observadas/).length).toBeGreaterThan(0);
+    expect(
+      screen.getByTitle(
+        "Dificuldade geral elevada, compensada por 8 partidas observadas nesta posição."
+      )
+    ).toBeDefined();
+    expect(
+      screen.getByTitle(
+        "Dificuldade geral baixa e nenhuma partida observada nesta posição."
+      )
+    ).toBeDefined();
+  });
+});
