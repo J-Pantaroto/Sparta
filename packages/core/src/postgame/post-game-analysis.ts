@@ -5,7 +5,11 @@ import {
   roleBaselines,
   scoreChampionPerformance
 } from "../scoring/champion-performance.js";
-import { buildRatioSignal, buildScoreSignal, type DimensionSignal } from "../scoring/dimension-signals.js";
+import {
+  buildRatioSignal,
+  buildScoreSignal,
+  type DimensionSignal
+} from "../scoring/dimension-signals.js";
 import type {
   MatchPerformanceMetrics,
   MatchTimelineSummary,
@@ -56,9 +60,12 @@ function buildRatioSignals(role: Role, metrics: MatchPerformanceMetrics): Dimens
     vision: metrics.visionScorePerMinute / baseline.vision,
     // undefined (nao 0) quando a Riot nao manda o objeto "challenges" -
     // 0 aqui seria inventar uma participacao real que nao temos como saber.
-    kp: metrics.killParticipation === undefined ? undefined : metrics.killParticipation / baseline.kp,
+    kp:
+      metrics.killParticipation === undefined ? undefined : metrics.killParticipation / baseline.kp,
     objective:
-      metrics.objectiveParticipation === undefined ? undefined : metrics.objectiveParticipation / baseline.objective
+      metrics.objectiveParticipation === undefined
+        ? undefined
+        : metrics.objectiveParticipation / baseline.objective
   };
 
   const scores: Record<string, number | undefined> = {
@@ -89,7 +96,12 @@ function toStrengthsAndWeaknesses(signals: DimensionSignal[]): {
     .filter((signal) => signal.kind === "strength")
     .sort((a, b) => b.magnitude - a.magnitude)
     .slice(0, MAX_STRENGTHS)
-    .map((signal) => ({ code: signal.code, label: signal.label, detail: signal.detail, confidence: "low" }));
+    .map((signal) => ({
+      code: signal.code,
+      label: signal.label,
+      detail: signal.detail,
+      confidence: "low"
+    }));
 
   const weaknesses: PlayerWeakness[] = signals
     .filter((signal) => signal.kind === "weakness")
@@ -109,15 +121,23 @@ function toStrengthsAndWeaknesses(signals: DimensionSignal[]): {
 function buildTips(timeline: MatchTimelineSummary): string[] {
   const tips: string[] = [];
   if (timeline.deathsBefore10 >= 2) {
-    tips.push("Você morreu 2 ou mais vezes antes dos 10 minutos - reveja trocas de dano e visão no início da lane.");
+    tips.push(
+      "Você morreu 2 ou mais vezes antes dos 10 minutos - reveja trocas de dano e visão no início da lane."
+    );
   }
   if (timeline.goldDiffAt15 !== undefined && timeline.goldDiffAt15 < -1000) {
-    tips.push("Sua equipe estava mais de 1000 de ouro atrás aos 15 minutos - avalie se valeu repriorizar lane sobre objetivos.");
+    tips.push(
+      "Sua equipe estava mais de 1000 de ouro atrás aos 15 minutos - avalie se valeu repriorizar lane sobre objetivos."
+    );
   }
   return tips;
 }
 
-function buildExpectedPlan(role: Role, championName: string, championHistory: PlayerChampionStats | undefined): string {
+function buildExpectedPlan(
+  role: Role,
+  championName: string,
+  championHistory: PlayerChampionStats | undefined
+): string {
   if (!championHistory) {
     return `Sem histórico seu com ${championName} no papel ${role} ainda - a expectativa usada aqui é a referência geral do papel, não o seu desempenho pessoal.`;
   }
@@ -126,7 +146,11 @@ function buildExpectedPlan(role: Role, championName: string, championHistory: Pl
     return `Você tem ${championHistory.games} partida(s) com ${championName} no papel ${role}, ainda poucas pra estabelecer uma expectativa pessoal confiável - a referência aqui combina esse histórico curto com a baseline geral do papel.`;
   }
   const relativeToBaseline =
-    performance.score >= 65 ? "acima da referência do papel" : performance.score <= 35 ? "abaixo da referência do papel" : "próximo da referência do papel";
+    performance.score >= 65
+      ? "acima da referência do papel"
+      : performance.score <= 35
+        ? "abaixo da referência do papel"
+        : "próximo da referência do papel";
   return `Com base nas suas ${championHistory.games} partidas anteriores com ${championName} no papel ${role} (score histórico ${performance.score}), a expectativa era um desempenho ${relativeToBaseline}.`;
 }
 
@@ -151,11 +175,14 @@ function buildExecutionSummary(
   return `${outcome}${earlyGame}${topSignal}`;
 }
 
-function buildPickAssessment(championName: string, role: Role, won: boolean, enemyLaneChampionName: string | undefined): string {
+function buildPickAssessment(
+  championName: string,
+  role: Role,
+  won: boolean,
+  enemyLaneChampionName: string | undefined
+): string {
   const matchupClause = enemyLaneChampionName ? ` contra ${enemyLaneChampionName}` : "";
-  return won
-    ? `${championName} no papel ${role}${matchupClause} funcionou nessa partida.`
-    : `${championName} no papel ${role}${matchupClause} não performou como esperado nessa partida - vale revisar se a escolha fez sentido pro contexto do draft.`;
+  return `${won ? "Vitória" : "Derrota"} observada com ${championName} no papel ${role}${matchupClause}. O resultado isolado não classifica a escolha como certa ou errada.`;
 }
 
 function buildMetrics(context: PostGameMatchContext): MatchPerformanceMetrics {
@@ -187,8 +214,10 @@ export function generatePostGameAnalysis(context: PostGameMatchContext): PostGam
   if (context.durationSeconds < SHORT_MATCH_DURATION_SECONDS) {
     return {
       matchId: context.matchId,
-      expectedPlan: "Partida encerrada muito cedo (provável remake) - sem dado suficiente pra estimar uma expectativa.",
-      executionSummary: "A partida durou menos de 5 minutos - não há dado suficiente pra analisar a execução.",
+      expectedPlan:
+        "Partida encerrada muito cedo (provável remake) - sem dado suficiente pra estimar uma expectativa.",
+      executionSummary:
+        "A partida durou menos de 5 minutos - não há dado suficiente pra analisar a execução.",
       pickAssessment: `${context.championName} não chegou a ser testado de verdade nessa partida.`,
       strengths: [],
       weaknesses: [],
@@ -205,7 +234,12 @@ export function generatePostGameAnalysis(context: PostGameMatchContext): PostGam
     matchId: context.matchId,
     expectedPlan: buildExpectedPlan(context.role, context.championName, context.championHistory),
     executionSummary: buildExecutionSummary(context.won, context.timeline, strengths, weaknesses),
-    pickAssessment: buildPickAssessment(context.championName, context.role, context.won, context.enemyLaneChampionName),
+    pickAssessment: buildPickAssessment(
+      context.championName,
+      context.role,
+      context.won,
+      context.enemyLaneChampionName
+    ),
     strengths,
     weaknesses,
     tips,

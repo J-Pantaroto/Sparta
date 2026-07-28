@@ -106,6 +106,22 @@
   line-height: var(--leading-normal);
 }
 
+.sp-draft-comparison__grid {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.sp-draft-comparison__notice {
+  margin-top: var(--space-4);
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  background: var(--bg-sunken);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+}
+
 /* Ação prática pra próxima partida - numerada, não uma lista de emoji. */
 .sp-tip {
   display: flex;

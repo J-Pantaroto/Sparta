@@ -6,6 +6,17 @@ Etapa 20:
 - `GET /patches/:patch/champions/:championId` inclui `theoreticalImpact`;
 - nenhum dos dois participa de `POST /drafts/recommendations`.
 
+Etapa 22:
+
+- `GET /draft-sessions/:sessionId/post-game-comparison` consulta por sessão;
+- `GET /matches/:matchId/draft-comparison` consulta por partida;
+- `POST /draft-sessions/:sessionId/post-game-comparison/generate` gera
+  idempotentemente só com fontes resolvidas no servidor e rejeita métricas ou
+  conclusões no body;
+- estados distinguem `AVAILABLE`, `PARTIAL`, `MATCH_NOT_LINKED`,
+  `SNAPSHOT_MISSING`, `TIMELINE_UNAVAILABLE` e `NOT_GENERATED`;
+- toda leitura é limitada à conta Riot autenticada.
+
 Base local: `http://localhost:3333`.
 
 Endpoints:

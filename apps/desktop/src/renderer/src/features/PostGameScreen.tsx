@@ -14,10 +14,13 @@ import {
   analyzePostgame,
   ApiError,
   fetchChampionRoleEvidence,
+  fetchDraftComparison,
   fetchPostgameReport,
   fetchMatchObservation,
   fetchRecentMatches,
+  generateDraftComparison,
   type ChampionRoleEvidenceResponse,
+  type DraftComparisonResponse,
   type RiotAccountSummary
 } from "../services/api-client";
 import { fetchAllChampions, type DataDragonChampionSummary } from "../services/datadragon";
@@ -69,6 +72,8 @@ export function PostGameScreen({
   const [reportError, setReportError] = useState<string | null>(null);
   const [observation, setObservation] = useState<MatchLoadoutObservation | null>(null);
   const [roleEvidence, setRoleEvidence] = useState<ChampionRoleEvidenceResponse | null>(null);
+  const [draftComparison, setDraftComparison] = useState<DraftComparisonResponse | null>(null);
+  const [draftComparisonLoading, setDraftComparisonLoading] = useState(false);
 
   const matches = useAsyncData<{ puuid: string; matches: RecentChampionMatch[] }>(
     () => (account ? fetchRecentMatches(account.puuid, 10) : undefined),
@@ -85,12 +90,44 @@ export function PostGameScreen({
     setSelectedMatchId(matchId);
     setObservation(null);
     setRoleEvidence(null);
+    setDraftComparison(null);
+    setDraftComparisonLoading(true);
     void fetchMatchObservation(sessionToken, matchId)
       .then(setObservation)
       .catch(() => setObservation(null));
     void fetchChampionRoleEvidence(account.puuid, match.championId, match.role)
       .then(setRoleEvidence)
       .catch(() => setRoleEvidence(null));
+    void fetchDraftComparison(sessionToken, matchId)
+      .then(async (response) => {
+        if (response.state === "NOT_GENERATED" && response.draftSessionId) {
+          const generated = await generateDraftComparison(sessionToken, response.draftSessionId);
+          setDraftComparison({
+            state: !generated.report.coverageDimensions.snapshotAvailable
+              ? "SNAPSHOT_MISSING"
+              : !generated.report.coverageDimensions.timelineAvailable
+                ? "TIMELINE_UNAVAILABLE"
+                : generated.report.status === "AVAILABLE"
+                  ? "AVAILABLE"
+                  : "PARTIAL",
+            draftSessionId: response.draftSessionId,
+            report: generated.report
+          });
+          return;
+        }
+        setDraftComparison(response);
+      })
+      .catch((error) =>
+        setDraftComparison({
+          state: "NOT_GENERATED",
+          report: null,
+          reason:
+            error instanceof Error
+              ? error.message
+              : "A comparação com o draft não pôde ser carregada."
+        })
+      )
+      .finally(() => setDraftComparisonLoading(false));
     setReportStatus("loading");
     setReportError(null);
     try {
@@ -243,21 +280,27 @@ export function PostGameScreen({
                 <Loading block label="Analisando a partida..." />
               </Card>
             ) : reportStatus === "error" ? (
-              <Card>
-                <ErrorState
-                  inline
-                  description={reportError ?? undefined}
-                  actions={
-                    <Button
-                      variant="secondary"
-                      icon={<RefreshCw size={14} />}
-                      onClick={() => void reanalyze()}
-                    >
-                      Tentar de novo
-                    </Button>
-                  }
+              <div style={{ display: "grid", gap: "var(--space-4)" }}>
+                <Card>
+                  <ErrorState
+                    inline
+                    description={reportError ?? undefined}
+                    actions={
+                      <Button
+                        variant="secondary"
+                        icon={<RefreshCw size={14} />}
+                        onClick={() => void reanalyze()}
+                      >
+                        Tentar de novo
+                      </Button>
+                    }
+                  />
+                </Card>
+                <DraftComparisonSection
+                  response={draftComparison}
+                  loading={draftComparisonLoading}
                 />
-              </Card>
+              </div>
             ) : (
               report &&
               selectedMatch && (
@@ -270,6 +313,8 @@ export function PostGameScreen({
                   ddragonVersion={ddragonVersion}
                   observation={observation}
                   roleEvidence={roleEvidence}
+                  draftComparison={draftComparison}
+                  draftComparisonLoading={draftComparisonLoading}
                   onReanalyze={() => void reanalyze()}
                 />
               )
@@ -297,6 +342,8 @@ function MatchReport({
   ddragonVersion,
   observation,
   roleEvidence,
+  draftComparison,
+  draftComparisonLoading,
   onReanalyze
 }: {
   report: PostGameAnalysis;
@@ -305,6 +352,8 @@ function MatchReport({
   ddragonVersion: string;
   observation: MatchLoadoutObservation | null;
   roleEvidence: ChampionRoleEvidenceResponse | null;
+  draftComparison: DraftComparisonResponse | null;
+  draftComparisonLoading: boolean;
   onReanalyze: () => void;
 }) {
   const baseline = roleBaselines[match.role];
@@ -392,11 +441,11 @@ function MatchReport({
         </div>
 
         <div className="sp-report__pair">
-          <span className="sp-report__pair-label">O que era esperado</span>
+          <span className="sp-report__pair-label">Referência geral calculada no pós-game</span>
           <span className="sp-report__pair-text">{report.expectedPlan}</span>
         </div>
         <div className="sp-report__pair">
-          <span className="sp-report__pair-label">O que aconteceu</span>
+          <span className="sp-report__pair-label">Resumo observado da execução</span>
           <span className="sp-report__pair-text">{report.executionSummary}</span>
         </div>
         <ObjectiveParticipationLine metrics={report.metrics} />
@@ -405,6 +454,8 @@ function MatchReport({
       {observation && <MatchObservationCard observation={observation} />}
 
       {roleEvidence && <ChampionRoleEvidenceCard evidence={roleEvidence} />}
+
+      <DraftComparisonSection response={draftComparison} loading={draftComparisonLoading} />
 
       {priority && (
         <Card>
@@ -484,6 +535,141 @@ function MatchReport({
         </Button>
       </div>
     </div>
+  );
+}
+
+function percent(value: number) {
+  return `${Math.round(value * 100)}%`;
+}
+
+export function DraftComparisonSection({
+  response,
+  loading = false
+}: {
+  response: DraftComparisonResponse | null;
+  loading?: boolean;
+}) {
+  if (loading) {
+    return (
+      <Card>
+        <Loading block label="Comparando draft e partida..." />
+      </Card>
+    );
+  }
+
+  const report = response?.report;
+  if (!report) {
+    return (
+      <Card>
+        <SectionHeader
+          title="Draft versus partida"
+          description={
+            response?.reason ??
+            "Nenhuma comparação com um draft persistido está disponível para esta partida."
+          }
+        />
+        <p className="sp-observation__muted">
+          O resumo observado da partida permanece disponível sem inventar contexto de draft.
+        </p>
+      </Card>
+    );
+  }
+
+  const choice = report.selectedChoice;
+  const observed = report.observedMatch;
+  return (
+    <Card>
+      <SectionHeader
+        eyebrow="Comparação histórica"
+        title="Draft versus partida"
+        description={`Cobertura das comparações possíveis: ${percent(report.coverage)}. Cobertura não é confiança, qualidade da partida ou chance de vitória.`}
+        actions={
+          <Badge tone={report.status === "AVAILABLE" ? "positive" : "neutral"}>
+            {report.status === "AVAILABLE" ? "disponível" : "parcial"}
+          </Badge>
+        }
+      />
+
+      <div className="sp-draft-comparison__grid">
+        <div className="sp-report__pair">
+          <span className="sp-report__pair-label">Escolha registrada</span>
+          <span className="sp-report__pair-text">
+            {choice.championName}
+            {choice.rank !== undefined
+              ? ` · ${choice.rank}º lugar · ${choice.group === "PRIMARY" ? "principal" : "alternativa"}`
+              : report.coverageDimensions.snapshotAvailable
+                ? " · fora do snapshot registrado"
+                : " · snapshot histórico ausente"}
+          </span>
+          {choice.coverage !== undefined && (
+            <span className="sp-observation__muted">
+              Cobertura da análise no draft: {percent(choice.coverage)}
+              {choice.score !== undefined ? ` · score registrado ${choice.score.toFixed(1)}` : ""}
+            </span>
+          )}
+        </div>
+
+        <div className="sp-report__pair">
+          <span className="sp-report__pair-label">O que era conhecido no draft</span>
+          <span className="sp-report__pair-text">
+            {choice.executionRisk?.explanation ??
+              choice.personalExperience?.explanation ??
+              "Nenhum sinal pessoal adicional estava disponível no snapshot."}
+          </span>
+          {choice.strategicSignals.slice(0, 3).map((signal) => (
+            <span className="sp-observation__muted" key={signal}>
+              {signal}
+            </span>
+          ))}
+        </div>
+
+        <div className="sp-report__pair">
+          <span className="sp-report__pair-label">O que foi observado na partida</span>
+          <span className="sp-report__pair-text">
+            {observed.won ? "Vitória" : "Derrota"} · {observed.kills}/{observed.deaths}/
+            {observed.assists} · KDA {observed.kda.toFixed(2)}
+          </span>
+          <span className="sp-observation__muted">
+            Posição {observed.observedRole ? roleLabels[observed.observedRole] : "indisponível"}
+            {observed.deathsBefore10 !== undefined
+              ? ` · ${observed.deathsBefore10} morte(s) antes dos 10 min`
+              : " · timeline indisponível"}
+            {observed.objectiveParticipation !== undefined
+              ? ` · ${Math.round(observed.objectiveParticipation * 100)}% de participação nos objetivos considerados`
+              : " · objetivos indisponíveis"}
+          </span>
+        </div>
+      </div>
+
+      {report.comparableSignals.length > 0 && (
+        <div className="sp-report__pair">
+          <span className="sp-report__pair-label">Correspondências verificáveis</span>
+          <SignalChipList stacked>
+            {report.comparableSignals.map((signal) => (
+              <SignalChip key={signal.id} tone="info">
+                {signal.statement}
+              </SignalChip>
+            ))}
+          </SignalChipList>
+        </div>
+      )}
+
+      {report.unavailableSignals.length > 0 && (
+        <div className="sp-report__pair">
+          <span className="sp-report__pair-label">Dados indisponíveis e limitações</span>
+          {report.unavailableSignals.map((signal) => (
+            <span className="sp-observation__muted" key={signal.id}>
+              {signal.unavailableReason}
+            </span>
+          ))}
+        </div>
+      )}
+
+      <p className="sp-draft-comparison__notice">
+        Correspondência não significa causalidade, e o resultado isolado não valida ou invalida a
+        recomendação.
+      </p>
+    </Card>
   );
 }
 

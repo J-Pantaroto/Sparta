@@ -1,7 +1,8 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import type { ChampionRoleEvidenceResponse } from "../services/api-client";
-import { ChampionRoleEvidenceCard } from "./PostGameScreen";
+import type { DraftPostGameComparison } from "@sparta/core";
+import type { ChampionRoleEvidenceResponse, DraftComparisonResponse } from "../services/api-client";
+import { ChampionRoleEvidenceCard, DraftComparisonSection } from "./PostGameScreen";
 
 function response(status: "AVAILABLE" | "UNAVAILABLE"): ChampionRoleEvidenceResponse {
   const unavailableReason =
@@ -68,5 +69,94 @@ describe("ChampionRoleEvidenceCard", () => {
 
     expect(screen.getByText(/Nenhuma partida observada/)).toBeTruthy();
     expect(screen.queryByText(/50%/)).toBeNull();
+  });
+});
+
+function comparisonResponse(): DraftComparisonResponse {
+  const report = {
+    draftSessionId: "draft-1",
+    matchId: "BR1_1",
+    status: "PARTIAL",
+    coverage: 0.75,
+    selectedChoice: {
+      championId: 234,
+      championName: "Viego",
+      group: "PRIMARY",
+      rank: 2,
+      score: 71,
+      coverage: 0.82,
+      strategicSignals: ["O draft registrava necessidade de engage."],
+      knownLimitations: [],
+      unavailableMetricKeys: []
+    },
+    observedMatch: {
+      championId: 234,
+      championName: "Viego",
+      won: false,
+      observedRole: "JUNGLE",
+      positionStatus: "AVAILABLE",
+      kills: 3,
+      deaths: 7,
+      assists: 5,
+      kda: 8 / 7,
+      csPerMinute: 6,
+      goldPerMinute: 380,
+      damagePerMinute: 500,
+      visionScorePerMinute: 0.7,
+      deathsBefore10: 2,
+      objectiveParticipation: 0,
+      finalItems: [],
+      runeIds: [],
+      summonerSpellIds: []
+    },
+    comparableSignals: [
+      {
+        id: "position",
+        key: "POSITION_ALIGNMENT",
+        status: "AVAILABLE",
+        statement: "A posição observada corresponde à posição usada no draft.",
+        limitation: "Não demonstra causalidade."
+      }
+    ],
+    unavailableSignals: [
+      {
+        id: "matchup",
+        key: "PERSONAL_MATCHUP_AND_RESULT",
+        status: "UNAVAILABLE",
+        statement: "Comparação indisponível.",
+        limitation: "Não demonstra causalidade.",
+        unavailableReason: "O adversário direto não pôde ser confirmado."
+      }
+    ]
+  } as unknown as DraftPostGameComparison;
+  return { state: "PARTIAL", draftSessionId: "draft-1", report };
+}
+
+describe("DraftComparisonSection", () => {
+  it("separa escolha histórica, observação e limitações sem julgar o resultado", () => {
+    render(<DraftComparisonSection response={comparisonResponse()} />);
+
+    expect(screen.getByText("Draft versus partida")).toBeTruthy();
+    expect(screen.getByText(/Viego · 2º lugar · principal/)).toBeTruthy();
+    expect(screen.getByText(/Cobertura da análise no draft: 82%/)).toBeTruthy();
+    expect(screen.getByText(/Derrota · 3\/7\/5/)).toBeTruthy();
+    expect(screen.getByText(/adversário direto não pôde ser confirmado/i)).toBeTruthy();
+    expect(screen.getByText(/Correspondência não significa causalidade/)).toBeTruthy();
+    expect(screen.queryByText(/recomendação (certa|errada)/i)).toBeNull();
+  });
+
+  it("sem vínculo preserva o resumo observado sem inventar contexto de draft", () => {
+    render(
+      <DraftComparisonSection
+        response={{
+          state: "MATCH_NOT_LINKED",
+          report: null,
+          reason: "Nenhuma sessão de draft vinculada a esta partida."
+        }}
+      />
+    );
+
+    expect(screen.getByText(/Nenhuma sessão de draft vinculada/)).toBeTruthy();
+    expect(screen.getByText(/sem inventar contexto de draft/)).toBeTruthy();
   });
 });

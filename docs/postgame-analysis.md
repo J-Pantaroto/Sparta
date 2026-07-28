@@ -1,16 +1,18 @@
-# Post-Game Analysis
+# Análise pós-game
 
-A análise pós-game compara expectativa do draft com execução real.
+O pós-game possui duas leituras separadas:
 
-Métricas planejadas:
+1. a análise geral da partida, calculada a partir do Match-V5, timeline e
+   referências do papel;
+2. “Draft versus partida”, que usa exclusivamente a sessão vinculada e o
+   snapshot histórico imutável.
 
-- mortes antes de 10/15 minutos;
-- CS aos 10/15;
-- gold diff quando disponível;
-- dano total e dano por minuto;
-- visão;
-- participação em objetivos;
-- participação em abates;
-- coerência com a condição de vitória.
+A segunda leitura está documentada em
+[`draft-postgame-comparison.md`](draft-postgame-comparison.md). Ela é a única
+que afirma o que já era conhecido durante o draft. A referência geral pode
+ser recalculada com o histórico atual e, por isso, aparece com esse rótulo na
+interface.
 
-O MVP expõe endpoint mockado para o contrato. A versão real será alimentada por Match-V5 e timeline.
+As duas leituras preservam ausência e zero: zero mortes ou zero participação
+observada é um valor real; timeline, denominador ou campo ausente continua
+indisponível.

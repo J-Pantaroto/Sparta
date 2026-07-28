@@ -17,20 +17,21 @@ model User {
 }
 
 model RiotAccount {
-  id              String                    @id @default(uuid())
-  userId          String?
-  puuid           String                    @unique
-  gameName        String
-  tagLine         String
-  platformRegion  String
-  regionalRouting String
-  createdAt       DateTime                  @default(now())
-  updatedAt       DateTime                  @updatedAt
-  user            User?                     @relation(fields: [userId], references: [id])
-  profile         PlayerProfile?
-  matches         MatchParticipant[]
-  championPool    PlayerChampionPoolEntry[]
-  draftSessions   DraftSession[]
+  id                  String                            @id @default(uuid())
+  userId              String?
+  puuid               String                            @unique
+  gameName            String
+  tagLine             String
+  platformRegion      String
+  regionalRouting     String
+  createdAt           DateTime                          @default(now())
+  updatedAt           DateTime                          @updatedAt
+  user                User?                             @relation(fields: [userId], references: [id])
+  profile             PlayerProfile?
+  matches             MatchParticipant[]
+  championPool        PlayerChampionPoolEntry[]
+  draftSessions       DraftSession[]
+  postgameComparisons DraftPostGameComparisonRevision[]
 
   @@index([puuid])
 }
@@ -113,8 +114,8 @@ model ChampionTag {
 }
 
 model Match {
-  id                  String             @id @default(uuid())
-  matchId             String             @unique
+  id                  String                            @id @default(uuid())
+  matchId             String                            @unique
   /// Identificador numérico compartilhado com o gameflow do LCU.
   gameId              String?
   platform            String
@@ -129,7 +130,8 @@ model Match {
   participants        MatchParticipant[]
   timeline            MatchTimeline?
   postgameReports     PostgameReport[]
-  linkedDraftSessions DraftSession[]     @relation("DraftSessionLinkedMatch")
+  linkedDraftSessions DraftSession[]                    @relation("DraftSessionLinkedMatch")
+  draftComparisons    DraftPostGameComparisonRevision[]
 
   @@unique([platform, gameId])
   @@index([matchId])
@@ -213,7 +215,7 @@ model PlayerChampionStats {
 /// que era codigo morto: tinha um `draftStateJson` sem contrato e nenhum
 /// campo de ciclo de vida, origem ou vinculo com partida.
 model DraftSession {
-  id                        String                   @id @default(uuid())
+  id                        String                            @id @default(uuid())
   /// Conta Riot dona da sessao. O acesso e sempre filtrado por ela.
   riotAccountId             String
   /// "LCU" ou "USER". Sessao manual nunca e apresentada como observada.
@@ -230,8 +232,8 @@ model DraftSession {
   /// Estado conhecido do draft (aliados, inimigos, bans, adversario direto,
   /// picks desconhecidos). Contrato estruturado - NAO e o payload bruto do LCU.
   knownDraftJson            Json
-  startedAt                 DateTime                 @default(now())
-  updatedAt                 DateTime                 @updatedAt
+  startedAt                 DateTime                          @default(now())
+  updatedAt                 DateTime                          @updatedAt
   lockedInAt                DateTime?
   completedAt               DateTime?
   /// Chave tecnica da sessao do lado do cliente. Unica por conta: uma nova
@@ -242,21 +244,22 @@ model DraftSession {
   externalGameIdSource      String?
   externalGameIdObservedAt  DateTime?
   /// Estado auditável do reconciliador.
-  matchLinkStatus           String                   @default("PENDING")
+  matchLinkStatus           String                            @default("PENDING")
   matchLinkStrategy         String?
   matchLinkAlgorithmVersion String?
-  matchLinkEvidenceJson     Json                     @default("[]")
-  matchLinkCandidateCount   Int                      @default(0)
+  matchLinkEvidenceJson     Json                              @default("[]")
+  matchLinkCandidateCount   Int                               @default(0)
   matchLinkReason           String?
   matchLinkDecidedAt        DateTime?
   /// `Match.matchId` do Match-V5. Preenchido exclusivamente pelo reconciliador.
   linkedMatchId             String?
   /// Valor pré-Etapa 21 informado pelo cliente, preservado só para auditoria.
   legacyLinkedMatchId       String?
-  riotAccount               RiotAccount              @relation(fields: [riotAccountId], references: [id])
-  linkedMatch               Match?                   @relation("DraftSessionLinkedMatch", fields: [linkedMatchId], references: [matchId], onDelete: SetNull)
+  riotAccount               RiotAccount                       @relation(fields: [riotAccountId], references: [id])
+  linkedMatch               Match?                            @relation("DraftSessionLinkedMatch", fields: [linkedMatchId], references: [matchId], onDelete: SetNull)
   snapshots                 RecommendationSnapshot[]
   matchLinkRevisions        DraftMatchLinkRevision[]
+  postgameComparisons       DraftPostGameComparisonRevision[]
 
   @@unique([riotAccountId, externalSessionId])
   @@unique([riotAccountId, linkedMatchId])
@@ -290,7 +293,7 @@ model DraftMatchLinkRevision {
 /// Execucao imutavel do motor de recomendacao. Snapshot novo so nasce quando
 /// o input canonico muda; o anterior nunca e reescrito.
 model RecommendationSnapshot {
-  id                    String                    @id @default(uuid())
+  id                    String                            @id @default(uuid())
   draftSessionId        String
   /// SHA-256 da serializacao canonica do input. Nao depende de ordem de
   /// array nem do instante da analise.
@@ -299,11 +302,12 @@ model RecommendationSnapshot {
   canonicalInputJson    Json
   algorithmVersionsJson Json
   dataCoverage          Float
-  createdAt             DateTime                  @default(now())
+  createdAt             DateTime                          @default(now())
   /// Quando um snapshot posterior passou a valer. Nulo enquanto e o atual.
   supersededAt          DateTime?
-  draftSession          DraftSession              @relation(fields: [draftSessionId], references: [id], onDelete: Cascade)
+  draftSession          DraftSession                      @relation(fields: [draftSessionId], references: [id], onDelete: Cascade)
   recommendations       PersistedRecommendation[]
+  postgameComparisons   DraftPostGameComparisonRevision[]
 
   @@unique([draftSessionId, inputHash])
   @@index([draftSessionId, createdAt])
@@ -335,17 +339,51 @@ model PersistedRecommendation {
 }
 
 model PostgameReport {
-  id             String   @id @default(uuid())
-  matchId        String
-  puuid          String
-  draftSessionId String?
-  reportJson     Json
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  match          Match    @relation(fields: [matchId], references: [id])
+  id               String                            @id @default(uuid())
+  matchId          String
+  puuid            String
+  draftSessionId   String?
+  reportJson       Json
+  createdAt        DateTime                          @default(now())
+  updatedAt        DateTime                          @updatedAt
+  match            Match                             @relation(fields: [matchId], references: [id])
+  draftComparisons DraftPostGameComparisonRevision[]
 
   @@unique([matchId, puuid])
   @@index([puuid])
+}
+
+/// Revisão imutável da comparação entre o contexto histórico do draft e a
+/// partida vinculada. Uma mudança legítima de fonte ou de algoritmo cria
+/// outra revisão; nunca sobrescreve o relatório anterior.
+model DraftPostGameComparisonRevision {
+  id                     String                  @id @default(uuid())
+  draftSessionId         String
+  matchId                String
+  snapshotId             String?
+  postgameReportId       String?
+  riotAccountId          String
+  revision               Int
+  inputHash              String
+  algorithmVersion       String
+  sourceVersionsJson     Json
+  snapshotSignalIdsJson  Json                    @default("[]")
+  coverage               Float
+  status                 String
+  unavailableReasonsJson Json                    @default("[]")
+  reportJson             Json
+  generatedAt            DateTime                @default(now())
+  draftSession           DraftSession            @relation(fields: [draftSessionId], references: [id], onDelete: Cascade)
+  match                  Match                   @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  snapshot               RecommendationSnapshot? @relation(fields: [snapshotId], references: [id], onDelete: SetNull)
+  postgameReport         PostgameReport?         @relation(fields: [postgameReportId], references: [id], onDelete: SetNull)
+  riotAccount            RiotAccount             @relation(fields: [riotAccountId], references: [id], onDelete: Cascade)
+
+  @@unique([draftSessionId, revision])
+  @@unique([draftSessionId, inputHash, algorithmVersion])
+  @@index([matchId, riotAccountId, generatedAt])
+  @@index([snapshotId])
+  @@index([postgameReportId])
 }
 
 model ReplayImportJob {

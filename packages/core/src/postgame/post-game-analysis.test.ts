@@ -51,7 +51,10 @@ function championHistory(overrides: Partial<PlayerChampionStats> = {}): PlayerCh
     visionScorePerMinute: 0.85,
     killParticipation: 0.56,
     objectiveParticipation: 0.38,
-    coverage: { killParticipation: availableCoverage(10), objectiveParticipation: availableCoverage(10) },
+    coverage: {
+      killParticipation: availableCoverage(10),
+      objectiveParticipation: availableCoverage(10)
+    },
     recentMatches: [],
     ...overrides
   };
@@ -91,7 +94,7 @@ describe("generatePostGameAnalysis", () => {
     expect(result.weaknesses).toEqual([]);
     expect(result.executionSummary).toContain("Vitória");
     expect(result.executionSummary).toContain("sem mortes antes dos 10 minutos");
-    expect(result.pickAssessment).toContain("funcionou");
+    expect(result.pickAssessment).toContain("não classifica a escolha");
   });
 
   it("gera fraquezas e dicas numa derrota com mortes cedo e atraso de ouro", () => {
@@ -126,7 +129,7 @@ describe("generatePostGameAnalysis", () => {
     expect(result.tips.length).toBe(2);
     expect(result.executionSummary).toContain("Derrota");
     expect(result.executionSummary).toContain("mortes antes dos 10 minutos");
-    expect(result.pickAssessment).toContain("não performou como esperado");
+    expect(result.pickAssessment).toContain("não classifica a escolha");
   });
 
   it("expectedPlan reconhece a ausência de histórico pessoal com o campeão", () => {

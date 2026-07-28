@@ -21,7 +21,9 @@ Endpoints:
 - `GET /drafts/sessions`, `GET /drafts/sessions/active`, `GET /drafts/sessions/:id`, `GET /drafts/sessions/:id/snapshots`, `POST /drafts/sessions/:id/lock-in`, `POST /drafts/sessions/:id/status` (autenticadas) — sessões de draft persistidas. Ver `docs/draft-persistence.md`
 - `POST /drafts/recommendations` (autenticado) — motor real (`@sparta/core`) sobre o pool consolidado. Retorna até cinco principais, três alternativas e `poolSummary`; mantém temporariamente o alias legado `recommendations`
 - `POST /drafts/pre-game-analysis` (autenticado) — real, derivado do draft atual pelo motor puro `generatePreGameAnalysis` (`@sparta/core`). Responde `422` `PLAYER_ROLE_UNAVAILABLE` sem posição e `422` `SELECTED_CHAMPION_UNAVAILABLE` sem campeão confirmado (ou com campeão fora do catálogo). Ver `docs/pre-game-analysis.md`
-- `POST /postgame/analyze`, `GET /postgame/:matchId` — mock
+- `POST /postgame/analyze`, `GET /postgame/:matchId` — análise geral real a partir de Match-V5 e timeline
+- `GET /draft-sessions/:sessionId/post-game-comparison`, `GET /matches/:matchId/draft-comparison` (autenticados) — consulta a revisão histórica “Draft versus partida”, distinguindo vínculo, snapshot, timeline, parcialidade e geração
+- `POST /draft-sessions/:sessionId/post-game-comparison/generate` (autenticado) — gera idempotentemente somente a partir das fontes persistidas no servidor; ignora métricas ou conclusões do cliente
 - `POST /replays/import`, `GET /replays/:jobId` — nao implementado (fora do MVP)
 
 Swagger UI fica em `/docs`.
@@ -53,6 +55,10 @@ campeão confirmado. Ver `docs/champion-capabilities.md` e
 O impacto teórico de patch é calculado fora do motor de recomendação e usa
 somente Patch Intelligence + capacidades rastreáveis da mesma habilidade.
 Ver `docs/theoretical-patch-impact.md`.
+
+A comparação pós-game rastreável preserva o snapshot original, separa fatos
+anteriores e posteriores e nunca produz causalidade ou contrafactual. Ver
+`docs/draft-postgame-comparison.md`.
 
 ## Erros externos
 

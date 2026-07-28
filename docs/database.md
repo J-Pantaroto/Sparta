@@ -17,6 +17,7 @@ Tabelas principais:
 - `draft_sessions`
 - `pick_recommendations`
 - `postgame_reports`
+- `draft_post_game_comparison_revisions`
 - `replay_import_jobs`
 - `api_cache_entries`
 
@@ -30,14 +31,18 @@ Tabelas principais:
 - unicidade de entrada do pool por conta Riot, campeão e posição;
 - consulta do pool por conta Riot, posição e estado `enabled`.
 
-O snapshot da recomendação fica em `pick_recommendations.snapshotJson` para comparação pós-game.
+Snapshots de recomendação vivem em `RecommendationSnapshot` e
+`PersistedRecommendation`. `DraftPostGameComparisonRevision` preserva cada
+revisão da comparação com hash canônico, versão do algoritmo, IDs de sinais,
+cobertura e motivos de indisponibilidade. Ela se vincula à sessão, snapshot,
+partida, conta e, quando existente, ao `PostgameReport` geral; nunca
+sobrescreve uma revisão histórica. Ver `docs/draft-postgame-comparison.md`.
 
 `PlayerChampionPoolEntry` persiste somente a seleção de candidatos por
 posição: `source` (`PERSONAL_OBSERVED` ou `USER_PROVIDED`), `enabled` e
 timestamps auditáveis. A origem observada é derivada das `MatchObservation`
 normalizadas; desabilitar uma entrada manual não remove partidas,
-participantes ou observações. Draft e ranking não são persistidos pela Etapa
-12. Ver `docs/player-champion-pool.md`.
+participantes ou observações. Draft e ranking não são persistidos pela Etapa 12. Ver `docs/player-champion-pool.md`.
 
 `Champion` preserva o `info.difficulty` oficial da Data Dragon em
 `dataDragonDifficulty`, junto do valor 0-100 e da versão do algoritmo de

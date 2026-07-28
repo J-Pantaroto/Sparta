@@ -6,16 +6,24 @@ const {
   matchFindUniqueMock,
   postgameReportUpsertMock,
   postgameReportFindUniqueMock,
+  matchParticipantFindFirstMock,
   findMatchDetailMock,
-  findChampionStatsByPuuidMock
+  findChampionStatsByPuuidMock,
+  findDraftComparisonBySessionMock,
+  findDraftComparisonByMatchMock,
+  generateDraftComparisonMock
 } = vi.hoisted(() => ({
   getAuthenticatedUserIdMock: vi.fn(),
   riotAccountFindFirstMock: vi.fn(),
   matchFindUniqueMock: vi.fn(),
   postgameReportUpsertMock: vi.fn(),
   postgameReportFindUniqueMock: vi.fn(),
+  matchParticipantFindFirstMock: vi.fn(),
   findMatchDetailMock: vi.fn(),
-  findChampionStatsByPuuidMock: vi.fn()
+  findChampionStatsByPuuidMock: vi.fn(),
+  findDraftComparisonBySessionMock: vi.fn(),
+  findDraftComparisonByMatchMock: vi.fn(),
+  generateDraftComparisonMock: vi.fn()
 }));
 
 vi.mock("../auth/routes.js", () => ({
@@ -27,6 +35,7 @@ vi.mock("../../db/prisma.js", () => ({
   prisma: {
     riotAccount: { findFirst: riotAccountFindFirstMock },
     match: { findUnique: matchFindUniqueMock },
+    matchParticipant: { findFirst: matchParticipantFindFirstMock },
     postgameReport: { upsert: postgameReportUpsertMock, findUnique: postgameReportFindUniqueMock }
   }
 }));
@@ -37,6 +46,12 @@ vi.mock("../matches/match-repository.js", () => ({
 
 vi.mock("../players/player-stats-repository.js", () => ({
   findChampionStatsByPuuid: findChampionStatsByPuuidMock
+}));
+
+vi.mock("./draft-postgame-comparison-repository.js", () => ({
+  findDraftComparisonBySession: findDraftComparisonBySessionMock,
+  findDraftComparisonByMatch: findDraftComparisonByMatchMock,
+  generateDraftComparison: generateDraftComparisonMock
 }));
 
 import { buildApp } from "../../app.js";
@@ -84,7 +99,11 @@ describe("postgame routes", () => {
       getAuthenticatedUserIdMock.mockResolvedValue(null);
       const app = await buildApp();
 
-      const response = await app.inject({ method: "POST", url: "/postgame/analyze", payload: { matchId: "riot-m1" } });
+      const response = await app.inject({
+        method: "POST",
+        url: "/postgame/analyze",
+        payload: { matchId: "riot-m1" }
+      });
 
       expect(response.statusCode).toBe(401);
       await app.close();
@@ -95,7 +114,11 @@ describe("postgame routes", () => {
       riotAccountFindFirstMock.mockResolvedValue(null);
       const app = await buildApp();
 
-      const response = await app.inject({ method: "POST", url: "/postgame/analyze", payload: { matchId: "riot-m1" } });
+      const response = await app.inject({
+        method: "POST",
+        url: "/postgame/analyze",
+        payload: { matchId: "riot-m1" }
+      });
 
       expect(response.statusCode).toBe(404);
       await app.close();
@@ -107,7 +130,11 @@ describe("postgame routes", () => {
       findMatchDetailMock.mockResolvedValue(null);
       const app = await buildApp();
 
-      const response = await app.inject({ method: "POST", url: "/postgame/analyze", payload: { matchId: "riot-m1" } });
+      const response = await app.inject({
+        method: "POST",
+        url: "/postgame/analyze",
+        payload: { matchId: "riot-m1" }
+      });
 
       expect(response.statusCode).toBe(404);
       await app.close();
@@ -119,7 +146,11 @@ describe("postgame routes", () => {
       findMatchDetailMock.mockResolvedValue(matchDetail);
       const app = await buildApp();
 
-      const response = await app.inject({ method: "POST", url: "/postgame/analyze", payload: { matchId: "riot-m1" } });
+      const response = await app.inject({
+        method: "POST",
+        url: "/postgame/analyze",
+        payload: { matchId: "riot-m1" }
+      });
       const body = response.json();
 
       expect(response.statusCode).toBe(200);
@@ -176,7 +207,9 @@ describe("postgame routes", () => {
       getAuthenticatedUserIdMock.mockResolvedValue("user-1");
       riotAccountFindFirstMock.mockResolvedValue({ puuid: "puuid-1" });
       matchFindUniqueMock.mockResolvedValue({ id: "match-db-id" });
-      postgameReportFindUniqueMock.mockResolvedValue({ reportJson: { matchId: "riot-m1", pickAssessment: "ja analisado" } });
+      postgameReportFindUniqueMock.mockResolvedValue({
+        reportJson: { matchId: "riot-m1", pickAssessment: "ja analisado" }
+      });
       const app = await buildApp();
 
       const response = await app.inject({ method: "GET", url: "/postgame/riot-m1" });
@@ -184,6 +217,88 @@ describe("postgame routes", () => {
 
       expect(response.statusCode).toBe(200);
       expect(body.pickAssessment).toBe("ja analisado");
+      await app.close();
+    });
+  });
+
+  describe("comparação entre draft e partida", () => {
+    it("GET por sessão distingue relatório ainda não gerado", async () => {
+      getAuthenticatedUserIdMock.mockResolvedValue("user-1");
+      riotAccountFindFirstMock.mockResolvedValue({ id: "account-1", puuid: "puuid-1" });
+      findDraftComparisonBySessionMock.mockResolvedValue({
+        state: "NOT_GENERATED",
+        draftSessionId: "11111111-1111-4111-8111-111111111111",
+        report: null
+      });
+      const app = await buildApp();
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/draft-sessions/11111111-1111-4111-8111-111111111111/post-game-comparison"
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().state).toBe("NOT_GENERATED");
+      expect(findDraftComparisonBySessionMock).toHaveBeenCalledWith(
+        "account-1",
+        "11111111-1111-4111-8111-111111111111"
+      );
+      await app.close();
+    });
+
+    it("GET por partida não expõe partida que não pertence à conta", async () => {
+      getAuthenticatedUserIdMock.mockResolvedValue("user-1");
+      riotAccountFindFirstMock.mockResolvedValue({ id: "account-1", puuid: "puuid-1" });
+      matchParticipantFindFirstMock.mockResolvedValue(null);
+      const app = await buildApp();
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/matches/BR1_1/draft-comparison"
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(findDraftComparisonByMatchMock).not.toHaveBeenCalled();
+      await app.close();
+    });
+
+    it("POST rejeita métricas e conclusões enviadas pelo cliente", async () => {
+      getAuthenticatedUserIdMock.mockResolvedValue("user-1");
+      riotAccountFindFirstMock.mockResolvedValue({ id: "account-1", puuid: "puuid-1" });
+      const app = await buildApp();
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/draft-sessions/11111111-1111-4111-8111-111111111111/post-game-comparison/generate",
+        payload: { score: 100, conclusion: "cliente não é fonte" }
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(generateDraftComparisonMock).not.toHaveBeenCalled();
+      await app.close();
+    });
+
+    it("POST sem payload gera somente com fontes resolvidas no servidor", async () => {
+      getAuthenticatedUserIdMock.mockResolvedValue("user-1");
+      riotAccountFindFirstMock.mockResolvedValue({ id: "account-1", puuid: "puuid-1" });
+      generateDraftComparisonMock.mockResolvedValue({
+        ok: true,
+        created: true,
+        report: { draftSessionId: "11111111-1111-4111-8111-111111111111" }
+      });
+      const app = await buildApp();
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/draft-sessions/11111111-1111-4111-8111-111111111111/post-game-comparison/generate"
+      });
+
+      expect(response.statusCode).toBe(201);
+      expect(generateDraftComparisonMock).toHaveBeenCalledWith(
+        "account-1",
+        "puuid-1",
+        "11111111-1111-4111-8111-111111111111"
+      );
       await app.close();
     });
   });

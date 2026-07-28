@@ -14,6 +14,7 @@ import type {
   ChampionPerformanceScore,
   DraftState,
   DraftRecommendationResponse,
+  DraftPostGameComparison,
   GlobalChampionRoleEligibility,
   GrowthJourney,
   MatchLoadoutObservation,
@@ -436,6 +437,38 @@ export function fetchPostgameReport(token: string, matchId: string) {
   return request<PostGameAnalysis>(`/postgame/${encodeURIComponent(matchId)}`, {
     headers: { Authorization: `Bearer ${token}` }
   });
+}
+
+export type DraftComparisonState =
+  | "AVAILABLE"
+  | "PARTIAL"
+  | "MATCH_NOT_LINKED"
+  | "SNAPSHOT_MISSING"
+  | "TIMELINE_UNAVAILABLE"
+  | "NOT_GENERATED";
+
+export interface DraftComparisonResponse {
+  state: DraftComparisonState;
+  draftSessionId?: string;
+  report: DraftPostGameComparison | null;
+  reason?: string;
+}
+
+export function fetchDraftComparison(token: string, matchId: string) {
+  return request<DraftComparisonResponse>(
+    `/matches/${encodeURIComponent(matchId)}/draft-comparison`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+}
+
+export function generateDraftComparison(token: string, sessionId: string) {
+  return request<{ created: boolean; report: DraftPostGameComparison }>(
+    `/draft-sessions/${encodeURIComponent(sessionId)}/post-game-comparison/generate`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` }
+    }
+  );
 }
 
 export function fetchMatchObservation(token: string, matchId: string) {
