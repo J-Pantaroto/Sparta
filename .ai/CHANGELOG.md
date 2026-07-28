@@ -22,6 +22,22 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-07-28 18:01 — Pós-game comparativo entre draft e partida
+
+**Status:** IMPLEMENTADA · Prompt:
+`.ai/prompts/features/0022-pos-game-comparativo-draft-partida.md`
+
+O pós-game agora preserva o snapshot original e separa rigorosamente o que
+era conhecido no draft dos fatos observados na partida. Ranking, grupo,
+score, cobertura, riscos, posição, matchup, loadout e patch são comparados
+somente quando há evidência compatível, sempre com limitações de não
+causalidade; escolha fora do snapshot não recebe score retroativo e
+vitória/derrota não julga o motor. Relatórios são revisionados de forma
+imutável e idempotente por hash/versão, consultáveis por sessão ou partida e
+protegidos por conta. A interface ganhou “Draft versus partida” sem
+redesenho. Foram validados 718 testes, typecheck, lint, builds, schema Prisma
+e navegação local sem erros de console. Implementação funcional: `2f60736`.
+
 ## 2026-07-28 17:39 — Vínculo auditável entre drafts e Match-V5
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0021-vinculo-draft-match-v5.md`

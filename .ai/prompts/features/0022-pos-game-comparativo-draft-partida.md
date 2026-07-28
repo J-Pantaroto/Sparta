@@ -1,7 +1,7 @@
 ---
-status: EM_ANDAMENTO
+status: IMPLEMENTADA
 solicitado_em: 2026-07-28 17:43
-implementado_em:
+implementado_em: 2026-07-28 18:01
 ---
 
 # Pós-game comparativo entre draft, escolha e partida real
@@ -37,6 +37,7 @@ implementado_em:
 
 - Contrato puro `draft-postgame-comparison/1.0.0`, com separação explícita
   entre evidência anterior e fatos posteriores.
+- Implementação funcional no commit `2f60736`, enviado para `origin/main`.
 - Snapshot histórico é lido sem recalcular o motor; escolha fora dele não
   recebe score, posição ou grupo retroativos.
 - Comparações de posição, risco/timeline, matchup confirmado, loadout
