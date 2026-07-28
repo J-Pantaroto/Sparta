@@ -22,6 +22,21 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-07-28 01:10 — Capacidades rastreáveis dos campeões
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0014-modelo-rastreavel-capacidades-campeoes.md`
+
+O Sparta ganhou um catálogo técnico separado de `ChampionTag`, extraído
+deterministicamente dos recursos completos oficiais da Data Dragon 16.14.1.
+Os 173 perfis preservam passiva/habilidade, trecho original, regra, versão,
+locale, disponibilidade e cobertura para 23 capacidades; ausência textual
+permanece indisponível. O catálogo deliberadamente cobre em média 19,15%:
+hard CC não cria confiabilidade, dash não cria engage e escudo/cura não cria
+peel. Gerador e modo check são reprocessáveis, e uma nova consulta técnica
+expõe evidências sem tocar em ranking ou pré-game. 16 testes novos; 555 testes
+TypeScript, 1 Python, typecheck, lint, build, check do catálogo e validação na
+imagem real da API aprovados. Ver `docs/champion-capabilities.md`.
+
 ## 2026-07-28 00:42 — Dificuldade do campeão e risco pessoal de execução
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0013-dificuldade-risco-pessoal-execucao.md`

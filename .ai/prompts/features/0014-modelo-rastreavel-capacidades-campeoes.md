@@ -1,7 +1,7 @@
 ---
-status: EM_ANDAMENTO
+status: IMPLEMENTADA
 solicitado_em: 2026-07-28 00:52
-implementado_em:
+implementado_em: 2026-07-28 01:10
 ---
 
 # Modelo rastreável de capacidades dos campeões
@@ -16,6 +16,8 @@ implementado_em:
 > ranking, score, recomendações ou pré-game.
 
 ## Notas de implementação
+
+Implementado no commit `5e70cb6`, enviado para `origin/main`.
 
 - Novo `ChampionCapabilityProfile` com 23 dimensões independentes, evidências
   `PASSIVE`/`SPELL`/`CHAMPION_METADATA`, valor, disponibilidade, proveniência,
