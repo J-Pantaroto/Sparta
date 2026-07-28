@@ -22,6 +22,21 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-07-28 16:35 — Patch Intelligence oficial e auditável
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0019-patch-intelligence-riot.md`
+
+Notas oficiais da Riot agora podem ser validadas e importadas por comandos
+controlados, com allowlist, parser conservador versionado, hash canônico,
+cache explícito, associação segura ao catálogo e histórico imutável de
+revisões. API e Champion Select apresentam somente a evidência oficial,
+separada do motor de recomendação. O patch 26.14 foi importado com 21
+mudanças, 10 campeões resolvidos e três itens preservados sem catálogo; a
+segunda execução foi `UNCHANGED`. Foram validados 675 testes TypeScript e 1
+Python, typecheck, lint, builds e a API real em Docker. `META_STRENGTH`,
+ranking, score, pesos, pool, risco, matchup e elegibilidade global continuam
+inalterados. Implementação funcional: `013878a`.
+
 ## 2026-07-28 15:45 — Contrato e decisão da fonte global de meta
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0018-fonte-global-meta.md`
@@ -49,6 +64,7 @@ lint, build e uma consulta real com amostra 8 e bloqueio `403` para outro
 jogador. Implementação funcional: `d8758b8`.
 
 ## 2026-07-28 13:10 — Persistência de drafts e recomendações
+
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0016-persistencia-drafts-recomendacoes.md`
 
 Sessões reais de champion select e snapshots imutáveis das recomendações passam a ser
@@ -61,7 +77,6 @@ reescrito. Falha de persistência devolve `FAILED` sanitizado sem derrubar o Cha
 Vínculo com Match-V5 só com identificador confiável; sem ele a sessão permanece honestamente sem
 vínculo. Escolha fora do ranking é registrada como fato, sem julgamento. Ranking, pesos e fórmulas
 inalterados. 62 testes novos (626 no total). Ver `docs/draft-persistence.md`.
-
 
 ## 2026-07-28 01:37 — Análise estratégica do draft 5×5
 

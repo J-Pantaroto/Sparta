@@ -1,5 +1,34 @@
 # Sparta - Contexto para Continuidade
 
+## Etapa 19: Patch Intelligence com notas oficiais da Riot
+
+`PatchRelease`, `PatchChange` e `StructuredPatchDelta`
+(`patch-intelligence/1.0.0`) preservam a evidência oficial, URL, locale,
+publicação/coleta, disponibilidade e proveniência. O coletor aceita somente
+notas em `leagueoflegends.com/.../news/game-updates/*-notes`, reutiliza a
+política HTTP da Etapa 9 e mantém uma hora `FRESH` mais sete dias de fallback
+`STALE`.
+
+O parser `riot-patch-notes-parser/1.0.0` usa classificação editorial
+explícita, mantém compensações como `ADJUSTMENT`, bugfix como `BUGFIX` e
+ambiguidade como `UNCLASSIFIED`; direção numérica isolada nunca classifica.
+Escalares explícitos podem ser estruturados, enquanto séries, fórmulas e
+texto permanecem literais. O hash canônico ignora coleta, whitespace,
+atributos visuais e IDs gerados pelo site.
+
+`PatchRelease` + `PatchReleaseRevision` + `PatchImportAttempt` (migration
+`20260728163000_patch_intelligence`) separam identidade, revisões imutáveis e
+falhas. `patches:check` não persiste; `patches:import` é idempotente. O patch
+oficial 26.14 está no banco local: 21 mudanças, 10 campeões associados com
+segurança, três itens não resolvidos preservados, revisão 1; reimportação
+`UNCHANGED`.
+
+Consultas: `GET /patches`, `/patches/current`, `/patches/:patch` e
+`/patches/:patch/champions/:championId`. O Champion Select mostra resumo,
+indicador secundário e detalhe oficial fora do ranking. Patch Intelligence
+não toca `META_STRENGTH`, score, pesos, pool, risco, matchup ou elegibilidade
+global. Ver `docs/patch-intelligence.md`.
+
 ## Etapa 18: decisão e contrato da fonte global de meta
 
 Decisão registrada como `SELF_AGGREGATION_CANDIDATE`: a candidata para o meta
@@ -56,7 +85,7 @@ input canônico, versões, cobertura e todos os candidatos com ranking, grupo, p
 métricas estruturadas, motivos, limitações e análise estratégica.
 
 **Identidade**: o LCU não expõe id estável de sessão, então a chave técnica é gerada pelo desktop
-ao *entrar* no champion select e descartada ao sair — não deriva de campeão nem de horário, e uma
+ao _entrar_ no champion select e descartada ao sair — não deriva de campeão nem de horário, e uma
 entrada nova nunca reaproveita a anterior.
 
 **Dedup**: o hash SHA-256 do input canônico ignora ordem de arrays, instante da análise e campos
@@ -417,15 +446,15 @@ fosse posição. `playerRoleSource?: "LCU" | "USER"` distingue detecção de esc
 `ProvenanceSourceType` ganhou `USER_PROVIDED`: escolha do usuário não é observação do cliente
 nem dado oficial da Riot.
 
-| Local | Fallback removido |
-|---|---|
-| `App.tsx` | `playerRole: "MID"` no estado inicial |
-| `App.tsx` | `role: member.position ?? "MID"` em aliado/inimigo do LCU |
-| `ChampionSelectScreen` | `role: "MID"` no inimigo escolhido à mão |
-| `match-mapper.ts` | `TEAM_POSITION_TO_ROLE[...] ?? "MID"` no histórico Match-V5 |
-| `player-role.ts` | `Record<string, Role>` fazia o TS crer que sempre havia retorno |
-| `schemas.ts` | `playerRole` obrigatório — o cliente **tinha** que mandar algo |
-| Seletor da UI | `<Select>` sem valor vazio: o navegador pré-selecionava a 1ª opção (TOP) |
+| Local                  | Fallback removido                                                        |
+| ---------------------- | ------------------------------------------------------------------------ |
+| `App.tsx`              | `playerRole: "MID"` no estado inicial                                    |
+| `App.tsx`              | `role: member.position ?? "MID"` em aliado/inimigo do LCU                |
+| `ChampionSelectScreen` | `role: "MID"` no inimigo escolhido à mão                                 |
+| `match-mapper.ts`      | `TEAM_POSITION_TO_ROLE[...] ?? "MID"` no histórico Match-V5              |
+| `player-role.ts`       | `Record<string, Role>` fazia o TS crer que sempre havia retorno          |
+| `schemas.ts`           | `playerRole` obrigatório — o cliente **tinha** que mandar algo           |
+| Seletor da UI          | `<Select>` sem valor vazio: o navegador pré-selecionava a 1ª opção (TOP) |
 
 1. **Mapeamento do LCU** — novo `toRole` rejeita `unselected`, `unknown`, string vazia, só
    espaços e qualquer valor fora da tabela. Um vocabulário novo da Riot produz ausência, não MID.
@@ -668,12 +697,12 @@ chapados** (6 das 8 métricas eram o default 50). Esta fase resolve os dois.
 
 **Medido no app/API reais, conta Zekerus#117:**
 
-| Cenário | Antes | Depois |
-|---|---|---|
-| Viego (JUNGLE), first pick | blind 50, sinergia 50, encaixe 50 (defaults) | blind **43**, sinergia **50** (neutro correto), encaixe **65** |
-| Viego, com Ahri+Jinx aliados e Lee Sin inimigo | idem, tudo 50 | sinergia **21.3**, resposta ao draft **57.8**, encaixe **69**, aviso de composição real |
-| Avisos no first pick | "Pouca linha de frente, Engage limitado, Wave clear baixo, Dano pouco balanceado" | só "Amostra pequena" |
-| MID (sem amostra) | "Nenhuma recomendação" + motivo errado | "Ainda sem amostra suficiente em Mid" + "Orianna: 1 de 5 partidas" |
+| Cenário                                        | Antes                                                                             | Depois                                                                                  |
+| ---------------------------------------------- | --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Viego (JUNGLE), first pick                     | blind 50, sinergia 50, encaixe 50 (defaults)                                      | blind **43**, sinergia **50** (neutro correto), encaixe **65**                          |
+| Viego, com Ahri+Jinx aliados e Lee Sin inimigo | idem, tudo 50                                                                     | sinergia **21.3**, resposta ao draft **57.8**, encaixe **69**, aviso de composição real |
+| Avisos no first pick                           | "Pouca linha de frente, Engage limitado, Wave clear baixo, Dano pouco balanceado" | só "Amostra pequena"                                                                    |
+| MID (sem amostra)                              | "Nenhuma recomendação" + motivo errado                                            | "Ainda sem amostra suficiente em Mid" + "Orianna: 1 de 5 partidas"                      |
 
 `matchup` e `meta` seguem em 50 de propósito: o primeiro precisa de histórico do confronto, o
 segundo de `PatchMetaData`, que o Sparta não tem.
@@ -810,12 +839,12 @@ real, o que fazia a orientação padrão parecer análise personalizada.
 
 1. **Champion Select vira workspace de decisão** (`features/ChampionSelectScreen.tsx` + `.css`)
    - barra de sessão fixa no topo (posição, ordem de pick e **as 5 vagas do time inimigo**, com
-   `EmptyAvatarSlot` marcando quem ainda não foi revelado: quantos faltam é informação de
-   draft, não espaço vazio); rail estreito à esquerda com as recomendações compactas
-   (selecionáveis, a #1 destacada como `feature` + selo TOP) e painel de detalhe à direita com
-   as **8 métricas** (antes só as 4 maiores), razões e alertas completos e o botão de confirmar.
-   O grid de campeões inimigos virou **colapsável** (lápis na barra) e rola por dentro. Clicar
-   numa vaga preenchida remove aquele inimigo.
+     `EmptyAvatarSlot` marcando quem ainda não foi revelado: quantos faltam é informação de
+     draft, não espaço vazio); rail estreito à esquerda com as recomendações compactas
+     (selecionáveis, a #1 destacada como `feature` + selo TOP) e painel de detalhe à direita com
+     as **8 métricas** (antes só as 4 maiores), razões e alertas completos e o botão de confirmar.
+     O grid de campeões inimigos virou **colapsável** (lápis na barra) e rola por dentro. Clicar
+     numa vaga preenchida remove aquele inimigo.
 2. **Rótulos crus traduzidos** - `PickRecommendation.category` (`best_blind`, `comfort_pick`…)
    e `confidence` apareciam em inglês na tela; novo `categoryLabels` em `app/labels.ts`.
 3. **Pré-game reorganizado** (`features/PreGameScreen.tsx`) - herói com a splash do campeão
@@ -913,15 +942,15 @@ depois do teste). 0 imagens quebradas.
 
 **Validação medida no app Electron real (CDP), conta Zekerus#117:**
 
-| O quê | Resultado |
-|---|---|
-| 1000x720 / 1280x720 / 1440x900 / 1920x1080, nas 7 telas | Sem overflow horizontal, sem card cortado, navegação completa |
-| Sidebar responsiva | 232px acima de 1160px de viewport, 196px abaixo (medido em cada largura) |
-| Foco por teclado | Tab real (`Input.dispatchKeyEvent`): `focusVisible: true`, anel de 2px na cor do tema |
-| `prefers-reduced-motion: reduce` | Transição de card e animação de spinner caem pra ~0s |
-| Trava da cor de destaque | 4 skins de artes bem diferentes: Lux Elementalista `hsl(38)` dourada, Thresh Terror Profundo `hsl(203 100% 45%)` (o mais escuro permitido), Leona Solari `hsl(23)`, Nocturne `hsl(203)` - **todas dentro** de S≥55% e L entre 45% e 62% |
-| Offline com tema baixado | Com a rede desligada, a arte (data URL) e a cor continuam aplicadas |
-| Imagens quebradas | 0 em todas as telas, em todas as validações |
+| O quê                                                   | Resultado                                                                                                                                                                                                                               |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1000x720 / 1280x720 / 1440x900 / 1920x1080, nas 7 telas | Sem overflow horizontal, sem card cortado, navegação completa                                                                                                                                                                           |
+| Sidebar responsiva                                      | 232px acima de 1160px de viewport, 196px abaixo (medido em cada largura)                                                                                                                                                                |
+| Foco por teclado                                        | Tab real (`Input.dispatchKeyEvent`): `focusVisible: true`, anel de 2px na cor do tema                                                                                                                                                   |
+| `prefers-reduced-motion: reduce`                        | Transição de card e animação de spinner caem pra ~0s                                                                                                                                                                                    |
+| Trava da cor de destaque                                | 4 skins de artes bem diferentes: Lux Elementalista `hsl(38)` dourada, Thresh Terror Profundo `hsl(203 100% 45%)` (o mais escuro permitido), Leona Solari `hsl(23)`, Nocturne `hsl(203)` - **todas dentro** de S≥55% e L entre 45% e 62% |
+| Offline com tema baixado                                | Com a rede desligada, a arte (data URL) e a cor continuam aplicadas                                                                                                                                                                     |
+| Imagens quebradas                                       | 0 em todas as telas, em todas as validações                                                                                                                                                                                             |
 
 **Limite honesto do teste de offline**: recarregar a página com a rede desligada não renderiza
 nada **em modo de desenvolvimento**, porque o renderer é servido pelo Vite via
@@ -936,7 +965,7 @@ dentro de uma sessão de champion select de verdade, que precisa do cliente do L
 
 Pedido do usuário depois da Fase 12: tirar os **chromas** do seletor de skins (poluíam a lista como se fossem temas) e fazer o tema **refletir muito mais no app** - cores derivadas da skin e splash art de fundo, com a linguagem visual de **Mobalytics, Blitz e iTero**.
 
-**Achado 1 - o campo `chromas` da Data Dragon não serve pra filtrar**: ele significa "esta skin *tem* chromas", não "isto é um chroma". Os chromas vêm como entradas irmãs, com `chromas: false` e o nome entre parênteses. A fonte limpa é a **Community Dragon**, que já era usada desde a Fase 12: o JSON do campeão traz só as skins reais no topo, com os chromas **aninhados** (`skins[].chromas[]`), e o `id` é `championId * 1000 + num`. Novo `fetchRealSkinNums(championId)` (`datadragon.ts`) deriva esse conjunto e `fetchChampionSkins` filtra a lista pt_BR por ele - mantém os nomes em português e tira os chromas. Sem a Community Dragon (CDN fora), devolve a lista completa: melhor mostrar chroma a mais do que esconder skin de verdade. **Medido no Zed: 71 → 15 cards, 0 com parênteses.**
+**Achado 1 - o campo `chromas` da Data Dragon não serve pra filtrar**: ele significa "esta skin _tem_ chromas", não "isto é um chroma". Os chromas vêm como entradas irmãs, com `chromas: false` e o nome entre parênteses. A fonte limpa é a **Community Dragon**, que já era usada desde a Fase 12: o JSON do campeão traz só as skins reais no topo, com os chromas **aninhados** (`skins[].chromas[]`), e o `id` é `championId * 1000 + num`. Novo `fetchRealSkinNums(championId)` (`datadragon.ts`) deriva esse conjunto e `fetchChampionSkins` filtra a lista pt_BR por ele - mantém os nomes em português e tira os chromas. Sem a Community Dragon (CDN fora), devolve a lista completa: melhor mostrar chroma a mais do que esconder skin de verdade. **Medido no Zed: 71 → 15 cards, 0 com parênteses.**
 
 **Achado 2 (bug real, latente desde a Fase 10) - a CSP bloqueava a Community Dragon**: `apps/desktop/src/renderer/index.html` listava só `ddragon.leagueoflegends.com` em `img-src`/`connect-src`. Ou seja, **todo fallback de Community Dragon adicionado nas Fases 10 (ícones) e 12 (splash) era código morto** - nunca poderia ter disparado, e a validação daquelas fases não testou o caminho de fallback de fato. Corrigido adicionando `https://raw.communitydragon.org` nas duas diretivas; só então o filtro de chroma (e os fallbacks anteriores) passaram a funcionar.
 
@@ -954,7 +983,7 @@ Validado no app Electron real via CDP: Zed com **15 cards / 0 chromas**; a matiz
 
 Depois da Fase 11 o usuário reportou que o módulo de temas continuava quebrado. A investigação (testando as URLs reais contra a CDN e o fluxo real pelo bridge IPC do Electron) achou **dois bugs independentes**, os dois presentes desde a Sub-fase 6a:
 
-1. **Extensão errada da splash art**: `championSplashUrl` (`apps/desktop/src/renderer/src/features/datadragon.ts`) montava a URL com `.png`, mas a Data Dragon serve splash art como **`.jpg`** - e a CDN responde **403** (não 404) pra `.png`. Isso quebrava *tudo*: as prévias das skins no seletor (todas caíam no fallback pro ícone do campeão) **e** o download (`Falha ao baixar a imagem (403)`). Confirmado medindo as duas extensões: `Ahri_0.png` → 403 / `Ahri_0.jpg` → 200 (158KB). **A "validação" do download na Fase 11 passou por engano** - testou o handler IPC com uma URL `.jpg` montada à mão, não o caminho que o app realmente usa (que montava `.png`); o User-Agent adicionado lá não era a causa raiz (mas foi mantido, é correto ter).
+1. **Extensão errada da splash art**: `championSplashUrl` (`apps/desktop/src/renderer/src/features/datadragon.ts`) montava a URL com `.png`, mas a Data Dragon serve splash art como **`.jpg`** - e a CDN responde **403** (não 404) pra `.png`. Isso quebrava _tudo_: as prévias das skins no seletor (todas caíam no fallback pro ícone do campeão) **e** o download (`Falha ao baixar a imagem (403)`). Confirmado medindo as duas extensões: `Ahri_0.png` → 403 / `Ahri_0.jpg` → 200 (158KB). **A "validação" do download na Fase 11 passou por engano** - testou o handler IPC com uma URL `.jpg` montada à mão, não o caminho que o app realmente usa (que montava `.png`); o User-Agent adicionado lá não era a causa raiz (mas foi mantido, é correto ter).
 2. **`file://` nunca carregava no renderer**: mesmo com o download gravando o arquivo em disco, o `localSplashPath` era `file://<caminho>` e o Chromium bloqueia `file://` a partir da origem da página (`http://localhost` em dev, bundle em prod) - o tema "baixado" nunca aparecia. Confirmado no Electron real: arquivo de 187KB no disco, `img.onerror` disparando. Tentei um esquema próprio (`protocol.registerSchemesAsPrivileged` + `protocol.handle`, com `standard`/`secure`/`corsEnabled`), mas **o handler nunca era chamado** a partir de uma origem `http://` - o Chromium bloqueia antes. Solução final: o handler IPC devolve um **data URL** (`data:image/jpeg;base64,...`), que carrega em qualquer origem; o arquivo em disco continua sendo a cópia offline.
 
 Além disso, atendendo ao pedido explícito do usuário de usar outra API como fallback: novo `communityDragonSplashUrl(championId, skinNum)` (`datadragon.ts`) resolve a splash pela **Community Dragon** (JSON do campeão por ID numérico → `splashPath` mapeado pra URL da CDN), usado (a) automaticamente no `<img>` via o novo componente `SkinSplash.tsx` (Data Dragon → Community Dragon → ícone do campeão) e (b) no download, quando a Data Dragon falha pra aquela skin. `featured-champion-context.tsx` descarta `localSplashPath` legado que não seja `data:` (os `file://` gravados antes nunca funcionariam).
@@ -965,7 +994,7 @@ Validado no app Electron real via CDP: as **71 prévias de skin do Zed carregam,
 
 Feedback do usuário depois de reabrir o app com a Fase 10: (1) botão "← Voltar pra lista de campeões" sem estilo nenhum (`<button>` HTML puro); (2) download de skin não funcionava; (3) Champion Select podia ser aberto/usado livremente, sem o jogador estar numa sessão real; (4) faltava detecção automática da posição/papel (Top/Jungle/etc.) e de troca de lane; (5) Dashboard e telas resumidas demais.
 
-**Achado-chave da detecção de papel**: `LcuChampSelectTeamMember.assignedPosition` (`packages/riot/src/lcu/read-only-client.ts`) já era lido e tipado desde a Fase 6c, só nunca consumido. O LCU atualiza esse campo ao vivo quando dois jogadores trocam de posição pela ferramenta do próprio cliente - como o Sparta já faz poll da sessão a cada 2.5s (mesmo loop que deriva `pickOrder`), reler o campo a cada tick detecta a troca de lane de graça, sem lógica de detecção de troca nenhuma. **Achado-bug real**: `draft.playerRole` estava hardcoded em `"MID"` (`App.tsx`) e nunca era alterado por código nenhum - todo jogador que não joga MID recebia recomendações calculadas pro papel errado, e não havia *nenhum* controle (manual ou automático) pra definir isso.
+**Achado-chave da detecção de papel**: `LcuChampSelectTeamMember.assignedPosition` (`packages/riot/src/lcu/read-only-client.ts`) já era lido e tipado desde a Fase 6c, só nunca consumido. O LCU atualiza esse campo ao vivo quando dois jogadores trocam de posição pela ferramenta do próprio cliente - como o Sparta já faz poll da sessão a cada 2.5s (mesmo loop que deriva `pickOrder`), reler o campo a cada tick detecta a troca de lane de graça, sem lógica de detecção de troca nenhuma. **Achado-bug real**: `draft.playerRole` estava hardcoded em `"MID"` (`App.tsx`) e nunca era alterado por código nenhum - todo jogador que não joga MID recebia recomendações calculadas pro papel errado, e não havia _nenhum_ controle (manual ou automático) pra definir isso.
 
 1. **`packages/riot/src/lcu/player-role.ts`** (novo, padrão de `pick-order.ts`) — `derivePlayerRole(snapshot): Role | undefined`. Mapeia `assignedPosition` do LCU (`top/jungle/middle/bottom/utility`) pro `Role` do Sparta (`bottom→ADC`, `utility→SUPPORT`). Retorna `undefined` (nunca chuta) sem sessão, jogador não encontrado, ou posição vazia/desconhecida (blind pick/ARAM). 8 testes (`player-role.test.ts`), incluindo o cenário de troca de lane (chamar 2x com snapshots diferentes confirma que não precisa de estado extra).
 2. **IPC `sparta:player-role`** — `startGameflowWatcher` (`apps/desktop/src/main/index.ts`) deriva o papel no mesmo tick que já deriva a ordem de pick, transmite só quando muda; `preload/index.ts` + `sparta-global.d.ts` ganharam `onPlayerRole` (mesmo padrão de `onPickOrder`). `App.tsx` ganhou `autoPlayerRole` que sincroniza em `draft.playerRole`.
@@ -1002,16 +1031,17 @@ O usuário pediu pra validar a Fase 9b "no Electron empacotando de verdade, não
 Pra validar de verdade, esta sessão conectou ao processo Electron real via Chrome DevTools Protocol (`app.commandLine.appendSwitch("remote-debugging-port", "9222")`, temporário, revertido antes do commit) e confirmou, por inspeção direta do `window` da janela real: **`window.sparta` sempre foi `undefined`, em toda sessão anterior deste projeto** - o bridge de IPC nunca funcionou de verdade, apesar de "validado" em texto nas Fases 6a/6c.
 
 Causa raiz (duas camadas, achadas em sequência via console do processo real):
+
 1. `apps/desktop/src/main/index.ts` apontava o preload pra `../preload/index.js`, mas `apps/desktop/package.json` tem `"type": "module"` - o electron-vite builda o preload como ESM e sempre gerou `index.mjs` (nunca `.js`), então o preload nunca era encontrado (`ENOENT`, erro real visto no console do processo real, nunca nos nossos testes porque browser comum não reporta erro de preload nenhum).
 2. Corrigido o caminho pra `.mjs`, um segundo erro real apareceu: `SyntaxError: Cannot use import statement outside a module` - processos renderer sandboxed (`--enable-sandbox`, padrão do Electron desde varias versões) carregam o preload por um loader que **não entende `import`/ESM**, mesmo com a extensão certa.
 
 Correção final (`apps/desktop/electron.vite.config.ts` + `apps/desktop/src/main/index.ts`): forçar o build do preload pra CommonJS de verdade via `rollupOptions.output.format: "cjs"` + `entryFileNames: "[name].cjs"` (extensão `.cjs` ignora o `"type":"module"` do `package.json`, ao contrário de `.js`), e apontar `webPreferences.preload` pra `../preload/index.cjs`. Sem essa extensão o Node ainda tentaria interpretar o arquivo como ESM independente do conteúdo.
 
-**Impacto real**: todo recurso que depende de `window.sparta` nunca funcionou em nenhuma sessão anterior - detecção automática de champion select (`onGameflowPhase`, Fase 6c parcial), ordem de pick automática via LCU (`onPickOrder`, Fase 6c), e download de skin pro disco (`downloadSkin`, Sub-fase 6a). Os itens "não validado nesta sessão" registrados nas Fases 6a/6c sobre esses recursos eram, na verdade, "nem *podia* ter sido validado do jeito que a validação foi feita" - o bug estava presente o tempo todo.
+**Impacto real**: todo recurso que depende de `window.sparta` nunca funcionou em nenhuma sessão anterior - detecção automática de champion select (`onGameflowPhase`, Fase 6c parcial), ordem de pick automática via LCU (`onPickOrder`, Fase 6c), e download de skin pro disco (`downloadSkin`, Sub-fase 6a). Os itens "não validado nesta sessão" registrados nas Fases 6a/6c sobre esses recursos eram, na verdade, "nem _podia_ ter sido validado do jeito que a validação foi feita" - o bug estava presente o tempo todo.
 
 Validado via CDP contra o processo Electron real (não a Browser tool): `window.sparta` agora existe com todos os métodos esperados (`onGameflowPhase`/`downloadSkin`/`onPickOrder`); screenshots reais (`Page.captureScreenshot` via CDP) confirmando Dashboard/Perfil/Pós-game/Evolução (Fase 9) renderizando corretamente dentro da janela Electron de verdade, com a conta real Zekerus#117 (mesmo token de sessão assinado de sempre). `pnpm typecheck && pnpm lint && pnpm test && pnpm build` completos no monorepo.
 
-**Não coberto por esta correção** (fora de escopo, registrado como trabalho futuro): validar de fato a detecção automática de champion select / ordem de pick / download de skin *funcionando* agora que o bridge existe - precisa do cliente do League aberto (gameflow/pick order) ou de clicar o botão de baixar skin de verdade (download), nenhum dos dois testado nesta sessão. O bridge existir é a pré-condição pra esses recursos funcionarem; ainda não foi confirmado que o comportamento *downstream* de cada um está correto agora que ele deixou de ser sempre `undefined`.
+**Não coberto por esta correção** (fora de escopo, registrado como trabalho futuro): validar de fato a detecção automática de champion select / ordem de pick / download de skin _funcionando_ agora que o bridge existe - precisa do cliente do League aberto (gameflow/pick order) ou de clicar o botão de baixar skin de verdade (download), nenhum dos dois testado nesta sessão. O bridge existir é a pré-condição pra esses recursos funcionarem; ainda não foi confirmado que o comportamento _downstream_ de cada um está correto agora que ele deixou de ser sempre `undefined`.
 
 ### Bug real corrigido: card de skin com nome/botão sobrepostos
 
@@ -1120,7 +1150,7 @@ Substitui o input manual 1-5 de "Pick order" no Champion Select por detecção a
 
 ### Sub-fase 6b: configuração "quantas partidas analisar" + bug real de CORS corrigido
 
-Nova configuração pessoal: quantas das últimas partidas do jogador o Sparta deve considerar nas análises (últimas 20/50/100, ou um valor personalizado até 200) — diferente do `limit` de `/players/:puuid/recent-matches` (que é só quantas partidas *listar* na UI, não quantas *analisar*).
+Nova configuração pessoal: quantas das últimas partidas do jogador o Sparta deve considerar nas análises (últimas 20/50/100, ou um valor personalizado até 200) — diferente do `limit` de `/players/:puuid/recent-matches` (que é só quantas partidas _listar_ na UI, não quantas _analisar_).
 
 1. **Migração `PlayerProfile.matchAnalysisLimit Int @default(50)`**.
 2. **`findParticipationHistory`** (`matches/match-repository.ts`) e **`findPostgameReportsByPuuid`** (`postgame/postgame-repository.ts`) ganharam parâmetro opcional `limit?: number` (`take` do Prisma em cima do `orderBy: desc` já existente) — sem `limit`, comportamento inalterado.
@@ -1201,7 +1231,7 @@ O que ficou deliberadamente fora de escopo (confirmado com o usuário antes de i
 **Achado que definiu o desenho**: `DraftSession`/`PickRecommendation` nunca são gravados em lugar nenhum (`recommendPicks` é uma função pura chamada ao vivo no champion select, o resultado é sempre descartado) — não existe, hoje, nenhum jeito de saber "o que o draft recomendou" pra uma partida real já jogada. Por isso `expectedPlan` é honestamente redefinido como derivado do **histórico próprio do jogador** nesse campeão+role (ou da baseline geral do role, se for a primeira vez), nunca como lembrança de uma recomendação armazenada que nunca existiu — o texto gerado deixa isso explícito.
 
 1. **Módulo compartilhado `packages/core/src/scoring/dimension-signals.ts`** — extraído de `player-insights.ts` (Fase 2) sem mudar comportamento (`RATIO_DIMENSIONS`/`SCORE_DIMENSIONS`, `buildRatioSignal`/`buildScoreSignal`, thresholds, `ratioMagnitude`/`scoreMagnitude`, `round`). Generico sobre "um valor de razão/score já calculado" — não sabe se veio de uma média entre partidas (Fase 2) ou do valor bruto de uma única partida (Fase 4).
-2. **Novo módulo puro `packages/core/src/postgame/post-game-analysis.ts`** — `generatePostGameAnalysis` calcula 7 dimensões por razão (kda/cs/damage/gold/vision/kp/objective, valor da partida ÷ baseline do role) + mortes como dimensão de score, reaproveitando o módulo compartilhado; `confidence` fixo em `"low"` em todo item (uma partida é sempre baixa confiança como sinal *geral*, mesmo sendo 100% precisa sobre o que aconteceu nela); guarda partidas curtas/remake (`durationSeconds < 300`) pra não gerar sinal a partir de zeros default da timeline; `pickAssessment`/`executionSummary`/`expectedPlan` são compostos por fragmentos de texto independentes (resultado + sinal mais forte + histórico), não uma árvore de decisão sobre o produto cartesiano completo — evita explosão combinatória de templates.
+2. **Novo módulo puro `packages/core/src/postgame/post-game-analysis.ts`** — `generatePostGameAnalysis` calcula 7 dimensões por razão (kda/cs/damage/gold/vision/kp/objective, valor da partida ÷ baseline do role) + mortes como dimensão de score, reaproveitando o módulo compartilhado; `confidence` fixo em `"low"` em todo item (uma partida é sempre baixa confiança como sinal _geral_, mesmo sendo 100% precisa sobre o que aconteceu nela); guarda partidas curtas/remake (`durationSeconds < 300`) pra não gerar sinal a partir de zeros default da timeline; `pickAssessment`/`executionSummary`/`expectedPlan` são compostos por fragmentos de texto independentes (resultado + sinal mais forte + histórico), não uma árvore de decisão sobre o produto cartesiano completo — evita explosão combinatória de templates.
 3. **Nova consulta `findMatchDetail(matchId, puuid)`** (`apps/api/src/modules/matches/match-repository.ts`) — busca Match+MatchTimeline+os 10 MatchParticipant de uma partida específica (diferente de `findParticipationHistory`, que agrega o histórico inteiro sem timeline nem outros participantes), localiza a linha do próprio jogador e o laner oposto (mesmo role, `teamId` diferente).
 4. **`POST /postgame/analyze` e `GET /postgame/:matchId` religados com dado real** (`apps/api/src/modules/postgame/routes.ts`) — ambos autenticados; o POST encolhe o body pra só `{ matchId }` (servidor resolve tudo a partir de dado real, sem mais confiar em performance vinda do cliente) e persiste o resultado em `PostgameReport` via upsert (reanalisar depois de mais histórico acumulado atualiza o texto, não devolve relatório velho); o GET lê o relatório persistido, 404 honesto se ainda não analisado. Migration `20260722020000_postgame_report_unique` adiciona `@@unique([matchId, puuid])` e `updatedAt` (tabela estava vazia, sem necessidade de backfill).
 
@@ -1598,16 +1628,16 @@ npx pnpm@10.34.4 --filter @sparta/api backfill:match-participants
 
 Tabelas com uso real vs ainda sem código:
 
-| Tabela | Status |
-|---|---|
-| `User`, `RiotAccount` | Real desde antes da Fase 1 |
-| `Champion` | Real — sincronizado via Data Dragon (`catalog:sync`) |
-| `ChampionTag` | Real — cobre os **173 campeões** desde a Fase 15: `champion-tags:generate` deriva os atributos das tags/notas da Data Dragon e grava em `data/seeds/champion-tags.json`, e `prisma:seed` faz upsert com update de verdade. Entradas `"source": "manual"` sobrevivem à regeneração |
-| `Match`, `MatchParticipant`, `MatchTimeline` | Real — persistidos pelo sync incremental; desde a Fase 3, os 10 participantes por partida (não só o rastreado), com `teamId` |
-| `PlayerProfile`, `PlayerChampionStats` | Real — agregado apos cada sync; `strengthsJson`/`weaknessesJson`/`recentFormJson` tambem reais desde a Fase 2; `matchAnalysisLimit` desde a Fase 6b |
-| `ApiCacheEntry` | Real — cache de Account-V1 (24h) e Data Dragon (7 dias) |
-| `PostgameReport` | Real — upsert por (matchId, puuid) a cada `POST /postgame/analyze` (Fase 4); lido pela Fase 5 pra Growth Journey (sem tabela nova) |
-| `DraftSession`, `PickRecommendation`, `ReplayImportJob` | Ainda sem nenhum codigo que leia/escreva |
+| Tabela                                                  | Status                                                                                                                                                                                                                                                                            |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `User`, `RiotAccount`                                   | Real desde antes da Fase 1                                                                                                                                                                                                                                                        |
+| `Champion`                                              | Real — sincronizado via Data Dragon (`catalog:sync`)                                                                                                                                                                                                                              |
+| `ChampionTag`                                           | Real — cobre os **173 campeões** desde a Fase 15: `champion-tags:generate` deriva os atributos das tags/notas da Data Dragon e grava em `data/seeds/champion-tags.json`, e `prisma:seed` faz upsert com update de verdade. Entradas `"source": "manual"` sobrevivem à regeneração |
+| `Match`, `MatchParticipant`, `MatchTimeline`            | Real — persistidos pelo sync incremental; desde a Fase 3, os 10 participantes por partida (não só o rastreado), com `teamId`                                                                                                                                                      |
+| `PlayerProfile`, `PlayerChampionStats`                  | Real — agregado apos cada sync; `strengthsJson`/`weaknessesJson`/`recentFormJson` tambem reais desde a Fase 2; `matchAnalysisLimit` desde a Fase 6b                                                                                                                               |
+| `ApiCacheEntry`                                         | Real — cache de Account-V1 (24h) e Data Dragon (7 dias)                                                                                                                                                                                                                           |
+| `PostgameReport`                                        | Real — upsert por (matchId, puuid) a cada `POST /postgame/analyze` (Fase 4); lido pela Fase 5 pra Growth Journey (sem tabela nova)                                                                                                                                                |
+| `DraftSession`, `PickRecommendation`, `ReplayImportJob` | Ainda sem nenhum codigo que leia/escreva                                                                                                                                                                                                                                          |
 
 Próximo passo natural: conectar o desktop às rotas de perfil/drafts reais (hoje só auth usa a API real).
 
