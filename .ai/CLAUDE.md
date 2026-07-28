@@ -1,5 +1,26 @@
 # Sparta - Contexto para Continuidade
 
+## Etapa 12: pool pessoal por posição e cinco recomendações
+
+O Champion Select usa um pool explícito por conta Riot, campeão e posição:
+observações Match-V5 normalizadas (`PERSONAL_OBSERVED`) unidas a inclusões
+manuais (`USER_PROVIDED`). A tabela `PlayerChampionPoolEntry` preserva origem,
+estado e timestamps; observações prevalecem sobre inclusão manual e não podem
+ser apagadas ou desabilitadas pela interface.
+
+`recommendFromPersonalPool` produz até cinco principais e três alternativas,
+sem duplicatas ou preenchimento heurístico, com rank, origem, amostra,
+cobertura, métricas e limitações independentes. Candidato manual sem histórico
+mantém os sinais pessoais indisponíveis e confiança ausente; os pesos
+disponíveis são normalizados só para ele. Pesos, thresholds, fórmulas e scores
+dos candidatos observados elegíveis não mudaram. `ChampionTag.roles` e
+elegibilidade global continuam fora do pool.
+
+Rotas autenticadas: `GET/POST /players/pool`,
+`PATCH /players/pool/:championId` e `POST /drafts/recommendations`. O desktop
+aceita temporariamente a resposta antiga sem inventar alternativas. Ver
+`docs/player-champion-pool.md`.
+
 ## Etapa 11: experiência pessoal e elegibilidade global por posição
 
 `PlayerChampionRoleEvidence` agrega exclusivamente
@@ -1365,7 +1386,10 @@ Endpoints iniciais:
 - `GET /players/:puuid/growth-journey`
 - `GET /players/settings` (autenticado)
 - `PUT /players/settings` (autenticado)
-- `POST /drafts/recommendations`
+- `GET /players/pool` (autenticado)
+- `POST /players/pool` (autenticado)
+- `PATCH /players/pool/:championId` (autenticado)
+- `POST /drafts/recommendations` (autenticado)
 - `POST /drafts/pre-game-analysis` (autenticado)
 - `POST /postgame/analyze`
 - `GET /postgame/:matchId`
@@ -1374,7 +1398,7 @@ Endpoints iniciais:
 
 Auth (`apps/api/src/modules/auth`): senha com `scrypt` (nativo do `node:crypto`) e token de sessao assinado com HMAC-SHA256 (`node:crypto`, sem `jsonwebtoken`/`bcrypt` como dependencia). Segredo em `AUTH_TOKEN_SECRET` (ver `src/config/env.ts`; `loadEnv()` recusa subir se `NODE_ENV=production` e o segredo ainda for o default de dev). Token vai no header `Authorization: Bearer <token>`.
 
-CORS restrito a uma allowlist (`localhost:5173` em dev + origem `null` do app empacotado via `file://`) e rate limit de 5/min em `/auth/login` e `/auth/register` (`@fastify/rate-limit`) — ver `app.ts`. `methods` do `@fastify/cors` é configurado explicitamente como `["GET","HEAD","POST","PUT"]` (Fase 6b) — o default do plugin quando `methods` não é informado é `"GET,HEAD,POST"`, o que bloqueava silenciosamente qualquer `PUT` no preflight (erro genérico "Failed to fetch" no navegador, sem a requisição real chegar a sair) até essa correção.
+CORS restrito a uma allowlist (`localhost:5173` em dev + origem `null` do app empacotado via `file://`) e rate limit de 5/min em `/auth/login` e `/auth/register` (`@fastify/rate-limit`) — ver `app.ts`. `methods` do `@fastify/cors` é configurado explicitamente como `["GET","HEAD","POST","PUT","PATCH"]`: `PUT` atende settings e `PATCH` atende a desativação de entradas manuais do pool.
 
 `POST /players/link-riot-account` chama Account-V1 de verdade (`apps/api/src/modules/riot-integration/account-lookup.ts`, cache de 24h via `ApiCacheEntry`) e grava o puuid real. `POST /players/sync` é autenticado, resolve a conta Riot do proprio usuario e sincroniza partidas novas de verdade (`apps/api/src/modules/sync/riot-sync-service.ts`) — ver "Pendências desta sessão" pra mais detalhes de como isso funciona.
 

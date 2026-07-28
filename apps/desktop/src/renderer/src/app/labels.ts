@@ -109,5 +109,6 @@ export const categoryLabels: Record<PickRecommendation["category"], string> = {
   best_matchup: "Melhor matchup",
   best_teamfit: "Encaixa no time",
   safe_pick: "Escolha segura",
-  comfort_pick: "Zona de conforto"
+  comfort_pick: "Zona de conforto",
+  strategic_option: "Opção estratégica"
 };

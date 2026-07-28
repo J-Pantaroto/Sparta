@@ -2,10 +2,9 @@ import type { FastifyPluginAsync } from "fastify";
 import {
   aggregateMatchupData,
   generatePreGameAnalysis,
-  recommendPicks,
+  recommendFromPersonalPool,
   type MatchupData,
-  type PlayerChampionStats,
-  type PlayerProfile
+  type PlayerChampionStats
 } from "@sparta/core";
 import { draftRecommendationRequestSchema, preGameAnalysisRequestSchema } from "../../routes/schemas.js";
 import { compositionRules } from "../../config/composition-rules.js";
@@ -13,22 +12,15 @@ import { prisma } from "../../db/prisma.js";
 import { getAuthenticatedUserId } from "../auth/routes.js";
 import { findAllChampionTags, findChampionNamesByIds } from "../catalog/champion-repository.js";
 import { findPersonalLaneMatchupHistory } from "../matches/matchup-repository.js";
-import {
-  deriveObservedRoles,
-  findChampionStatsByPuuid,
-  findPlayerInsightsByPuuid
-} from "../players/player-stats-repository.js";
-
-const neutralRecentForm = { last10Score: 50, last20Score: 50, last50Score: 50, trend: "stable" as const, confidence: "low" as const };
+import { findChampionStatsByPuuid } from "../players/player-stats-repository.js";
+import { findPlayerPool } from "../players/player-pool-repository.js";
 
 export const draftsRoutes: FastifyPluginAsync = async (app) => {
   /**
-   * Recomendacoes reais de draft: player/championStats/strengths/weaknesses/
-   * recentForm vem da conta Riot do usuario autenticado (Fase 1/2),
-   * championTags da tabela real (catalog), matchups agregados na hora a
-   * partir do historico persistido (Fase 3). Usuario autenticado sem conta
-   * Riot vinculada, ou sem sync ainda, recebe um perfil neutro/vazio -
-   * poucas ou nenhuma recomendacao honesta, nao dado mockado.
+   * Recomendacoes reais de draft: o pool une observacoes normalizadas do
+   * proprio jogador e inclusoes manuais da conta autenticada. ChampionStats,
+   * tags estrategicas e matchups pessoais apenas avaliam esses candidatos;
+   * nenhuma dessas fontes cria elegibilidade global ou completa o pool.
    */
   app.post("/drafts/recommendations", async (request, reply) => {
     const userId = await getAuthenticatedUserId(request);
@@ -51,57 +43,45 @@ export const draftsRoutes: FastifyPluginAsync = async (app) => {
 
     const riotAccount = await prisma.riotAccount.findFirst({ where: { userId } });
 
-    let player: PlayerProfile;
     let championStats: PlayerChampionStats[];
 
     if (!riotAccount) {
       championStats = [];
-      player = {
-        id: userId,
-        account: { puuid: "", gameName: "", tagLine: "", platformRegion: "", regionalRouting: "" },
-        preferredRoles: [],
-        championStats: [],
-        strengths: [],
-        weaknesses: [],
-        recentForm: neutralRecentForm
-      };
     } else {
       championStats = await findChampionStatsByPuuid(riotAccount.puuid);
-      const insights = await findPlayerInsightsByPuuid(riotAccount.puuid);
-      player = {
-        id: riotAccount.puuid,
-        account: {
-          puuid: riotAccount.puuid,
-          gameName: riotAccount.gameName,
-          tagLine: riotAccount.tagLine,
-          platformRegion: riotAccount.platformRegion,
-          regionalRouting: riotAccount.regionalRouting
-        },
-        preferredRoles: deriveObservedRoles(championStats),
-        championStats,
-        ...insights
-      };
     }
 
-    const [championTags, laneHistory] = await Promise.all([
+    const [championTags, laneHistory, personalPool] = await Promise.all([
       findAllChampionTags(),
       riotAccount
         ? findPersonalLaneMatchupHistory(riotAccount.puuid, payload.draft.playerRole)
-        : Promise.resolve([])
+        : Promise.resolve([]),
+      riotAccount
+        ? findPlayerPool(riotAccount.id, riotAccount.puuid, payload.draft.playerRole)
+        : Promise.resolve({ entries: [], roleSummaries: [] })
     ]);
     const matchups = aggregateMatchupData(laneHistory);
 
+    const result = recommendFromPersonalPool({
+      draft: payload.draft,
+      candidates: personalPool.entries.map((entry) => ({
+        championId: entry.championId,
+        championName: entry.championName,
+        role: entry.role,
+        source: entry.source,
+        enabled: entry.enabled
+      })),
+      championStats,
+      championTags,
+      matchups,
+      compositionRules,
+      patchMeta: null
+    });
     return {
-      recommendations: recommendPicks({
-        draft: payload.draft,
-        player,
-        championStats,
-        championTags,
-        matchups,
-        compositionRules,
-        patchMeta: null,
-        limit: 5
-      })
+      ...result,
+      // Alias de transição para clientes anteriores à Etapa 12. Nunca inclui
+      // alternativas nem inventa candidatos.
+      recommendations: result.primaryRecommendations
     };
   });
 

@@ -24,6 +24,106 @@ const legado = {
   recentMatches: []
 } as unknown as PlayerChampionStats;
 
+describe("compatibilidade do contrato de recomendacoes (Etapa 12)", () => {
+  const draft: DraftState = {
+    playerRole: "MID",
+    pickOrder: 1,
+    allies: [],
+    enemies: [],
+    bannedChampionIds: []
+  };
+  const recommendation = {
+    championId: 61,
+    championName: "Orianna",
+    role: "MID",
+    totalScore: 70,
+    confidence: "medium",
+    dataCoverage: 0.8,
+    category: "comfort_pick",
+    reasons: [],
+    warnings: [],
+    metrics: {
+      personalPerformance: 70,
+      recentForm: 60,
+      matchup: null,
+      blindSafety: 50,
+      allySynergy: 50,
+      enemyDraftAnswer: 50,
+      compositionFit: 50,
+      meta: null
+    }
+  };
+
+  it("aceita resposta antiga simples sem inventar alternativas ou origem do pool", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ recommendations: [recommendation] }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" }
+        })
+      )
+    );
+
+    const result = await fetchDraftRecommendations("token", draft);
+
+    expect(result.primaryRecommendations).toHaveLength(1);
+    expect(result.alternatives).toEqual([]);
+    expect(result.primaryRecommendations[0]).not.toHaveProperty("poolSource");
+    expect(result.poolSummary.shortageReason).toMatch(/API/i);
+    vi.unstubAllGlobals();
+  });
+
+  it("preserva principais, alternativas e resumo do contrato novo", async () => {
+    const ranked = {
+      ...recommendation,
+      rank: 1,
+      poolSource: "PERSONAL_OBSERVED",
+      poolProvenance: {
+        sourceType: "OBSERVED",
+        sourceId: "riot-match-v5",
+        status: "AVAILABLE"
+      },
+      personalGames: 8,
+      limitations: []
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            primaryRecommendations: [ranked],
+            alternatives: [
+              { ...ranked, championId: 103, championName: "Ahri", rank: 6 }
+            ],
+            poolSummary: {
+              totalCandidates: 6,
+              evaluatedCandidates: 6,
+              primaryCount: 5,
+              alternativeCount: 1,
+              status: "AVAILABLE"
+            }
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" }
+          }
+        )
+      )
+    );
+
+    const result = await fetchDraftRecommendations("token", draft);
+
+    expect(result.primaryRecommendations[0].poolSource).toBe("PERSONAL_OBSERVED");
+    expect(result.alternatives).toHaveLength(1);
+    expect(result.poolSummary).toMatchObject({
+      totalCandidates: 6,
+      alternativeCount: 1
+    });
+    vi.unstubAllGlobals();
+  });
+});
+
 describe("ensureChampionStatsCoverage", () => {
   it("converte o zero de participação em objetivos, que é provadamente artificial", () => {
     // O mapper do Match-V5 nunca preencheu esse campo: medido no banco real,

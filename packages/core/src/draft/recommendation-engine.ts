@@ -12,6 +12,11 @@ import type {
   RecommendationReason,
   TeamComposition
 } from "../types/domain.js";
+import type {
+  DraftRecommendationResponse,
+  PlayerChampionPoolCandidate,
+  RankedPoolRecommendation
+} from "../types/player-champion-pool.js";
 
 type MetricKey = keyof PickRecommendation["metrics"];
 export type RecommendationWeights = Record<MetricKey, number>;
@@ -135,9 +140,299 @@ export function recommendPicks(input: {
         })
       } satisfies PickRecommendation;
     })
-    .filter((recommendation) => recommendation.metrics.personalPerformance > 0)
+    .filter(
+      (recommendation) =>
+        recommendation.metrics.personalPerformance !== null &&
+        recommendation.metrics.personalPerformance > 0
+    )
     .sort((a, b) => b.totalScore - a.totalScore)
     .slice(0, input.limit ?? 5);
+}
+
+/**
+ * Avalia a união explícita do pool observado/manual. Candidato sem amostra
+ * pessoal continua no ranking, mas seus três sinais pessoais ficam ausentes
+ * e os pesos restantes são normalizados só para ele.
+ */
+export function recommendFromPersonalPool(input: {
+  draft: DraftState;
+  candidates: PlayerChampionPoolCandidate[];
+  championStats: PlayerChampionStats[];
+  championTags: ChampionTag[];
+  matchups: MatchupData[];
+  compositionRules: CompositionRules;
+  patchMeta: PatchMetaData | null;
+}): DraftRecommendationResponse {
+  const role = input.draft.playerRole;
+  if (!role) return emptyPoolResponse(0, "A posição do jogador ainda não foi identificada.");
+
+  const deduplicated = new Map<number, PlayerChampionPoolCandidate>();
+  for (const candidate of input.candidates) {
+    if (!candidate.enabled || candidate.role !== role) continue;
+    const current = deduplicated.get(candidate.championId);
+    if (!current || candidate.source === "PERSONAL_OBSERVED") {
+      deduplicated.set(candidate.championId, { ...candidate });
+    }
+  }
+
+  const pool = [...deduplicated.values()];
+  const banned = new Set(input.draft.bannedChampionIds);
+  const picked = new Set(
+    [...input.draft.allies, ...input.draft.enemies].map((pick) => pick.championId)
+  );
+  const evaluable = pool.filter(
+    (candidate) => !banned.has(candidate.championId) && !picked.has(candidate.championId)
+  );
+  const weights = selectWeights(input.draft);
+  const enemyLaneChampionId = input.draft.enemyLaneChampionId;
+
+  const ranked = evaluable
+    .map((candidate) => {
+      const stats = input.championStats.find(
+        (entry) => entry.championId === candidate.championId && entry.role === role
+      );
+      const personal = stats ? scoreChampionPerformance(stats) : undefined;
+      const hasPersonalPerformance = personal?.eligible === true;
+      const tag = input.championTags.find(
+        (entry) =>
+          entry.championId === candidate.championId ||
+          entry.championName === candidate.championName
+      );
+      const personalMatchup = stats
+        ? findPersonalMatchup(candidate.championId, enemyLaneChampionId, role, input.matchups)
+        : undefined;
+      const composition = analyzeTeamComposition(input.draft, input.championTags, tag);
+      const metrics: PickRecommendation["metrics"] = {
+        personalPerformance: hasPersonalPerformance ? personal.score : null,
+        recentForm: hasPersonalPerformance ? (personal.components.recent ?? null) : null,
+        matchup: personalMatchup?.score ?? null,
+        blindSafety: tag ? tag.blindSafety * 100 : null,
+        allySynergy: tag ? calculateAllySynergy(tag, composition, input.draft) : null,
+        enemyDraftAnswer: tag
+          ? calculateEnemyAnswer(tag, input.draft, input.championTags)
+          : null,
+        compositionFit: tag
+          ? calculateCompositionFit(tag, composition, input.compositionRules)
+          : null,
+        meta: null
+      };
+      const availability: MetricAvailability = {
+        personalPerformance: metrics.personalPerformance !== null,
+        recentForm: metrics.recentForm !== null,
+        matchup: personalMatchup !== undefined,
+        blindSafety: metrics.blindSafety !== null,
+        allySynergy: metrics.allySynergy !== null,
+        enemyDraftAnswer: metrics.enemyDraftAnswer !== null,
+        compositionFit: metrics.compositionFit !== null,
+        meta: false
+      };
+      const { normalizedWeights, dataCoverage } = normalizeAvailableWeights(weights, availability);
+      const totalScore = round(
+        (Object.keys(normalizedWeights) as MetricKey[]).reduce(
+          (score, key) => score + (metrics[key] ?? 0) * normalizedWeights[key],
+          0
+        )
+      );
+      const personalGames = stats?.games ?? 0;
+      const limitations = buildPoolLimitations(
+        candidate,
+        personalGames,
+        hasPersonalPerformance,
+        tag !== undefined
+      );
+      const confidence =
+        hasPersonalPerformance && personal ? personal.confidence : undefined;
+
+      return {
+        championId: candidate.championId,
+        championName: candidate.championName,
+        role,
+        totalScore,
+        confidence,
+        dataCoverage,
+        category: selectCategory(input.draft, metrics, hasPersonalPerformance),
+        reasons: buildPoolReasons(candidate, stats, metrics, composition),
+        warnings: buildPoolWarnings(limitations, metrics, composition),
+        metrics,
+        metricDetails: toRecommendationMetrics(metrics, confidence, {
+          personalMatchup,
+          playerRole: role,
+          enemyLaneKnown: enemyLaneChampionId !== undefined
+        }),
+        rank: 0,
+        poolSource: candidate.source,
+        poolProvenance: {
+          sourceType: candidate.source === "PERSONAL_OBSERVED" ? "OBSERVED" : "USER_PROVIDED",
+          sourceId:
+            candidate.source === "PERSONAL_OBSERVED" ? "riot-match-v5" : "sparta-user-pool",
+          resource:
+            candidate.source === "PERSONAL_OBSERVED"
+              ? "MatchObservation"
+              : "PlayerChampionPoolEntry",
+          position: role,
+          sampleSize: personalGames,
+          status: "AVAILABLE"
+        },
+        personalGames,
+        limitations
+      } satisfies RankedPoolRecommendation;
+    })
+    .sort((left, right) => right.totalScore - left.totalScore || left.championId - right.championId)
+    .map((recommendation, index) => ({ ...recommendation, rank: index + 1 }));
+
+  const primaryRecommendations = ranked.slice(0, 5);
+  const alternatives = ranked.slice(5, 8);
+  const shortage = ranked.length < 5 ? 5 - ranked.length : 0;
+  const roleName: Record<NonNullable<DraftState["playerRole"]>, string> = {
+    TOP: "Top",
+    JUNGLE: "Jungle",
+    MID: "Mid",
+    ADC: "ADC",
+    SUPPORT: "Suporte"
+  };
+  return {
+    primaryRecommendations,
+    alternatives,
+    poolSummary: {
+      totalCandidates: pool.length,
+      evaluatedCandidates: ranked.length,
+      primaryCount: primaryRecommendations.length,
+      alternativeCount: alternatives.length,
+      status: ranked.length === 0 ? "UNAVAILABLE" : shortage > 0 ? "PARTIAL" : "AVAILABLE",
+      ...(shortage > 0
+        ? {
+            shortageReason: `Seu pool de ${roleName[role]} possui ${ranked.length} candidato(s) disponível(is). Adicione pelo menos mais ${shortage} para receber cinco recomendações.`
+          }
+        : {})
+    }
+  };
+}
+
+function emptyPoolResponse(totalCandidates: number, shortageReason: string): DraftRecommendationResponse {
+  return {
+    primaryRecommendations: [],
+    alternatives: [],
+    poolSummary: {
+      totalCandidates,
+      evaluatedCandidates: 0,
+      primaryCount: 0,
+      alternativeCount: 0,
+      status: "UNAVAILABLE",
+      shortageReason
+    }
+  };
+}
+
+function buildPoolReasons(
+  candidate: PlayerChampionPoolCandidate,
+  stats: PlayerChampionStats | undefined,
+  metrics: PickRecommendation["metrics"],
+  composition: TeamComposition
+): RecommendationReason[] {
+  const reasons: RecommendationReason[] = [
+    candidate.source === "PERSONAL_OBSERVED"
+      ? {
+          code: "pool_observed",
+          label: "Experiência observada",
+          detail: `${stats?.games ?? 0} partida(s) observadas nesta posição.`,
+          impact: stats?.games ?? 0
+        }
+      : {
+          code: "pool_user_provided",
+          label: "Adicionado ao pool",
+          detail: "Adicionado manualmente ao seu pool.",
+          impact: 0
+        }
+  ];
+  if (metrics.personalPerformance !== null && stats) {
+    reasons.push({
+      code: "personal_performance",
+      label: "Desempenho pessoal",
+      detail: `${stats.championName} tem score pessoal ${round(metrics.personalPerformance)} com ${stats.games} partidas válidas.`,
+      impact: metrics.personalPerformance
+    });
+  }
+  if (metrics.blindSafety !== null && metrics.blindSafety >= 70) {
+    reasons.push({
+      code: "blind_safety",
+      label: "Seguro para blind pick",
+      detail: "O perfil derivado indica boa segurança para blind pick.",
+      impact: metrics.blindSafety
+    });
+  }
+  if (metrics.matchup !== null && metrics.matchup >= 60) {
+    reasons.push({
+      code: "matchup",
+      label: "Boa matchup pessoal",
+      detail: "O histórico pessoal indica resposta positiva para a lane revelada.",
+      impact: metrics.matchup
+    });
+  }
+  if (metrics.compositionFit !== null && composition.strengths.length > 0) {
+    reasons.push({
+      code: "composition",
+      label: "Encaixe de composição",
+      detail: `Combina com: ${composition.strengths.join(", ")}.`,
+      impact: metrics.compositionFit
+    });
+  }
+  return reasons;
+}
+
+function buildPoolLimitations(
+  candidate: PlayerChampionPoolCandidate,
+  personalGames: number,
+  hasPersonalPerformance: boolean,
+  hasStrategicProfile: boolean
+): string[] {
+  const limitations: string[] = [];
+  if (!hasPersonalPerformance && personalGames === 0) {
+    limitations.push(
+      candidate.source === "USER_PROVIDED"
+        ? "Sem histórico pessoal nesta posição; candidato adicionado manualmente."
+        : "Sem amostra pessoal suficiente para calcular desempenho nesta posição."
+    );
+  } else if (!hasPersonalPerformance) {
+    limitations.push(
+      `${personalGames} partida(s) observada(s); amostra insuficiente para calcular desempenho pessoal.`
+    );
+  }
+  if (!hasStrategicProfile) {
+    limitations.push(
+      "Perfil estratégico do campeão indisponível; sinais de composição não foram calculados."
+    );
+  }
+  return limitations;
+}
+
+function buildPoolWarnings(
+  limitations: string[],
+  metrics: PickRecommendation["metrics"],
+  composition: TeamComposition
+): RecommendationReason[] {
+  const warnings = limitations.map((detail) => ({
+    code: "personal_coverage",
+    label: "Análise pessoal limitada",
+    detail,
+    impact: 0
+  }));
+  if (metrics.recentForm !== null && metrics.recentForm < 45) {
+    warnings.push({
+      code: "recent_form",
+      label: "Forma recente fraca",
+      detail: "As partidas mais recentes reduzem a segurança desta recomendação.",
+      impact: metrics.recentForm
+    });
+  }
+  if (composition.risks.length > 0) {
+    warnings.push({
+      code: "draft_risk",
+      label: "Risco de composição",
+      detail: composition.risks.join(", "),
+      impact: 50
+    });
+  }
+  return warnings;
 }
 
 export function analyzeTeamComposition(
@@ -330,18 +625,19 @@ function buildReasons(
   metrics: PickRecommendation["metrics"],
   composition: TeamComposition
 ): RecommendationReason[] {
-  const reasons: RecommendationReason[] = [
-    {
+  const reasons: RecommendationReason[] = [];
+  if (metrics.personalPerformance !== null) {
+    reasons.push({
       code: "personal_performance",
       label: "Desempenho pessoal",
       detail: `${stats.championName} tem score pessoal ${round(metrics.personalPerformance)} com ${stats.games} partidas válidas.`,
       impact: metrics.personalPerformance
-    }
-  ];
+    });
+  }
   // 70/60: thresholds "bem acima do neutro 50" pra virar reason exibida ao
   // jogador - texto positivo so aparece quando o sinal e forte o bastante
   // pra valer a pena destacar, nao em qualquer valor acima da media.
-  if (metrics.blindSafety >= 70) {
+  if (metrics.blindSafety !== null && metrics.blindSafety >= 70) {
     reasons.push({
       code: "blind_safety",
       label: "Seguro para blind pick",
@@ -357,7 +653,7 @@ function buildReasons(
       impact: metrics.matchup
     });
   }
-  if (composition.strengths.length > 0) {
+  if (metrics.compositionFit !== null && composition.strengths.length > 0) {
     reasons.push({
       code: "composition",
       label: "Encaixe de composição",
@@ -389,7 +685,7 @@ function buildWarnings(
   // 45: abaixo do neutro 50 mas nao tao extremo quanto os cortes de fraqueza
   // de dimension-signals.ts (35) - aqui e so um aviso brando de "forma
   // recente fraca", nao uma fraqueza estrutural do jogador no campeao.
-  if (metrics.recentForm < 45) {
+  if (metrics.recentForm !== null && metrics.recentForm < 45) {
     warnings.push({
       code: "recent_form",
       label: "Forma recente fraca",
@@ -414,13 +710,24 @@ function buildWarnings(
 // (65) porque e a categoria "resultado padrao aceitavel", nao um destaque.
 function selectCategory(
   draft: DraftState,
-  metrics: PickRecommendation["metrics"]
+  metrics: PickRecommendation["metrics"],
+  hasPersonalPerformance = true
 ): PickRecommendation["category"] {
-  if (draft.pickOrder <= 1 && metrics.blindSafety >= 70) return "best_blind";
+  if (
+    draft.pickOrder <= 1 &&
+    metrics.blindSafety !== null &&
+    metrics.blindSafety >= 70
+  ) {
+    return "best_blind";
+  }
   if (draft.enemyLaneChampionId && metrics.matchup !== null && metrics.matchup >= 60) return "best_matchup";
-  if (metrics.allySynergy >= 60) return "best_teamfit";
-  if (metrics.blindSafety >= 65) return "safe_pick";
-  return "comfort_pick";
+  if (metrics.allySynergy !== null && metrics.allySynergy >= 60) {
+    return "best_teamfit";
+  }
+  if (metrics.blindSafety !== null && metrics.blindSafety >= 65) {
+    return "safe_pick";
+  }
+  return hasPersonalPerformance ? "comfort_pick" : "strategic_option";
 }
 
 function clamp(value: number, min = 0, max = 100): number {

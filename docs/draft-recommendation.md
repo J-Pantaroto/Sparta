@@ -12,7 +12,31 @@ Entradas:
 - `CompositionRules`;
 - `PatchMetaData | null`.
 
-Saída: 3 a 5 recomendações com score, confiança, categoria, motivos e avisos. Toda recomendação precisa explicar o motivo e o risco — score sem explicação não é aceito no produto.
+Saída atual: até cinco recomendações principais e até três alternativas,
+sempre originadas do pool pessoal explícito da posição. Toda recomendação
+precisa explicar motivo, risco, origem, amostra e cobertura — score sem
+explicação não é aceito no produto.
+
+## Pool de candidatos (Etapa 12)
+
+`recommendFromPersonalPool` recebe a união já consolidada de observações
+Match-V5 normalizadas (`PERSONAL_OBSERVED`) e inclusões explícitas
+(`USER_PROVIDED`). Não consulta `ChampionTag.roles`, classes, Smite, listas
+fixas nem elegibilidade global.
+
+O resultado é `{ primaryRecommendations, alternatives, poolSummary }`.
+Existindo pelo menos cinco candidatos válidos, os cinco primeiros ficam na
+lista principal; até três seguintes viram alternativas. Banidos e escolhidos
+não são avaliados, não há duplicatas e pool insuficiente nunca é preenchido.
+O desempate por `championId` torna o resultado independente da ordem de
+entrada.
+
+Candidato sem amostra pessoal mantém `personalPerformance`, `recentForm` e
+`matchup` indisponíveis, confiança ausente e `personalGames: 0`. Os pesos
+restantes são normalizados por candidato. Nenhum peso, threshold ou fórmula
+foi recalibrado; o score de candidato observado já elegível permanece
+invariante. Detalhes de persistência, API e compatibilidade:
+`docs/player-champion-pool.md`.
 
 ## Pesos por cenário (`selectWeights`)
 

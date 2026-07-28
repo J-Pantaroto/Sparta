@@ -1,7 +1,14 @@
 import { availableCoverage } from "../types/stat-coverage.js";
 import { describe, expect, it } from "vitest";
-import { analyzeTeamComposition, normalizeAvailableWeights, recommendPicks, selectWeights } from "./recommendation-engine.js";
+import {
+  analyzeTeamComposition,
+  normalizeAvailableWeights,
+  recommendFromPersonalPool,
+  recommendPicks,
+  selectWeights
+} from "./recommendation-engine.js";
 import type { ChampionTag, DraftState, PlayerChampionStats, PlayerProfile } from "../types/domain.js";
+import type { PlayerChampionPoolCandidate } from "../types/player-champion-pool.js";
 
 const championStats: PlayerChampionStats[] = [
   {
@@ -372,5 +379,258 @@ describe("motor de recomendacao - proveniencia nao muda resultado (Etapa 8)", ()
     );
 
     expect(antiga[0].totalScore).toBe(atual[0].totalScore);
+  });
+});
+
+describe("pool pessoal e cinco recomendacoes (Etapa 12)", () => {
+  const draft: DraftState = {
+    playerRole: "MID",
+    pickOrder: 3,
+    allies: [],
+    enemies: [],
+    bannedChampionIds: []
+  };
+  const compositionRules = {
+    minimumFrontline: 40,
+    minimumEngage: 40,
+    minimumWaveclear: 40,
+    preferDamageBalance: true
+  };
+
+  function candidates(count: number): PlayerChampionPoolCandidate[] {
+    return Array.from({ length: count }, (_, index) => ({
+      championId: 100 + index,
+      championName: `Campeao ${index + 1}`,
+      role: "MID",
+      source: "USER_PROVIDED",
+      enabled: true
+    }));
+  }
+
+  function tagsFor(pool: PlayerChampionPoolCandidate[]): ChampionTag[] {
+    return pool.map((candidate, index) => ({
+      ...tags[0],
+      championId: candidate.championId,
+      championName: candidate.championName,
+      roles: [],
+      blindSafety: 0.4 + index * 0.03
+    }));
+  }
+
+  function recommend(
+    pool: PlayerChampionPoolCandidate[],
+    stats: PlayerChampionStats[] = [],
+    draftOverride: DraftState = draft
+  ) {
+    return recommendFromPersonalPool({
+      draft: draftOverride,
+      candidates: pool,
+      championStats: stats,
+      championTags: tagsFor(pool),
+      matchups: [],
+      compositionRules,
+      patchMeta: null
+    });
+  }
+
+  it("separa exatamente cinco principais e ate tres alternativas, sem duplicatas", () => {
+    const result = recommend(candidates(8));
+    const ids = [
+      ...result.primaryRecommendations,
+      ...result.alternatives
+    ].map((recommendation) => recommendation.championId);
+
+    expect(result.primaryRecommendations).toHaveLength(5);
+    expect(result.alternatives).toHaveLength(3);
+    expect(new Set(ids).size).toBe(8);
+    expect(result.poolSummary).toMatchObject({
+      totalCandidates: 8,
+      evaluatedCandidates: 8,
+      primaryCount: 5,
+      alternativeCount: 3,
+      status: "AVAILABLE"
+    });
+  });
+
+  it("nao preenche cinco vagas artificialmente quando o pool e menor", () => {
+    const result = recommend(candidates(3));
+
+    expect(result.primaryRecommendations).toHaveLength(3);
+    expect(result.alternatives).toEqual([]);
+    expect(result.poolSummary.status).toBe("PARTIAL");
+    expect(result.poolSummary.shortageReason).toContain("mais 2");
+  });
+
+  it("mantem sinais pessoais ausentes para inclusao manual sem historico", () => {
+    const [recommendation] = recommend(candidates(1)).primaryRecommendations;
+
+    expect(recommendation.poolSource).toBe("USER_PROVIDED");
+    expect(recommendation.personalGames).toBe(0);
+    expect(recommendation.confidence).toBeUndefined();
+    expect(recommendation.metrics.personalPerformance).toBeNull();
+    expect(recommendation.metrics.recentForm).toBeNull();
+    expect(recommendation.metrics.matchup).toBeNull();
+    expect(recommendation.dataCoverage).toBeLessThan(1);
+    expect(recommendation.metricDetails.filter((metric) => metric.status === "UNAVAILABLE"))
+      .toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ key: "PERSONAL_PERFORMANCE" }),
+          expect.objectContaining({ key: "RECENT_FORM" }),
+          expect.objectContaining({ key: "PERSONAL_MATCHUP" })
+        ])
+      );
+    expect(recommendation.totalScore).toBeGreaterThanOrEqual(0);
+  });
+
+  it("nao usa 50 neutro quando o perfil estrategico tambem esta ausente", () => {
+    const pool = candidates(1);
+    const [recommendation] = recommendFromPersonalPool({
+      draft,
+      candidates: pool,
+      championStats: [],
+      championTags: [],
+      matchups: [],
+      compositionRules,
+      patchMeta: null
+    }).primaryRecommendations;
+
+    expect(recommendation.metrics).toEqual({
+      personalPerformance: null,
+      recentForm: null,
+      matchup: null,
+      blindSafety: null,
+      allySynergy: null,
+      enemyDraftAnswer: null,
+      compositionFit: null,
+      meta: null
+    });
+    expect(recommendation.totalScore).toBe(0);
+    expect(recommendation.dataCoverage).toBe(0);
+    expect(recommendation.metricDetails.every((metric) => metric.value === null))
+      .toBe(true);
+  });
+
+  it("nao promove uma unica partida observada a desempenho pessoal elegivel", () => {
+    const pool: PlayerChampionPoolCandidate[] = [
+      {
+        championId: 61,
+        championName: "Orianna",
+        role: "MID",
+        source: "PERSONAL_OBSERVED",
+        enabled: true
+      }
+    ];
+    const result = recommend(pool, [{ ...championStats[0], games: 1 }]);
+    const [recommendation] = result.primaryRecommendations;
+
+    expect(recommendation.poolSource).toBe("PERSONAL_OBSERVED");
+    expect(recommendation.personalGames).toBe(1);
+    expect(recommendation.metrics.personalPerformance).toBeNull();
+    expect(recommendation.metrics.recentForm).toBeNull();
+  });
+
+  it("normaliza pesos e cobertura de cada candidato de forma independente", () => {
+    const pool: PlayerChampionPoolCandidate[] = [
+      {
+        championId: 61,
+        championName: "Orianna",
+        role: "MID",
+        source: "PERSONAL_OBSERVED",
+        enabled: true
+      },
+      {
+        championId: 103,
+        championName: "Ahri",
+        role: "MID",
+        source: "USER_PROVIDED",
+        enabled: true
+      }
+    ];
+    const result = recommend(pool, championStats);
+    const observed = result.primaryRecommendations.find(
+      (recommendation) => recommendation.championId === 61
+    )!;
+    const manual = result.primaryRecommendations.find(
+      (recommendation) => recommendation.championId === 103
+    )!;
+
+    expect(observed.metrics.personalPerformance).not.toBeNull();
+    expect(manual.metrics.personalPerformance).toBeNull();
+    expect(observed.dataCoverage).toBeGreaterThan(manual.dataCoverage);
+    expect(
+      observed.metricDetails.find(
+        (metric) => metric.key === "PERSONAL_PERFORMANCE"
+      )?.status
+    ).toBe("AVAILABLE");
+    expect(
+      manual.metricDetails.find(
+        (metric) => metric.key === "PERSONAL_PERFORMANCE"
+      )?.status
+    ).toBe("UNAVAILABLE");
+  });
+
+  it("preserva score e metricas do motor anterior para candidato observado elegivel", () => {
+    const pool: PlayerChampionPoolCandidate[] = [
+      {
+        championId: 61,
+        championName: "Orianna",
+        role: "MID",
+        source: "PERSONAL_OBSERVED",
+        enabled: true
+      }
+    ];
+    const common = {
+      draft,
+      championStats,
+      championTags: tags,
+      matchups: [],
+      compositionRules,
+      patchMeta: null
+    };
+    const legacy = recommendPicks({ ...common, player });
+    const current = recommendFromPersonalPool({ ...common, candidates: pool });
+
+    expect(current.primaryRecommendations[0].totalScore).toBe(legacy[0].totalScore);
+    expect(current.primaryRecommendations[0].metrics).toEqual(legacy[0].metrics);
+  });
+
+  it("e invariavel a ordem de entrada e remove somente candidato indisponivel", () => {
+    const pool = candidates(8);
+    const forward = recommend(pool);
+    const reverse = recommend([...pool].reverse());
+    const withoutOne = recommend(pool.filter((candidate) => candidate.championId !== 103));
+    const orderedIds = (result: ReturnType<typeof recommend>) =>
+      [...result.primaryRecommendations, ...result.alternatives].map(
+        (recommendation) => recommendation.championId
+      );
+
+    expect(orderedIds(reverse)).toEqual(orderedIds(forward));
+    expect(orderedIds(withoutOne)).toEqual(
+      orderedIds(forward).filter((championId) => championId !== 103)
+    );
+  });
+
+  it("exclui banidos e campeoes ja escolhidos antes de montar as listas", () => {
+    const pool = candidates(7);
+    const result = recommend(pool, [], {
+      ...draft,
+      bannedChampionIds: [100],
+      allies: [
+        {
+          championId: 101,
+          championName: "Campeao 2",
+          role: "TOP",
+          team: "ally"
+        }
+      ]
+    });
+    const ids = [...result.primaryRecommendations, ...result.alternatives].map(
+      (recommendation) => recommendation.championId
+    );
+
+    expect(ids).not.toContain(100);
+    expect(ids).not.toContain(101);
+    expect(result.poolSummary.totalCandidates).toBe(7);
+    expect(result.poolSummary.evaluatedCandidates).toBe(5);
   });
 });

@@ -3,8 +3,17 @@ import { describe, expect, it, vi } from "vitest";
 import type { DraftState, PickRecommendation } from "@sparta/core";
 import { ChampionSelectScreen } from "./ChampionSelectScreen";
 
+const apiMocks = vi.hoisted(() => ({
+  fetchPlayerPool: vi.fn(),
+  addPlayerPoolEntry: vi.fn(),
+  disablePlayerPoolEntry: vi.fn()
+}));
+
 vi.mock("../services/api-client", () => ({
-  fetchPlayerProfile: () => new Promise(() => {})
+  fetchPlayerProfile: () => new Promise(() => {}),
+  fetchPlayerPool: apiMocks.fetchPlayerPool,
+  addPlayerPoolEntry: apiMocks.addPlayerPoolEntry,
+  disablePlayerPoolEntry: apiMocks.disablePlayerPoolEntry
 }));
 vi.mock("../services/datadragon", () => ({
   fetchAllChampions: () => Promise.resolve([]),
@@ -125,5 +134,136 @@ describe("Champion Select sem posição identificada (Etapa 6)", () => {
       />
     );
     expect(container.textContent).not.toMatch(/NaN|Infinity|undefined/);
+  });
+});
+
+describe("pool pessoal na selecao de campeoes (Etapa 12)", () => {
+  it("separa principais de alternativas e mostra origem/amostra sem inventar dados", () => {
+    const alternativa = {
+      ...recomendacaoMid,
+      championId: 103,
+      championName: "Ahri",
+      poolSource: "USER_PROVIDED",
+      personalGames: 0,
+      rank: 6,
+      limitations: ["Sem historico pessoal observado."]
+    } as unknown as PickRecommendation;
+
+    render(
+      <ChampionSelectScreen
+        draft={{
+          playerRole: "MID",
+          pickOrder: 1,
+          allies: [],
+          enemies: [],
+          bannedChampionIds: []
+        }}
+        setDraft={vi.fn()}
+        autoPickOrder={null}
+        autoPlayerRole={null}
+        champSelectActive
+        recommendations={[recomendacaoMid]}
+        alternatives={[alternativa]}
+        poolSummary={{
+          totalCandidates: 2,
+          evaluatedCandidates: 2,
+          primaryCount: 2,
+          alternativeCount: 0,
+          status: "PARTIAL",
+          shortageReason: "Adicione pelo menos mais 3."
+        }}
+        recommendationsStatus="idle"
+        noAccountLinked={false}
+        ddragonVersion="14.1.1"
+        riotAccounts={[]}
+        draftAutoFilled={false}
+      />
+    );
+
+    expect(screen.getByText("Alternativas")).toBeDefined();
+    expect(screen.getAllByText("Ahri").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Adicionado por voc/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Sem hist/).length).toBeGreaterThan(0);
+    expect(screen.getByText("Adicione pelo menos mais 3.")).toBeDefined();
+  });
+
+  it("distingue entradas observadas e manuais e oferece desabilitar somente a manual", async () => {
+    apiMocks.fetchPlayerPool.mockResolvedValue({
+      entries: [
+        {
+          playerId: "puuid-1",
+          championId: 61,
+          championName: "Orianna",
+          role: "MID",
+          source: "PERSONAL_OBSERVED",
+          enabled: true,
+          createdAt: "2026-07-27T23:00:00.000Z",
+          updatedAt: "2026-07-27T23:00:00.000Z",
+          provenance: {
+            sourceType: "OBSERVED",
+            sourceId: "riot-match-v5",
+            status: "AVAILABLE"
+          }
+        },
+        {
+          playerId: "puuid-1",
+          championId: 103,
+          championName: "Ahri",
+          role: "MID",
+          source: "USER_PROVIDED",
+          enabled: true,
+          createdAt: "2026-07-27T23:00:00.000Z",
+          updatedAt: "2026-07-27T23:00:00.000Z",
+          provenance: {
+            sourceType: "USER_PROVIDED",
+            sourceId: "sparta-user-pool",
+            status: "AVAILABLE"
+          }
+        }
+      ],
+      roleSummaries: [
+        {
+          role: "MID",
+          enabledCandidates: 2,
+          observedCandidates: 1,
+          userProvidedCandidates: 1
+        }
+      ]
+    });
+
+    render(
+      <ChampionSelectScreen
+        draft={{
+          playerRole: "MID",
+          pickOrder: 1,
+          allies: [],
+          enemies: [],
+          bannedChampionIds: []
+        }}
+        setDraft={vi.fn()}
+        autoPickOrder={null}
+        autoPlayerRole={null}
+        champSelectActive
+        recommendations={[]}
+        recommendationsStatus="idle"
+        noAccountLinked={false}
+        ddragonVersion="14.1.1"
+        riotAccounts={[]}
+        sessionToken="token"
+        draftAutoFilled={false}
+      />
+    );
+
+    expect(await screen.findByText("Observado")).toBeDefined();
+    expect(screen.getByText(/Adicionado por voc/)).toBeDefined();
+    expect(screen.queryByLabelText("Desabilitar Orianna do pool")).toBeNull();
+    expect(screen.getByLabelText("Desabilitar Ahri do pool")).toBeDefined();
+    expect(
+      screen.getByText(
+        (_, element) =>
+          element?.classList.contains("sp-badge") === true &&
+          element.textContent === "Mid: 2"
+      )
+    ).toBeDefined();
   });
 });

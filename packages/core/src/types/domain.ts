@@ -291,8 +291,15 @@ export interface PickRecommendation {
   championName: string;
   role: Role;
   totalScore: number;
-  confidence: Confidence;
-  category: "best_blind" | "best_matchup" | "best_teamfit" | "safe_pick" | "comfort_pick";
+  /** Ausente quando não existe amostra pessoal suficiente. */
+  confidence?: Confidence;
+  category:
+    | "best_blind"
+    | "best_matchup"
+    | "best_teamfit"
+    | "safe_pick"
+    | "comfort_pick"
+    | "strategic_option";
   reasons: RecommendationReason[];
   warnings: RecommendationReason[];
   /**
@@ -307,13 +314,13 @@ export interface PickRecommendation {
    * `metricDetails` pra apresentar.
    */
   metrics: {
-    personalPerformance: number;
-    recentForm: number;
+    personalPerformance: number | null;
+    recentForm: number | null;
     matchup: number | null;
-    blindSafety: number;
-    allySynergy: number;
-    enemyDraftAnswer: number;
-    compositionFit: number;
+    blindSafety: number | null;
+    allySynergy: number | null;
+    enemyDraftAnswer: number | null;
+    compositionFit: number | null;
     meta: number | null;
   };
   /**

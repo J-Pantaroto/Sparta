@@ -45,14 +45,14 @@ const championTagProvenance: DataProvenance = {
  */
 export function toRecommendationMetrics(
   metrics: PickRecommendation["metrics"],
-  confidence: Confidence,
+  confidence: Confidence | undefined,
   context: {
     personalMatchup?: MatchupData;
     playerRole?: Role;
     enemyLaneKnown?: boolean;
   } = {}
 ): RecommendationMetric[] {
-  const personalConfidence = toConfidenceScore(confidence);
+  const personalConfidence = confidence === undefined ? undefined : toConfidenceScore(confidence);
   const personalMatchup = context.personalMatchup;
   const personalMatchupMetric = personalMatchup
     ? availableMetric({
@@ -77,40 +77,64 @@ export function toRecommendationMetrics(
       );
 
   return [
-    availableMetric({
-      key: "PERSONAL_PERFORMANCE",
-      value: metrics.personalPerformance,
-      confidence: personalConfidence,
-      provenance: personalHistoryProvenance
-    }),
-    availableMetric({
-      key: "RECENT_FORM",
-      value: metrics.recentForm,
-      confidence: personalConfidence,
-      provenance: personalHistoryProvenance
-    }),
+    metrics.personalPerformance === null
+      ? unavailableMetric("PERSONAL_PERFORMANCE", "Sem histórico pessoal suficiente nesta posição.")
+      : availableMetric({
+          key: "PERSONAL_PERFORMANCE",
+          value: metrics.personalPerformance,
+          confidence: personalConfidence,
+          provenance: personalHistoryProvenance
+        }),
+    metrics.recentForm === null
+      ? unavailableMetric("RECENT_FORM", "Sem histórico pessoal suficiente nesta posição.")
+      : availableMetric({
+          key: "RECENT_FORM",
+          value: metrics.recentForm,
+          confidence: personalConfidence,
+          provenance: personalHistoryProvenance
+        }),
     personalMatchupMetric,
     unavailableMetric("GLOBAL_MATCHUP", "Dados globais de matchup ainda não estão disponíveis."),
-    availableMetric({
-      key: "BLIND_SAFETY",
-      value: metrics.blindSafety,
-      provenance: championTagProvenance
-    }),
-    availableMetric({
-      key: "ALLY_SYNERGY",
-      value: metrics.allySynergy,
-      provenance: championTagProvenance
-    }),
-    availableMetric({
-      key: "ENEMY_COMPOSITION_ANSWER",
-      value: metrics.enemyDraftAnswer,
-      provenance: championTagProvenance
-    }),
-    availableMetric({
-      key: "TEAM_COMPOSITION",
-      value: metrics.compositionFit,
-      provenance: championTagProvenance
-    }),
+    metrics.blindSafety === null
+      ? unavailableMetric(
+          "BLIND_SAFETY",
+          "Sem perfil estratégico disponível para este campeão."
+        )
+      : availableMetric({
+          key: "BLIND_SAFETY",
+          value: metrics.blindSafety,
+          provenance: championTagProvenance
+        }),
+    metrics.allySynergy === null
+      ? unavailableMetric(
+          "ALLY_SYNERGY",
+          "Sem perfil estratégico disponível para este campeão."
+        )
+      : availableMetric({
+          key: "ALLY_SYNERGY",
+          value: metrics.allySynergy,
+          provenance: championTagProvenance
+        }),
+    metrics.enemyDraftAnswer === null
+      ? unavailableMetric(
+          "ENEMY_COMPOSITION_ANSWER",
+          "Sem perfil estratégico disponível para este campeão."
+        )
+      : availableMetric({
+          key: "ENEMY_COMPOSITION_ANSWER",
+          value: metrics.enemyDraftAnswer,
+          provenance: championTagProvenance
+        }),
+    metrics.compositionFit === null
+      ? unavailableMetric(
+          "TEAM_COMPOSITION",
+          "Sem perfil estratégico disponível para este campeão."
+        )
+      : availableMetric({
+          key: "TEAM_COMPOSITION",
+          value: metrics.compositionFit,
+          provenance: championTagProvenance
+        }),
     unavailableMetric("META_STRENGTH", "Dados estatísticos do meta deste patch ainda não estão disponíveis.")
   ];
 }
@@ -119,7 +143,8 @@ export function toRecommendationMetrics(
  * Entrada tolerante: uma recomendação que pode ter vindo de um backend
  * anterior ao contrato (ou de um cache gravado antes dele).
  */
-type MaybeStructured = Pick<PickRecommendation, "metrics" | "confidence"> & {
+type MaybeStructured = Pick<PickRecommendation, "metrics"> & {
+  confidence?: Confidence;
   metricDetails?: RecommendationMetric[];
 };
 

@@ -11,7 +11,10 @@ const {
   getAuthenticatedUserIdMock,
   riotAccountFindFirstMock,
   syncPlayerMatchesMock,
-  findPlayerChampionRoleEvidenceMock
+  findPlayerChampionRoleEvidenceMock,
+  findPlayerPoolMock,
+  addUserProvidedPoolEntryMock,
+  disableUserProvidedPoolEntryMock
 } = vi.hoisted(() => ({
   findRiotAccountByRiotIdMock: vi.fn(),
   findChampionStatsByPuuidMock: vi.fn(),
@@ -23,7 +26,10 @@ const {
   getAuthenticatedUserIdMock: vi.fn(),
   riotAccountFindFirstMock: vi.fn(),
   syncPlayerMatchesMock: vi.fn(),
-  findPlayerChampionRoleEvidenceMock: vi.fn()
+  findPlayerChampionRoleEvidenceMock: vi.fn(),
+  findPlayerPoolMock: vi.fn(),
+  addUserProvidedPoolEntryMock: vi.fn(),
+  disableUserProvidedPoolEntryMock: vi.fn()
 }));
 
 vi.mock("./player-stats-repository.js", () => ({
@@ -64,12 +70,19 @@ vi.mock("./player-champion-role-evidence-repository.js", () => ({
   findPlayerChampionRoleEvidence: findPlayerChampionRoleEvidenceMock
 }));
 
+vi.mock("./player-pool-repository.js", () => ({
+  findPlayerPool: findPlayerPoolMock,
+  addUserProvidedPoolEntry: addUserProvidedPoolEntryMock,
+  disableUserProvidedPoolEntry: disableUserProvidedPoolEntryMock
+}));
+
 import { buildApp } from "../../app.js";
 
 describe("players routes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     findMatchAnalysisLimitByPuuidMock.mockResolvedValue(50);
+    findPlayerPoolMock.mockResolvedValue({ entries: [], roleSummaries: [] });
   });
 
   it("retorna 404 no perfil quando a conta Riot nao foi vinculada no Sparta", async () => {
@@ -290,6 +303,116 @@ describe("players routes", () => {
     expect(body.weaknessTrends).toHaveLength(1);
     expect(body.weaknessTrends[0].code).toBe("morre_demais");
     await app.close();
+  });
+
+  describe("pool pessoal", () => {
+    const account = {
+      id: "acc-1",
+      puuid: "puuid-1",
+      platformRegion: "br1"
+    };
+    const entry = {
+      playerId: "puuid-1",
+      championId: 61,
+      championName: "Orianna",
+      role: "MID",
+      source: "USER_PROVIDED",
+      enabled: true,
+      createdAt: "2026-07-27T23:00:00.000Z",
+      updatedAt: "2026-07-27T23:00:00.000Z",
+      provenance: {
+        sourceType: "USER_PROVIDED",
+        sourceId: "sparta-user-pool",
+        status: "AVAILABLE"
+      }
+    };
+
+    it("lista somente o pool da conta autenticada e encaminha o filtro de posicao", async () => {
+      getAuthenticatedUserIdMock.mockResolvedValue("user-1");
+      riotAccountFindFirstMock.mockResolvedValue(account);
+      findPlayerPoolMock.mockResolvedValue({
+        entries: [entry],
+        roleSummaries: [
+          {
+            role: "MID",
+            enabledCandidates: 1,
+            observedCandidates: 0,
+            userProvidedCandidates: 1
+          }
+        ]
+      });
+      const app = await buildApp();
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/players/pool?role=MID"
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(findPlayerPoolMock).toHaveBeenCalledWith("acc-1", "puuid-1", "MID");
+      expect(response.json().entries[0].source).toBe("USER_PROVIDED");
+      await app.close();
+    });
+
+    it("cria inclusao manual sem aceitar origem enviada pelo cliente", async () => {
+      getAuthenticatedUserIdMock.mockResolvedValue("user-1");
+      riotAccountFindFirstMock.mockResolvedValue(account);
+      addUserProvidedPoolEntryMock.mockResolvedValue({
+        status: "CREATED",
+        entry
+      });
+      const app = await buildApp();
+
+      const created = await app.inject({
+        method: "POST",
+        url: "/players/pool",
+        payload: { championId: 61, role: "MID" }
+      });
+      const forged = await app.inject({
+        method: "POST",
+        url: "/players/pool",
+        payload: {
+          championId: 61,
+          role: "MID",
+          source: "PERSONAL_OBSERVED"
+        }
+      });
+
+      expect(created.statusCode).toBe(201);
+      expect(addUserProvidedPoolEntryMock).toHaveBeenCalledWith(
+        "acc-1",
+        "puuid-1",
+        61,
+        "MID"
+      );
+      expect(forged.statusCode).toBe(500);
+      expect(addUserProvidedPoolEntryMock).toHaveBeenCalledTimes(1);
+      await app.close();
+    });
+
+    it("recusa desabilitar entrada observada", async () => {
+      getAuthenticatedUserIdMock.mockResolvedValue("user-1");
+      riotAccountFindFirstMock.mockResolvedValue(account);
+      disableUserProvidedPoolEntryMock.mockResolvedValue({
+        status: "OBSERVED_ENTRY"
+      });
+      const app = await buildApp();
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: "/players/pool/61",
+        payload: { role: "MID", enabled: false }
+      });
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json().code).toBe("OBSERVED_ENTRY_CANNOT_BE_DISABLED");
+      expect(disableUserProvidedPoolEntryMock).toHaveBeenCalledWith(
+        "acc-1",
+        61,
+        "MID"
+      );
+      await app.close();
+    });
   });
 
   describe("GET /players/settings", () => {

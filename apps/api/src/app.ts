@@ -32,11 +32,10 @@ export async function buildApp() {
       }
       callback(new Error("Origem nao permitida"), false);
     },
-    // @fastify/cors default e "GET,HEAD,POST" quando methods nao e
-    // informado - PUT ficava de fora do preflight (bloqueado no navegador
-    // antes mesmo de chegar no servidor) desde sempre, so nunca foi notado
-    // porque nenhuma rota usava PUT ate GET/PUT /players/settings (Fase 6b).
-    methods: ["GET", "HEAD", "POST", "PUT"]
+    // A lista e explicita porque o default do plugin nao inclui metodos de
+    // mutacao alem de POST. PUT atende settings; PATCH atende a desativacao
+    // de entradas manuais do pool pessoal.
+    methods: ["GET", "HEAD", "POST", "PUT", "PATCH"]
   });
   // Limite global generoso; rotas sensiveis a forca bruta (login/registro)
   // tem limite proprio, mais restrito, definido em modules/auth/routes.ts.

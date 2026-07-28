@@ -25,6 +25,11 @@ import {
 } from "./player-stats-repository.js";
 import { syncPlayerMatches } from "../sync/riot-sync-service.js";
 import { findPlayerChampionRoleEvidence } from "./player-champion-role-evidence-repository.js";
+import {
+  addUserProvidedPoolEntry,
+  disableUserProvidedPoolEntry,
+  findPlayerPool
+} from "./player-pool-repository.js";
 
 export const linkRiotAccountSchema = z.object({
   gameName: z.string().min(3, "Informe o nome do invocador"),
@@ -118,6 +123,85 @@ export const playersRoutes: FastifyPluginAsync = async (app) => {
       ),
       scope: filters
     };
+  });
+
+  app.get("/players/pool", async (request, reply) => {
+    const userId = await getAuthenticatedUserId(request);
+    if (!userId) {
+      reply.code(401);
+      return { error: "Nao autenticado." };
+    }
+    const query = z.object({ role: roleSchema.optional() }).parse(request.query);
+    const riotAccount = await prisma.riotAccount.findFirst({ where: { userId } });
+    if (!riotAccount) {
+      reply.code(404);
+      return { error: "Nenhuma conta Riot vinculada." };
+    }
+    return findPlayerPool(riotAccount.id, riotAccount.puuid, query.role);
+  });
+
+  app.post("/players/pool", async (request, reply) => {
+    const userId = await getAuthenticatedUserId(request);
+    if (!userId) {
+      reply.code(401);
+      return { error: "Nao autenticado." };
+    }
+    const payload = z
+      .object({ championId: z.number().int().positive(), role: roleSchema })
+      .strict()
+      .parse(request.body);
+    const riotAccount = await prisma.riotAccount.findFirst({ where: { userId } });
+    if (!riotAccount) {
+      reply.code(404);
+      return { error: "Nenhuma conta Riot vinculada." };
+    }
+    const result = await addUserProvidedPoolEntry(
+      riotAccount.id,
+      riotAccount.puuid,
+      payload.championId,
+      payload.role
+    );
+    if (result.status === "CHAMPION_NOT_FOUND") {
+      reply.code(404);
+      return { code: "CHAMPION_NOT_FOUND", message: "Campeão não encontrado no catálogo." };
+    }
+    reply.code(result.status === "CREATED" ? 201 : 200);
+    return { entry: result.entry };
+  });
+
+  app.patch("/players/pool/:championId", async (request, reply) => {
+    const userId = await getAuthenticatedUserId(request);
+    if (!userId) {
+      reply.code(401);
+      return { error: "Nao autenticado." };
+    }
+    const params = z.object({ championId: z.coerce.number().int().positive() }).parse(request.params);
+    const payload = z
+      .object({ role: roleSchema, enabled: z.literal(false) })
+      .strict()
+      .parse(request.body);
+    const riotAccount = await prisma.riotAccount.findFirst({ where: { userId } });
+    if (!riotAccount) {
+      reply.code(404);
+      return { error: "Nenhuma conta Riot vinculada." };
+    }
+    const result = await disableUserProvidedPoolEntry(
+      riotAccount.id,
+      params.championId,
+      payload.role
+    );
+    if (result.status === "NOT_FOUND") {
+      reply.code(404);
+      return { code: "POOL_ENTRY_NOT_FOUND", message: "Entrada não encontrada no seu pool." };
+    }
+    if (result.status === "OBSERVED_ENTRY") {
+      reply.code(409);
+      return {
+        code: "OBSERVED_ENTRY_CANNOT_BE_DISABLED",
+        message: "Uma entrada observada não pode ser classificada nem removida como manual."
+      };
+    }
+    return { entry: result.entry };
   });
 
   /**

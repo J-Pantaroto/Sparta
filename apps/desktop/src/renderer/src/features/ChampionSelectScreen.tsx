@@ -1,9 +1,21 @@
-import { MIN_GAMES_FOR_RANKING, type DraftState, type PickRecommendation, type Role } from "@sparta/core";
-import { Check, Crosshair, Pencil, X } from "lucide-react";
+import {
+  type DraftState,
+  type PickRecommendation,
+  type PlayerChampionPoolEntry,
+  type PlayerChampionPoolRoleSummary,
+  type RecommendationPoolSummary,
+  type Role
+} from "@sparta/core";
+import { Check, Crosshair, Pencil, Plus, X } from "lucide-react";
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import { ROLES, categoryLabels, confidenceLabels, metricKeyLabels, roleLabels } from "../app/labels";
 import { useAsyncData } from "../hooks/use-async-data";
-import { fetchPlayerProfile, type PlayerProfileResponse, type RiotAccountSummary } from "../services/api-client";
+import {
+  addPlayerPoolEntry,
+  disablePlayerPoolEntry,
+  fetchPlayerPool,
+  type RiotAccountSummary
+} from "../services/api-client";
 import type { DataDragonChampionSummary } from "../services/datadragon";
 import { ThemedPageHero } from "../theme/ThemedPageHero";
 import {
@@ -47,10 +59,14 @@ interface ChampionSelectScreenProps {
   autoPlayerRole: Role | null;
   champSelectActive: boolean;
   recommendations: PickRecommendation[];
+  alternatives?: PickRecommendation[];
+  poolSummary?: RecommendationPoolSummary | null;
   recommendationsStatus: string;
   noAccountLinked: boolean;
   ddragonVersion: string;
   riotAccounts: RiotAccountSummary[];
+  sessionToken?: string | null;
+  onPoolChanged?: () => void;
   /** O draft veio da sessao do LCU - a edicao manual sai de cena. */
   draftAutoFilled: boolean;
 }
@@ -68,38 +84,87 @@ export function ChampionSelectScreen({
   autoPlayerRole,
   champSelectActive,
   recommendations,
+  alternatives = [],
+  poolSummary = null,
   recommendationsStatus,
   noAccountLinked,
   ddragonVersion,
-  riotAccounts,
+  sessionToken = null,
+  onPoolChanged,
   draftAutoFilled
 }: ChampionSelectScreenProps) {
   const [confirmedChampion, setConfirmedChampion] = useState<{ championId: number; championName: string } | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [editingEnemies, setEditingEnemies] = useState(false);
+  const [editingPool, setEditingPool] = useState(false);
+  const [poolRevision, setPoolRevision] = useState(0);
+  const [poolError, setPoolError] = useState<string | null>(null);
   // Simulação manual: só quando NÃO há sessão real detectada (com sessão a
   // tela abre direto). Existe pra dar pra testar sem o League aberto.
   const [devOverride, setDevOverride] = useState(false);
 
-  // So e consultado pra explicar uma lista vazia: sem isso a tela nao
-  // tem como dizer QUANTAS partidas faltam pro campeao entrar no corte.
-  const account = riotAccounts[0];
-  const profile = useAsyncData<PlayerProfileResponse>(
-    () => (account ? fetchPlayerProfile(account.gameName, account.tagLine) : undefined),
-    [account?.gameName, account?.tagLine]
+  const pool = useAsyncData<{
+    entries: PlayerChampionPoolEntry[];
+    roleSummaries: PlayerChampionPoolRoleSummary[];
+  }>(
+    () =>
+      sessionToken && draft.playerRole
+        ? fetchPlayerPool(sessionToken, draft.playerRole)
+        : undefined,
+    [sessionToken, draft.playerRole, poolRevision]
   );
 
   // A recomendação #1 muda conforme o draft evolui; sem seleção explícita, o
   // detalhe acompanha o topo da lista em vez de ficar preso num campeão que
   // já não é mais o melhor.
+  const allRecommendations = [...recommendations, ...alternatives];
   const selected =
-    recommendations.find((recommendation) => recommendation.championId === selectedId) ?? recommendations[0];
+    allRecommendations.find((recommendation) => recommendation.championId === selectedId) ??
+    recommendations[0] ??
+    alternatives[0];
 
   useEffect(() => {
-    if (selectedId !== null && !recommendations.some((item) => item.championId === selectedId)) {
+    if (
+      selectedId !== null &&
+      !allRecommendations.some((item) => item.championId === selectedId)
+    ) {
       setSelectedId(null);
     }
-  }, [recommendations, selectedId]);
+  }, [recommendations, alternatives, selectedId]);
+
+  function refreshPool() {
+    setPoolRevision((current) => current + 1);
+    onPoolChanged?.();
+  }
+
+  async function addToPool(champion: DataDragonChampionSummary) {
+    if (!sessionToken || !draft.playerRole) return;
+    if (
+      pool.data?.entries.some(
+        (entry) => entry.championId === champion.id && entry.enabled
+      )
+    ) {
+      return;
+    }
+    setPoolError(null);
+    try {
+      await addPlayerPoolEntry(sessionToken, champion.id, draft.playerRole);
+      refreshPool();
+    } catch (error) {
+      setPoolError(error instanceof Error ? error.message : "Não foi possível atualizar o pool.");
+    }
+  }
+
+  async function disableFromPool(championId: number) {
+    if (!sessionToken || !draft.playerRole) return;
+    setPoolError(null);
+    try {
+      await disablePlayerPoolEntry(sessionToken, championId, draft.playerRole);
+      refreshPool();
+    } catch (error) {
+      setPoolError(error instanceof Error ? error.message : "Não foi possível atualizar o pool.");
+    }
+  }
 
   function toggleEnemy(champion: DataDragonChampionSummary) {
     setDraft((current) => {
@@ -313,6 +378,76 @@ export function ChampionSelectScreen({
         )}
       </Card>
 
+      {draft.playerRole && sessionToken && (
+        <Card>
+          <SectionHeader
+            title={`Seu pool de ${roleLabels[draft.playerRole]}`}
+            description="Observações reais entram automaticamente; inclusões manuais valem somente para você e para esta posição."
+            actions={
+              <Button
+                variant="secondary"
+                icon={editingPool ? <X size={14} /> : <Plus size={14} />}
+                onClick={() => setEditingPool((current) => !current)}
+              >
+                {editingPool ? "Fechar" : "Adicionar campeão"}
+              </Button>
+            }
+          />
+          <div className="sp-observation__values">
+            {(pool.data?.roleSummaries ?? []).map((summary) => (
+              <Badge
+                key={summary.role}
+                tone={summary.role === draft.playerRole ? "accent" : "neutral"}
+              >
+                {roleLabels[summary.role]}: {summary.enabledCandidates}
+              </Badge>
+            ))}
+          </div>
+          {pool.status === "loading" && <Loading block label="Atualizando pool..." />}
+          {poolError && <ErrorState inline description={poolError} />}
+          <div className="sp-pool-list">
+            {(pool.data?.entries ?? [])
+              .filter((entry) => entry.enabled)
+              .map((entry) => (
+                <div className="sp-pool-entry" key={`${entry.championId}-${entry.role}`}>
+                  <ChampionAvatar
+                    championId={entry.championId}
+                    ddragonVersion={ddragonVersion}
+                    size="sm"
+                    alt={entry.championName}
+                  />
+                  <span>{entry.championName}</span>
+                  <Badge tone={entry.source === "PERSONAL_OBSERVED" ? "positive" : "neutral"}>
+                    {entry.source === "PERSONAL_OBSERVED" ? "Observado" : "Adicionado por você"}
+                  </Badge>
+                  {entry.source === "USER_PROVIDED" && (
+                    <IconButton
+                      label={`Desabilitar ${entry.championName} do pool`}
+                      icon={<X size={14} />}
+                      onClick={() => void disableFromPool(entry.championId)}
+                    />
+                  )}
+                </div>
+              ))}
+          </div>
+          {editingPool && (
+            <div style={{ marginTop: "var(--space-4)" }}>
+              <ChampionGrid
+                ddragonVersion={ddragonVersion}
+                maxHeight="180px"
+                searchPlaceholder={`Adicionar a ${roleLabels[draft.playerRole]}...`}
+                onSelect={(champion) => void addToPool(champion)}
+                isSelected={(champion) =>
+                  pool.data?.entries.some(
+                    (entry) => entry.championId === champion.id && entry.enabled
+                  ) ?? false
+                }
+              />
+            </div>
+          )}
+        </Card>
+      )}
+
       {!draft.playerRole ? (
         <Card>
           <EmptyState
@@ -333,16 +468,28 @@ export function ChampionSelectScreen({
           <ErrorState inline title="Não foi possível calcular recomendações agora" />
         </Card>
       )}
+      {recommendationsStatus !== "loading" && poolSummary?.shortageReason && (
+        <Card>
+          <p className="sp-pool-shortage">{poolSummary.shortageReason}</p>
+        </Card>
+      )}
 
       {/* Durante o recálculo nada da posição anterior fica visível: o hook
           preserva o último `data` pra evitar flicker, o que aqui significaria
           exibir os cards do papel antigo como se fossem os atuais. */}
-      {recommendationsStatus === "loading" ? null : recommendations.length === 0 ? (
+      {recommendationsStatus === "loading" ? null : allRecommendations.length === 0 ? (
         <Card>
-          <NoRecommendations
-            role={draft.playerRole}
-            championStats={profile.data?.championStats ?? []}
-            ddragonVersion={ddragonVersion}
+          <EmptyState
+            icon={<Crosshair size={22} />}
+            title={
+              (poolSummary?.totalCandidates ?? 0) > 0
+                ? "Nenhum candidato do pool está disponível neste draft"
+                : `Seu pool de ${roleLabels[draft.playerRole]} ainda está vazio`
+            }
+            description={
+              poolSummary?.shortageReason ??
+              "Adicione campeões manualmente ou sincronize partidas observadas nesta posição."
+            }
           />
         </Card>
       ) : (
@@ -360,7 +507,7 @@ export function ChampionSelectScreen({
                     onClick={() => setSelectedId(recommendation.championId)}
                     label={`Ver detalhes de ${recommendation.championName}`}
                   >
-                    {index === 0 && <span className="sp-rec__rank">TOP</span>}
+                    <span className="sp-rec__rank">#{index + 1}</span>
                     <div className="sp-rec">
                       <ChampionAvatar
                         championId={recommendation.championId}
@@ -371,11 +518,46 @@ export function ChampionSelectScreen({
                       <span style={{ minWidth: 0 }}>
                         <strong className="sp-rec__name">{recommendation.championName}</strong>
                         <span className="sp-rec__category">{categoryLabels[recommendation.category]}</span>
+                        <span className="sp-rec__category">
+                          {poolSourceLabel(recommendation)} · {personalGamesLabel(recommendation)}
+                        </span>
                       </span>
                       <ScoreBadge score={recommendation.totalScore} size="xs" />
                     </div>
                   </InteractiveCard>
                 ))}
+                {alternatives.length > 0 && (
+                  <>
+                    <span className="sp-pool-section-label">Alternativas</span>
+                    {alternatives.map((recommendation, index) => (
+                      <InteractiveCard
+                        key={recommendation.championId}
+                        pad="sm"
+                        selected={selected?.championId === recommendation.championId}
+                        onClick={() => setSelectedId(recommendation.championId)}
+                        label={`Ver alternativa ${recommendation.championName}`}
+                      >
+                        <span className="sp-rec__rank">
+                          #{recommendations.length + index + 1}
+                        </span>
+                        <div className="sp-rec">
+                          <ChampionAvatar
+                            championId={recommendation.championId}
+                            ddragonVersion={ddragonVersion}
+                            alt={recommendation.championName}
+                          />
+                          <span style={{ minWidth: 0 }}>
+                            <strong className="sp-rec__name">{recommendation.championName}</strong>
+                            <span className="sp-rec__category">
+                              {poolSourceLabel(recommendation)} · {personalGamesLabel(recommendation)}
+                            </span>
+                          </span>
+                          <ScoreBadge score={recommendation.totalScore} size="xs" />
+                        </div>
+                      </InteractiveCard>
+                    ))}
+                  </>
+                )}
               </div>
             }
             main={
@@ -397,7 +579,13 @@ export function ChampionSelectScreen({
                             {categoryLabels[selected.category]}
                           </Badge>
                           <Badge tone="neutral">{roleLabels[selected.role]}</Badge>
-                          <Badge tone="neutral">confiança {confidenceLabels[selected.confidence]}</Badge>
+                          {selected.confidence && (
+                            <Badge tone="neutral">
+                              confiança {confidenceLabels[selected.confidence]}
+                            </Badge>
+                          )}
+                          <Badge tone="neutral">{poolSourceLabel(selected)}</Badge>
+                          <Badge tone="neutral">{personalGamesLabel(selected)}</Badge>
                         </div>
                       </div>
                       <ScoreBadge score={selected.totalScore} size="lg" />
@@ -472,56 +660,16 @@ export function ChampionSelectScreen({
   );
 }
 
-/**
- * Lista vazia explicada com numero real. O motor so pontua campeao com pelo
- * menos `MIN_GAMES_FOR_RANKING` partidas NAQUELA posicao (abaixo disso
- * `scoreChampionPerformance` devolve 0 e o campeao e descartado) - a versao
- * anterior desta tela culpava a tabela de atributos do Sparta, o que era
- * falso: campeao sem atributo entra na lista normalmente, so com metricas
- * neutras.
- */
-function NoRecommendations({
-  role,
-  championStats,
-  ddragonVersion
-}: {
-  role: Role;
-  championStats: PlayerProfileResponse["championStats"];
-  ddragonVersion: string;
-}) {
-  const naPosicao = championStats
-    .filter((champion) => champion.role === role)
-    .sort((a, b) => b.games - a.games)
-    .slice(0, 3);
+function poolSourceLabel(recommendation: PickRecommendation): string {
+  const source = (recommendation as PickRecommendation & { poolSource?: string }).poolSource;
+  if (source === "PERSONAL_OBSERVED") return "Observado";
+  if (source === "USER_PROVIDED") return "Adicionado por você";
+  return "Origem não informada";
+}
 
-  return (
-    <EmptyState
-      icon={<Crosshair size={22} />}
-      title={`Ainda sem amostra suficiente em ${roleLabels[role]}`}
-      description={`O Sparta só recomenda um campeão depois de ${MIN_GAMES_FOR_RANKING} partidas com ele nessa posição — abaixo disso a comparação não se sustenta, e ele prefere não sugerir a inventar uma escolha.`}
-      actions={
-        naPosicao.length > 0 && (
-          <div style={{ display: "grid", gap: "var(--space-2)", justifyItems: "start" }}>
-            {naPosicao.map((champion) => (
-              <div
-                key={`${champion.championId}-${champion.role}`}
-                style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}
-              >
-                <ChampionAvatar
-                  championId={champion.championId}
-                  ddragonVersion={ddragonVersion}
-                  size="sm"
-                  alt={champion.championName}
-                />
-                <span>{champion.championName}</span>
-                <Badge tone="neutral">
-                  {champion.games} de {MIN_GAMES_FOR_RANKING} partidas
-                </Badge>
-              </div>
-            ))}
-          </div>
-        )
-      }
-    />
-  );
+function personalGamesLabel(recommendation: PickRecommendation): string {
+  const games = (recommendation as PickRecommendation & { personalGames?: number }).personalGames;
+  if (games === undefined) return "Amostra não informada";
+  if (games === 0) return "Sem histórico pessoal";
+  return `${games} ${games === 1 ? "partida observada" : "partidas observadas"}`;
 }

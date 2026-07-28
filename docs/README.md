@@ -8,6 +8,7 @@ Leitura recomendada:
 - `setup.md` para ambiente local.
 - `riot-compliance.md` para limites de integração.
 - `scoring-model.md` e `draft-recommendation.md` para os motores iniciais.
+- `player-champion-pool.md` para origem, persistência e gerenciamento do pool pessoal por posição.
 - `pre-game-analysis.md` para a análise pré-game derivada do draft atual.
 - `champion-tags.md` para a origem, derivação e revisão dos perfis de campeão.
 - `data-provenance.md` para origem, disponibilidade e confiança dos dados.

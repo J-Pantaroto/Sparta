@@ -11,12 +11,19 @@ Endpoints:
 - `POST /players/sync` (autenticado) — real, sincroniza partidas novas via Match-V5
 - `GET /players/:puuid/recent-matches?limit=10` — real
 - `GET /players/:puuid/champion-performance` — real
-- `POST /drafts/recommendations` — motor real (`@sparta/core`), mas cai no mock (`apps/api/src/routes/mock-data.ts`) pra qualquer campo que o cliente nao mandar
+- `GET /players/pool?role=MID` (autenticado) — materializa observações pessoais e consulta o pool explícito por posição, com contagens para todas as posições
+- `POST /players/pool` (autenticado) — adiciona `{ championId, role }` como `USER_PROVIDED`; idempotente e sem aceitar origem enviada pelo cliente
+- `PATCH /players/pool/:championId` (autenticado) — desabilita entrada manual com `{ role, enabled: false }`; não altera observações reais
+- `POST /drafts/recommendations` (autenticado) — motor real (`@sparta/core`) sobre o pool consolidado. Retorna até cinco principais, três alternativas e `poolSummary`; mantém temporariamente o alias legado `recommendations`
 - `POST /drafts/pre-game-analysis` (autenticado) — real, derivado do draft atual pelo motor puro `generatePreGameAnalysis` (`@sparta/core`). Responde `422` `PLAYER_ROLE_UNAVAILABLE` sem posição e `422` `SELECTED_CHAMPION_UNAVAILABLE` sem campeão confirmado (ou com campeão fora do catálogo). Ver `docs/pre-game-analysis.md`
 - `POST /postgame/analyze`, `GET /postgame/:matchId` — mock
 - `POST /replays/import`, `GET /replays/:jobId` — nao implementado (fora do MVP)
 
 Swagger UI fica em `/docs`.
+
+O contrato e as regras de origem do pool estão em
+`docs/player-champion-pool.md`. `PATCH` está explicitamente liberado no CORS
+para o desktop; a allowlist de origens permanece restrita.
 
 ## Erros externos
 

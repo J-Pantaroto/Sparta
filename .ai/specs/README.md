@@ -20,6 +20,7 @@ Snapshot gerado em: 2026-07-25 (atualizado em 2026-07-27).
 - `design-system.md` — design system do desktop (tokens, componentes).
 - `docker.md` — infraestrutura via Docker Compose.
 - `draft-recommendation.md` — motor de recomendação de draft.
+- `player-champion-pool.md` — pool pessoal por posição, origens, API e contrato 5+3.
 - `github.md` — configuração de repositório/CI.
 - `postgame-analysis.md` — análise pós-game.
 - `pre-game-analysis.md` — análise pré-game derivada do draft atual.

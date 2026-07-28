@@ -7,7 +7,8 @@ const {
   findPlayerInsightsByPuuidMock,
   findAllChampionTagsMock,
   findChampionNamesByIdsMock,
-  findPersonalLaneMatchupHistoryMock
+  findPersonalLaneMatchupHistoryMock,
+  findPlayerPoolMock
 } = vi.hoisted(() => ({
   getAuthenticatedUserIdMock: vi.fn(),
   riotAccountFindFirstMock: vi.fn(),
@@ -15,7 +16,8 @@ const {
   findPlayerInsightsByPuuidMock: vi.fn(),
   findAllChampionTagsMock: vi.fn(),
   findChampionNamesByIdsMock: vi.fn(),
-  findPersonalLaneMatchupHistoryMock: vi.fn()
+  findPersonalLaneMatchupHistoryMock: vi.fn(),
+  findPlayerPoolMock: vi.fn()
 }));
 
 vi.mock("../auth/routes.js", () => ({
@@ -42,6 +44,10 @@ vi.mock("../players/player-stats-repository.js", () => ({
   deriveObservedRoles: (stats: { role: string }[]) => Array.from(new Set(stats.map((entry) => entry.role)))
 }));
 
+vi.mock("../players/player-pool-repository.js", () => ({
+  findPlayerPool: findPlayerPoolMock
+}));
+
 import { buildApp } from "../../app.js";
 
 const draftPayload = {
@@ -54,6 +60,7 @@ describe("drafts routes", () => {
     findAllChampionTagsMock.mockResolvedValue([]);
     findChampionNamesByIdsMock.mockResolvedValue(new Map([[61, "Orianna"]]));
     findPersonalLaneMatchupHistoryMock.mockResolvedValue([]);
+    findPlayerPoolMock.mockResolvedValue({ entries: [], roleSummaries: [] });
   });
 
   describe("posição ausente (Etapa 6)", () => {
@@ -147,6 +154,7 @@ describe("drafts routes", () => {
   it("usa dado real (championStats/championTags/matchups) da conta Riot do usuario autenticado", async () => {
     getAuthenticatedUserIdMock.mockResolvedValue("user-1");
     riotAccountFindFirstMock.mockResolvedValue({
+      id: "account-1",
       puuid: "puuid-1",
       gameName: "Zekerus",
       tagLine: "117",
@@ -177,6 +185,19 @@ describe("drafts routes", () => {
       weaknesses: [],
       recentForm: { last10Score: 60, last20Score: 58, last50Score: 55, trend: "stable", confidence: "medium" }
     });
+    findPlayerPoolMock.mockResolvedValue({
+      entries: [
+        {
+          playerId: "puuid-1",
+          championId: 61,
+          championName: "Orianna",
+          role: "MID",
+          source: "PERSONAL_OBSERVED",
+          enabled: true
+        }
+      ],
+      roleSummaries: []
+    });
 
     const app = await buildApp();
     const response = await app.inject({ method: "POST", url: "/drafts/recommendations", payload: draftPayload });
@@ -184,8 +205,12 @@ describe("drafts routes", () => {
 
     expect(response.statusCode).toBe(200);
     expect(findPersonalLaneMatchupHistoryMock).toHaveBeenCalledWith("puuid-1", "MID");
+    expect(findPlayerPoolMock).toHaveBeenCalledWith("account-1", "puuid-1", "MID");
     expect(body.recommendations.length).toBeGreaterThan(0);
     expect(body.recommendations[0].championName).toBe("Orianna");
+    expect(body.primaryRecommendations).toEqual(body.recommendations);
+    expect(body.alternatives).toEqual([]);
+    expect(body.poolSummary.primaryCount).toBe(1);
     await app.close();
   });
 

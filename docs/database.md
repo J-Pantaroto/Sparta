@@ -13,6 +13,7 @@ Tabelas principais:
 - `champions`
 - `champion_tags`
 - `player_champion_stats`
+- `player_champion_pool_entries`
 - `draft_sessions`
 - `pick_recommendations`
 - `postgame_reports`
@@ -26,5 +27,14 @@ Tabelas principais:
 - `championId`;
 - unicidade de partidas por `matchId`;
 - unicidade de estatística por jogador, campeão e role.
+- unicidade de entrada do pool por conta Riot, campeão e posição;
+- consulta do pool por conta Riot, posição e estado `enabled`.
 
 O snapshot da recomendação fica em `pick_recommendations.snapshotJson` para comparação pós-game.
+
+`PlayerChampionPoolEntry` persiste somente a seleção de candidatos por
+posição: `source` (`PERSONAL_OBSERVED` ou `USER_PROVIDED`), `enabled` e
+timestamps auditáveis. A origem observada é derivada das `MatchObservation`
+normalizadas; desabilitar uma entrada manual não remove partidas,
+participantes ou observações. Draft e ranking não são persistidos pela Etapa
+12. Ver `docs/player-champion-pool.md`.

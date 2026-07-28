@@ -29,6 +29,7 @@ model RiotAccount {
   user            User?    @relation(fields: [userId], references: [id])
   profile         PlayerProfile?
   matches         MatchParticipant[]
+  championPool    PlayerChampionPoolEntry[]
 
   @@index([puuid])
 }
@@ -56,6 +57,24 @@ model Champion {
   tags        ChampionTag?
   participants MatchParticipant[]
   playerStats PlayerChampionStats[]
+  poolEntries PlayerChampionPoolEntry[]
+}
+
+model PlayerChampionPoolEntry {
+  id            String   @id @default(uuid())
+  riotAccountId String
+  championId    Int
+  role          String
+  source        String
+  enabled       Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  riotAccount   RiotAccount @relation(fields: [riotAccountId], references: [id], onDelete: Cascade)
+  champion      Champion @relation(fields: [championId], references: [id])
+
+  @@unique([riotAccountId, championId, role])
+  @@index([riotAccountId, role, enabled])
+  @@index([championId])
 }
 
 model ChampionTag {

@@ -8,10 +8,13 @@ import {
 import type {
   ChampionPerformanceScore,
   DraftState,
+  DraftRecommendationResponse,
   GlobalChampionRoleEligibility,
   GrowthJourney,
   MatchLoadoutObservation,
   PickRecommendation,
+  PlayerChampionPoolEntry,
+  PlayerChampionPoolRoleSummary,
   PlayerChampionRoleEvidence,
   PlayerChampionStats,
   PlayerStrength,
@@ -243,19 +246,77 @@ export async function fetchDraftRecommendations(token: string, draft: DraftState
     throw new PlayerRoleUnavailableError();
   }
 
-  const result = await request<{ recommendations: PickRecommendation[] }>("/drafts/recommendations", {
+  const result = await request<
+    Partial<DraftRecommendationResponse> & { recommendations?: PickRecommendation[] }
+  >("/drafts/recommendations", {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify({ draft })
   });
 
-  return {
-    ...result,
-    recommendations: (result.recommendations ?? []).map((recommendation) => ({
+  const normalize = (recommendations: PickRecommendation[]) =>
+    recommendations.map((recommendation) => ({
       ...recommendation,
       metricDetails: ensureRecommendationMetrics(recommendation)
-    }))
-  };
+    }));
+  if (Array.isArray(result.primaryRecommendations)) {
+    return {
+      primaryRecommendations: normalize(result.primaryRecommendations),
+      alternatives: normalize(result.alternatives ?? []),
+      poolSummary: result.poolSummary ?? {
+        totalCandidates: result.primaryRecommendations.length,
+        evaluatedCandidates: result.primaryRecommendations.length,
+        primaryCount: result.primaryRecommendations.length,
+        alternativeCount: 0,
+        status: result.primaryRecommendations.length > 0 ? "PARTIAL" : "UNAVAILABLE"
+      }
+    } as DraftRecommendationResponse;
+  }
+
+  const legacy = normalize(result.recommendations ?? []);
+  return {
+    primaryRecommendations: legacy,
+    alternatives: [],
+    poolSummary: {
+      totalCandidates: legacy.length,
+      evaluatedCandidates: legacy.length,
+      primaryCount: legacy.length,
+      alternativeCount: 0,
+      status: legacy.length >= 5 ? "AVAILABLE" : legacy.length > 0 ? "PARTIAL" : "UNAVAILABLE",
+      ...(legacy.length < 5
+        ? { shortageReason: "A resposta anterior da API não informa a cobertura completa do pool." }
+        : {})
+    }
+  } as unknown as DraftRecommendationResponse;
+}
+
+export function fetchPlayerPool(token: string, role?: Role) {
+  const query = role ? `?role=${role}` : "";
+  return request<{
+    entries: PlayerChampionPoolEntry[];
+    roleSummaries: PlayerChampionPoolRoleSummary[];
+  }>(`/players/pool${query}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
+export function addPlayerPoolEntry(token: string, championId: number, role: Role) {
+  return request<{ entry: PlayerChampionPoolEntry }>("/players/pool", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ championId, role })
+  });
+}
+
+export function disablePlayerPoolEntry(token: string, championId: number, role: Role) {
+  return request<{ entry: PlayerChampionPoolEntry }>(
+    `/players/pool/${championId}`,
+    {
+      method: "PATCH",
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ role, enabled: false })
+    }
+  );
 }
 
 /**

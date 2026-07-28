@@ -1,4 +1,10 @@
-import type { CacheMetadata, DraftPick, DraftState, PickRecommendation, Role } from "@sparta/core";
+import type {
+  CacheMetadata,
+  DraftPick,
+  DraftRecommendationResponse,
+  DraftState,
+  Role
+} from "@sparta/core";
 import type { LcuDraftMember, LcuDraftSnapshot } from "@sparta/riot";
 import { useEffect, useMemo, useState } from "react";
 import { navGroups, type Page } from "./app/navigation";
@@ -68,18 +74,19 @@ function SpartaApp() {
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
   const [riotAccounts, setRiotAccounts] = useState<RiotAccountSummary[]>([]);
+  const [poolRevision, setPoolRevision] = useState(0);
 
   // Proteção centralizada: sem posição, a requisição nem sai. A API também
   // recusa (`PLAYER_ROLE_UNAVAILABLE`), mas barrar aqui evita depender de a
   // API estar na mesma versão do desktop. `useAsyncData` já descarta o
   // resultado de uma execução anterior quando as dependências mudam, então
   // trocar de posição não deixa a resposta antiga sobrescrever a nova.
-  const recommendationsQuery = useAsyncData<PickRecommendation[]>(
+  const recommendationsQuery = useAsyncData<DraftRecommendationResponse>(
     () =>
       sessionToken && draft.playerRole
-        ? fetchDraftRecommendations(sessionToken, draft).then((result) => result.recommendations)
+        ? fetchDraftRecommendations(sessionToken, draft)
         : undefined,
-    [sessionToken, draft]
+    [sessionToken, draft, poolRevision]
   );
 
   function loadDataDragonVersion() {
@@ -409,11 +416,15 @@ function SpartaApp() {
           autoPickOrder={autoPickOrder}
           autoPlayerRole={autoPlayerRole}
           champSelectActive={champSelectActive}
-          recommendations={recommendationsQuery.data ?? []}
+          recommendations={recommendationsQuery.data?.primaryRecommendations ?? []}
+          alternatives={recommendationsQuery.data?.alternatives ?? []}
+          poolSummary={recommendationsQuery.data?.poolSummary ?? null}
           recommendationsStatus={recommendationsQuery.status}
           noAccountLinked={riotAccounts.length === 0}
           ddragonVersion={ddragonVersion}
           riotAccounts={riotAccounts}
+          sessionToken={sessionToken}
+          onPoolChanged={() => setPoolRevision((current) => current + 1)}
           draftAutoFilled={autoDraft !== null}
         />
       )}
