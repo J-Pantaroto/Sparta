@@ -22,6 +22,21 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-07-27 23:38 — Pool pessoal por posição e recomendações 5+3
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0012-pool-pessoal-cinco-recomendacoes.md`
+
+O Champion Select agora consolida somente experiência Match-V5 normalizada e
+inclusões explícitas do usuário em um pool auditável por posição. O motor
+retorna até cinco principais e três alternativas reais, com origem, amostra,
+cobertura e indisponibilidades independentes; pool curto não é completado e
+candidato sem histórico não recebe zero ou 50 artificial. API e desktop
+gerenciam entradas manuais sem apagar observações e mantêm compatibilidade com
+o contrato anterior. 22 testes novos (527 no total), typecheck, lint e build
+aprovados. No Postgres real, 11 entradas observadas foram materializadas de
+forma idempotente; Jungle produziu 5 principais + 1 alternativa única.
+Detalhes em `docs/player-champion-pool.md`.
+
 ## 2026-07-27 21:47 — Evidência pessoal separada de elegibilidade global
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0011-evidencia-pessoal-elegibilidade-global-posicao.md`
