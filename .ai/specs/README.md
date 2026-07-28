@@ -29,6 +29,7 @@ Snapshot gerado em: 2026-07-25 (atualizado em 2026-07-27).
 - `pre-game-analysis.md` — análise pré-game derivada do draft atual.
 - `champion-tags.md` — origem, derivação e revisão das `ChampionTag`.
 - `draft-persistence.md` — sessões de draft e snapshots imutáveis de recomendação.
+- `personal-loadout-evidence.md` — inventários finais, runas e feitiços pessoais agregados por posição.
 - `replay-analysis.md` — análise de replay (experimental).
 - `riot-compliance.md` — limites de produto e compliance com a Riot.
 - `scoring-model.md` — modelo de scoring de desempenho.

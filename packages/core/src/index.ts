@@ -23,6 +23,7 @@ export * from "./types/provenance.js";
 export * from "./types/cache.js";
 export * from "./types/stat-coverage.js";
 export * from "./aggregation/objective-participation.js";
+export * from "./aggregation/personal-loadout-evidence.js";
 export * from "./draft/pre-game-analysis.js";
 export * from "./scoring/weight-normalization.js";
 export * from "./types/recommendation-metric.js";

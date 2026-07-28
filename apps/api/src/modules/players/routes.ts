@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import {
+  aggregatePersonalLoadoutEvidence,
   computeGrowthJourney,
   rankChampionPool,
   unavailableGlobalChampionRoleEligibility,
@@ -30,6 +31,7 @@ import {
   disableUserProvidedPoolEntry,
   findPlayerPool
 } from "./player-pool-repository.js";
+import { findPersonalLoadoutObservations } from "./personal-loadout-repository.js";
 
 export const linkRiotAccountSchema = z.object({
   gameName: z.string().min(3, "Informe o nome do invocador"),
@@ -42,7 +44,12 @@ const roleSchema = z.enum(["TOP", "JUNGLE", "MID", "ADC", "SUPPORT"]);
 const commaSeparatedStrings = z
   .string()
   .optional()
-  .transform((value) => value?.split(",").map((item) => item.trim()).filter(Boolean));
+  .transform((value) =>
+    value
+      ?.split(",")
+      .map((item) => item.trim())
+      .filter(Boolean)
+  );
 const commaSeparatedNumbers = z
   .string()
   .optional()
@@ -125,6 +132,66 @@ export const playersRoutes: FastifyPluginAsync = async (app) => {
     };
   });
 
+  app.get(
+    "/players/:playerId/champions/:championId/roles/:role/loadout-evidence",
+    async (request, reply) => {
+      const userId = await getAuthenticatedUserId(request);
+      if (!userId) {
+        reply.code(401);
+        return { code: "UNAUTHENTICATED", message: "Não autenticado." };
+      }
+      const params = z
+        .object({
+          playerId: z.string().min(1),
+          championId: z.coerce.number().int().positive(),
+          role: roleSchema
+        })
+        .parse(request.params);
+      const query = z
+        .object({
+          patch: z.string().min(1).max(40).optional(),
+          queueId: commaSeparatedNumbers,
+          from: z.string().datetime().optional(),
+          to: z.string().datetime().optional(),
+          recentMatches: z.coerce.number().int().min(1).max(200).optional()
+        })
+        .refine((value) => !value.from || !value.to || value.from <= value.to, {
+          message: "from deve ser anterior ou igual a to."
+        })
+        .parse(request.query);
+      const riotAccount = await prisma.riotAccount.findFirst({ where: { userId } });
+      if (!riotAccount) {
+        reply.code(404);
+        return {
+          code: "RIOT_ACCOUNT_NOT_LINKED",
+          message: "Nenhuma conta Riot vinculada."
+        };
+      }
+      if (params.playerId !== riotAccount.puuid) {
+        reply.code(403);
+        return {
+          code: "PLAYER_HISTORY_FORBIDDEN",
+          message: "O histórico pessoal de outra conta não pode ser consultado."
+        };
+      }
+
+      const observations = await findPersonalLoadoutObservations(
+        riotAccount.puuid,
+        params.championId,
+        params.role
+      );
+      return aggregatePersonalLoadoutEvidence(observations, {
+        championId: params.championId,
+        role: params.role,
+        requestedPatch: query.patch,
+        queueIds: query.queueId,
+        playedAtFrom: query.from,
+        playedAtTo: query.to,
+        recentMatches: query.recentMatches
+      });
+    }
+  );
+
   app.get("/players/pool", async (request, reply) => {
     const userId = await getAuthenticatedUserId(request);
     if (!userId) {
@@ -175,7 +242,9 @@ export const playersRoutes: FastifyPluginAsync = async (app) => {
       reply.code(401);
       return { error: "Nao autenticado." };
     }
-    const params = z.object({ championId: z.coerce.number().int().positive() }).parse(request.params);
+    const params = z
+      .object({ championId: z.coerce.number().int().positive() })
+      .parse(request.params);
     const payload = z
       .object({ role: roleSchema, enabled: z.literal(false) })
       .strict()
@@ -260,7 +329,9 @@ export const playersRoutes: FastifyPluginAsync = async (app) => {
 
   app.get("/players/:puuid/recent-matches", async (request) => {
     const params = z.object({ puuid: z.string() }).parse(request.params);
-    const query = z.object({ limit: z.coerce.number().min(1).max(50).default(10) }).parse(request.query);
+    const query = z
+      .object({ limit: z.coerce.number().min(1).max(50).default(10) })
+      .parse(request.query);
 
     const history = await findParticipationHistory(params.puuid);
     const matches: RecentChampionMatch[] = history.slice(0, query.limit).map((entry) => ({
@@ -344,7 +415,13 @@ export const playersRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const payload = z
-      .object({ matchAnalysisLimit: z.number().int().min(MIN_MATCH_ANALYSIS_LIMIT).max(MAX_MATCH_ANALYSIS_LIMIT) })
+      .object({
+        matchAnalysisLimit: z
+          .number()
+          .int()
+          .min(MIN_MATCH_ANALYSIS_LIMIT)
+          .max(MAX_MATCH_ANALYSIS_LIMIT)
+      })
       .parse(request.body);
 
     await setMatchAnalysisLimit(riotAccount.id, payload.matchAnalysisLimit);

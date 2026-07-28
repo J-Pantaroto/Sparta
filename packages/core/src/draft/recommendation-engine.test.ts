@@ -7,9 +7,16 @@ import {
   recommendPicks,
   selectWeights
 } from "./recommendation-engine.js";
-import type { ChampionTag, DraftState, PlayerChampionStats, PlayerProfile } from "../types/domain.js";
+import type {
+  ChampionTag,
+  DraftState,
+  PlayerChampionStats,
+  PlayerProfile
+} from "../types/domain.js";
 import type { PlayerChampionPoolCandidate } from "../types/player-champion-pool.js";
 import { createChampionDifficultyEvidence } from "./execution-risk.js";
+import { aggregatePersonalLoadoutEvidence } from "../aggregation/personal-loadout-evidence.js";
+import type { MatchLoadoutObservation } from "../types/match-observation.js";
 
 const championStats: PlayerChampionStats[] = [
   {
@@ -27,7 +34,10 @@ const championStats: PlayerChampionStats[] = [
     visionScorePerMinute: 0.9,
     killParticipation: 0.62,
     objectiveParticipation: 0.4,
-    coverage: { killParticipation: availableCoverage(10), objectiveParticipation: availableCoverage(10) },
+    coverage: {
+      killParticipation: availableCoverage(10),
+      objectiveParticipation: availableCoverage(10)
+    },
     recentMatches: []
   }
 ];
@@ -64,7 +74,13 @@ const player: PlayerProfile = {
   championStats,
   strengths: [],
   weaknesses: [],
-  recentForm: { last10Score: 65, last20Score: 62, last50Score: 60, trend: "stable", confidence: "medium" }
+  recentForm: {
+    last10Score: 65,
+    last20Score: 62,
+    last50Score: 60,
+    trend: "stable",
+    confidence: "medium"
+  }
 };
 
 describe("recommendation engine", () => {
@@ -119,6 +135,87 @@ describe("recommendation engine", () => {
     expect(withoutGlobalRole).toEqual(withLegacyRole);
   });
 
+  it("agregar loadout pessoal não altera score, ordem, cobertura ou input do ranking", () => {
+    const input = {
+      draft: {
+        playerRole: "MID" as const,
+        pickOrder: 1,
+        allies: [],
+        enemies: [],
+        bannedChampionIds: []
+      },
+      player,
+      championStats,
+      championTags: tags,
+      matchups: [],
+      compositionRules: {
+        minimumFrontline: 35,
+        minimumEngage: 35,
+        minimumWaveclear: 35,
+        preferDamageBalance: true
+      },
+      patchMeta: null
+    };
+    const before = recommendPicks(input);
+    const loadout: MatchLoadoutObservation = {
+      extractorVersion: "match-observation/1.0.0",
+      matchId: "BR1_loadout",
+      championId: 61,
+      context: {
+        patch: "16.14",
+        queueId: 420,
+        platform: "BR1",
+        startedAt: "2026-07-20T12:00:00.000Z",
+        won: true
+      },
+      items: [],
+      runes: {
+        status: "UNAVAILABLE",
+        selections: [],
+        fragments: [],
+        provenance: {
+          sourceType: "OBSERVED",
+          sourceId: "riot-match-v5",
+          status: "UNAVAILABLE"
+        }
+      },
+      summonerSpells: [],
+      position: {
+        normalizedRole: "MID",
+        diverged: false,
+        status: "AVAILABLE",
+        observedProvenance: {
+          sourceType: "OBSERVED",
+          sourceId: "riot-match-v5",
+          status: "AVAILABLE"
+        },
+        normalizedProvenance: {
+          sourceType: "CALCULATED",
+          sourceId: "sparta",
+          status: "AVAILABLE"
+        }
+      }
+    };
+
+    aggregatePersonalLoadoutEvidence([loadout], { championId: 61, role: "MID" });
+    const after = recommendPicks(input);
+
+    expect(after).toEqual(before);
+    expect(
+      after.map(({ championId, totalScore, dataCoverage }) => ({
+        championId,
+        totalScore,
+        dataCoverage
+      }))
+    ).toEqual(
+      before.map(({ championId, totalScore, dataCoverage }) => ({
+        championId,
+        totalScore,
+        dataCoverage
+      }))
+    );
+  });
+
   it("detects composition risks", () => {
     // Precisa de pelo menos um aliado: risco de composicao e afirmacao
     // sobre o TIME, e sem ninguem escolhido a analise descreveria so o
@@ -138,7 +235,13 @@ describe("recommendation engine", () => {
   });
 
   it("has each selectWeights scenario table summing to 1.0 (invariante estrutural)", () => {
-    const baseDraft: DraftState = { playerRole: "MID", pickOrder: 1, allies: [], enemies: [], bannedChampionIds: [] };
+    const baseDraft: DraftState = {
+      playerRole: "MID",
+      pickOrder: 1,
+      allies: [],
+      enemies: [],
+      bannedChampionIds: []
+    };
 
     const scenarios: DraftState[] = [
       { ...baseDraft, pickOrder: 1 },
@@ -173,7 +276,10 @@ describe("recommendation engine", () => {
     });
 
     expect(dataCoverage).toBeCloseTo(0.7, 5);
-    expect(Object.values(normalizedWeights).reduce((sum, weight) => sum + weight, 0)).toBeCloseTo(1, 5);
+    expect(Object.values(normalizedWeights).reduce((sum, weight) => sum + weight, 0)).toBeCloseTo(
+      1,
+      5
+    );
     expect(normalizedWeights.matchup).toBe(0);
     expect(normalizedWeights.meta).toBe(0);
     expect(normalizedWeights.blindSafety).toBe(0); // tinha peso zero no cenário original
@@ -196,7 +302,14 @@ describe("recommendation engine", () => {
       ],
       championTags: tags,
       matchups: [
-        { championId: 61, enemyChampionId: 157, role: "MID", score: 50, sampleSize: 8, confidence: "medium" }
+        {
+          championId: 61,
+          enemyChampionId: 157,
+          role: "MID",
+          score: 50,
+          sampleSize: 8,
+          confidence: "medium"
+        }
       ],
       compositionRules: {
         minimumFrontline: 35,
@@ -208,12 +321,16 @@ describe("recommendation engine", () => {
     });
 
     const withMatchup = recommendations.find((recommendation) => recommendation.championId === 61)!;
-    const withoutMatchup = recommendations.find((recommendation) => recommendation.championId === 99)!;
+    const withoutMatchup = recommendations.find(
+      (recommendation) => recommendation.championId === 99
+    )!;
     expect(withMatchup.dataCoverage).toBeCloseTo(0.95, 5);
     expect(withoutMatchup.dataCoverage).toBeCloseTo(0.7, 5);
     expect(withMatchup.totalScore).toBeGreaterThanOrEqual(0);
     expect(withMatchup.totalScore).toBeLessThanOrEqual(100);
-    expect(withMatchup.metricDetails.find((metric) => metric.key === "PERSONAL_MATCHUP")?.value).toBe(50);
+    expect(
+      withMatchup.metricDetails.find((metric) => metric.key === "PERSONAL_MATCHUP")?.value
+    ).toBe(50);
   });
 });
 
@@ -258,7 +375,10 @@ describe("guardas de time vazio", () => {
     visionScorePerMinute: 0.8,
     killParticipation: 0.55,
     objectiveParticipation: 0.4,
-    coverage: { killParticipation: availableCoverage(10), objectiveParticipation: availableCoverage(10) },
+    coverage: {
+      killParticipation: availableCoverage(10),
+      objectiveParticipation: availableCoverage(10)
+    },
     recentMatches: []
   };
 
@@ -303,12 +423,24 @@ describe("guardas de time vazio", () => {
 describe("motor de recomendacao - proveniencia nao muda resultado (Etapa 8)", () => {
   const profile: PlayerProfile = {
     id: "player-1",
-    account: { puuid: "p", gameName: "Zekerus", tagLine: "117", platformRegion: "br1", regionalRouting: "americas" },
+    account: {
+      puuid: "p",
+      gameName: "Zekerus",
+      tagLine: "117",
+      platformRegion: "br1",
+      regionalRouting: "americas"
+    },
     preferredRoles: ["MID"],
     championStats,
     strengths: [],
     weaknesses: [],
-    recentForm: { last10Score: 60, last20Score: 58, last50Score: 55, trend: "stable", confidence: "medium" }
+    recentForm: {
+      last10Score: 60,
+      last20Score: 58,
+      last50Score: 55,
+      trend: "stable",
+      confidence: "medium"
+    }
   };
 
   const draft: DraftState = {
@@ -363,7 +495,10 @@ describe("motor de recomendacao - proveniencia nao muda resultado (Etapa 8)", ()
   it("estado de revisao nao entra em nenhuma metrica", () => {
     const revisado = recommend(tags.map((tag) => ({ ...tag, provenance })));
     const naoRevisado = recommend(
-      tags.map((tag) => ({ ...tag, provenance: { ...provenance, reviewState: "UNREVIEWED" as const, reviewedDimensions: [] } }))
+      tags.map((tag) => ({
+        ...tag,
+        provenance: { ...provenance, reviewState: "UNREVIEWED" as const, reviewedDimensions: [] }
+      }))
     );
 
     expect(revisado[0].metrics).toEqual(naoRevisado[0].metrics);
@@ -436,10 +571,9 @@ describe("pool pessoal e cinco recomendacoes (Etapa 12)", () => {
 
   it("separa exatamente cinco principais e ate tres alternativas, sem duplicatas", () => {
     const result = recommend(candidates(8));
-    const ids = [
-      ...result.primaryRecommendations,
-      ...result.alternatives
-    ].map((recommendation) => recommendation.championId);
+    const ids = [...result.primaryRecommendations, ...result.alternatives].map(
+      (recommendation) => recommendation.championId
+    );
 
     expect(result.primaryRecommendations).toHaveLength(5);
     expect(result.alternatives).toHaveLength(3);
@@ -472,14 +606,15 @@ describe("pool pessoal e cinco recomendacoes (Etapa 12)", () => {
     expect(recommendation.metrics.recentForm).toBeNull();
     expect(recommendation.metrics.matchup).toBeNull();
     expect(recommendation.dataCoverage).toBeLessThan(1);
-    expect(recommendation.metricDetails.filter((metric) => metric.status === "UNAVAILABLE"))
-      .toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ key: "PERSONAL_PERFORMANCE" }),
-          expect.objectContaining({ key: "RECENT_FORM" }),
-          expect.objectContaining({ key: "PERSONAL_MATCHUP" })
-        ])
-      );
+    expect(
+      recommendation.metricDetails.filter((metric) => metric.status === "UNAVAILABLE")
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: "PERSONAL_PERFORMANCE" }),
+        expect.objectContaining({ key: "RECENT_FORM" }),
+        expect.objectContaining({ key: "PERSONAL_MATCHUP" })
+      ])
+    );
     expect(recommendation.totalScore).toBeGreaterThanOrEqual(0);
   });
 
@@ -507,8 +642,7 @@ describe("pool pessoal e cinco recomendacoes (Etapa 12)", () => {
     });
     expect(recommendation.totalScore).toBe(0);
     expect(recommendation.dataCoverage).toBe(0);
-    expect(recommendation.metricDetails.every((metric) => metric.value === null))
-      .toBe(true);
+    expect(recommendation.metricDetails.every((metric) => metric.value === null)).toBe(true);
   });
 
   it("nao promove uma unica partida observada a desempenho pessoal elegivel", () => {
@@ -559,14 +693,10 @@ describe("pool pessoal e cinco recomendacoes (Etapa 12)", () => {
     expect(manual.metrics.personalPerformance).toBeNull();
     expect(observed.dataCoverage).toBeGreaterThan(manual.dataCoverage);
     expect(
-      observed.metricDetails.find(
-        (metric) => metric.key === "PERSONAL_PERFORMANCE"
-      )?.status
+      observed.metricDetails.find((metric) => metric.key === "PERSONAL_PERFORMANCE")?.status
     ).toBe("AVAILABLE");
     expect(
-      manual.metricDetails.find(
-        (metric) => metric.key === "PERSONAL_PERFORMANCE"
-      )?.status
+      manual.metricDetails.find((metric) => metric.key === "PERSONAL_PERFORMANCE")?.status
     ).toBe("UNAVAILABLE");
   });
 
@@ -686,10 +816,7 @@ describe("dificuldade e risco pessoal no ranking (Etapa 13)", () => {
     }
   ];
 
-  function recommend(
-    candidates = pool,
-    stats: PlayerChampionStats[] = []
-  ) {
+  function recommend(candidates = pool, stats: PlayerChampionStats[] = []) {
     return recommendFromPersonalPool({
       draft,
       candidates,
@@ -704,35 +831,23 @@ describe("dificuldade e risco pessoal no ranking (Etapa 13)", () => {
 
   it("opções estrategicamente iguais são diferenciadas pelo risco limitado", () => {
     const result = recommend();
-    const simple = result.primaryRecommendations.find(
-      (entry) => entry.championId === 201
-    )!;
-    const difficult = result.primaryRecommendations.find(
-      (entry) => entry.championId === 200
-    )!;
+    const simple = result.primaryRecommendations.find((entry) => entry.championId === 201)!;
+    const difficult = result.primaryRecommendations.find((entry) => entry.championId === 200)!;
 
     expect(simple.totalScore).toBeGreaterThan(difficult.totalScore);
-    expect(
-      simple.metricDetails.find(
-        (metric) => metric.key === "CHAMPION_DIFFICULTY"
-      )?.value
-    ).toBe(20);
-    expect(
-      difficult.metricDetails.find(
-        (metric) => metric.key === "EXECUTION_RISK"
-      )?.value
-    ).toBe(100);
+    expect(simple.metricDetails.find((metric) => metric.key === "CHAMPION_DIFFICULTY")?.value).toBe(
+      20
+    );
+    expect(difficult.metricDetails.find((metric) => metric.key === "EXECUTION_RISK")?.value).toBe(
+      100
+    );
     expect(difficult.warnings).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ code: "execution_risk" })
-      ])
+      expect.arrayContaining([expect.objectContaining({ code: "execution_risk" })])
     );
   });
 
   it("experiência reduz o risco sem alterar a dificuldade oficial", () => {
-    const noHistory = recommend().primaryRecommendations.find(
-      (entry) => entry.championId === 200
-    )!;
+    const noHistory = recommend().primaryRecommendations.find((entry) => entry.championId === 200)!;
     const experiencedStats: PlayerChampionStats = {
       ...championStats[0],
       championId: 200,
@@ -757,8 +872,9 @@ describe("dificuldade e risco pessoal no ranking (Etapa 13)", () => {
         }
       ]
     };
-    const experienced = recommend(pool, [experiencedStats])
-      .primaryRecommendations.find((entry) => entry.championId === 200)!;
+    const experienced = recommend(pool, [experiencedStats]).primaryRecommendations.find(
+      (entry) => entry.championId === 200
+    )!;
 
     const metric = (
       recommendation: typeof experienced,
@@ -777,10 +893,7 @@ describe("dificuldade e risco pessoal no ranking (Etapa 13)", () => {
     const reverse = recommend([...pool].reverse());
     const scoreById = (result: ReturnType<typeof recommend>) =>
       Object.fromEntries(
-        result.primaryRecommendations.map((entry) => [
-          entry.championId,
-          entry.totalScore
-        ])
+        result.primaryRecommendations.map((entry) => [entry.championId, entry.totalScore])
       );
 
     expect(scoreById(reverse)).toEqual(scoreById(forward));
@@ -809,10 +922,7 @@ describe("dificuldade e risco pessoal no ranking (Etapa 13)", () => {
       patchMeta: null
     });
 
-    for (const recommendation of [
-      ...result.primaryRecommendations,
-      ...result.alternatives
-    ]) {
+    for (const recommendation of [...result.primaryRecommendations, ...result.alternatives]) {
       expect(recommendation.metricDetails).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ key: "CHAMPION_DIFFICULTY", value: 50 }),

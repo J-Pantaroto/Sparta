@@ -1,4 +1,9 @@
-import { ensureRecommendationMetrics, unavailableCoverage, unknownCoverage } from "@sparta/core";
+import {
+  ensureRecommendationMetrics,
+  unavailableCoverage,
+  unavailablePersonalLoadoutEvidence,
+  unknownCoverage
+} from "@sparta/core";
 import {
   ExternalServiceError,
   HTTP_TIMEOUTS,
@@ -12,6 +17,7 @@ import type {
   GlobalChampionRoleEligibility,
   GrowthJourney,
   MatchLoadoutObservation,
+  PersonalLoadoutEvidence,
   PickRecommendation,
   PlayerChampionPoolEntry,
   PlayerChampionPoolRoleSummary,
@@ -117,7 +123,10 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
           ? String((body as { message: unknown }).message)
           : "Falha na requisicao.";
     const code =
-      body && typeof body === "object" && "code" in body && typeof (body as { code?: unknown }).code === "string"
+      body &&
+      typeof body === "object" &&
+      "code" in body &&
+      typeof (body as { code?: unknown }).code === "string"
         ? (body as { code: string }).code
         : undefined;
     throw new ApiError(message, response.status, body, code);
@@ -157,7 +166,6 @@ export function linkRiotAccount(
   });
 }
 
-
 /**
  * Normaliza estatisticas de campeao vindas de uma API anterior a Etapa 4.
  *
@@ -178,7 +186,9 @@ export function ensureChampionStatsCoverage(stats: PlayerChampionStats): PlayerC
   if (stats.coverage) return stats;
 
   const objectiveUnavailable =
-    stats.objectiveParticipation === 0 || stats.objectiveParticipation === null || stats.objectiveParticipation === undefined;
+    stats.objectiveParticipation === 0 ||
+    stats.objectiveParticipation === null ||
+    stats.objectiveParticipation === undefined;
 
   return {
     ...stats,
@@ -201,7 +211,10 @@ export async function fetchPlayerProfile(gameName: string, tagLine: string) {
   const profile = await request<PlayerProfileResponse>(
     `/players/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}/profile`
   );
-  return { ...profile, championStats: (profile.championStats ?? []).map(ensureChampionStatsCoverage) };
+  return {
+    ...profile,
+    championStats: (profile.championStats ?? []).map(ensureChampionStatsCoverage)
+  };
 }
 
 export function fetchChampionPerformance(puuid: string) {
@@ -217,7 +230,9 @@ export function fetchRecentMatches(puuid: string, limit = 10) {
 }
 
 export function fetchGrowthJourney(puuid: string) {
-  return request<{ puuid: string } & GrowthJourney>(`/players/${encodeURIComponent(puuid)}/growth-journey`);
+  return request<{ puuid: string } & GrowthJourney>(
+    `/players/${encodeURIComponent(puuid)}/growth-journey`
+  );
 }
 
 /**
@@ -339,14 +354,11 @@ export function addPlayerPoolEntry(token: string, championId: number, role: Role
 }
 
 export function disablePlayerPoolEntry(token: string, championId: number, role: Role) {
-  return request<{ entry: PlayerChampionPoolEntry }>(
-    `/players/pool/${championId}`,
-    {
-      method: "PATCH",
-      headers: { Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ role, enabled: false })
-    }
-  );
+  return request<{ entry: PlayerChampionPoolEntry }>(`/players/pool/${championId}`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ role, enabled: false })
+  });
 }
 
 /**
@@ -396,7 +408,9 @@ export async function fetchPreGameAnalysis(token: string, draft: DraftState) {
       const code = (error.payload as { code?: string } | undefined)?.code;
       if (code === "PLAYER_ROLE_UNAVAILABLE") throw new PlayerRoleUnavailableError();
       if (code === "SELECTED_CHAMPION_UNAVAILABLE") {
-        throw new SelectedChampionUnavailableError((error.payload as { message?: string } | undefined)?.message);
+        throw new SelectedChampionUnavailableError(
+          (error.payload as { message?: string } | undefined)?.message
+        );
       }
     }
     throw error;
@@ -426,14 +440,58 @@ export function fetchMatchObservation(token: string, matchId: string) {
   });
 }
 
-export function fetchChampionRoleEvidence(
-  puuid: string,
-  championId: number,
-  role: Role
-) {
+export function fetchChampionRoleEvidence(puuid: string, championId: number, role: Role) {
   return request<ChampionRoleEvidenceResponse>(
     `/players/${encodeURIComponent(puuid)}/champions/${championId}/role-evidence?role=${role}`
   );
+}
+
+export async function fetchPersonalLoadoutEvidence(
+  token: string,
+  playerId: string,
+  championId: number,
+  role: Role,
+  filters: {
+    patch?: string;
+    queueIds?: number[];
+    playedAtFrom?: string;
+    playedAtTo?: string;
+    recentMatches?: number;
+  } = {}
+) {
+  const query: string[] = [];
+  if (filters.patch) query.push(`patch=${encodeURIComponent(filters.patch)}`);
+  if (filters.queueIds?.length) query.push(`queueId=${filters.queueIds.join(",")}`);
+  if (filters.playedAtFrom) query.push(`from=${encodeURIComponent(filters.playedAtFrom)}`);
+  if (filters.playedAtTo) query.push(`to=${encodeURIComponent(filters.playedAtTo)}`);
+  if (filters.recentMatches !== undefined) {
+    query.push(`recentMatches=${filters.recentMatches}`);
+  }
+  const suffix = query.length > 0 ? `?${query.join("&")}` : "";
+  try {
+    const result = await request<PersonalLoadoutEvidence>(
+      `/players/${encodeURIComponent(playerId)}/champions/${championId}` +
+        `/roles/${role}/loadout-evidence${suffix}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (!result || result.algorithmVersion === undefined || result.parts === undefined) {
+      return unavailablePersonalLoadoutEvidence(
+        championId,
+        role,
+        "A resposta da API não traz a análise pessoal agregada."
+      );
+    }
+    return result;
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404 && error.code === undefined) {
+      return unavailablePersonalLoadoutEvidence(
+        championId,
+        role,
+        "Histórico pessoal indisponível nesta versão da API."
+      );
+    }
+    throw error;
+  }
 }
 
 export function fetchSettings(token: string) {
@@ -520,12 +578,12 @@ export function fetchDraftSessionDetail(token: string, sessionId: string) {
 
 /** Registra o campeão confirmado na sessão. Não emite julgamento nenhum. */
 export function lockInDraftSession(token: string, sessionId: string, championId: number) {
-  return request<{ session: DraftSessionSummary; selectedChampion: DraftSessionDetail["selectedChampion"] }>(
-    `/drafts/sessions/${encodeURIComponent(sessionId)}/lock-in`,
-    {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ championId })
-    }
-  );
+  return request<{
+    session: DraftSessionSummary;
+    selectedChampion: DraftSessionDetail["selectedChampion"];
+  }>(`/drafts/sessions/${encodeURIComponent(sessionId)}/lock-in`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ championId })
+  });
 }

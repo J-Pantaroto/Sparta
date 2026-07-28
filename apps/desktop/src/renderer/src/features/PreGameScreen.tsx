@@ -35,6 +35,7 @@ import {
   SignalChipList
 } from "../ui";
 import { BuildPanel } from "./BuildPanel";
+import { PersonalLoadoutHistory } from "./PersonalLoadoutHistory";
 
 const MAX_ENEMIES = 5;
 
@@ -49,11 +50,13 @@ const MAX_ENEMIES = 5;
 export function PreGameScreen({
   draft,
   ddragonVersion,
-  sessionToken
+  sessionToken,
+  playerId
 }: {
   draft: DraftState;
   ddragonVersion: string;
   sessionToken: string | null;
+  playerId?: string;
 }) {
   const catalog = useAsyncData<DataDragonChampionSummary[]>(
     () => fetchAllChampions(ddragonVersion),
@@ -67,20 +70,18 @@ export function PreGameScreen({
   // A análise é refeita a cada mudança relevante do draft. O `deps` inclui
   // campeão e posição de propósito: trocar qualquer um dos dois invalida a
   // leitura anterior por completo.
-  const analysis = useAsyncData<PreGameAnalysis>(
-    () => {
-      if (!sessionToken || !draft.playerRole || draft.selectedChampionId === undefined) return undefined;
-      return fetchPreGameAnalysis(sessionToken, draft);
-    },
-    [
-      sessionToken,
-      draft.playerRole,
-      draft.selectedChampionId,
-      draft.enemyLaneChampionId,
-      draft.allies.map((pick) => pick.championId).join(","),
-      draft.enemies.map((pick) => pick.championId).join(",")
-    ]
-  );
+  const analysis = useAsyncData<PreGameAnalysis>(() => {
+    if (!sessionToken || !draft.playerRole || draft.selectedChampionId === undefined)
+      return undefined;
+    return fetchPreGameAnalysis(sessionToken, draft);
+  }, [
+    sessionToken,
+    draft.playerRole,
+    draft.selectedChampionId,
+    draft.enemyLaneChampionId,
+    draft.allies.map((pick) => pick.championId).join(","),
+    draft.enemies.map((pick) => pick.championId).join(",")
+  ]);
 
   const ownChampion = catalog.data?.find((champion) => champion.id === draft.selectedChampionId);
   const enemyChampions = draft.enemies
@@ -114,7 +115,9 @@ export function PreGameScreen({
         eyebrow="Pré-game"
         title={ownChampion.name}
         subtitle={
-          draft.playerRole ? `Preparação pro confronto em ${roleLabels[draft.playerRole]}.` : "Preparação pro confronto."
+          draft.playerRole
+            ? `Preparação pro confronto em ${roleLabels[draft.playerRole]}.`
+            : "Preparação pro confronto."
         }
         artUrl={heroSplash}
         aside={
@@ -129,8 +132,14 @@ export function PreGameScreen({
         }
         meta={
           <InlineStats>
-            <InlineStat label="Posição" value={draft.playerRole ? roleLabels[draft.playerRole] : "Não identificada"} />
-            <InlineStat label="Inimigos revelados" value={`${enemyChampions.length}/${MAX_ENEMIES}`} />
+            <InlineStat
+              label="Posição"
+              value={draft.playerRole ? roleLabels[draft.playerRole] : "Não identificada"}
+            />
+            <InlineStat
+              label="Inimigos revelados"
+              value={`${enemyChampions.length}/${MAX_ENEMIES}`}
+            />
             <InlineStat
               label="Cobertura dos dados"
               value={analysis.data ? `${Math.round(analysis.data.dataCoverage * 100)}%` : "—"}
@@ -146,6 +155,16 @@ export function PreGameScreen({
           <div style={{ display: "grid", gap: "var(--space-4)" }}>
             <AnalysisBody state={analysis} />
 
+            {draft.playerRole && (
+              <PersonalLoadoutHistory
+                token={sessionToken}
+                playerId={playerId}
+                championId={ownChampion.id}
+                role={draft.playerRole}
+                requestedPatch={draft.patch}
+              />
+            )}
+
             <Card>
               <SectionHeader
                 title="Composição inimiga revelada"
@@ -153,7 +172,9 @@ export function PreGameScreen({
                 actions={
                   enemyLean &&
                   enemyLean.lean !== "BALANCED" && (
-                    <Badge tone="accent">{enemyLean.lean === "MAGIC" ? "Foco mágico" : "Foco físico"}</Badge>
+                    <Badge tone="accent">
+                      {enemyLean.lean === "MAGIC" ? "Foco mágico" : "Foco físico"}
+                    </Badge>
                   )
                 }
               />
@@ -161,7 +182,13 @@ export function PreGameScreen({
                 {Array.from({ length: MAX_ENEMIES }, (_, index) => {
                   const champion = enemyChampions[index];
                   if (!champion) {
-                    return <EmptyAvatarSlot key={`empty-${index}`} size="lg" label="Inimigo ainda não revelado" />;
+                    return (
+                      <EmptyAvatarSlot
+                        key={`empty-${index}`}
+                        size="lg"
+                        label="Inimigo ainda não revelado"
+                      />
+                    );
                   }
                   return (
                     <div key={champion.id} style={{ textAlign: "center", minWidth: 0 }}>
@@ -193,7 +220,9 @@ export function PreGameScreen({
         }
         aside={
           <div style={{ display: "grid", gap: "var(--space-4)" }}>
-            {analysis.status === "success" && analysis.data && <SectionCard section={analysis.data.laneContext} />}
+            {analysis.status === "success" && analysis.data && (
+              <SectionCard section={analysis.data.laneContext} />
+            )}
             <BuildPanel
               confirmedChampion={{ championId: ownChampion.id, championName: ownChampion.name }}
               enemies={draft.enemies}
@@ -238,7 +267,10 @@ function AnalysisBody({
   if (state.status === "error" || !state.data) {
     return (
       <Card>
-        <EmptyState title="Não foi possível analisar este draft" description={state.error ?? "Erro desconhecido."} />
+        <EmptyState
+          title="Não foi possível analisar este draft"
+          description={state.error ?? "Erro desconhecido."}
+        />
       </Card>
     );
   }
@@ -251,7 +283,11 @@ function AnalysisBody({
         <SectionHeader
           eyebrow="Resumo da escolha"
           title={analysis.summary.description}
-          actions={analysis.status === "PARTIAL" ? <Badge tone="warning">Draft incompleto</Badge> : undefined}
+          actions={
+            analysis.status === "PARTIAL" ? (
+              <Badge tone="warning">Draft incompleto</Badge>
+            ) : undefined
+          }
         />
         {analysis.summary.evidence && analysis.summary.evidence.length > 0 && (
           <SignalChipList>
@@ -262,9 +298,16 @@ function AnalysisBody({
             ))}
           </SignalChipList>
         )}
-        <p style={{ marginTop: "var(--space-4)", color: "var(--text-secondary)", fontSize: "var(--text-sm)" }}>
-          Cobertura dos dados: {Math.round(analysis.dataCoverage * 100)}% dos sinais esperados estavam disponíveis. Não é
-          confiança estatística nem chance de vitória — é quanto do draft e das tabelas o Sparta conseguiu ler.
+        <p
+          style={{
+            marginTop: "var(--space-4)",
+            color: "var(--text-secondary)",
+            fontSize: "var(--text-sm)"
+          }}
+        >
+          Cobertura dos dados: {Math.round(analysis.dataCoverage * 100)}% dos sinais esperados
+          estavam disponíveis. Não é confiança estatística nem chance de vitória — é quanto do draft
+          e das tabelas o Sparta conseguiu ler.
         </p>
       </Card>
 
@@ -313,7 +356,13 @@ function ProfileSourceNote({ provenance }: { provenance?: ChampionTagProvenance 
   const versao = provenance?.source.patch;
 
   return (
-    <p style={{ marginTop: "var(--space-4)", color: "var(--text-tertiary)", fontSize: "var(--text-xs)" }}>
+    <p
+      style={{
+        marginTop: "var(--space-4)",
+        color: "var(--text-tertiary)",
+        fontSize: "var(--text-xs)"
+      }}
+    >
       {texto}
       {versao ? ` Fonte: champion.json ${versao}.` : ""}
     </p>
@@ -339,14 +388,21 @@ function SectionCard({ section, footer }: { section: AnalysisSection; footer?: R
         actions={partial ? <Badge tone="warning">Parcial</Badge> : undefined}
       />
       {vazia ? (
-        <EmptyState inline title="Ainda sem dado pra esta leitura" description={section.unavailableReason} />
+        <EmptyState
+          inline
+          title="Ainda sem dado pra esta leitura"
+          description={section.unavailableReason}
+        />
       ) : (
         <SignalChipList stacked>
           {section.signals.map((signal) => (
             <SignalChip key={signal.key} tone={chipTone(signal)}>
               {signal.description}
               {signal.evidence && signal.evidence.length > 0 && (
-                <span style={{ color: "var(--text-tertiary)" }}> · {signal.evidence.join(" · ")}</span>
+                <span style={{ color: "var(--text-tertiary)" }}>
+                  {" "}
+                  · {signal.evidence.join(" · ")}
+                </span>
               )}
             </SignalChip>
           ))}

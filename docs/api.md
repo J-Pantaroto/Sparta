@@ -14,6 +14,7 @@ Endpoints:
 - `GET /players/pool?role=MID` (autenticado) — materializa observações pessoais e consulta o pool explícito por posição, com contagens para todas as posições
 - `POST /players/pool` (autenticado) — adiciona `{ championId, role }` como `USER_PROVIDED`; idempotente e sem aceitar origem enviada pelo cliente
 - `PATCH /players/pool/:championId` (autenticado) — desabilita entrada manual com `{ role, enabled: false }`; não altera observações reais
+- `GET /players/:playerId/champions/:championId/roles/:role/loadout-evidence` (autenticado) — agrega inventários finais, runas e feitiços pessoais da posição. Aceita `patch`, `queueId`, `from`, `to` e `recentMatches`; `:playerId` precisa ser o puuid da própria conta vinculada
 - `GET /drafts/sessions`, `GET /drafts/sessions/active`, `GET /drafts/sessions/:id`, `GET /drafts/sessions/:id/snapshots`, `POST /drafts/sessions/:id/lock-in`, `POST /drafts/sessions/:id/status` (autenticadas) — sessões de draft persistidas. Ver `docs/draft-persistence.md`
 - `POST /drafts/recommendations` (autenticado) — motor real (`@sparta/core`) sobre o pool consolidado. Retorna até cinco principais, três alternativas e `poolSummary`; mantém temporariamente o alias legado `recommendations`
 - `POST /drafts/pre-game-analysis` (autenticado) — real, derivado do draft atual pelo motor puro `generatePreGameAnalysis` (`@sparta/core`). Responde `422` `PLAYER_ROLE_UNAVAILABLE` sem posição e `422` `SELECTED_CHAMPION_UNAVAILABLE` sem campeão confirmado (ou com campeão fora do catálogo). Ver `docs/pre-game-analysis.md`
@@ -25,6 +26,12 @@ Swagger UI fica em `/docs`.
 O contrato e as regras de origem do pool estão em
 `docs/player-champion-pool.md`. `PATCH` está explicitamente liberado no CORS
 para o desktop; a allowlist de origens permanece restrita.
+
+O contrato da análise pessoal de loadouts está em
+`docs/personal-loadout-evidence.md`. A rota devolve `403
+PLAYER_HISTORY_FORBIDDEN` antes de ler observações quando o puuid do path não
+é o da conta autenticada. A consulta é independente das recomendações e não
+altera score, ranking ou snapshot.
 
 As recomendações atuais também carregam `CHAMPION_DIFFICULTY`,
 `PERSONAL_EXPERIENCE` e `EXECUTION_RISK` em `metricDetails`. Resposta

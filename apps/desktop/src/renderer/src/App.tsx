@@ -36,7 +36,15 @@ import { PreGameScreen } from "./features/PreGameScreen";
 import { ProfileScreen } from "./features/ProfileScreen";
 import { SettingsScreen } from "./features/SettingsScreen";
 import { FeaturedChampionProvider, useFeaturedChampion } from "./theme/featured-champion-context";
-import { AppShell, AuthLayout, Loading, PlayerSummary, Sidebar, SidebarGroup, SidebarNavItem } from "./ui";
+import {
+  AppShell,
+  AuthLayout,
+  Loading,
+  PlayerSummary,
+  Sidebar,
+  SidebarGroup,
+  SidebarNavItem
+} from "./ui";
 
 type SessionStatus = "checking" | "auth" | "link-account" | "ready";
 
@@ -102,14 +110,12 @@ function SpartaApp() {
   // API estar na mesma versão do desktop. `useAsyncData` já descarta o
   // resultado de uma execução anterior quando as dependências mudam, então
   // trocar de posição não deixa a resposta antiga sobrescrever a nova.
-  const recommendationsQuery = useAsyncData<DraftRecommendationResponse & { persistence?: DraftPersistenceInfo }>(
+  const recommendationsQuery = useAsyncData<
+    DraftRecommendationResponse & { persistence?: DraftPersistenceInfo }
+  >(
     () =>
       sessionToken && draft.playerRole
-        ? fetchDraftRecommendations(
-            sessionToken,
-            draft,
-            draftSession ?? undefined
-          )
+        ? fetchDraftRecommendations(sessionToken, draft, draftSession ?? undefined)
         : undefined,
     [sessionToken, draft, poolRevision, draftSession]
   );
@@ -195,7 +201,9 @@ function SpartaApp() {
 
   useEffect(() => {
     if (autoPickOrder === null) return;
-    setDraft((current) => (current.pickOrder === autoPickOrder ? current : { ...current, pickOrder: autoPickOrder }));
+    setDraft((current) =>
+      current.pickOrder === autoPickOrder ? current : { ...current, pickOrder: autoPickOrder }
+    );
   }, [autoPickOrder]);
 
   // Papel real do jogador (assignedPosition do LCU) - reflete troca de lane
@@ -356,7 +364,11 @@ function SpartaApp() {
 
   if (sessionStatus === "auth") {
     return (
-      <AuthScreen splashUrl={splashUrl} onAuthenticated={handleAuthenticated} onSkip={() => setSessionStatus("ready")} />
+      <AuthScreen
+        splashUrl={splashUrl}
+        onAuthenticated={handleAuthenticated}
+        onSkip={() => setSessionStatus("ready")}
+      />
     );
   }
 
@@ -379,7 +391,11 @@ function SpartaApp() {
         subtitle={ddragonError ?? "Consultando a versão atual da Data Dragon..."}
       >
         {ddragonError ? (
-          <button type="button" className="sp-button sp-button--primary" onClick={loadDataDragonVersion}>
+          <button
+            type="button"
+            className="sp-button sp-button--primary"
+            onClick={loadDataDragonVersion}
+          >
             Tentar novamente
           </button>
         ) : (
@@ -398,7 +414,11 @@ function SpartaApp() {
           footer={
             <PlayerSummary
               artUrl={splashUrl}
-              name={account ? `${account.gameName}#${account.tagLine}` : (sessionUser?.displayName ?? "Convidado")}
+              name={
+                account
+                  ? `${account.gameName}#${account.tagLine}`
+                  : (sessionUser?.displayName ?? "Convidado")
+              }
               meta={account ? account.platformRegion.toUpperCase() : "Sem conta Riot vinculada"}
             />
           }
@@ -431,7 +451,10 @@ function SpartaApp() {
           }}
         >
           Data Dragon indisponível: usando catálogo local desatualizado, coletado em{" "}
-          {ddragonCache.collectedAt ? new Date(ddragonCache.collectedAt).toLocaleString("pt-BR") : "data desconhecida"}.
+          {ddragonCache.collectedAt
+            ? new Date(ddragonCache.collectedAt).toLocaleString("pt-BR")
+            : "data desconhecida"}
+          .
         </div>
       )}
       {championCatalog.status === "error" && (
@@ -447,7 +470,9 @@ function SpartaApp() {
           onNavigate={setPage}
         />
       )}
-      {page === "profile" && <ProfileScreen riotAccounts={riotAccounts} ddragonVersion={ddragonVersion} />}
+      {page === "profile" && (
+        <ProfileScreen riotAccounts={riotAccounts} ddragonVersion={ddragonVersion} />
+      )}
       {page === "select" && (
         <ChampionSelectScreen
           draft={draft}
@@ -468,14 +493,25 @@ function SpartaApp() {
         />
       )}
       {page === "pregame" && (
-        <PreGameScreen draft={draft} ddragonVersion={ddragonVersion} sessionToken={sessionToken} />
+        <PreGameScreen
+          draft={draft}
+          ddragonVersion={ddragonVersion}
+          sessionToken={sessionToken}
+          playerId={account?.puuid}
+        />
       )}
       {page === "postgame" && (
-        <PostGameScreen riotAccounts={riotAccounts} sessionToken={sessionToken} ddragonVersion={ddragonVersion} />
+        <PostGameScreen
+          riotAccounts={riotAccounts}
+          sessionToken={sessionToken}
+          ddragonVersion={ddragonVersion}
+        />
       )}
       {page === "drafts" && <DraftHistoryScreen sessionToken={sessionToken} />}
       {page === "growth" && <GrowthJourneyScreen riotAccounts={riotAccounts} />}
-      {page === "settings" && <SettingsScreen ddragonVersion={ddragonVersion} sessionToken={sessionToken} />}
+      {page === "settings" && (
+        <SettingsScreen ddragonVersion={ddragonVersion} sessionToken={sessionToken} />
+      )}
     </AppShell>
   );
 }

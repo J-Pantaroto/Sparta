@@ -12,6 +12,7 @@ const {
   riotAccountFindFirstMock,
   syncPlayerMatchesMock,
   findPlayerChampionRoleEvidenceMock,
+  findPersonalLoadoutObservationsMock,
   findPlayerPoolMock,
   addUserProvidedPoolEntryMock,
   disableUserProvidedPoolEntryMock
@@ -27,6 +28,7 @@ const {
   riotAccountFindFirstMock: vi.fn(),
   syncPlayerMatchesMock: vi.fn(),
   findPlayerChampionRoleEvidenceMock: vi.fn(),
+  findPersonalLoadoutObservationsMock: vi.fn(),
   findPlayerPoolMock: vi.fn(),
   addUserProvidedPoolEntryMock: vi.fn(),
   disableUserProvidedPoolEntryMock: vi.fn()
@@ -40,7 +42,8 @@ vi.mock("./player-stats-repository.js", () => ({
   setMatchAnalysisLimit: setMatchAnalysisLimitMock,
   MIN_MATCH_ANALYSIS_LIMIT: 1,
   MAX_MATCH_ANALYSIS_LIMIT: 200,
-  deriveObservedRoles: (stats: { role: string }[]) => Array.from(new Set(stats.map((entry) => entry.role)))
+  deriveObservedRoles: (stats: { role: string }[]) =>
+    Array.from(new Set(stats.map((entry) => entry.role)))
 }));
 
 vi.mock("../matches/match-repository.js", () => ({
@@ -70,6 +73,10 @@ vi.mock("./player-champion-role-evidence-repository.js", () => ({
   findPlayerChampionRoleEvidence: findPlayerChampionRoleEvidenceMock
 }));
 
+vi.mock("./personal-loadout-repository.js", () => ({
+  findPersonalLoadoutObservations: findPersonalLoadoutObservationsMock
+}));
+
 vi.mock("./player-pool-repository.js", () => ({
   findPlayerPool: findPlayerPoolMock,
   addUserProvidedPoolEntry: addUserProvidedPoolEntryMock,
@@ -83,6 +90,7 @@ describe("players routes", () => {
     vi.clearAllMocks();
     findMatchAnalysisLimitByPuuidMock.mockResolvedValue(50);
     findPlayerPoolMock.mockResolvedValue({ entries: [], roleSummaries: [] });
+    findPersonalLoadoutObservationsMock.mockResolvedValue([]);
   });
 
   it("retorna 404 no perfil quando a conta Riot nao foi vinculada no Sparta", async () => {
@@ -125,7 +133,13 @@ describe("players routes", () => {
     findPlayerInsightsByPuuidMock.mockResolvedValue({
       strengths: [],
       weaknesses: [],
-      recentForm: { last10Score: 50, last20Score: 50, last50Score: 50, trend: "stable", confidence: "low" }
+      recentForm: {
+        last10Score: 50,
+        last20Score: 50,
+        last50Score: 50,
+        trend: "stable",
+        confidence: "low"
+      }
     });
     const app = await buildApp();
 
@@ -196,6 +210,70 @@ describe("players routes", () => {
     await app.close();
   });
 
+  it("expõe loadouts pessoais somente para a conta autenticada e preserva filtros", async () => {
+    getAuthenticatedUserIdMock.mockResolvedValue("user-1");
+    riotAccountFindFirstMock.mockResolvedValue({ puuid: "puuid-1" });
+    findPersonalLoadoutObservationsMock.mockResolvedValue([]);
+    const app = await buildApp();
+
+    const response = await app.inject({
+      method: "GET",
+      url:
+        "/players/puuid-1/champions/161/roles/SUPPORT/loadout-evidence" +
+        "?patch=16.14.1&queueId=420,440&from=2026-07-01T00%3A00%3A00.000Z" +
+        "&to=2026-07-28T00%3A00%3A00.000Z&recentMatches=20",
+      headers: { authorization: "Bearer token" }
+    });
+    const body = response.json();
+
+    expect(response.statusCode).toBe(200);
+    expect(findPersonalLoadoutObservationsMock).toHaveBeenCalledWith("puuid-1", 161, "SUPPORT");
+    expect(body).toMatchObject({
+      championId: 161,
+      role: "SUPPORT",
+      status: "UNAVAILABLE",
+      sampleSize: 0,
+      patchScope: {
+        requestedPatch: "16.14.1",
+        hasRequestedPatchObservations: false
+      },
+      queueScope: { requestedQueueIds: [420, 440] },
+      filterScope: { recentMatches: 20 }
+    });
+    await app.close();
+  });
+
+  it("nega consulta ao histórico pessoal de outra conta antes de ler observações", async () => {
+    getAuthenticatedUserIdMock.mockResolvedValue("user-1");
+    riotAccountFindFirstMock.mockResolvedValue({ puuid: "puuid-own" });
+    const app = await buildApp();
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/players/puuid-other/champions/161/roles/SUPPORT/loadout-evidence",
+      headers: { authorization: "Bearer token" }
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toMatchObject({ code: "PLAYER_HISTORY_FORBIDDEN" });
+    expect(findPersonalLoadoutObservationsMock).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("exige autenticação para consultar loadouts pessoais", async () => {
+    getAuthenticatedUserIdMock.mockResolvedValue(null);
+    const app = await buildApp();
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/players/puuid-1/champions/161/roles/SUPPORT/loadout-evidence"
+    });
+
+    expect(response.statusCode).toBe(401);
+    expect(riotAccountFindFirstMock).not.toHaveBeenCalled();
+    await app.close();
+  });
+
   // Etapa 4: a rota nao pode transformar ausencia em zero no caminho de
   // saida - o cliente perderia a distincao sem nenhum aviso.
   it("recent-matches devolve null quando a partida nao traz participacao, sem converter pra 0", async () => {
@@ -260,7 +338,10 @@ describe("players routes", () => {
     findChampionStatsByPuuidMock.mockResolvedValue([]);
     const app = await buildApp();
 
-    const response = await app.inject({ method: "GET", url: "/players/puuid-x/champion-performance" });
+    const response = await app.inject({
+      method: "GET",
+      url: "/players/puuid-x/champion-performance"
+    });
 
     expect(response.statusCode).toBe(200);
     expect(response.json().champions).toEqual([]);
@@ -282,8 +363,23 @@ describe("players routes", () => {
   });
 
   it("growth-journey deriva tendencias reais a partir dos relatorios persistidos", async () => {
-    const weakness = { code: "morre_demais", label: "Morre com frequencia", detail: "d", severity: "medium", confidence: "low" };
-    const reportWith = { matchId: "m", expectedPlan: "p", executionSummary: "e", pickAssessment: "a", strengths: [], weaknesses: [weakness], tips: [], metrics: {} };
+    const weakness = {
+      code: "morre_demais",
+      label: "Morre com frequencia",
+      detail: "d",
+      severity: "medium",
+      confidence: "low"
+    };
+    const reportWith = {
+      matchId: "m",
+      expectedPlan: "p",
+      executionSummary: "e",
+      pickAssessment: "a",
+      strengths: [],
+      weaknesses: [weakness],
+      tips: [],
+      metrics: {}
+    };
     const reportWithout = { ...reportWith, weaknesses: [] };
     findPostgameReportsByPuuidMock.mockResolvedValue([
       reportWithout,
@@ -379,12 +475,7 @@ describe("players routes", () => {
       });
 
       expect(created.statusCode).toBe(201);
-      expect(addUserProvidedPoolEntryMock).toHaveBeenCalledWith(
-        "acc-1",
-        "puuid-1",
-        61,
-        "MID"
-      );
+      expect(addUserProvidedPoolEntryMock).toHaveBeenCalledWith("acc-1", "puuid-1", 61, "MID");
       expect(forged.statusCode).toBe(500);
       expect(addUserProvidedPoolEntryMock).toHaveBeenCalledTimes(1);
       await app.close();
@@ -406,11 +497,7 @@ describe("players routes", () => {
 
       expect(response.statusCode).toBe(409);
       expect(response.json().code).toBe("OBSERVED_ENTRY_CANNOT_BE_DISABLED");
-      expect(disableUserProvidedPoolEntryMock).toHaveBeenCalledWith(
-        "acc-1",
-        61,
-        "MID"
-      );
+      expect(disableUserProvidedPoolEntryMock).toHaveBeenCalledWith("acc-1", 61, "MID");
       await app.close();
     });
   });
@@ -456,7 +543,11 @@ describe("players routes", () => {
       getAuthenticatedUserIdMock.mockResolvedValue(null);
       const app = await buildApp();
 
-      const response = await app.inject({ method: "PUT", url: "/players/settings", payload: { matchAnalysisLimit: 100 } });
+      const response = await app.inject({
+        method: "PUT",
+        url: "/players/settings",
+        payload: { matchAnalysisLimit: 100 }
+      });
 
       expect(response.statusCode).toBe(401);
       await app.close();
@@ -464,10 +555,18 @@ describe("players routes", () => {
 
     it("rejeita valores fora de [1,200] (zod.parse lanca, mesmo comportamento das outras rotas sem handler global de erro)", async () => {
       getAuthenticatedUserIdMock.mockResolvedValue("user-1");
-      riotAccountFindFirstMock.mockResolvedValue({ id: "acc-1", puuid: "puuid-1", platformRegion: "br1" });
+      riotAccountFindFirstMock.mockResolvedValue({
+        id: "acc-1",
+        puuid: "puuid-1",
+        platformRegion: "br1"
+      });
       const app = await buildApp();
 
-      const response = await app.inject({ method: "PUT", url: "/players/settings", payload: { matchAnalysisLimit: 500 } });
+      const response = await app.inject({
+        method: "PUT",
+        url: "/players/settings",
+        payload: { matchAnalysisLimit: 500 }
+      });
 
       expect(response.statusCode).toBe(500);
       expect(setMatchAnalysisLimitMock).not.toHaveBeenCalled();
@@ -476,12 +575,26 @@ describe("players routes", () => {
 
     it("salva o novo limite e dispara um sync na hora", async () => {
       getAuthenticatedUserIdMock.mockResolvedValue("user-1");
-      riotAccountFindFirstMock.mockResolvedValue({ id: "acc-1", puuid: "puuid-1", platformRegion: "br1" });
+      riotAccountFindFirstMock.mockResolvedValue({
+        id: "acc-1",
+        puuid: "puuid-1",
+        platformRegion: "br1"
+      });
       setMatchAnalysisLimitMock.mockResolvedValue(undefined);
-      syncPlayerMatchesMock.mockResolvedValue({ requested: 0, imported: 0, skippedExisting: 0, failed: [], skippedParticipants: [] });
+      syncPlayerMatchesMock.mockResolvedValue({
+        requested: 0,
+        imported: 0,
+        skippedExisting: 0,
+        failed: [],
+        skippedParticipants: []
+      });
       const app = await buildApp();
 
-      const response = await app.inject({ method: "PUT", url: "/players/settings", payload: { matchAnalysisLimit: 100 } });
+      const response = await app.inject({
+        method: "PUT",
+        url: "/players/settings",
+        payload: { matchAnalysisLimit: 100 }
+      });
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toEqual({ matchAnalysisLimit: 100 });
@@ -492,12 +605,20 @@ describe("players routes", () => {
 
     it("ainda retorna sucesso (configuracao ja salva) mesmo se o sync imediato falhar", async () => {
       getAuthenticatedUserIdMock.mockResolvedValue("user-1");
-      riotAccountFindFirstMock.mockResolvedValue({ id: "acc-1", puuid: "puuid-1", platformRegion: "br1" });
+      riotAccountFindFirstMock.mockResolvedValue({
+        id: "acc-1",
+        puuid: "puuid-1",
+        platformRegion: "br1"
+      });
       setMatchAnalysisLimitMock.mockResolvedValue(undefined);
       syncPlayerMatchesMock.mockRejectedValue(new Error("Riot API request failed with 401"));
       const app = await buildApp();
 
-      const response = await app.inject({ method: "PUT", url: "/players/settings", payload: { matchAnalysisLimit: 100 } });
+      const response = await app.inject({
+        method: "PUT",
+        url: "/players/settings",
+        payload: { matchAnalysisLimit: 100 }
+      });
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toEqual({ matchAnalysisLimit: 100 });

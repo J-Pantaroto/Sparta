@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import type { DraftState, PlayerChampionStats } from "@sparta/core";
-import { ensureChampionStatsCoverage, fetchDraftRecommendations, PlayerRoleUnavailableError } from "./api-client";
+import {
+  ensureChampionStatsCoverage,
+  fetchDraftRecommendations,
+  fetchPersonalLoadoutEvidence,
+  PlayerRoleUnavailableError
+} from "./api-client";
 
 /**
  * Compatibilidade com uma API anterior a Etapa 4: desktop e API sao
@@ -107,9 +112,7 @@ describe("compatibilidade do contrato de recomendacoes (Etapa 12)", () => {
         new Response(
           JSON.stringify({
             primaryRecommendations: [ranked],
-            alternatives: [
-              { ...ranked, championId: 103, championName: "Ahri", rank: 6 }
-            ],
+            alternatives: [{ ...ranked, championId: 103, championName: "Ahri", rank: 6 }],
             poolSummary: {
               totalCandidates: 6,
               evaluatedCandidates: 6,
@@ -172,7 +175,11 @@ describe("ensureChampionStatsCoverage", () => {
       objectiveParticipation: 0.42,
       coverage: {
         killParticipation: { sampleSize: 8, availableSampleSize: 8, status: "AVAILABLE" as const },
-        objectiveParticipation: { sampleSize: 8, availableSampleSize: 8, status: "AVAILABLE" as const }
+        objectiveParticipation: {
+          sampleSize: 8,
+          availableSampleSize: 8,
+          status: "AVAILABLE" as const
+        }
       }
     } as PlayerChampionStats;
     expect(ensureChampionStatsCoverage(novo)).toBe(novo);
@@ -181,7 +188,12 @@ describe("ensureChampionStatsCoverage", () => {
 });
 
 describe("guarda de posição no cliente da API (Etapa 6)", () => {
-  const draftSemPosicao = { pickOrder: 1, allies: [], enemies: [], bannedChampionIds: [] } as DraftState;
+  const draftSemPosicao = {
+    pickOrder: 1,
+    allies: [],
+    enemies: [],
+    bannedChampionIds: []
+  } as DraftState;
 
   it("não envia a requisição sem posição", async () => {
     const fetchSpy = vi.fn();
@@ -200,6 +212,38 @@ describe("guarda de posição no cliente da API (Etapa 6)", () => {
     vi.stubGlobal("fetch", vi.fn());
     const erro = await fetchDraftRecommendations("token", draftSemPosicao).catch((e: unknown) => e);
     expect((erro as PlayerRoleUnavailableError).code).toBe("PLAYER_ROLE_UNAVAILABLE");
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("compatibilidade do histórico pessoal agregado (Etapa 17)", () => {
+  it("API anterior sem a rota vira indisponibilidade estruturada, nunca configuração padrão", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            statusCode: 404,
+            error: "Not Found",
+            message: "Route GET not found"
+          }),
+          {
+            status: 404,
+            headers: { "Content-Type": "application/json" }
+          }
+        )
+      )
+    );
+
+    const result = await fetchPersonalLoadoutEvidence("token", "puuid-1", 61, "MID", {
+      patch: "16.14.1"
+    });
+
+    expect(result.status).toBe("UNAVAILABLE");
+    expect(result.finalInventories).toEqual([]);
+    expect(result.runePages).toEqual([]);
+    expect(result.summonerSpellSets).toEqual([]);
+    expect(result.unavailableReason).toMatch(/versão da API/i);
     vi.unstubAllGlobals();
   });
 });

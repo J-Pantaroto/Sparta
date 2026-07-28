@@ -1,5 +1,16 @@
 # Origem, disponibilidade e confiança dos dados
 
+## Loadouts pessoais (Etapa 17)
+
+Itens, perks, fragmentos, feitiços, patch, fila, resultado e data continuam
+`OBSERVED` do Match-V5. Assinaturas, frequência e ordenação são `CALCULATED`
+pelo Sparta em `personal-loadout-evidence/1.0.0`; não carregam confiança nem
+causalidade. Nome e asset mantêm proveniência `OFFICIAL` do catálogo gravado
+na observação, inclusive `STALE` para outra versão e `UNAVAILABLE` quando só o
+ID existe. Disponibilidade é independente para inventário, runas e feitiços.
+Histórico fora do patch pedido fica `STALE` numa seção separada e nunca
+preenche a ausência atual. Ver `docs/personal-loadout-evidence.md`.
+
 ## Estratégia 5×5 (Etapa 15)
 
 Cada `StrategicSignal` leva evidências por campeão/capacidade e as

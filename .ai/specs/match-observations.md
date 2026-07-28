@@ -12,5 +12,8 @@ Fonte de verdade: `docs/match-observations.md`.
 - Backfill local, versionado e idempotente; nenhuma chamada externa.
 - API autenticada: `GET /matches/:matchId/observation`.
 - Consumidor mínimo: card factual no pós-game.
+- A Etapa 17 agrega esses fatos sob demanda por jogador, campeão e posição,
+  sem alterar slots originais nem persistir o agregado. Ver
+  `docs/personal-loadout-evidence.md`.
 
 Detalhes, modelo e limitações estão no documento fonte.

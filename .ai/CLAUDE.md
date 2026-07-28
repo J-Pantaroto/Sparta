@@ -1,5 +1,28 @@
 # Sparta - Contexto para Continuidade
 
+## Etapa 17: inteligência pessoal de builds, runas e feitiços
+
+`aggregatePersonalLoadoutEvidence` (`personal-loadout-evidence/1.0.0`) agrega
+sob demanda somente `MatchObservation` por jogador, campeão e posição
+normalizada. Inventário final usa multiconjunto canônico (ignora slot e item
+0, preserva duplicatas e IDs desconhecidos); runas preservam árvores, ordem,
+perks, fragmentos e parcialidade; feitiços invertidos compartilham o par
+canônico, mas todas as ordens observadas continuam expostas.
+
+Patch, fila, período e recência são filtros factuais. Configurações fora do
+patch solicitado ficam em histórico `STALE`, nunca como atuais. Cada parte tem
+disponibilidade e amostra independentes; resolução de catálogo indisponível
+não elimina o ID observado. Ordenação: frequência, última utilização e
+assinatura, sem usar vitória como critério.
+
+Rota protegida:
+`GET /players/:playerId/champions/:championId/roles/:role/loadout-evidence`.
+O path só aceita o puuid da conta autenticada. A seção “Seu histórico com este
+campeão” aparece no detalhe da recomendação e no pré-game, consultada fora do
+payload do motor. Score, ordem, cobertura, risco, estratégia, pool e snapshots
+permanecem invariantes. Sem migration nem fonte externa. Ver
+`docs/personal-loadout-evidence.md`.
+
 ## Etapa 16: persistência de drafts e recomendações
 
 `DraftSession` e `PickRecommendation` existiam no schema desde o início e **nunca tiveram uma

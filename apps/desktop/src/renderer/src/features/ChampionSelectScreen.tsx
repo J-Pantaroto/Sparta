@@ -53,6 +53,7 @@ import {
   StatusBadge
 } from "../ui";
 import { BuildPanel } from "./BuildPanel";
+import { PersonalLoadoutHistory } from "./PersonalLoadoutHistory";
 import "./ChampionSelectScreen.css";
 
 const MAX_ENEMIES = 5;
@@ -98,6 +99,7 @@ export function ChampionSelectScreen({
   recommendationsStatus,
   noAccountLinked,
   ddragonVersion,
+  riotAccounts,
   sessionToken = null,
   onPoolChanged,
   draftAutoFilled
@@ -721,6 +723,16 @@ export function ChampionSelectScreen({
                           </p>
                         </div>
                       )}
+
+                      <div style={{ marginTop: "var(--space-5)" }}>
+                        <PersonalLoadoutHistory
+                          token={sessionToken}
+                          playerId={riotAccounts[0]?.puuid}
+                          championId={selected.championId}
+                          role={draft.playerRole}
+                          requestedPatch={draft.patch}
+                        />
+                      </div>
 
                       {(selected.reasons.length > 0 || selected.warnings.length > 0) && (
                         <div style={{ marginTop: "var(--space-5)" }}>

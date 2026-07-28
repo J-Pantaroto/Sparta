@@ -79,3 +79,12 @@ utilizadas”, “Feitiços utilizados” e “Posição observada”. A build �
 final dos slots; cronologia de compra ficou fora desta etapa porque exigiria
 modelar corretamente compra, venda, undo, transformação e destruição na
 timeline.
+
+## Agregação pessoal
+
+A Etapa 17 passou a agregar essas entidades sob demanda por jogador, campeão e
+`normalizedRole`, sem alterar a observação individual nem criar persistência
+derivada. Slots de item continuam disponíveis na fonte; somente a assinatura
+do inventário usa multiconjunto sem posição. Páginas parciais preservam
+ausências, e pares invertidos de feitiços são equivalentes apenas no agregado,
+mantendo as ordens observadas. Ver `docs/personal-loadout-evidence.md`.
