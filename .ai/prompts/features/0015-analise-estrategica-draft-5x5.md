@@ -1,7 +1,7 @@
 ---
-status: EM_ANDAMENTO
+status: IMPLEMENTADA
 solicitado_em: 2026-07-28 01:14
-implementado_em:
+implementado_em: 2026-07-28 01:37
 ---
 
 # Análise estratégica do draft 5×5
@@ -53,4 +53,18 @@ implementado_em:
 
 ## Notas de implementação
 
-Em andamento.
+Implementada no commit `24802ce`. O motor puro `analyzeDraftStrategy`
+centraliza ranking, detalhes e pré-game, separa candidato, aliados, inimigos e
+adversário direto, e produz perfis, contribuições, lacunas, ameaças, respostas,
+cobertura, disponibilidade, evidência e proveniência versionadas. Somente
+`TEAM_COMPOSITION` e `ENEMY_COMPOSITION_ANSWER` passaram a consumir os novos
+sinais; os pesos e os demais conceitos do ranking foram preservados.
+
+`ChampionCapabilityProfile` é a fonte principal. `ChampionTag` atua apenas como
+fallback explícito para dimensões suportadas, sem contagem dupla; desconhecido
+e indisponível nunca viram ausência nem score neutro. Cards e detalhes exibem o
+resumo estratégico, com risco de execução e experiência mantidos separados.
+
+Validação concluída com 565 testes TypeScript e 1 teste Python, typecheck, lint
+e builds de core, Riot, API e desktop. A API real em Docker confirmou análise
+parcial rastreável e igualdade exata entre os sinais do ranking e do pré-game.

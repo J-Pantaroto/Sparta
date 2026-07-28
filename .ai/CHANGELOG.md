@@ -22,6 +22,20 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-07-28 01:37 — Análise estratégica do draft 5×5
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0015-analise-estrategica-draft-5x5.md`
+
+Um motor puro e versionado agora analisa candidato, aliados e inimigos
+conhecidos, lacunas da composição, ameaças e respostas por capacidade, com
+evidência, proveniência, disponibilidade e cobertura. Ranking, detalhes e
+pré-game reutilizam exatamente os mesmos sinais para `TEAM_COMPOSITION` e
+`ENEMY_COMPOSITION_ANSWER`, sem alterar pesos ou os demais conceitos. Draft
+incompleto permanece parcial e nunca recebe neutro artificial. A interface
+expõe resumo e auditoria estratégica mantendo experiência e risco separados.
+565 testes TypeScript, 1 Python, typecheck, lint, builds e validação real em
+Docker aprovados. Ver `docs/draft-strategic-analysis.md`.
+
 ## 2026-07-28 01:10 — Capacidades rastreáveis dos campeões
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0014-modelo-rastreavel-capacidades-campeoes.md`
