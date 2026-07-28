@@ -9,13 +9,18 @@ import {
   type RiotMatchTimelineDto
 } from "@sparta/riot";
 import { getRiotApiClient } from "../riot-integration/client-factory.js";
-import { findExistingMatchIds, persistMatch, type ParticipantToPersist } from "../matches/match-repository.js";
+import {
+  findExistingMatchIds,
+  persistMatch,
+  type ParticipantToPersist
+} from "../matches/match-repository.js";
 import {
   computeAndPersistPlayerInsights,
   findMatchAnalysisLimitByPuuid,
   recomputeChampionStats,
   type PlayerChampionObservedRolePair
 } from "../players/player-stats-repository.js";
+import { reconcileDraftSessionsForAccount } from "../drafts/draft-match-reconciler.js";
 
 export interface SyncFailure {
   matchId: string;
@@ -57,9 +62,16 @@ export interface SyncablePlayer {
  */
 export async function syncPlayerMatches(
   player: SyncablePlayer,
-  opts?: { maxNewMatches?: number; onInsightsFailed?: (error: unknown) => void }
+  opts?: {
+    maxNewMatches?: number;
+    onInsightsFailed?: (error: unknown) => void;
+    onDraftReconciliationFailed?: (error: unknown) => void;
+  }
 ): Promise<SyncResult> {
-  const maxNewMatches = Math.min(opts?.maxNewMatches ?? DEFAULT_MAX_NEW_MATCHES, MAX_NEW_MATCHES_CEILING);
+  const maxNewMatches = Math.min(
+    opts?.maxNewMatches ?? DEFAULT_MAX_NEW_MATCHES,
+    MAX_NEW_MATCHES_CEILING
+  );
   const client = getRiotApiClient();
 
   const matchIds = await client.getMatchIdsByPuuid(player.puuid, MATCH_ID_WINDOW);
@@ -87,7 +99,10 @@ export async function syncPlayerMatches(
       const summary = summaries.find((entry) => entry.puuid === player.puuid);
 
       if (!participantTeam || !summary) {
-        result.failed.push({ matchId, reason: "Puuid do jogador nao encontrado entre os participantes da partida." });
+        result.failed.push({
+          matchId,
+          reason: "Puuid do jogador nao encontrado entre os participantes da partida."
+        });
         continue;
       }
 
@@ -142,7 +157,12 @@ export async function syncPlayerMatches(
   // da Riot (isso continua governado por maxNewMatches/rate limit acima).
   const matchAnalysisLimit = await findMatchAnalysisLimitByPuuid(player.puuid);
 
-  await recomputeChampionStats(player.riotAccountId, player.puuid, touchedPairs, matchAnalysisLimit);
+  await recomputeChampionStats(
+    player.riotAccountId,
+    player.puuid,
+    touchedPairs,
+    matchAnalysisLimit
+  );
 
   // Strengths/weaknesses/recentForm dependem do historico inteiro do
   // jogador (nao so das partidas novas) - so vale recalcular quando essa
@@ -154,6 +174,17 @@ export async function syncPlayerMatches(
       await computeAndPersistPlayerInsights(player.riotAccountId, player.puuid, matchAnalysisLimit);
     } catch (error) {
       opts?.onInsightsFailed?.(error);
+    }
+  }
+
+  // Reconciliação é efeito colateral best-effort: a partida já persistida
+  // continua válida mesmo se este passo falhar. Reprocessamento posterior é
+  // idempotente e recupera o estado.
+  if (result.imported > 0) {
+    try {
+      await reconcileDraftSessionsForAccount(player.riotAccountId);
+    } catch (error) {
+      opts?.onDraftReconciliationFailed?.(error);
     }
   }
 

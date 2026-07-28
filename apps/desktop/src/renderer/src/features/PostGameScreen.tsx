@@ -7,7 +7,7 @@ import {
   type RecentChampionMatch
 } from "@sparta/core";
 import { AlertTriangle, ListChecks, RefreshCw, UserPlus } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { roleLabels, severityLabels } from "../app/labels";
 import { useAsyncData } from "../hooks/use-async-data";
 import {
@@ -47,6 +47,7 @@ interface PostGameScreenProps {
   riotAccounts: RiotAccountSummary[];
   sessionToken: string | null;
   ddragonVersion: string;
+  initialMatchId?: string | null;
 }
 
 /**
@@ -58,7 +59,8 @@ interface PostGameScreenProps {
 export function PostGameScreen({
   riotAccounts,
   sessionToken,
-  ddragonVersion
+  ddragonVersion,
+  initialMatchId
 }: PostGameScreenProps) {
   const account = riotAccounts[0];
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
@@ -131,6 +133,13 @@ export function PostGameScreen({
     }
   }
 
+  const matchList = matches.data?.matches ?? [];
+  useEffect(() => {
+    if (!initialMatchId || selectedMatchId || matchList.length === 0) return;
+    const match = matchList.find((entry) => entry.matchId === initialMatchId);
+    if (match) void openMatch(match);
+  }, [initialMatchId, matchList, selectedMatchId]);
+
   if (!account) {
     return (
       <PageLayout>
@@ -146,7 +155,6 @@ export function PostGameScreen({
     );
   }
 
-  const matchList = matches.data?.matches ?? [];
   const selectedMatch = matchList.find((match) => match.matchId === selectedMatchId);
   const wins = matchList.filter((match) => match.won).length;
 
@@ -479,11 +487,7 @@ function MatchReport({
   );
 }
 
-export function ChampionRoleEvidenceCard({
-  evidence
-}: {
-  evidence: ChampionRoleEvidenceResponse;
-}) {
+export function ChampionRoleEvidenceCard({ evidence }: { evidence: ChampionRoleEvidenceResponse }) {
   const personal = evidence.personalRoleEvidence;
   const lastPlayedAt = personal.lastPlayedAt
     ? new Date(personal.lastPlayedAt).toLocaleDateString("pt-BR")

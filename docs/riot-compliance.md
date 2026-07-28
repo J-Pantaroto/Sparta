@@ -48,6 +48,11 @@ Dados que a Riot não fornece (ex.: objeto `challenges` ausente em patches antig
 Implementados em `packages/riot/src/lcu/read-only-client.ts` (`LcuReadOnlyClient`), consumidos apenas pelo processo `main` do Electron (`apps/desktop/src/main/index.ts`), nunca pelo backend nem por integrações remotas:
 
 - `GET /lol-gameflow/v1/gameflow-phase` — poll a cada 2.5s so para saber a fase atual (ex.: `ChampSelect`) e trocar a aba da UI do Sparta automaticamente. Nenhuma escrita, nenhuma automação.
+- `GET /lol-gameflow/v1/session` — leitura do `gameData.gameId` durante champion select/início da
+  partida. O valor numérico é usado somente como identidade auditável para reconciliar a sessão
+  persistida com a partida Match-V5; não aciona nenhuma ação no cliente. A Riot classifica a
+  League Client API como não oficialmente suportada e sem garantia de documentação/estabilidade;
+  se o campo ou endpoint não estiver disponível, o vínculo permanece `PENDING` e o fluxo continua.
 - `GET /lol-champ-select/v1/session` — leitura da sessão de champion select, no mesmo poll de 2.5s. O que é lido e pra quê:
   - `myTeam[].assignedPosition` do próprio jogador → posição (Top/Jungle/Mid/ADC/Suporte), pra a recomendação usar o papel certo e refletir troca de lane feita pela ferramenta do próprio cliente;
   - `actions[]` → ordem de pick do jogador e campeões **banidos** (bans concluídos), pra o motor não recomendar quem já está fora;

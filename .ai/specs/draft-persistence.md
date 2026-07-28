@@ -25,14 +25,14 @@ isso foram substituídas, não estendidas. Não houve migração de dados porque
 
 ## Sessão
 
-| Campo | Observação |
-|---|---|
-| `source` | `LCU` ou `USER`. **Sessão manual nunca é apresentada como observada.** |
-| `status` | `ACTIVE` → `LOCKED_IN`/`IN_GAME` → `COMPLETED`/`ABANDONED` |
-| `roleSource` | Como a posição foi obtida; ausência é tratada como `USER`, nunca `LCU` |
-| `knownDraftJson` | Contrato estruturado do estado conhecido — **não** é o payload bruto do LCU |
-| `externalSessionId` | Chave técnica da sessão no cliente (ver abaixo) |
-| `linkedMatchId` | Só preenchido com identificador confiável |
+| Campo               | Observação                                                                  |
+| ------------------- | --------------------------------------------------------------------------- |
+| `source`            | `LCU` ou `USER`. **Sessão manual nunca é apresentada como observada.**      |
+| `status`            | `ACTIVE` → `LOCKED_IN`/`IN_GAME` → `COMPLETED`/`ABANDONED`                  |
+| `roleSource`        | Como a posição foi obtida; ausência é tratada como `USER`, nunca `LCU`      |
+| `knownDraftJson`    | Contrato estruturado do estado conhecido — **não** é o payload bruto do LCU |
+| `externalSessionId` | Chave técnica da sessão no cliente (ver abaixo)                             |
+| `linkedMatchId`     | Só preenchido com identificador confiável                                   |
 
 ### Identidade
 
@@ -99,17 +99,27 @@ mudou**.
 
 `compareSelectedChampion` devolve um dos três estados, sem julgamento:
 
-| Estado | Significado |
-|---|---|
-| `RANKED` | Estava no snapshot; guarda posição e grupo |
-| `NOT_IN_SNAPSHOT` | Havia snapshot e o campeão não estava nele |
-| `NO_SNAPSHOT` | A escolha aconteceu antes de existir snapshot — só o fato é conhecido |
+| Estado            | Significado                                                           |
+| ----------------- | --------------------------------------------------------------------- |
+| `RANKED`          | Estava no snapshot; guarda posição e grupo                            |
+| `NOT_IN_SNAPSHOT` | Havia snapshot e o campeão não estava nele                            |
+| `NO_SNAPSHOT`     | A escolha aconteceu antes de existir snapshot — só o fato é conhecido |
 
 ## Vínculo com Match-V5
 
-`decideMatchLink` só aceita um `matchId` explícito. Campeão igual, horário aproximado, resultado e
-posição isolada **não** vinculam. Sem identificador a sessão permanece `UNLINKED` com o motivo, e
-a reconciliação pode acontecer depois.
+O desktop **não envia `matchId`**. Quando disponível, ele persiste apenas o `gameId` numérico lido
+de `GET /lol-gameflow/v1/session`; o reconciliador do servidor compara esse identificador com o
+`gameId` oficial da partida Match-V5. Esse vínculo exato tem precedência permanente.
+
+Sem `gameId`, a estratégia secundária exige, ao mesmo tempo: PUUID, plataforma, campeão escolhido,
+início da partida dentro da janela de `startedAt - 2 min` até `lockedInAt/updatedAt + 20 min`,
+compatibilidade de posição e fila quando informadas e presença de todos os participantes conhecidos
+do draft. Um candidato único vincula; dois ou mais resultam em `AMBIGUOUS`; zero permanece
+`PENDING`. Não há score nem desempate por proximidade.
+
+Estados persistidos: `PENDING`, `LINKED`, `AMBIGUOUS`, `UNLINKABLE` e `NOT_APPLICABLE`. Estratégia,
+versão do algoritmo, instante, evidências, motivo, número de candidatos e revisões imutáveis ficam
+auditáveis.
 
 **Nenhum draft histórico foi criado a partir das partidas já armazenadas.** O Match-V5 não contém
 o estado anterior do draft nem as recomendações produzidas; fabricá-los seria inventar exatamente
@@ -135,15 +145,17 @@ conteúdo dela.
 
 ## API
 
-| Rota | O que faz |
-|---|---|
-| `POST /drafts/recommendations` | Analisa e, com `session` no payload, persiste como efeito colateral |
-| `GET /drafts/sessions/active` | Sessão em andamento da própria conta |
-| `GET /drafts/sessions` | Histórico recente |
-| `GET /drafts/sessions/:id` | Detalhe + snapshot atual + comparação da escolha + estado do vínculo |
-| `GET /drafts/sessions/:id/snapshots` | Todos os snapshots, do mais novo ao mais antigo |
-| `POST /drafts/sessions/:id/lock-in` | Registra o campeão confirmado |
-| `POST /drafts/sessions/:id/status` | Transição explícita de ciclo de vida |
+| Rota                                      | O que faz                                                            |
+| ----------------------------------------- | -------------------------------------------------------------------- |
+| `POST /drafts/recommendations`            | Analisa e, com `session` no payload, persiste como efeito colateral  |
+| `GET /drafts/sessions/active`             | Sessão em andamento da própria conta                                 |
+| `GET /drafts/sessions`                    | Histórico recente                                                    |
+| `GET /drafts/sessions/:id`                | Detalhe + snapshot atual + comparação da escolha + estado do vínculo |
+| `GET /drafts/sessions/:id/snapshots`      | Todos os snapshots, do mais novo ao mais antigo                      |
+| `POST /drafts/sessions/:id/lock-in`       | Registra o campeão confirmado                                        |
+| `POST /drafts/sessions/:id/status`        | Aceita somente `IN_GAME` ou `ABANDONED`; nunca `matchId`             |
+| `POST /drafts/sessions/:id/observed-game` | Persiste o `gameId` numérico observado no LCU                        |
+| `POST /drafts/sessions/reconcile`         | Reprocessa, de forma protegida, somente sessões existentes           |
 
 Não existe endpoint que aceite um snapshot arbitrário: a criação passa sempre pela orquestração,
 com o input reconstruído a partir do que o motor de fato usou.
@@ -154,6 +166,5 @@ com o input reconstruído a partir do que o motor de fato usou.
   junta os bans dos dois times de propósito. Separar aliados de inimigos exigiria inventar o lado,
   então eles são preservados sem atribuição e o contrato declara `banSideKnown: false`.
 - **`queueId`/`gameVersion`** só são gravados quando o cliente os informa; não são deduzidos.
-- **A conclusão automática por Match-V5 ainda não existe**: hoje o vínculo depende de alguém
-  informar o `matchId`. A reconciliação automática é trabalho de uma etapa futura, e a ausência
-  dela deixa a sessão honestamente sem vínculo.
+- O Match-V5 não expõe bans de champion select; por isso bans não entram como sinal de vínculo.
+- Sessões manuais e dodges são `NOT_APPLICABLE` e nunca consomem a partida seguinte.

@@ -67,6 +67,7 @@ export interface RiotMatchTeamDto {
 export interface RiotMatchDto {
   metadata: { matchId: string; participants: string[] };
   info: {
+    gameId?: number;
     gameDuration: number;
     gameVersion: string;
     gameStartTimestamp: number;

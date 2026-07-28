@@ -28,7 +28,13 @@ import {
  * comparação não foi implementada, e sugeri-la visualmente seria inventar
  * conclusão.
  */
-export function DraftHistoryScreen({ sessionToken }: { sessionToken: string | null }) {
+export function DraftHistoryScreen({
+  sessionToken,
+  onOpenMatch
+}: {
+  sessionToken: string | null;
+  onOpenMatch?: (matchId: string) => void;
+}) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const history = useAsyncData<{ sessions: DraftSessionSummary[] }>(
@@ -37,7 +43,8 @@ export function DraftHistoryScreen({ sessionToken }: { sessionToken: string | nu
   );
 
   const detail = useAsyncData<DraftSessionDetail>(
-    () => (sessionToken && selectedId ? fetchDraftSessionDetail(sessionToken, selectedId) : undefined),
+    () =>
+      sessionToken && selectedId ? fetchDraftSessionDetail(sessionToken, selectedId) : undefined,
     [sessionToken, selectedId]
   );
 
@@ -59,7 +66,10 @@ export function DraftHistoryScreen({ sessionToken }: { sessionToken: string | nu
 
       {history.status === "error" && (
         <Card>
-          <EmptyState title="Histórico não pôde ser carregado" description={history.error ?? undefined} />
+          <EmptyState
+            title="Histórico não pôde ser carregado"
+            description={history.error ?? undefined}
+          />
         </Card>
       )}
 
@@ -93,10 +103,15 @@ export function DraftHistoryScreen({ sessionToken }: { sessionToken: string | nu
                     <SignalChip tone="info" pill>
                       {session.source === "LCU" ? "Lida do League Client" : "Simulação manual"}
                     </SignalChip>
+                    <SignalChip tone="info" pill>
+                      {matchLinkStatusLabels[session.matchLinkStatus]}
+                    </SignalChip>
                   </SignalChipList>
                 }
               />
-              {session.id === selectedId && <SessionDetail state={detail} />}
+              {session.id === selectedId && (
+                <SessionDetail state={detail} onOpenMatch={onOpenMatch} />
+              )}
             </InteractiveCard>
           ))}
         </div>
@@ -113,8 +128,17 @@ const statusLabels: Record<DraftSessionSummary["status"], string> = {
   ABANDONED: "Abandonada"
 };
 
+const matchLinkStatusLabels: Record<DraftSessionSummary["matchLinkStatus"], string> = {
+  PENDING: "Partida aguardando sincronização",
+  LINKED: "Partida vinculada",
+  AMBIGUOUS: "Vínculo ambíguo",
+  UNLINKABLE: "Evidência insuficiente",
+  NOT_APPLICABLE: "Sem partida aplicável"
+};
+
 function describeKnownDraft(session: DraftSessionSummary): string {
-  const { allies, enemies, bannedChampionIds, unknownAllyPicks, unknownEnemyPicks } = session.knownDraft;
+  const { allies, enemies, bannedChampionIds, unknownAllyPicks, unknownEnemyPicks } =
+    session.knownDraft;
   return (
     `${allies.length} aliado(s) e ${enemies.length} inimigo(s) revelados · ` +
     `${unknownAllyPicks + unknownEnemyPicks} pick(s) ainda desconhecido(s) · ` +
@@ -122,10 +146,18 @@ function describeKnownDraft(session: DraftSessionSummary): string {
   );
 }
 
-function SessionDetail({ state }: { state: { data: DraftSessionDetail | null; status: string; error: string | null } }) {
+function SessionDetail({
+  state,
+  onOpenMatch
+}: {
+  state: { data: DraftSessionDetail | null; status: string; error: string | null };
+  onOpenMatch?: (matchId: string) => void;
+}) {
   if (state.status === "loading") return <Loading label="Carregando sessão..." />;
   if (state.status === "error" || !state.data) {
-    return <EmptyState inline title="Detalhe indisponível" description={state.error ?? undefined} />;
+    return (
+      <EmptyState inline title="Detalhe indisponível" description={state.error ?? undefined} />
+    );
   }
 
   const { latestSnapshot, selectedChampion, matchLink } = state.data;
@@ -176,10 +208,19 @@ function SessionDetail({ state }: { state: { data: DraftSessionDetail | null; st
       <SignalChipList stacked>
         <SignalChip tone="info">{describeSelection(selectedChampion)}</SignalChip>
         <SignalChip tone="info">
-          {matchLink.state === "LINKED"
-            ? `Partida vinculada: ${matchLink.matchId}`
-            : "Partida ainda não vinculada"}
+          {matchLinkStatusLabels[matchLink.status]}
+          {matchLink.matchId ? `: ${matchLink.matchId}` : ""}
         </SignalChip>
+        {matchLink.strategy && (
+          <SignalChip tone="info">
+            Estratégia:{" "}
+            {matchLink.strategy === "EXACT_GAME_ID" ? "gameId exato" : "evidências fortes"}
+          </SignalChip>
+        )}
+        {matchLink.reason && <SignalChip tone="info">{matchLink.reason}</SignalChip>}
+        {matchLink.status === "AMBIGUOUS" && (
+          <SignalChip tone="info">{matchLink.candidateCount} candidatos plausíveis</SignalChip>
+        )}
         {latestSnapshot && (
           <SignalChip tone="info">
             Versões usadas:{" "}
@@ -189,6 +230,18 @@ function SessionDetail({ state }: { state: { data: DraftSessionDetail | null; st
           </SignalChip>
         )}
       </SignalChipList>
+      {matchLink.status === "LINKED" && matchLink.matchId && onOpenMatch && (
+        <button
+          type="button"
+          className="sp-button sp-button--primary"
+          onClick={(event) => {
+            event.stopPropagation();
+            onOpenMatch(matchLink.matchId as string);
+          }}
+        >
+          Abrir pós-jogo vinculado
+        </button>
+      )}
     </div>
   );
 }
@@ -204,7 +257,9 @@ function describeSelection(selection: DraftSessionDetail["selectedChampion"]): s
 }
 
 /** Rótulo do estado de persistência da sessão atual, pro Champion Select. */
-export function persistenceLabel(status?: "SAVED" | "UNCHANGED" | "NOT_TRACKED" | "FAILED"): string | null {
+export function persistenceLabel(
+  status?: "SAVED" | "UNCHANGED" | "NOT_TRACKED" | "FAILED"
+): string | null {
   if (status === "SAVED") return "Sessão salva no histórico";
   if (status === "UNCHANGED") return "Histórico já atualizado";
   if (status === "FAILED") return "Histórico não pôde ser salvo";

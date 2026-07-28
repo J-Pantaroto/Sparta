@@ -17,7 +17,10 @@ const {
   listSnapshotsMock,
   findLatestSnapshotMock,
   transitionDraftSessionMock,
-  describeSelectedChampionMock
+  describeSelectedChampionMock,
+  listDraftMatchLinkRevisionsMock,
+  observeExternalGameIdMock,
+  reconcileDraftSessionsForAccountMock
 } = vi.hoisted(() => ({
   getAuthenticatedUserIdMock: vi.fn(),
   riotAccountFindFirstMock: vi.fn(),
@@ -35,7 +38,10 @@ const {
   listSnapshotsMock: vi.fn(),
   findLatestSnapshotMock: vi.fn(),
   transitionDraftSessionMock: vi.fn(),
-  describeSelectedChampionMock: vi.fn()
+  describeSelectedChampionMock: vi.fn(),
+  listDraftMatchLinkRevisionsMock: vi.fn(),
+  observeExternalGameIdMock: vi.fn(),
+  reconcileDraftSessionsForAccountMock: vi.fn()
 }));
 
 vi.mock("./draft-session-repository.js", () => ({
@@ -47,7 +53,13 @@ vi.mock("./draft-session-repository.js", () => ({
   listSnapshots: listSnapshotsMock,
   findLatestSnapshot: findLatestSnapshotMock,
   transitionDraftSession: transitionDraftSessionMock,
-  describeSelectedChampion: describeSelectedChampionMock
+  describeSelectedChampion: describeSelectedChampionMock,
+  listDraftMatchLinkRevisions: listDraftMatchLinkRevisionsMock,
+  observeExternalGameId: observeExternalGameIdMock
+}));
+
+vi.mock("./draft-match-reconciler.js", () => ({
+  reconcileDraftSessionsForAccount: reconcileDraftSessionsForAccountMock
 }));
 
 vi.mock("../auth/routes.js", () => ({
@@ -502,7 +514,10 @@ describe("persistência de draft (Etapa 16)", () => {
       regionalRouting: "americas"
     });
     upsertActiveDraftSessionMock.mockResolvedValue(sessaoAtiva);
-    persistRecommendationSnapshotMock.mockResolvedValue({ status: "CREATED", snapshotId: "snap-1" });
+    persistRecommendationSnapshotMock.mockResolvedValue({
+      status: "CREATED",
+      snapshotId: "snap-1"
+    });
   });
 
   it("sem identificação de sessão, nada é gravado e a análise sai normal", async () => {
@@ -546,7 +561,10 @@ describe("persistência de draft (Etapa 16)", () => {
   });
 
   it("input inalterado não grava de novo", async () => {
-    persistRecommendationSnapshotMock.mockResolvedValue({ status: "UNCHANGED", snapshotId: "snap-1" });
+    persistRecommendationSnapshotMock.mockResolvedValue({
+      status: "UNCHANGED",
+      snapshotId: "snap-1"
+    });
     const app = await buildApp();
 
     const response = await app.inject({
@@ -578,7 +596,9 @@ describe("persistência de draft (Etapa 16)", () => {
   });
 
   it("exceção na gravação também não derruba, e não vaza detalhe interno", async () => {
-    upsertActiveDraftSessionMock.mockRejectedValue(new Error("connection refused em 10.0.0.5:5432"));
+    upsertActiveDraftSessionMock.mockRejectedValue(
+      new Error("connection refused em 10.0.0.5:5432")
+    );
     const app = await buildApp();
 
     const response = await app.inject({
@@ -640,6 +660,7 @@ describe("consultas de sessão (Etapa 16)", () => {
     listSnapshotsMock.mockResolvedValue(null);
     findLatestSnapshotMock.mockResolvedValue(null);
     describeSelectedChampionMock.mockResolvedValue(null);
+    listDraftMatchLinkRevisionsMock.mockResolvedValue([]);
   });
 
   it("exige autenticação", async () => {
@@ -685,9 +706,9 @@ describe("consultas de sessão (Etapa 16)", () => {
 
     const body = (await app.inject({ method: "GET", url: "/drafts/sessions/sessao-1" })).json();
 
-    expect(body.matchLink.state).toBe("UNLINKED");
+    expect(body.matchLink.status).toBe("PENDING");
     expect(body.matchLink.reason).toBeTruthy();
-    expect(body.matchLink.matchId).toBeUndefined();
+    expect(body.matchLink.matchId).toBeNull();
     await app.close();
   });
 
@@ -701,8 +722,66 @@ describe("consultas de sessão (Etapa 16)", () => {
     });
 
     expect(response.statusCode).toBe(422);
-    expect(response.json().code).toBe("MATCH_LINK_UNAVAILABLE");
+    expect(response.json().code).toBe("MATCH_LINK_SERVER_MANAGED");
     expect(transitionDraftSessionMock).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("não aceita matchId arbitrário do desktop nem para concluir a sessão", async () => {
+    const app = await buildApp();
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/drafts/sessions/sessao-1/status",
+      payload: { status: "COMPLETED", matchId: "BR1_999999" }
+    });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json().code).toBe("MATCH_LINK_SERVER_MANAGED");
+    expect(transitionDraftSessionMock).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("registra somente o gameId numérico observado, sem receber matchId", async () => {
+    observeExternalGameIdMock.mockResolvedValue({
+      ok: true,
+      session: { id: "sessao-1", externalGameId: "123456" }
+    });
+    const app = await buildApp();
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/drafts/sessions/sessao-1/observed-game",
+      payload: { gameId: "123456", matchId: "BR1_123456" }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(observeExternalGameIdMock).toHaveBeenCalledWith({
+      riotAccountId: "conta-1",
+      sessionRef: "sessao-1",
+      gameId: "123456"
+    });
+    await app.close();
+  });
+
+  it("reprocessa apenas a conta autenticada e devolve o relatório do backfill", async () => {
+    reconcileDraftSessionsForAccountMock.mockResolvedValue({
+      processed: 3,
+      linked: 1,
+      ambiguous: 1,
+      pending: 1,
+      unlinkable: 0,
+      notApplicable: 0,
+      unchanged: 0,
+      failed: 0
+    });
+    const app = await buildApp();
+
+    const response = await app.inject({ method: "POST", url: "/drafts/sessions/reconcile" });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().report).toMatchObject({ linked: 1, ambiguous: 1, pending: 1 });
+    expect(reconcileDraftSessionsForAccountMock).toHaveBeenCalledWith("conta-1");
     await app.close();
   });
 

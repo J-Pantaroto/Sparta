@@ -50,7 +50,9 @@ export const draftSessionIdentitySchema = z.object({
   sessionKey: z.string().min(8).max(128),
   source: z.enum(["LCU", "USER"]),
   queueId: z.number().int().optional(),
-  gameVersion: z.string().max(40).optional()
+  gameVersion: z.string().max(40).optional(),
+  /** gameId numérico observado pelo LCU; não é um matchId informado à mão. */
+  gameId: z.string().regex(/^\d+$/).max(32).optional()
 });
 
 export const draftRecommendationRequestSchemaWithSession = z.object({
@@ -63,7 +65,10 @@ export const draftSessionLockInSchema = z.object({
 });
 
 export const draftSessionTransitionSchema = z.object({
-  status: z.enum(["IN_GAME", "COMPLETED", "ABANDONED"]),
-  /** Exigido para COMPLETED: sem identificador confiavel nao ha conclusao. */
-  matchId: z.string().min(3).max(64).optional()
+  // COMPLETED é reservado ao reconciliador e nunca é aceito do desktop.
+  status: z.enum(["IN_GAME", "ABANDONED", "COMPLETED"])
+});
+
+export const draftSessionObservedGameSchema = z.object({
+  gameId: z.string().regex(/^\d+$/).max(32)
 });

@@ -1,5 +1,10 @@
 import { contextBridge, ipcRenderer } from "electron";
-import type { LcuDraftSnapshot, LcuGameflowPhase, LcuReadStatus } from "@sparta/riot";
+import type {
+  LcuDraftSnapshot,
+  LcuGameflowPhase,
+  LcuObservedGame,
+  LcuReadStatus
+} from "@sparta/riot";
 import type { Role } from "@sparta/core";
 
 contextBridge.exposeInMainWorld("sparta", {
@@ -59,6 +64,7 @@ contextBridge.exposeInMainWorld("sparta", {
     pickOrder: number | null;
     playerRole: Role | null;
     draft: LcuDraftSnapshot | null;
+    observedGame: LcuObservedGame | null;
   }> {
     return ipcRenderer.invoke("sparta:lcu-state");
   },
@@ -66,5 +72,10 @@ contextBridge.exposeInMainWorld("sparta", {
     const listener = (_event: unknown, draft: LcuDraftSnapshot | null) => callback(draft);
     ipcRenderer.on("sparta:draft-snapshot", listener);
     return () => ipcRenderer.removeListener("sparta:draft-snapshot", listener);
+  },
+  onObservedGame(callback: (game: LcuObservedGame | null) => void) {
+    const listener = (_event: unknown, game: LcuObservedGame | null) => callback(game);
+    ipcRenderer.on("sparta:observed-game", listener);
+    return () => ipcRenderer.removeListener("sparta:observed-game", listener);
   }
 });

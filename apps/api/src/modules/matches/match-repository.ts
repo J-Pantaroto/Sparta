@@ -6,7 +6,10 @@ import type { RiotMatchDto } from "@sparta/riot";
 
 export async function findExistingMatchIds(matchIds: string[]): Promise<Set<string>> {
   if (matchIds.length === 0) return new Set();
-  const rows = await prisma.match.findMany({ where: { matchId: { in: matchIds } }, select: { matchId: true } });
+  const rows = await prisma.match.findMany({
+    where: { matchId: { in: matchIds } },
+    select: { matchId: true }
+  });
   return new Set(rows.map((row) => row.matchId));
 }
 
@@ -36,12 +39,17 @@ async function persistMatchParticipants(
   matchDbId: string,
   participants: ParticipantToPersist[]
 ): Promise<PersistParticipantsResult> {
-  const distinctChampionIds = Array.from(new Set(participants.map((entry) => entry.summary.championId)));
+  const distinctChampionIds = Array.from(
+    new Set(participants.map((entry) => entry.summary.championId))
+  );
   const participantPuuids = participants.map((entry) => entry.summary.puuid);
 
   const [existingChampions, knownAccounts] = await Promise.all([
     tx.champion.findMany({ where: { id: { in: distinctChampionIds } }, select: { id: true } }),
-    tx.riotAccount.findMany({ where: { puuid: { in: participantPuuids } }, select: { id: true, puuid: true } })
+    tx.riotAccount.findMany({
+      where: { puuid: { in: participantPuuids } },
+      select: { id: true, puuid: true }
+    })
   ]);
   const knownChampionIds = new Set(existingChampions.map((champion) => champion.id));
   const riotAccountIdByPuuid = new Map(knownAccounts.map((account) => [account.puuid, account.id]));
@@ -117,10 +125,13 @@ export interface PersistMatchResult {
  */
 export async function persistMatch(input: PersistMatchInput): Promise<PersistMatchResult> {
   const { participants, timeline, trackedPuuid, platform, rawMatch } = input;
+  const rawInfo = (rawMatch as unknown as { info?: RiotMatchDto["info"] }).info;
 
   const tracked = participants.find((entry) => entry.summary.puuid === trackedPuuid);
   if (!tracked) {
-    throw new Error(`Participante rastreado (${trackedPuuid}) nao encontrado na lista de participantes da partida.`);
+    throw new Error(
+      `Participante rastreado (${trackedPuuid}) nao encontrado na lista de participantes da partida.`
+    );
   }
   const { summary: trackedSummary } = tracked;
 
@@ -130,8 +141,16 @@ export async function persistMatch(input: PersistMatchInput): Promise<PersistMat
       update: {},
       create: {
         matchId: trackedSummary.matchId,
+        gameId:
+          rawInfo?.gameId !== undefined
+            ? String(rawInfo.gameId)
+            : trackedSummary.matchId.match(/_(\d+)$/)?.[1],
         platform,
         patch: trackedSummary.patch,
+        gameVersion: rawInfo?.gameVersion,
+        queueId: rawInfo?.queueId,
+        gameMode: rawInfo?.gameMode,
+        gameType: rawInfo?.gameType,
         durationSeconds: trackedSummary.durationSeconds,
         startedAt: new Date(trackedSummary.startedAt),
         rawJson: rawMatch
@@ -210,7 +229,8 @@ export async function findMatchesMissingParticipants(): Promise<MatchNeedingBack
     .filter(
       (match) =>
         match.rawJson !== null &&
-        (match._count.participants < 10 || match.participants.some((participant) => participant.teamId === null))
+        (match._count.participants < 10 ||
+          match.participants.some((participant) => participant.teamId === null))
     )
     .map(({ id, matchId, rawJson }) => ({ id, matchId, rawJson }));
 }
@@ -348,7 +368,10 @@ export interface ParticipationRecord {
  * (comportamento inalterado, usado por chamadores que ainda nao passam a
  * configuracao).
  */
-export async function findParticipationHistory(puuid: string, limit?: number): Promise<ParticipationRecord[]> {
+export async function findParticipationHistory(
+  puuid: string,
+  limit?: number
+): Promise<ParticipationRecord[]> {
   const rows = await prisma.matchParticipant.findMany({
     where: { puuid, role: { not: null } },
     include: { match: true, champion: true },

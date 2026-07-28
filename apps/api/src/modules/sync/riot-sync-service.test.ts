@@ -8,7 +8,8 @@ const {
   getMatchTimelineMock,
   getMatchIdsByPuuidMock,
   recomputeChampionStatsMock,
-  findMatchAnalysisLimitByPuuidMock
+  findMatchAnalysisLimitByPuuidMock,
+  reconcileDraftSessionsForAccountMock
 } = vi.hoisted(() => ({
   findExistingMatchIdsMock: vi.fn(),
   persistMatchMock: vi.fn(),
@@ -16,7 +17,8 @@ const {
   getMatchTimelineMock: vi.fn(),
   getMatchIdsByPuuidMock: vi.fn(),
   recomputeChampionStatsMock: vi.fn(),
-  findMatchAnalysisLimitByPuuidMock: vi.fn()
+  findMatchAnalysisLimitByPuuidMock: vi.fn(),
+  reconcileDraftSessionsForAccountMock: vi.fn()
 }));
 
 vi.mock("../matches/match-repository.js", () => ({
@@ -35,6 +37,10 @@ vi.mock("../riot-integration/client-factory.js", () => ({
 vi.mock("../players/player-stats-repository.js", () => ({
   recomputeChampionStats: recomputeChampionStatsMock,
   findMatchAnalysisLimitByPuuid: findMatchAnalysisLimitByPuuidMock
+}));
+
+vi.mock("../drafts/draft-match-reconciler.js", () => ({
+  reconcileDraftSessionsForAccount: reconcileDraftSessionsForAccountMock
 }));
 
 import { syncPlayerMatches } from "./riot-sync-service.js";
@@ -111,6 +117,16 @@ describe("syncPlayerMatches", () => {
     vi.clearAllMocks();
     recomputeChampionStatsMock.mockResolvedValue(undefined);
     findMatchAnalysisLimitByPuuidMock.mockResolvedValue(50);
+    reconcileDraftSessionsForAccountMock.mockResolvedValue({
+      processed: 0,
+      linked: 0,
+      ambiguous: 0,
+      pending: 0,
+      unlinkable: 0,
+      notApplicable: 0,
+      unchanged: 0,
+      failed: 0
+    });
   });
 
   it("pula partidas ja existentes e so processa as novas", async () => {
@@ -189,8 +205,14 @@ describe("syncPlayerMatches", () => {
       expect.objectContaining({
         trackedPuuid: PUUID,
         participants: expect.arrayContaining([
-          expect.objectContaining({ teamId: 100, summary: expect.objectContaining({ puuid: PUUID, championId: 61 }) }),
-          expect.objectContaining({ teamId: 200, summary: expect.objectContaining({ puuid: "puuid-enemy", championId: 157 }) })
+          expect.objectContaining({
+            teamId: 100,
+            summary: expect.objectContaining({ puuid: PUUID, championId: 61 })
+          }),
+          expect.objectContaining({
+            teamId: 200,
+            summary: expect.objectContaining({ puuid: "puuid-enemy", championId: 157 })
+          })
         ])
       })
     );
@@ -214,12 +236,30 @@ describe("syncPlayerMatches", () => {
     getMatchIdsByPuuidMock.mockResolvedValue(["m1", "m2", "m3"]);
     findExistingMatchIdsMock.mockResolvedValue(new Set());
     getMatchMock.mockImplementation((matchId: string) => Promise.resolve(rawMatch(matchId)));
-    getMatchTimelineMock.mockImplementation((matchId: string) => Promise.resolve(rawTimeline(matchId)));
+    getMatchTimelineMock.mockImplementation((matchId: string) =>
+      Promise.resolve(rawTimeline(matchId))
+    );
     persistMatchMock.mockResolvedValue({ skippedParticipantPuuids: [] });
 
     const result = await syncPlayerMatches(player, { maxNewMatches: 2 });
 
     expect(result.imported).toBe(2);
     expect(result.stoppedEarly).toBe("max_reached");
+  });
+
+  it("falha do reconciliador não invalida partidas já importadas", async () => {
+    getMatchIdsByPuuidMock.mockResolvedValue(["m1"]);
+    findExistingMatchIdsMock.mockResolvedValue(new Set());
+    getMatchMock.mockResolvedValue(rawMatch("m1"));
+    getMatchTimelineMock.mockResolvedValue(rawTimeline("m1"));
+    persistMatchMock.mockResolvedValue({ skippedParticipantPuuids: [] });
+    reconcileDraftSessionsForAccountMock.mockRejectedValue(new Error("db indisponível"));
+    const onDraftReconciliationFailed = vi.fn();
+
+    const result = await syncPlayerMatches(player, { onDraftReconciliationFailed });
+
+    expect(result.imported).toBe(1);
+    expect(result.failed).toEqual([]);
+    expect(onDraftReconciliationFailed).toHaveBeenCalledTimes(1);
   });
 });

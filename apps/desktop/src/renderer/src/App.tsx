@@ -5,14 +5,21 @@ import type {
   DraftState,
   Role
 } from "@sparta/core";
-import type { LcuDraftMember, LcuDraftSnapshot } from "@sparta/riot";
-import { useEffect, useMemo, useState } from "react";
+import type {
+  LcuDraftMember,
+  LcuDraftSnapshot,
+  LcuGameflowPhase,
+  LcuObservedGame
+} from "@sparta/riot";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { navGroups, type Page } from "./app/navigation";
 import { useAsyncData } from "./hooks/use-async-data";
 import {
   fetchDraftRecommendations,
   fetchSession,
+  observeDraftSessionGame,
   SESSION_TOKEN_KEY,
+  transitionDraftSessionStatus,
   type DraftPersistenceInfo,
   type DraftSessionIdentity,
   type RiotAccountSummary,
@@ -96,6 +103,7 @@ function SpartaApp() {
   const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
   const [riotAccounts, setRiotAccounts] = useState<RiotAccountSummary[]>([]);
   const [poolRevision, setPoolRevision] = useState(0);
+  const [postgameInitialMatchId, setPostgameInitialMatchId] = useState<string | null>(null);
   /**
    * Identidade da sessão de draft (Etapa 16). Nasce ao **entrar** no champion
    * select (ou ao iniciar a simulação manual) e é descartada ao sair - não
@@ -104,6 +112,13 @@ function SpartaApp() {
    * a análise continua funcionando igual.
    */
   const [draftSession, setDraftSession] = useState<DraftSessionIdentity | null>(null);
+  const [persistedDraftSessionId, setPersistedDraftSessionId] = useState<string | null>(null);
+  const persistedDraftSessionIdRef = useRef<string | null>(null);
+  const lastGameflowPhaseRef = useRef<LcuGameflowPhase | null>(null);
+  const sentObservedGameRef = useRef<string | null>(null);
+  const [observedGame, setObservedGame] = useState<LcuObservedGame | null>(null);
+  const [lastLcuSessionKey, setLastLcuSessionKey] = useState<string | null>(null);
+  const lastLcuSessionKeyRef = useRef<string | null>(null);
 
   // Proteção centralizada: sem posição, a requisição nem sai. A API também
   // recusa (`PLAYER_ROLE_UNAVAILABLE`), mas barrar aqui evita depender de a
@@ -119,6 +134,13 @@ function SpartaApp() {
         : undefined,
     [sessionToken, draft, poolRevision, draftSession]
   );
+
+  useEffect(() => {
+    const sessionId = recommendationsQuery.data?.persistence?.sessionId;
+    if (!sessionId) return;
+    setPersistedDraftSessionId(sessionId);
+    persistedDraftSessionIdRef.current = sessionId;
+  }, [recommendationsQuery.data?.persistence?.sessionId]);
 
   function loadDataDragonVersion() {
     setDdragonError(null);
@@ -169,16 +191,72 @@ function SpartaApp() {
   useEffect(() => {
     if (sessionStatus !== "ready" || !window.sparta?.onGameflowPhase) return;
     const unsubscribe = window.sparta.onGameflowPhase((phase) => {
+      const previous = lastGameflowPhaseRef.current;
+      lastGameflowPhaseRef.current = phase;
       const active = phase === "ChampSelect";
       setChampSelectActive(active);
       if (active) setPage("select");
+      if (active && previous !== "ChampSelect") {
+        setPersistedDraftSessionId(null);
+        persistedDraftSessionIdRef.current = null;
+        sentObservedGameRef.current = null;
+      }
+      const gameStarted = ["GameStart", "InProgress", "Reconnect"].includes(phase ?? "");
+      const sessionRef = persistedDraftSessionIdRef.current ?? lastLcuSessionKeyRef.current;
+      if (sessionToken && sessionRef && gameStarted) {
+        void transitionDraftSessionStatus(sessionToken, sessionRef, "IN_GAME").catch(
+          () => undefined
+        );
+      } else if (
+        sessionToken &&
+        sessionRef &&
+        previous === "ChampSelect" &&
+        !active &&
+        !gameStarted
+      ) {
+        void transitionDraftSessionStatus(sessionToken, sessionRef, "ABANDONED").catch(
+          () => undefined
+        );
+      }
       // Entrar cria uma chave nova; sair descarta. Nunca reaproveita.
       setDraftSession((current) =>
         active ? (current ?? { sessionKey: newDraftSessionKey(), source: "LCU" }) : null
       );
     });
     return unsubscribe;
+  }, [sessionStatus, sessionToken]);
+
+  useEffect(() => {
+    if (sessionStatus !== "ready" || !window.sparta?.onObservedGame) return;
+    return window.sparta.onObservedGame(setObservedGame);
   }, [sessionStatus]);
+
+  useEffect(() => {
+    if (!observedGame) return;
+    setDraftSession((current) =>
+      current?.source === "LCU" && current.gameId !== observedGame.gameId
+        ? { ...current, gameId: observedGame.gameId }
+        : current
+    );
+  }, [observedGame]);
+
+  useEffect(() => {
+    if (draftSession?.source === "LCU") {
+      setLastLcuSessionKey(draftSession.sessionKey);
+      lastLcuSessionKeyRef.current = draftSession.sessionKey;
+    }
+  }, [draftSession]);
+
+  useEffect(() => {
+    const sessionRef = persistedDraftSessionId ?? lastLcuSessionKey;
+    if (!sessionToken || !sessionRef || !observedGame) return;
+    const key = `${sessionRef}:${observedGame.gameId}`;
+    if (sentObservedGameRef.current === key) return;
+    sentObservedGameRef.current = key;
+    void observeDraftSessionGame(sessionToken, sessionRef, observedGame.gameId).catch(() => {
+      sentObservedGameRef.current = null;
+    });
+  }, [sessionToken, persistedDraftSessionId, lastLcuSessionKey, observedGame]);
 
   /**
    * Modo manual: a simulação também vira sessão persistida, marcada como
@@ -272,6 +350,7 @@ function SpartaApp() {
       if (state.pickOrder !== null) setAutoPickOrder(state.pickOrder);
       if (state.playerRole !== null) setAutoPlayerRole(state.playerRole);
       if (state.draft !== null) setAutoDraft(state.draft);
+      if (state.observedGame !== null) setObservedGame(state.observedGame);
     });
     return () => {
       cancelled = true;
@@ -505,9 +584,18 @@ function SpartaApp() {
           riotAccounts={riotAccounts}
           sessionToken={sessionToken}
           ddragonVersion={ddragonVersion}
+          initialMatchId={postgameInitialMatchId}
         />
       )}
-      {page === "drafts" && <DraftHistoryScreen sessionToken={sessionToken} />}
+      {page === "drafts" && (
+        <DraftHistoryScreen
+          sessionToken={sessionToken}
+          onOpenMatch={(matchId) => {
+            setPostgameInitialMatchId(matchId);
+            setPage("postgame");
+          }}
+        />
+      )}
       {page === "growth" && <GrowthJourneyScreen riotAccounts={riotAccounts} />}
       {page === "settings" && (
         <SettingsScreen ddragonVersion={ddragonVersion} sessionToken={sessionToken} />

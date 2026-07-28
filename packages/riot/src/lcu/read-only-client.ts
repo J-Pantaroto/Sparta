@@ -99,6 +99,11 @@ export function parseLcuLockfile(raw: string): LcuReadResult<LcuConnectionInfo> 
   return { status: "OK", data: { port, password, protocol: "https" } };
 }
 
+/** Identidade oficial da partida observada no gameflow local. */
+export interface LcuObservedGame {
+  gameId: string;
+}
+
 function missingLockfileStatus(): "CLIENT_CLOSED" | "LOCKFILE_MISSING" {
   const custom = process.env.LEAGUE_CLIENT_PATH;
   if (custom && existsSync(custom)) return "CLIENT_CLOSED";
@@ -107,7 +112,10 @@ function missingLockfileStatus(): "CLIENT_CLOSED" | "LOCKFILE_MISSING" {
     : "LOCKFILE_MISSING";
 }
 
-export function classifyLcuNetworkFailure(timedOut: boolean, code?: string): Exclude<LcuReadStatus, "OK"> {
+export function classifyLcuNetworkFailure(
+  timedOut: boolean,
+  code?: string
+): Exclude<LcuReadStatus, "OK"> {
   if (timedOut) return "REQUEST_TIMEOUT";
   return code === "ECONNREFUSED" ? "CONNECTION_REFUSED" : "ENDPOINT_UNAVAILABLE";
 }
@@ -173,7 +181,9 @@ function requestLcu<T>(
           }
           try {
             const payload: unknown = JSON.parse(body);
-            finish(validate(payload) ? { status: "OK", data: payload } : { status: "INVALID_RESPONSE" });
+            finish(
+              validate(payload) ? { status: "OK", data: payload } : { status: "INVALID_RESPONSE" }
+            );
           } catch {
             finish({ status: "INVALID_RESPONSE" });
           }
@@ -200,6 +210,21 @@ function isSession(payload: unknown): payload is Record<string, unknown> {
   return typeof payload === "object" && payload !== null && !Array.isArray(payload);
 }
 
+export function extractObservedGame(payload: Record<string, unknown>): LcuObservedGame | undefined {
+  const gameData =
+    typeof payload.gameData === "object" && payload.gameData !== null
+      ? (payload.gameData as Record<string, unknown>)
+      : undefined;
+  const rawGameId = gameData?.gameId;
+  const gameId =
+    typeof rawGameId === "number" && Number.isSafeInteger(rawGameId)
+      ? String(rawGameId)
+      : typeof rawGameId === "string"
+        ? rawGameId.trim()
+        : "";
+  return /^\d+$/.test(gameId) && gameId !== "0" ? { gameId } : undefined;
+}
+
 /**
  * Cliente local e somente leitura para o League Client Update (LCU).
  *
@@ -211,6 +236,7 @@ function isSession(payload: unknown): payload is Record<string, unknown> {
  *
  * Endpoints usados (documentados):
  * - GET /lol-gameflow/v1/gameflow-phase
+ * - GET /lol-gameflow/v1/session
  * - GET /lol-champ-select/v1/session
  */
 export class LcuReadOnlyClient {
@@ -221,13 +247,23 @@ export class LcuReadOnlyClient {
   async getGameflowPhase(): Promise<LcuReadResult<LcuGameflowPhase>> {
     const connection = readConnectionInfo();
     if (connection.status !== "OK") return connection;
-    return requestLcu(connection.data, "/lol-gameflow/v1/gameflow-phase", isGameflowPhase, "ENDPOINT_UNAVAILABLE");
+    return requestLcu(
+      connection.data,
+      "/lol-gameflow/v1/gameflow-phase",
+      isGameflowPhase,
+      "ENDPOINT_UNAVAILABLE"
+    );
   }
 
   async getChampionSelectSession(): Promise<LcuReadResult<LcuChampionSelectSnapshot>> {
     const connection = readConnectionInfo();
     if (connection.status !== "OK") return connection;
-    const session = await requestLcu(connection.data, "/lol-champ-select/v1/session", isSession, "OUTSIDE_CHAMP_SELECT");
+    const session = await requestLcu(
+      connection.data,
+      "/lol-champ-select/v1/session",
+      isSession,
+      "OUTSIDE_CHAMP_SELECT"
+    );
     if (session.status !== "OK") return session;
     return {
       status: "OK",
@@ -239,5 +275,18 @@ export class LcuReadOnlyClient {
         theirTeam: session.data.theirTeam as LcuChampSelectTeamMember[] | undefined
       }
     };
+  }
+
+  async getObservedGame(): Promise<LcuReadResult<LcuObservedGame | undefined>> {
+    const connection = readConnectionInfo();
+    if (connection.status !== "OK") return connection;
+    const session = await requestLcu(
+      connection.data,
+      "/lol-gameflow/v1/session",
+      isSession,
+      "ENDPOINT_UNAVAILABLE"
+    );
+    if (session.status !== "OK") return session;
+    return { status: "OK", data: extractObservedGame(session.data) };
   }
 }

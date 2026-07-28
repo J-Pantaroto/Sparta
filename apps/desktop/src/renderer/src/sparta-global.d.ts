@@ -1,4 +1,9 @@
-import type { LcuDraftSnapshot, LcuGameflowPhase, LcuReadStatus } from "@sparta/riot";
+import type {
+  LcuDraftSnapshot,
+  LcuGameflowPhase,
+  LcuObservedGame,
+  LcuReadStatus
+} from "@sparta/riot";
 import type { Role } from "@sparta/core";
 
 export {};
@@ -20,9 +25,11 @@ declare global {
         pickOrder: number | null;
         playerRole: Role | null;
         draft: LcuDraftSnapshot | null;
+        observedGame: LcuObservedGame | null;
       }>;
       /** Draft real (aliados/inimigos/bans) lido da sessao de champion select. */
       onDraftSnapshot: (callback: (draft: LcuDraftSnapshot | null) => void) => () => void;
+      onObservedGame: (callback: (game: LcuObservedGame | null) => void) => () => void;
     };
   }
 }

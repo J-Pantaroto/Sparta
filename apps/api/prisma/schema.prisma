@@ -8,25 +8,25 @@ datasource db {
 }
 
 model User {
-  id           String   @id @default(uuid())
-  email        String?  @unique
+  id           String        @id @default(uuid())
+  email        String?       @unique
   passwordHash String?
   displayName  String?
-  createdAt    DateTime @default(now())
+  createdAt    DateTime      @default(now())
   accounts     RiotAccount[]
 }
 
 model RiotAccount {
-  id              String   @id @default(uuid())
+  id              String                    @id @default(uuid())
   userId          String?
-  puuid           String   @unique
+  puuid           String                    @unique
   gameName        String
   tagLine         String
   platformRegion  String
   regionalRouting String
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  user            User?    @relation(fields: [userId], references: [id])
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+  user            User?                     @relation(fields: [userId], references: [id])
   profile         PlayerProfile?
   matches         MatchParticipant[]
   championPool    PlayerChampionPoolEntry[]
@@ -36,47 +36,47 @@ model RiotAccount {
 }
 
 model PlayerProfile {
-  id            String   @id @default(uuid())
-  riotAccountId String   @unique
-  preferredRoles String[]
-  strengthsJson Json     @default("[]")
-  weaknessesJson Json    @default("[]")
-  recentFormJson Json    @default("{}")
-  matchAnalysisLimit Int @default(50)
-  updatedAt     DateTime @updatedAt
-  riotAccount   RiotAccount @relation(fields: [riotAccountId], references: [id])
-  championStats PlayerChampionStats[]
+  id                 String                @id @default(uuid())
+  riotAccountId      String                @unique
+  preferredRoles     String[]
+  strengthsJson      Json                  @default("[]")
+  weaknessesJson     Json                  @default("[]")
+  recentFormJson     Json                  @default("{}")
+  matchAnalysisLimit Int                   @default(50)
+  updatedAt          DateTime              @updatedAt
+  riotAccount        RiotAccount           @relation(fields: [riotAccountId], references: [id])
+  championStats      PlayerChampionStats[]
 }
 
 model Champion {
-  id          Int      @id
-  key         String   @unique
-  name        String
-  title       String?
-  roles       String[]
-  version     String?
+  id                                      Int                       @id
+  key                                     String                    @unique
+  name                                    String
+  title                                   String?
+  roles                                   String[]
+  version                                 String?
   // `info.difficulty` oficial da Data Dragon (Etapa 13), separado de
   // ChampionTag.difficulty, que pertence ao perfil estratégico derivado.
-  dataDragonDifficulty Int?
-  difficultyNormalized Float?
+  dataDragonDifficulty                    Int?
+  difficultyNormalized                    Float?
   difficultyNormalizationAlgorithmVersion String?
-  tags        ChampionTag?
-  participants MatchParticipant[]
-  playerStats PlayerChampionStats[]
-  poolEntries PlayerChampionPoolEntry[]
+  tags                                    ChampionTag?
+  participants                            MatchParticipant[]
+  playerStats                             PlayerChampionStats[]
+  poolEntries                             PlayerChampionPoolEntry[]
 }
 
 model PlayerChampionPoolEntry {
-  id            String   @id @default(uuid())
+  id            String      @id @default(uuid())
   riotAccountId String
   championId    Int
   role          String
   source        String
-  enabled       Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  enabled       Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
   riotAccount   RiotAccount @relation(fields: [riotAccountId], references: [id], onDelete: Cascade)
-  champion      Champion @relation(fields: [championId], references: [id])
+  champion      Champion    @relation(fields: [championId], references: [id])
 
   @@unique([riotAccountId, championId, role])
   @@index([riotAccountId, role, enabled])
@@ -84,104 +84,66 @@ model PlayerChampionPoolEntry {
 }
 
 model ChampionTag {
-  id             String   @id @default(uuid())
-  championId     Int      @unique
-  damageProfile  String
-  tags           String[]
-  blindSafety    Float
-  difficulty     Float
-  engage         Float
-  peel           Float
-  frontline      Float
-  pickoff        Float
-  waveclear      Float
-  scaling        Float
-  earlyPressure  Float
+  id                 String    @id @default(uuid())
+  championId         Int       @unique
+  damageProfile      String
+  tags               String[]
+  blindSafety        Float
+  difficulty         Float
+  engage             Float
+  peel               Float
+  frontline          Float
+  pickoff            Float
+  waveclear          Float
+  scaling            Float
+  earlyPressure      Float
   // Proveniencia (Etapa 8). Tudo nullable: linha gravada antes desta etapa
   // nao tem origem registrada, e ausencia significa "nao informada" - nunca
   // "derivado" nem "revisado".
-  dataDragonVersion String?
-  locale            String?
-  sourceResource    String?
-  algorithmVersion  String?
-  generatedAt       DateTime?
-  reviewState       String?
+  dataDragonVersion  String?
+  locale             String?
+  sourceResource     String?
+  algorithmVersion   String?
+  generatedAt        DateTime?
+  reviewState        String?
   reviewedDimensions String[]
-  champion       Champion @relation(fields: [championId], references: [id])
+  champion           Champion  @relation(fields: [championId], references: [id])
 
   @@index([championId])
 }
 
 model Match {
-  id          String   @id @default(uuid())
-  matchId     String   @unique
-  platform    String
-  patch       String?
-  gameVersion String?
-  queueId     Int?
-  gameMode    String?
-  gameType    String?
-  durationSeconds Int?
-  startedAt   DateTime?
-  rawJson      Json?
-  participants MatchParticipant[]
-  timeline     MatchTimeline?
-  postgameReports PostgameReport[]
+  id                  String             @id @default(uuid())
+  matchId             String             @unique
+  /// Identificador numérico compartilhado com o gameflow do LCU.
+  gameId              String?
+  platform            String
+  patch               String?
+  gameVersion         String?
+  queueId             Int?
+  gameMode            String?
+  gameType            String?
+  durationSeconds     Int?
+  startedAt           DateTime?
+  rawJson             Json?
+  participants        MatchParticipant[]
+  timeline            MatchTimeline?
+  postgameReports     PostgameReport[]
+  linkedDraftSessions DraftSession[]     @relation("DraftSessionLinkedMatch")
 
+  @@unique([platform, gameId])
   @@index([matchId])
 }
 
 model MatchParticipant {
-  id                    String @id @default(uuid())
-  matchId               String
+  id                     String            @id @default(uuid())
+  matchId                String
   riotAccountId          String?
-  puuid                 String
-  championId            Int
-  role                  String?
-  teamId                Int?
-  won                   Boolean
-  kills                 Int
-  deaths                Int
-  assists               Int
-  csPerMinute           Float
-  goldPerMinute         Float
-  damagePerMinute       Float
-  visionScorePerMinute  Float
-  killParticipation     Float?
-  objectiveParticipation Float?
-  // Numerador e denominador da participacao em objetivos (20260726150000).
-  // NULL = nao observado; a razao acima e NULL junto.
-  objectiveTakedowns    Int?
-  teamObjectiveKills    Int?
-  match                 Match @relation(fields: [matchId], references: [id])
-  riotAccount           RiotAccount? @relation(fields: [riotAccountId], references: [id])
-  champion              Champion @relation(fields: [championId], references: [id])
-  observation           MatchObservation?
-
-  @@unique([matchId, puuid])
-  @@index([puuid])
-  @@index([championId])
-}
-
-model MatchTimeline {
-  id              String @id @default(uuid())
-  matchId          String @unique
-  deathsBefore10   Int    @default(0)
-  deathsBefore15   Int    @default(0)
-  csAt10           Float?
-  csAt15           Float?
-  goldDiffAt15     Float?
-  eventsJson       Json   @default("[]")
-  match            Match  @relation(fields: [matchId], references: [id])
-}
-
-model PlayerChampionStats {
-  id                     String @id @default(uuid())
-  playerProfileId         String
-  championId              Int
-  role                   String
-  games                  Int
-  wins                   Int
+  puuid                  String
+  championId             Int
+  role                   String?
+  teamId                 Int?
+  won                    Boolean
   kills                  Int
   deaths                 Int
   assists                Int
@@ -189,17 +151,59 @@ model PlayerChampionStats {
   goldPerMinute          Float
   damagePerMinute        Float
   visionScorePerMinute   Float
+  killParticipation      Float?
+  objectiveParticipation Float?
+  // Numerador e denominador da participacao em objetivos (20260726150000).
+  // NULL = nao observado; a razao acima e NULL junto.
+  objectiveTakedowns     Int?
+  teamObjectiveKills     Int?
+  match                  Match             @relation(fields: [matchId], references: [id])
+  riotAccount            RiotAccount?      @relation(fields: [riotAccountId], references: [id])
+  champion               Champion          @relation(fields: [championId], references: [id])
+  observation            MatchObservation?
+
+  @@unique([matchId, puuid])
+  @@index([puuid])
+  @@index([championId])
+}
+
+model MatchTimeline {
+  id             String @id @default(uuid())
+  matchId        String @unique
+  deathsBefore10 Int    @default(0)
+  deathsBefore15 Int    @default(0)
+  csAt10         Float?
+  csAt15         Float?
+  goldDiffAt15   Float?
+  eventsJson     Json   @default("[]")
+  match          Match  @relation(fields: [matchId], references: [id])
+}
+
+model PlayerChampionStats {
+  id                            String        @id @default(uuid())
+  playerProfileId               String
+  championId                    Int
+  role                          String
+  games                         Int
+  wins                          Int
+  kills                         Int
+  deaths                        Int
+  assists                       Int
+  csPerMinute                   Float
+  goldPerMinute                 Float
+  damagePerMinute               Float
+  visionScorePerMinute          Float
   // Nullable desde 20260726120000: ausencia de dado nao pode ser gravada
   // como 0. Os *Samples guardam quantas partidas do agregado tinham o dado
   // (NULL = cobertura desconhecida, linha anterior a migration).
-  killParticipation      Float?
-  objectiveParticipation Float?
+  killParticipation             Float?
+  objectiveParticipation        Float?
   killParticipationSamples      Int?
   objectiveParticipationSamples Int?
-  recentMatchesJson      Json @default("[]")
-  updatedAt              DateTime @updatedAt
-  playerProfile          PlayerProfile @relation(fields: [playerProfileId], references: [id])
-  champion               Champion @relation(fields: [championId], references: [id])
+  recentMatchesJson             Json          @default("[]")
+  updatedAt                     DateTime      @updatedAt
+  playerProfile                 PlayerProfile @relation(fields: [playerProfileId], references: [id])
+  champion                      Champion      @relation(fields: [championId], references: [id])
 
   @@unique([playerProfileId, championId, role])
   @@index([championId])
@@ -209,57 +213,97 @@ model PlayerChampionStats {
 /// que era codigo morto: tinha um `draftStateJson` sem contrato e nenhum
 /// campo de ciclo de vida, origem ou vinculo com partida.
 model DraftSession {
-  id                 String   @id @default(uuid())
+  id                        String                   @id @default(uuid())
   /// Conta Riot dona da sessao. O acesso e sempre filtrado por ela.
-  riotAccountId      String
+  riotAccountId             String
   /// "LCU" ou "USER". Sessao manual nunca e apresentada como observada.
-  source             String
+  source                    String
   /// ACTIVE | LOCKED_IN | IN_GAME | COMPLETED | ABANDONED
-  status             String
-  role               String
+  status                    String
+  role                      String
   /// "LCU" ou "USER" - como a posicao foi obtida.
-  roleSource         String
-  queueId            Int?
-  gameVersion        String?
-  patch              String?
-  selectedChampionId Int?
+  roleSource                String
+  queueId                   Int?
+  gameVersion               String?
+  patch                     String?
+  selectedChampionId        Int?
   /// Estado conhecido do draft (aliados, inimigos, bans, adversario direto,
   /// picks desconhecidos). Contrato estruturado - NAO e o payload bruto do LCU.
-  knownDraftJson     Json
-  startedAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-  lockedInAt         DateTime?
-  completedAt        DateTime?
+  knownDraftJson            Json
+  startedAt                 DateTime                 @default(now())
+  updatedAt                 DateTime                 @updatedAt
+  lockedInAt                DateTime?
+  completedAt               DateTime?
   /// Chave tecnica da sessao do lado do cliente. Unica por conta: uma nova
   /// entrada no champion select gera outra chave e portanto outra sessao.
-  externalSessionId  String?
-  /// `Match.matchId` do Match-V5. So preenchido com identificador confiavel.
-  linkedMatchId      String?
-  riotAccount        RiotAccount @relation(fields: [riotAccountId], references: [id])
-  snapshots          RecommendationSnapshot[]
+  externalSessionId         String?
+  /// `gameId` numérico observado pelo endpoint somente-leitura do LCU.
+  externalGameId            String?
+  externalGameIdSource      String?
+  externalGameIdObservedAt  DateTime?
+  /// Estado auditável do reconciliador.
+  matchLinkStatus           String                   @default("PENDING")
+  matchLinkStrategy         String?
+  matchLinkAlgorithmVersion String?
+  matchLinkEvidenceJson     Json                     @default("[]")
+  matchLinkCandidateCount   Int                      @default(0)
+  matchLinkReason           String?
+  matchLinkDecidedAt        DateTime?
+  /// `Match.matchId` do Match-V5. Preenchido exclusivamente pelo reconciliador.
+  linkedMatchId             String?
+  /// Valor pré-Etapa 21 informado pelo cliente, preservado só para auditoria.
+  legacyLinkedMatchId       String?
+  riotAccount               RiotAccount              @relation(fields: [riotAccountId], references: [id])
+  linkedMatch               Match?                   @relation("DraftSessionLinkedMatch", fields: [linkedMatchId], references: [matchId], onDelete: SetNull)
+  snapshots                 RecommendationSnapshot[]
+  matchLinkRevisions        DraftMatchLinkRevision[]
 
   @@unique([riotAccountId, externalSessionId])
+  @@unique([riotAccountId, linkedMatchId])
   @@index([riotAccountId, status])
+  @@index([riotAccountId, matchLinkStatus])
+  @@index([externalGameId])
   @@index([linkedMatchId])
+}
+
+/// Histórico imutável de cada decisão material do reconciliador.
+model DraftMatchLinkRevision {
+  id               String       @id @default(uuid())
+  draftSessionId   String
+  revision         Int
+  status           String
+  strategy         String?
+  matchId          String?
+  externalGameId   String?
+  evidenceJson     Json         @default("[]")
+  candidateCount   Int          @default(0)
+  algorithmVersion String
+  reason           String
+  decidedAt        DateTime     @default(now())
+  draftSession     DraftSession @relation(fields: [draftSessionId], references: [id], onDelete: Cascade)
+
+  @@unique([draftSessionId, revision])
+  @@index([draftSessionId, decidedAt])
+  @@index([matchId])
 }
 
 /// Execucao imutavel do motor de recomendacao. Snapshot novo so nasce quando
 /// o input canonico muda; o anterior nunca e reescrito.
 model RecommendationSnapshot {
-  id               String   @id @default(uuid())
-  draftSessionId   String
+  id                    String                    @id @default(uuid())
+  draftSessionId        String
   /// SHA-256 da serializacao canonica do input. Nao depende de ordem de
   /// array nem do instante da analise.
-  inputHash        String
+  inputHash             String
   /// Input canonico completo, pra o snapshot ser auditavel sozinho.
-  canonicalInputJson Json
+  canonicalInputJson    Json
   algorithmVersionsJson Json
-  dataCoverage     Float
-  createdAt        DateTime @default(now())
+  dataCoverage          Float
+  createdAt             DateTime                  @default(now())
   /// Quando um snapshot posterior passou a valer. Nulo enquanto e o atual.
-  supersededAt     DateTime?
-  draftSession     DraftSession @relation(fields: [draftSessionId], references: [id], onDelete: Cascade)
-  recommendations  PersistedRecommendation[]
+  supersededAt          DateTime?
+  draftSession          DraftSession              @relation(fields: [draftSessionId], references: [id], onDelete: Cascade)
+  recommendations       PersistedRecommendation[]
 
   @@unique([draftSessionId, inputHash])
   @@index([draftSessionId, createdAt])
@@ -268,7 +312,7 @@ model RecommendationSnapshot {
 /// Um candidato dentro de um snapshot. Guarda o que sustentou a posicao dele,
 /// nao so o score agregado.
 model PersistedRecommendation {
-  id            String   @id @default(uuid())
+  id            String                 @id @default(uuid())
   snapshotId    String
   championId    Int
   championName  String
@@ -291,46 +335,46 @@ model PersistedRecommendation {
 }
 
 model PostgameReport {
-  id              String   @id @default(uuid())
-  matchId          String
-  puuid           String
-  draftSessionId   String?
-  reportJson       Json
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-  match            Match @relation(fields: [matchId], references: [id])
+  id             String   @id @default(uuid())
+  matchId        String
+  puuid          String
+  draftSessionId String?
+  reportJson     Json
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  match          Match    @relation(fields: [matchId], references: [id])
 
   @@unique([matchId, puuid])
   @@index([puuid])
 }
 
 model ReplayImportJob {
-  id          String   @id @default(uuid())
-  fileName    String
-  status      String
-  metadataJson Json    @default("{}")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String   @id @default(uuid())
+  fileName     String
+  status       String
+  metadataJson Json     @default("{}")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }
 
 model ApiCacheEntry {
-  key         String   @id
+  key         String    @id
   valueJson   Json
   expiresAt   DateTime
   collectedAt DateTime?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime  @default(now())
 }
 
 /// Identidade lógica de uma nota oficial: patch + locale + URL oficial.
 /// O conteúdo mutável vive em revisões imutáveis.
 model PatchRelease {
-  id          String   @id @default(uuid())
-  patch       String
-  locale      String
-  sourceUrl   String
-  createdAt   DateTime @default(now())
-  revisions   PatchReleaseRevision[]
-  attempts    PatchImportAttempt[]
+  id        String                 @id @default(uuid())
+  patch     String
+  locale    String
+  sourceUrl String
+  createdAt DateTime               @default(now())
+  revisions PatchReleaseRevision[]
+  attempts  PatchImportAttempt[]
 
   @@unique([patch, locale, sourceUrl])
   @@index([patch, locale])
@@ -339,7 +383,7 @@ model PatchRelease {
 /// Evidência oficial imutável de uma versão da página. Uma edição posterior
 /// da Riot cria outra revisão; nunca atualiza changesJson ou sourceHash.
 model PatchReleaseRevision {
-  id             String   @id @default(uuid())
+  id             String       @id @default(uuid())
   patchReleaseId String
   revision       Int
   sourceHash     String
@@ -350,7 +394,7 @@ model PatchReleaseRevision {
   status         String
   changesJson    Json
   provenanceJson Json
-  createdAt      DateTime @default(now())
+  createdAt      DateTime     @default(now())
   patchRelease   PatchRelease @relation(fields: [patchReleaseId], references: [id], onDelete: Cascade)
 
   @@unique([patchReleaseId, revision])
@@ -361,12 +405,12 @@ model PatchReleaseRevision {
 /// Resultado sanitizado de cada tentativa controlada. Falhas ficam separadas
 /// das revisões válidas para nunca fabricar um release vazio.
 model PatchImportAttempt {
-  id             String   @id @default(uuid())
+  id             String        @id @default(uuid())
   patchReleaseId String?
   patch          String
   locale         String
   sourceUrl      String
-  attemptedAt    DateTime @default(now())
+  attemptedAt    DateTime      @default(now())
   status         String
   errorCode      String?
   cacheState     String?
@@ -377,90 +421,90 @@ model PatchImportAttempt {
 }
 
 model MatchObservation {
-  id                              String   @id @default(uuid())
-  matchParticipantId              String   @unique
-  extractorVersion                String
-  teamPosition                    String?
-  individualPosition              String?
-  positionAssignedByMatchmaking   String?
-  normalizedRole                  String?
-  normalizedRoleSource            String?
-  assignedRole                    String?
-  positionDiverged                Boolean
-  positionStatus                  String
-  runesStatus                     String
-  primaryStyleId                  Int?
-  secondaryStyleId                Int?
-  createdAt                       DateTime @default(now())
-  updatedAt                       DateTime @updatedAt
-  matchParticipant                MatchParticipant @relation(fields: [matchParticipantId], references: [id], onDelete: Cascade)
-  itemSlots                       MatchItemSlot[]
-  runeSelections                  MatchRuneSelection[]
-  runeFragments                   MatchRuneFragment[]
-  summonerSpellSlots              MatchSummonerSpellSlot[]
+  id                            String                   @id @default(uuid())
+  matchParticipantId            String                   @unique
+  extractorVersion              String
+  teamPosition                  String?
+  individualPosition            String?
+  positionAssignedByMatchmaking String?
+  normalizedRole                String?
+  normalizedRoleSource          String?
+  assignedRole                  String?
+  positionDiverged              Boolean
+  positionStatus                String
+  runesStatus                   String
+  primaryStyleId                Int?
+  secondaryStyleId              Int?
+  createdAt                     DateTime                 @default(now())
+  updatedAt                     DateTime                 @updatedAt
+  matchParticipant              MatchParticipant         @relation(fields: [matchParticipantId], references: [id], onDelete: Cascade)
+  itemSlots                     MatchItemSlot[]
+  runeSelections                MatchRuneSelection[]
+  runeFragments                 MatchRuneFragment[]
+  summonerSpellSlots            MatchSummonerSpellSlot[]
 
   @@index([normalizedRole])
   @@index([extractorVersion])
 }
 
 model MatchItemSlot {
-  id                  String @id @default(uuid())
-  matchObservationId  String
-  slot                Int
-  state               String
-  itemId              Int?
-  itemName            String?
-  asset               String?
-  catalogVersion      String?
-  catalogStatus       String
-  matchObservation    MatchObservation @relation(fields: [matchObservationId], references: [id], onDelete: Cascade)
+  id                 String           @id @default(uuid())
+  matchObservationId String
+  slot               Int
+  state              String
+  itemId             Int?
+  itemName           String?
+  asset              String?
+  catalogVersion     String?
+  catalogStatus      String
+  matchObservation   MatchObservation @relation(fields: [matchObservationId], references: [id], onDelete: Cascade)
 
   @@unique([matchObservationId, slot])
   @@index([itemId])
 }
 
 model MatchRuneSelection {
-  id                  String @id @default(uuid())
-  matchObservationId  String
-  tree                String
-  slotOrder           Int
-  perkId              Int
-  perkName            String?
-  isKeystone          Boolean
-  catalogVersion      String?
-  catalogStatus       String
-  matchObservation    MatchObservation @relation(fields: [matchObservationId], references: [id], onDelete: Cascade)
+  id                 String           @id @default(uuid())
+  matchObservationId String
+  tree               String
+  slotOrder          Int
+  perkId             Int
+  perkName           String?
+  isKeystone         Boolean
+  catalogVersion     String?
+  catalogStatus      String
+  matchObservation   MatchObservation @relation(fields: [matchObservationId], references: [id], onDelete: Cascade)
 
   @@unique([matchObservationId, tree, slotOrder])
   @@index([perkId])
 }
 
 model MatchRuneFragment {
-  id                  String @id @default(uuid())
-  matchObservationId  String
-  slot                String
-  state               String
-  fragmentId          Int?
-  fragmentName        String?
-  catalogVersion      String?
-  catalogStatus       String
-  matchObservation    MatchObservation @relation(fields: [matchObservationId], references: [id], onDelete: Cascade)
+  id                 String           @id @default(uuid())
+  matchObservationId String
+  slot               String
+  state              String
+  fragmentId         Int?
+  fragmentName       String?
+  catalogVersion     String?
+  catalogStatus      String
+  matchObservation   MatchObservation @relation(fields: [matchObservationId], references: [id], onDelete: Cascade)
 
   @@unique([matchObservationId, slot])
   @@index([fragmentId])
 }
 
 model MatchSummonerSpellSlot {
-  id                  String @id @default(uuid())
-  matchObservationId  String
-  slot                Int
-  state               String
-  spellId             Int?
-  spellName           String?
-  asset               String?
-  catalogVersion      String?
-  catalogStatus       String
-  matchObservation    MatchObservation @relation(fields: [matchObservationId], references: [id], onDelete: Cascade)
+  id                 String           @id @default(uuid())
+  matchObservationId String
+  slot               Int
+  state              String
+  spellId            Int?
+  spellName          String?
+  asset              String?
+  catalogVersion     String?
+  catalogStatus      String
+  matchObservation   MatchObservation @relation(fields: [matchObservationId], references: [id], onDelete: Cascade)
 
   @@unique([matchObservationId, slot])
   @@index([spellId])

@@ -18,6 +18,7 @@ import {
 import {
   draftRecommendationRequestSchemaWithSession,
   draftSessionLockInSchema,
+  draftSessionObservedGameSchema,
   draftSessionTransitionSchema,
   preGameAnalysisRequestSchema
 } from "../../routes/schemas.js";
@@ -26,12 +27,15 @@ import {
   findActiveDraftSession,
   findDraftSession,
   findLatestSnapshot,
+  listDraftMatchLinkRevisions,
   listDraftSessions,
   listSnapshots,
+  observeExternalGameId,
   persistRecommendationSnapshot,
   transitionDraftSession,
   upsertActiveDraftSession
 } from "./draft-session-repository.js";
+import { reconcileDraftSessionsForAccount } from "./draft-match-reconciler.js";
 import { compositionRules } from "../../config/composition-rules.js";
 import { prisma } from "../../db/prisma.js";
 import { getAuthenticatedUserId } from "../auth/routes.js";
@@ -270,21 +274,30 @@ export const draftsRoutes: FastifyPluginAsync = async (app) => {
       return { error: "Sessao nao encontrada." };
     }
 
-    const [snapshot, selectedChampion] = await Promise.all([
+    const [snapshot, selectedChampion, revisions] = await Promise.all([
       findLatestSnapshot(session.id),
-      describeSelectedChampion(account.id, session.id)
+      describeSelectedChampion(account.id, session.id),
+      listDraftMatchLinkRevisions(account.id, session.id)
     ]);
 
     return {
       session,
       latestSnapshot: snapshot,
       selectedChampion,
-      matchLink: session.linkedMatchId
-        ? { state: "LINKED" as const, matchId: session.linkedMatchId }
-        : {
-            state: "UNLINKED" as const,
-            reason: "Nenhum identificador de partida confiavel foi observado para esta sessao."
-          }
+      matchLink: {
+        status: session.matchLinkStatus ?? (session.linkedMatchId ? "LINKED" : "PENDING"),
+        strategy: session.matchLinkStrategy ?? null,
+        matchId: session.linkedMatchId,
+        externalGameId: session.externalGameId ?? null,
+        algorithmVersion: session.matchLinkAlgorithmVersion ?? null,
+        evidence: session.matchLinkEvidence ?? [],
+        candidateCount: session.matchLinkCandidateCount ?? 0,
+        reason:
+          session.matchLinkReason ??
+          (session.linkedMatchId ? null : "A partida ainda não foi reconciliada."),
+        decidedAt: session.matchLinkDecidedAt ?? null,
+        revisions: revisions ?? []
+      }
     };
   });
 
@@ -339,9 +352,8 @@ export const draftsRoutes: FastifyPluginAsync = async (app) => {
   });
 
   /**
-   * Transicao explicita de ciclo de vida (`IN_GAME`, `COMPLETED`,
-   * `ABANDONED`). `COMPLETED` exige `matchId`: sem identificador confiavel a
-   * sessao nao e concluida, fica onde estava.
+   * Transição observada de ciclo de vida. `COMPLETED` e `linkedMatchId`
+   * pertencem exclusivamente ao reconciliador.
    */
   app.post("/drafts/sessions/:sessionId/status", async (request, reply) => {
     const account = await resolveAccount(request, reply);
@@ -349,20 +361,18 @@ export const draftsRoutes: FastifyPluginAsync = async (app) => {
 
     const { sessionId } = request.params as { sessionId: string };
     const payload = draftSessionTransitionSchema.parse(request.body);
-
-    if (payload.status === "COMPLETED" && !payload.matchId) {
+    if (payload.status === "COMPLETED") {
       reply.code(422);
       return {
-        code: "MATCH_LINK_UNAVAILABLE",
-        message: "Concluir a sessao exige o identificador da partida."
+        code: "MATCH_LINK_SERVER_MANAGED",
+        message: "A conclusão e o vínculo são definidos exclusivamente pelo reconciliador."
       };
     }
 
     const result = await transitionDraftSession({
       riotAccountId: account.id,
       sessionId,
-      status: payload.status,
-      ...(payload.matchId ? { linkedMatchId: payload.matchId } : {})
+      status: payload.status
     });
 
     if (!result.ok) {
@@ -378,13 +388,44 @@ export const draftsRoutes: FastifyPluginAsync = async (app) => {
 
     return { session: result.session };
   });
+
+  /**
+   * Recebe apenas o gameId numérico observado no endpoint somente-leitura do
+   * LCU. Não aceita `matchId`; o vínculo continua sendo decisão do servidor.
+   */
+  app.post("/drafts/sessions/:sessionId/observed-game", async (request, reply) => {
+    const account = await resolveAccount(request, reply);
+    if (!account) return { error: "Nao autenticado." };
+    const { sessionId } = request.params as { sessionId: string };
+    const payload = draftSessionObservedGameSchema.parse(request.body);
+    const result = await observeExternalGameId({
+      riotAccountId: account.id,
+      sessionRef: sessionId,
+      gameId: payload.gameId
+    });
+    if (!result.ok) {
+      reply.code(result.reason === "NOT_FOUND" ? 404 : 409);
+      return { code: result.reason, message: "O gameId observado não pôde ser registrado." };
+    }
+    return { session: result.session };
+  });
+
+  /**
+   * Reprocessamento protegido e idempotente. Opera apenas nas sessões já
+   * persistidas da conta autenticada e não recebe IDs de partida.
+   */
+  app.post("/drafts/sessions/reconcile", async (request, reply) => {
+    const account = await resolveAccount(request, reply);
+    if (!account) return { error: "Nao autenticado." };
+    return { report: await reconcileDraftSessionsForAccount(account.id) };
+  });
 };
 
 /** Conta Riot do usuario autenticado, ou `null` com a resposta ja marcada. */
 async function resolveAccount(
   request: Parameters<typeof getAuthenticatedUserId>[0],
   reply: { code: (status: number) => unknown }
-): Promise<{ id: string; puuid: string } | null> {
+): Promise<{ id: string; puuid: string; platformRegion: string } | null> {
   const userId = await getAuthenticatedUserId(request);
   if (!userId) {
     reply.code(401);
@@ -395,7 +436,7 @@ async function resolveAccount(
     reply.code(404);
     return null;
   }
-  return { id: account.id, puuid: account.puuid };
+  return { id: account.id, puuid: account.puuid, platformRegion: account.platformRegion };
 }
 
 /**
@@ -411,11 +452,16 @@ function catalogVersionsOf(
   const versions: Record<string, string> = {};
 
   const patches = new Set(
-    championTags.map((tag) => tag.provenance?.source.patch).filter((patch): patch is string => !!patch)
+    championTags
+      .map((tag) => tag.provenance?.source.patch)
+      .filter((patch): patch is string => !!patch)
   );
   // Uma unica versao E todas as tags declarando-a: com uma tag sem versao nao
   // da pra afirmar a versao do conjunto.
-  if (patches.size === 1 && championTags.every((tag) => tag.provenance?.source.patch !== undefined)) {
+  if (
+    patches.size === 1 &&
+    championTags.every((tag) => tag.provenance?.source.patch !== undefined)
+  ) {
     versions.dataDragon = [...patches][0];
   }
 
@@ -466,13 +512,28 @@ export interface DraftPersistenceResult {
  * stack trace nem detalhe do banco.
  */
 async function persistDraftAnalysis(input: {
-  session?: { sessionKey: string; source: "LCU" | "USER"; queueId?: number; gameVersion?: string };
+  session?: {
+    sessionKey: string;
+    source: "LCU" | "USER";
+    queueId?: number;
+    gameVersion?: string;
+    gameId?: string;
+  };
   draft: Parameters<typeof summarizeKnownDraftState>[0];
   riotAccountId?: string;
-  pool: readonly { championId: number; championName: string; role: string; source: string; enabled: boolean }[];
+  pool: readonly {
+    championId: number;
+    championName: string;
+    role: string;
+    source: string;
+    enabled: boolean;
+  }[];
   championTags: readonly ChampionTag[];
   capabilityProfiles: readonly { algorithmVersion?: string }[];
-  result: { primaryRecommendations: readonly never[] | readonly unknown[]; alternatives: readonly unknown[] };
+  result: {
+    primaryRecommendations: readonly never[] | readonly unknown[];
+    alternatives: readonly unknown[];
+  };
 }): Promise<DraftPersistenceResult> {
   if (!input.session || !input.riotAccountId) return { status: "NOT_TRACKED" };
 
@@ -493,6 +554,7 @@ async function persistDraftAnalysis(input: {
         : {}),
       ...(input.session.queueId !== undefined ? { queueId: input.session.queueId } : {}),
       ...(input.session.gameVersion ? { gameVersion: input.session.gameVersion } : {}),
+      ...(input.session.gameId ? { externalGameId: input.session.gameId } : {}),
       ...(input.draft.patch ? { patch: input.draft.patch } : {})
     });
 
@@ -517,7 +579,8 @@ async function persistDraftAnalysis(input: {
     const coverage =
       recommendations.length === 0
         ? 0
-        : recommendations.reduce((total, entry) => total + entry.dataCoverage, 0) / recommendations.length;
+        : recommendations.reduce((total, entry) => total + entry.dataCoverage, 0) /
+          recommendations.length;
 
     const persisted = await persistRecommendationSnapshot({
       draftSessionId: session.id,

@@ -263,6 +263,7 @@ export class PlayerRoleUnavailableError extends Error {
 export interface DraftSessionIdentity {
   sessionKey: string;
   source: "LCU" | "USER";
+  gameId?: string;
 }
 
 export type DraftPersistenceStatus = "SAVED" | "UNCHANGED" | "NOT_TRACKED" | "FAILED";
@@ -544,6 +545,8 @@ export interface DraftSessionSummary {
   lockedInAt: string | null;
   completedAt: string | null;
   linkedMatchId: string | null;
+  externalGameId: string | null;
+  matchLinkStatus: "PENDING" | "LINKED" | "AMBIGUOUS" | "UNLINKABLE" | "NOT_APPLICABLE";
   knownDraft: {
     allies: { championId: number; championName: string; role?: Role }[];
     enemies: { championId: number; championName: string; role?: Role }[];
@@ -584,7 +587,34 @@ export interface DraftSessionDetail {
     rank?: number;
     group?: "PRIMARY" | "ALTERNATIVE";
   } | null;
-  matchLink: { state: "LINKED" | "UNLINKED"; matchId?: string; reason?: string };
+  matchLink: {
+    status: "PENDING" | "LINKED" | "AMBIGUOUS" | "UNLINKABLE" | "NOT_APPLICABLE";
+    strategy: "EXACT_GAME_ID" | "STRONG_EVIDENCE" | null;
+    matchId: string | null;
+    externalGameId: string | null;
+    algorithmVersion: string | null;
+    candidateCount: number;
+    reason: string | null;
+    decidedAt: string | null;
+    evidence: {
+      signal: string;
+      expected?: string | number | string[] | number[];
+      observed?: string | number | string[] | number[];
+      matched: boolean;
+      source: string;
+    }[];
+    revisions: {
+      revision: number;
+      status: string;
+      strategy: string | null;
+      matchId: string | null;
+      externalGameId: string | null;
+      candidateCount: number;
+      algorithmVersion: string;
+      reason: string;
+      decidedAt: string;
+    }[];
+  };
 }
 
 export function fetchDraftSessions(token: string, limit = 20) {
@@ -609,4 +639,30 @@ export function lockInDraftSession(token: string, sessionId: string, championId:
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify({ championId })
   });
+}
+
+export function observeDraftSessionGame(token: string, sessionId: string, gameId: string) {
+  return request<{ session: DraftSessionSummary }>(
+    `/drafts/sessions/${encodeURIComponent(sessionId)}/observed-game`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ gameId })
+    }
+  );
+}
+
+export function transitionDraftSessionStatus(
+  token: string,
+  sessionId: string,
+  status: "IN_GAME" | "ABANDONED"
+) {
+  return request<{ session: DraftSessionSummary }>(
+    `/drafts/sessions/${encodeURIComponent(sessionId)}/status`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ status })
+    }
+  );
 }

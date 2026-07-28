@@ -12,6 +12,7 @@ import {
   LcuReadOnlyClient,
   type LcuDraftSnapshot,
   type LcuGameflowPhase,
+  type LcuObservedGame,
   type LcuReadStatus
 } from "@sparta/riot";
 import type { Role } from "@sparta/core";
@@ -53,7 +54,8 @@ function registerSkinDownloadHandler() {
       }
     });
     const contentType = response.headers.get("content-type");
-    if (!contentType?.startsWith("image/")) throw new Error("A fonte externa não devolveu uma imagem válida.");
+    if (!contentType?.startsWith("image/"))
+      throw new Error("A fonte externa não devolveu uma imagem válida.");
     const buffer = Buffer.from(await response.arrayBuffer());
 
     const safeName = basename(fileName);
@@ -106,9 +108,17 @@ interface LcuState {
   pickOrder: number | null;
   playerRole: Role | null;
   draft: LcuDraftSnapshot | null;
+  observedGame: LcuObservedGame | null;
 }
 
-let lcuState: LcuState = { status: "CLIENT_CLOSED", phase: null, pickOrder: null, playerRole: null, draft: null };
+let lcuState: LcuState = {
+  status: "CLIENT_CLOSED",
+  phase: null,
+  pickOrder: null,
+  playerRole: null,
+  draft: null,
+  observedGame: null
+};
 
 function registerLcuStateHandler() {
   ipcMain.handle("sparta:lcu-state", () => lcuState);
@@ -120,6 +130,7 @@ function startGameflowWatcher() {
   let lastPickOrder: number | null = null;
   let lastPlayerRole: Role | null = null;
   let lastDraft: LcuDraftSnapshot | undefined;
+  let lastObservedGame: LcuObservedGame | undefined;
 
   function broadcast(channel: string, payload: unknown) {
     for (const window of BrowserWindow.getAllWindows()) {
@@ -135,10 +146,19 @@ function startGameflowWatcher() {
     if (lastPickOrder !== null) broadcast("sparta:pick-order", null);
     if (lastPlayerRole !== null) broadcast("sparta:player-role", null);
     if (lastDraft !== undefined) broadcast("sparta:draft-snapshot", null);
+    if (lastObservedGame !== undefined) broadcast("sparta:observed-game", null);
     lastPickOrder = null;
     lastPlayerRole = null;
     lastDraft = undefined;
-    lcuState = { status, phase, pickOrder: null, playerRole: null, draft: null };
+    lastObservedGame = undefined;
+    lcuState = {
+      status,
+      phase,
+      pickOrder: null,
+      playerRole: null,
+      draft: null,
+      observedGame: null
+    };
   }
 
   async function poll() {
@@ -154,8 +174,38 @@ function startGameflowWatcher() {
     }
     lcuState = { ...lcuState, status: "OK", phase: lastPhase };
 
+    const observesGame = ["ChampSelect", "GameStart", "InProgress", "Reconnect"].includes(phase);
+    if (observesGame) {
+      const gameResult = await client.getObservedGame();
+      if (gameResult.status === "OK") {
+        const observedGame = gameResult.data;
+        if (observedGame?.gameId !== lastObservedGame?.gameId) {
+          lastObservedGame = observedGame;
+          broadcast("sparta:observed-game", observedGame ?? null);
+        }
+        lcuState = { ...lcuState, observedGame: observedGame ?? null };
+      }
+    }
+
     if (phase !== "ChampSelect") {
-      clearObservedState("OUTSIDE_CHAMP_SELECT", phase);
+      if (!observesGame) {
+        clearObservedState("OUTSIDE_CHAMP_SELECT", phase);
+        return;
+      }
+      if (lastPickOrder !== null) broadcast("sparta:pick-order", null);
+      if (lastPlayerRole !== null) broadcast("sparta:player-role", null);
+      if (lastDraft !== undefined) broadcast("sparta:draft-snapshot", null);
+      lastPickOrder = null;
+      lastPlayerRole = null;
+      lastDraft = undefined;
+      lcuState = {
+        ...lcuState,
+        status: "OUTSIDE_CHAMP_SELECT",
+        phase,
+        pickOrder: null,
+        playerRole: null,
+        draft: null
+      };
       return;
     }
 
@@ -188,7 +238,8 @@ function startGameflowWatcher() {
       phase: lastPhase,
       pickOrder: lastPickOrder,
       playerRole: lastPlayerRole,
-      draft: lastDraft ?? null
+      draft: lastDraft ?? null,
+      observedGame: lastObservedGame ?? null
     };
   }
 

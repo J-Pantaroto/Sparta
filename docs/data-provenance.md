@@ -69,23 +69,23 @@ disponível, e um `OFFICIAL` pode estar indisponível.
 
 ### Origem (`ProvenanceSourceType`)
 
-| Valor | Significado |
-|---|---|
-| `OFFICIAL` | Publicado pela Riot (Riot API, Data Dragon). Fato. |
-| `OBSERVED` | Lido de um estado real, sem cálculo (sessão do LCU, partida persistida). |
-| `CALCULATED` | Agregação determinística sobre dado real. Reproduzível a partir da entrada. |
-| `DERIVED` | Algoritmo com julgamento de design embutido (pesos, limiares, tabelas de classe). |
-| `INFERRED` | Estimativa sobre dado incompleto. Não reproduzível só a partir da entrada. |
-| `CACHE` | Cópia local de uma das origens acima; `collectedAt`/`expiresAt` dizem se ainda vale. |
+| Valor        | Significado                                                                          |
+| ------------ | ------------------------------------------------------------------------------------ |
+| `OFFICIAL`   | Publicado pela Riot (Riot API, Data Dragon). Fato.                                   |
+| `OBSERVED`   | Lido de um estado real, sem cálculo (sessão do LCU, partida persistida).             |
+| `CALCULATED` | Agregação determinística sobre dado real. Reproduzível a partir da entrada.          |
+| `DERIVED`    | Algoritmo com julgamento de design embutido (pesos, limiares, tabelas de classe).    |
+| `INFERRED`   | Estimativa sobre dado incompleto. Não reproduzível só a partir da entrada.           |
+| `CACHE`      | Cópia local de uma das origens acima; `collectedAt`/`expiresAt` dizem se ainda vale. |
 
 ### Disponibilidade (`AvailabilityStatus`)
 
-| Valor | Significado | Valor numérico |
-|---|---|---|
-| `AVAILABLE` | Presente e atual. | Existe |
-| `PARTIAL` | Presente, cobrindo menos do que deveria. Usável com ressalva. | Existe |
-| `STALE` | Presente porém não atual (patch antigo, cache vencido). | Pode existir |
-| `UNAVAILABLE` | Não existe agora. | **Sempre `null`** |
+| Valor         | Significado                                                   | Valor numérico    |
+| ------------- | ------------------------------------------------------------- | ----------------- |
+| `AVAILABLE`   | Presente e atual.                                             | Existe            |
+| `PARTIAL`     | Presente, cobrindo menos do que deveria. Usável com ressalva. | Existe            |
+| `STALE`       | Presente porém não atual (patch antigo, cache vencido).       | Pode existir      |
+| `UNAVAILABLE` | Não existe agora.                                             | **Sempre `null`** |
 
 ## `DataProvenance`
 
@@ -128,14 +128,14 @@ Construtores (`availableMetric`, `unavailableMetric`, `staleMetric`) garantem o 
 
 ### Conceitos que não podem ser fundidos
 
-| Par | Por quê |
-|---|---|
-| `PERSONAL_MATCHUP` vs `GLOBAL_MATCHUP` | Histórico do próprio jogador vs taxa observada no meta. Um jogador pode ir bem num confronto estatisticamente ruim. |
-| `LANE_MATCHUP` (legado) | Alias de transporte de versões anteriores. É convertido centralmente para `PERSONAL_MATCHUP` indisponível quando não há proveniência suficiente; não é produzido pelo motor atual. |
-| `PATCH_OFFICIAL_CHANGE` vs `PATCH_IMPACT` vs `META_STRENGTH` | Fato publicado, interpretação do fato, e o que as partidas mostram depois. |
-| `CHAMPION_DIFFICULTY` vs `EXECUTION_RISK` | Dificuldade do campeão pra qualquer um vs risco desse campeão pra **este** jogador. |
-| `PERSONAL_PERFORMANCE` vs `PERSONAL_EXPERIENCE` | Quão bem joga vs quanto já jogou. |
-| `ALLY_SYNERGY` vs `TEAM_COMPOSITION` vs `ENEMY_COMPOSITION_ANSWER` | Encaixe com quem já foi escolhido, adequação ao 5x5 completo, e resposta ao time inimigo. |
+| Par                                                                | Por quê                                                                                                                                                                            |
+| ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PERSONAL_MATCHUP` vs `GLOBAL_MATCHUP`                             | Histórico do próprio jogador vs taxa observada no meta. Um jogador pode ir bem num confronto estatisticamente ruim.                                                                |
+| `LANE_MATCHUP` (legado)                                            | Alias de transporte de versões anteriores. É convertido centralmente para `PERSONAL_MATCHUP` indisponível quando não há proveniência suficiente; não é produzido pelo motor atual. |
+| `PATCH_OFFICIAL_CHANGE` vs `PATCH_IMPACT` vs `META_STRENGTH`       | Fato publicado, interpretação do fato, e o que as partidas mostram depois.                                                                                                         |
+| `CHAMPION_DIFFICULTY` vs `EXECUTION_RISK`                          | Dificuldade do campeão pra qualquer um vs risco desse campeão pra **este** jogador.                                                                                                |
+| `PERSONAL_PERFORMANCE` vs `PERSONAL_EXPERIENCE`                    | Quão bem joga vs quanto já jogou.                                                                                                                                                  |
+| `ALLY_SYNERGY` vs `TEAM_COMPOSITION` vs `ENEMY_COMPOSITION_ANSWER` | Encaixe com quem já foi escolhido, adequação ao 5x5 completo, e resposta ao time inimigo.                                                                                          |
 
 A lista de chaves é aberta: métricas de build/runa e de pré/pós-game entram sem alterar o
 contrato.
@@ -175,11 +175,11 @@ serve pra "recuperar" precisão perdida.
 
 `MetricRow` (`apps/desktop/src/renderer/src/ui/MetricRow.tsx`):
 
-| Status | Renderização |
-|---|---|
-| `AVAILABLE` | Barra normal com o valor. |
-| `PARTIAL` | Barra + marca "parcial". |
-| `STALE` | Barra dessaturada + marca "desatualizado" + motivo. |
+| Status        | Renderização                                                      |
+| ------------- | ----------------------------------------------------------------- |
+| `AVAILABLE`   | Barra normal com o valor.                                         |
+| `PARTIAL`     | Barra + marca "parcial".                                          |
+| `STALE`       | Barra dessaturada + marca "desatualizado" + motivo.               |
 | `UNAVAILABLE` | **Sem barra.** Trilho tracejado vazio, "Indisponível" e o motivo. |
 
 O trilho tracejado ocupa o mesmo espaço da barra (a lista não "pula" quando falta uma métrica)
@@ -270,12 +270,12 @@ ausência como zero por outro caminho.
 
 `StatCoverage` (`packages/core/src/types/domain.ts`) acompanha o valor:
 
-| Campo | Significado |
-|---|---|
-| `sampleSize` | Partidas consideradas no contexto. |
-| `availableSampleSize` | Partidas que realmente tinham o dado. `null` = cobertura desconhecida. |
-| `status` | `AVAILABLE` / `PARTIAL` / `UNAVAILABLE` — o mesmo enum da Etapa 2, não um segundo. |
-| `reason` | Por que está parcial ou indisponível. |
+| Campo                 | Significado                                                                        |
+| --------------------- | ---------------------------------------------------------------------------------- |
+| `sampleSize`          | Partidas consideradas no contexto.                                                 |
+| `availableSampleSize` | Partidas que realmente tinham o dado. `null` = cobertura desconhecida.             |
+| `status`              | `AVAILABLE` / `PARTIAL` / `UNAVAILABLE` — o mesmo enum da Etapa 2, não um segundo. |
+| `reason`              | Por que está parcial ou indisponível.                                              |
 
 Construtores em `packages/core/src/types/stat-coverage.ts`. Cobertura não é confiança: são dois
 eixos, e nenhum é derivado do outro.
@@ -294,17 +294,17 @@ a conta real: Viego JUNGLE **52 → 61,4**, Vel'Koz SUPPORT **46 → 53,7**, amb
 
 ### Decisões por campo
 
-| Campo | Decisão | Por quê |
-|---|---|---|
-| `killParticipation` (partida) | Já era `undefined` sem `challenges` | Correto desde a Fase 1 |
-| `killParticipation` (agregado) | `null` sem observação; média só sobre as válidas | Antes caía pra `0` |
-| `objectiveParticipation` | Sempre `null` | Não é extraído de nenhuma fonte hoje |
-| `deathsBefore10/15` | Continua `number` | Contagem de eventos: `0` = não morreu |
-| `csAt10/csAt15` | `undefined` se a partida não chegou no minuto | Antes era `0`, ou o CS de um minuto anterior rotulado como se fosse do minuto pedido |
-| `goldDiffAt15` | Já era `undefined` | Correto desde a Fase 1 |
-| `teamId` (participante) | Entrada descartada sem `teamId` | O `?? 0` criava um time fantasma (a Riot usa 100/200) na conta de aliados/inimigos |
-| `csPerMinute`, `goldPerMinute`, `damagePerMinute`, `visionScorePerMinute` | Continuam `number` | Toda partida persistida tem |
-| Agregado de coleção vazia | `aggregatePlayerChampionStats` devolve `null` | Sem observação não há agregado, e não um agregado zerado |
+| Campo                                                                     | Decisão                                          | Por quê                                                                              |
+| ------------------------------------------------------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------ |
+| `killParticipation` (partida)                                             | Já era `undefined` sem `challenges`              | Correto desde a Fase 1                                                               |
+| `killParticipation` (agregado)                                            | `null` sem observação; média só sobre as válidas | Antes caía pra `0`                                                                   |
+| `objectiveParticipation`                                                  | Sempre `null`                                    | Não é extraído de nenhuma fonte hoje                                                 |
+| `deathsBefore10/15`                                                       | Continua `number`                                | Contagem de eventos: `0` = não morreu                                                |
+| `csAt10/csAt15`                                                           | `undefined` se a partida não chegou no minuto    | Antes era `0`, ou o CS de um minuto anterior rotulado como se fosse do minuto pedido |
+| `goldDiffAt15`                                                            | Já era `undefined`                               | Correto desde a Fase 1                                                               |
+| `teamId` (participante)                                                   | Entrada descartada sem `teamId`                  | O `?? 0` criava um time fantasma (a Riot usa 100/200) na conta de aliados/inimigos   |
+| `csPerMinute`, `goldPerMinute`, `damagePerMinute`, `visionScorePerMinute` | Continuam `number`                               | Toda partida persistida tem                                                          |
+| Agregado de coleção vazia                                                 | `aggregatePlayerChampionStats` devolve `null`    | Sem observação não há agregado, e não um agregado zerado                             |
 
 ### Ambiguidade histórica que permanece
 
@@ -336,11 +336,11 @@ denominador = teams[meuTime].objectives.dragon.kills + .baron.kills
 
 ### Objetivos incluídos e excluídos
 
-| Objetivo | Situação | Motivo |
-|---|---|---|
-| Dragão | **Incluído** | 0 inconsistências em 220 participantes reais |
-| Barão | **Incluído** | 0 inconsistências em 220 participantes reais |
-| Arauto | **Excluído** | Contabilidade divergente (ver abaixo) |
+| Objetivo                                       | Situação       | Motivo                                                                               |
+| ---------------------------------------------- | -------------- | ------------------------------------------------------------------------------------ |
+| Dragão                                         | **Incluído**   | 0 inconsistências em 220 participantes reais                                         |
+| Barão                                          | **Incluído**   | 0 inconsistências em 220 participantes reais                                         |
+| Arauto                                         | **Excluído**   | Contabilidade divergente (ver abaixo)                                                |
 | Void grubs (`horde`), Atakhan, torre, inibidor | Fora do escopo | Existem no payload, mas a contabilidade de cada um não foi validada contra dado real |
 
 **Por que o Arauto ficou de fora.** `challenges.riftHeraldTakedowns` e
@@ -353,14 +353,14 @@ corresponda a algo verificável.
 
 ### Tratamento de zero, ausência e parcialidade
 
-| Situação | Resultado |
-|---|---|
-| Jogador participou de 0 dos objetivos, time conquistou pelo menos 1 | `0` real, `AVAILABLE` |
-| Time não conquistou dragão nem barão | **`UNAVAILABLE`** — não existe denominador, e `0%` diria "não participou de nada" quando não houve nada de que participar |
-| Sem `challenges` no payload | `UNAVAILABLE` |
-| Só um dos dois campos de takedown presente | `UNAVAILABLE` — somar um subconjunto contra um denominador que conta os dois subestimaria o percentual de forma sistemática |
-| Sem `teams`, ou time do jogador ausente da lista | `UNAVAILABLE` |
-| Numerador maior que denominador | Valor sai **sem truncar**, marcado `PARTIAL` com o motivo — a anomalia aparece em vez de ser escondida |
+| Situação                                                            | Resultado                                                                                                                   |
+| ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Jogador participou de 0 dos objetivos, time conquistou pelo menos 1 | `0` real, `AVAILABLE`                                                                                                       |
+| Time não conquistou dragão nem barão                                | **`UNAVAILABLE`** — não existe denominador, e `0%` diria "não participou de nada" quando não houve nada de que participar   |
+| Sem `challenges` no payload                                         | `UNAVAILABLE`                                                                                                               |
+| Só um dos dois campos de takedown presente                          | `UNAVAILABLE` — somar um subconjunto contra um denominador que conta os dois subestimaria o percentual de forma sistemática |
+| Sem `teams`, ou time do jogador ausente da lista                    | `UNAVAILABLE`                                                                                                               |
+| Numerador maior que denominador                                     | Valor sai **sem truncar**, marcado `PARTIAL` com o motivo — a anomalia aparece em vez de ser escondida                      |
 
 Os absolutos (`objectiveTakedowns`, `teamObjectiveKills`) são preservados mesmo quando a razão
 é indisponível: saber que o jogador participou de 0 de 0 é diferente de não saber nada.
@@ -385,13 +385,13 @@ medido. Nenhum peso foi recalibrado.
 
 Medido no banco real (22 partidas, patch 16.14, 220 participantes):
 
-| | |
-|---|---|
-| Partidas com `challenges` e `teams.objectives` | 22 de 22 |
-| Participantes com razão calculável | 195 |
-| Participantes com participação zero medida | 62 |
-| Participantes indisponíveis (time sem dragão/barão) | 25 |
-| Participantes com numerador > denominador | 0 |
+|                                                     |          |
+| --------------------------------------------------- | -------- |
+| Partidas com `challenges` e `teams.objectives`      | 22 de 22 |
+| Participantes com razão calculável                  | 195      |
+| Participantes com participação zero medida          | 62       |
+| Participantes indisponíveis (time sem dragão/barão) | 25       |
+| Participantes com numerador > denominador           | 0        |
 
 Patches anteriores ao `challenges` não existem no banco atual; o caminho está coberto por teste.
 
@@ -428,11 +428,11 @@ uma posição.
 
 `DraftState.playerRoleSource?: PlayerRoleSource` distingue as origens:
 
-| Valor | Significado |
-|---|---|
-| `"LCU"` | Lida de `assignedPosition` na sessão de champion select. |
-| `"USER"` | Escolhida à mão no modo manual/simulação. |
-| ausente | Sem posição. Não existe origem "desconhecida". |
+| Valor    | Significado                                              |
+| -------- | -------------------------------------------------------- |
+| `"LCU"`  | Lida de `assignedPosition` na sessão de champion select. |
+| `"USER"` | Escolhida à mão no modo manual/simulação.                |
+| ausente  | Sem posição. Não existe origem "desconhecida".           |
 
 `ProvenanceSourceType` ganhou `USER_PROVIDED` pelo mesmo motivo: uma escolha manual não é
 observação do cliente nem dado oficial da Riot, e classificá-la como qualquer um dos dois
@@ -443,26 +443,26 @@ opcional, e nunca se mistura com a posição do draft atual.
 
 ### Mapeamento do LCU
 
-| `assignedPosition` | Resultado |
-|---|---|
-| `top` / `jungle` | `TOP` / `JUNGLE` |
-| `middle` | `MID` |
-| `bottom` | `ADC` |
-| `utility` | `SUPPORT` |
-| `unselected`, `unknown`, string vazia, campo ausente | **ausente** |
-| qualquer outro valor | **ausente** |
+| `assignedPosition`                                   | Resultado        |
+| ---------------------------------------------------- | ---------------- |
+| `top` / `jungle`                                     | `TOP` / `JUNGLE` |
+| `middle`                                             | `MID`            |
+| `bottom`                                             | `ADC`            |
+| `utility`                                            | `SUPPORT`        |
+| `unselected`, `unknown`, string vazia, campo ausente | **ausente**      |
+| qualquer outro valor                                 | **ausente**      |
 
 Um vocabulário novo da Riot produz ausência, nunca MID: mapear o desconhecido para o meio
 geraria recomendações da posição errada sem nenhum sinal disso.
 
 ### Comportamento sem posição
 
-| Camada | Comportamento |
-|---|---|
-| Motor | `recommendPicks` devolve `[]` antes de escolher pool ou pesos. |
-| API | `POST /drafts/recommendations` responde **422** com `{"code":"PLAYER_ROLE_UNAVAILABLE"}`, sem consultar estatísticas. |
-| Cliente | `fetchDraftRecommendations` lança `PlayerRoleUnavailableError` — a requisição não sai. |
-| Interface | "Posição ainda não identificada", sem cards, sem loading infinito, sem erro técnico. |
+| Camada    | Comportamento                                                                                                         |
+| --------- | --------------------------------------------------------------------------------------------------------------------- |
+| Motor     | `recommendPicks` devolve `[]` antes de escolher pool ou pesos.                                                        |
+| API       | `POST /drafts/recommendations` responde **422** com `{"code":"PLAYER_ROLE_UNAVAILABLE"}`, sem consultar estatísticas. |
+| Cliente   | `fetchDraftRecommendations` lança `PlayerRoleUnavailableError` — a requisição não sai.                                |
+| Interface | "Posição ainda não identificada", sem cards, sem loading infinito, sem erro técnico.                                  |
 
 A proteção é dupla de propósito: o desktop barra antes de chamar (o que também protege contra
 uma API anterior a esta etapa, que aceitaria o request e usaria MID internamente), e a API
@@ -514,12 +514,22 @@ tem"). Draft incompleto é estado natural do produto, não erro.
 
 ### Origem por tipo de sinal
 
-| Sinal | `sourceType` |
-|---|---|
-| Draft vindo da sessão do cliente | `OBSERVED` |
-| Draft montado à mão pelo usuário | `USER_PROVIDED` |
-| Dimensões de composição (`ChampionTag`) | `DERIVED` — jamais `OFFICIAL` |
-| Desempenho pessoal no confronto | `CALCULATED`, com `sampleSize` |
+| Sinal                                   | `sourceType`                   |
+| --------------------------------------- | ------------------------------ |
+| Draft vindo da sessão do cliente        | `OBSERVED`                     |
+| Draft montado à mão pelo usuário        | `USER_PROVIDED`                |
+| Dimensões de composição (`ChampionTag`) | `DERIVED` — jamais `OFFICIAL`  |
+| Desempenho pessoal no confronto         | `CALCULATED`, com `sampleSize` |
+
+## Vínculo entre draft e partida
+
+- `DraftSession.externalGameId`: `OBSERVED`, lido de `gameData.gameId` no gameflow local do LCU.
+- `Match.gameId` e `Match.matchId`: `OFFICIAL`, vindos do payload Match-V5 persistido.
+- `EXACT_GAME_ID`: `CALCULATED` por igualdade determinística de gameId + plataforma.
+- `STRONG_EVIDENCE`: `CALCULATED` pelo contrato versionado `draft-match-link/1.0.0`; exige o
+  conjunto completo de sinais documentado e unicidade, sem score ou desempate.
+- Status, estratégia, evidências, razão, candidatos e revisões são persistidos. Ausência ou
+  ambiguidade continuam explícitas e nunca viram um vínculo neutro ou presumido.
 
 ### Cobertura não é confiança
 

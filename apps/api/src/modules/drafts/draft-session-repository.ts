@@ -3,11 +3,13 @@ import {
   canonicalSnapshotInputString,
   canTransitionDraftSession,
   compareSelectedChampion,
-  decideMatchLink,
   isTerminalDraftSessionStatus,
   type CanonicalSnapshotInput,
   type DraftSessionSource,
   type DraftSessionStatus,
+  type DraftMatchLinkStatus,
+  type DraftMatchLinkStrategy,
+  type DraftMatchLinkEvidence,
   type KnownDraftState,
   type PersistedRecommendation,
   type PlayerRoleSource,
@@ -55,7 +57,16 @@ export interface DraftSessionRow {
   lockedInAt: string | null;
   completedAt: string | null;
   externalSessionId: string | null;
+  externalGameId: string | null;
   linkedMatchId: string | null;
+  legacyLinkedMatchId: string | null;
+  matchLinkStatus: DraftMatchLinkStatus;
+  matchLinkStrategy: DraftMatchLinkStrategy | null;
+  matchLinkAlgorithmVersion: string | null;
+  matchLinkEvidence: DraftMatchLinkEvidence[];
+  matchLinkCandidateCount: number;
+  matchLinkReason: string | null;
+  matchLinkDecidedAt: string | null;
 }
 
 type PrismaDraftSession = Prisma.DraftSessionGetPayload<object>;
@@ -78,7 +89,16 @@ function toRow(row: PrismaDraftSession): DraftSessionRow {
     lockedInAt: row.lockedInAt?.toISOString() ?? null,
     completedAt: row.completedAt?.toISOString() ?? null,
     externalSessionId: row.externalSessionId,
-    linkedMatchId: row.linkedMatchId
+    externalGameId: row.externalGameId,
+    linkedMatchId: row.linkedMatchId,
+    legacyLinkedMatchId: row.legacyLinkedMatchId,
+    matchLinkStatus: row.matchLinkStatus as DraftMatchLinkStatus,
+    matchLinkStrategy: row.matchLinkStrategy as DraftMatchLinkStrategy | null,
+    matchLinkAlgorithmVersion: row.matchLinkAlgorithmVersion,
+    matchLinkEvidence: row.matchLinkEvidenceJson as unknown as DraftMatchLinkEvidence[],
+    matchLinkCandidateCount: row.matchLinkCandidateCount,
+    matchLinkReason: row.matchLinkReason,
+    matchLinkDecidedAt: row.matchLinkDecidedAt?.toISOString() ?? null
   };
 }
 
@@ -94,6 +114,7 @@ export interface UpsertDraftSessionInput {
   queueId?: number;
   gameVersion?: string;
   patch?: string;
+  externalGameId?: string;
 }
 
 /**
@@ -105,7 +126,9 @@ export interface UpsertDraftSessionInput {
  * atrasado do LCU, ou um reenvio depois do dodge, nao pode ressuscita-la nem
  * sobrescrever o estado com que ela terminou.
  */
-export async function upsertActiveDraftSession(input: UpsertDraftSessionInput): Promise<DraftSessionRow> {
+export async function upsertActiveDraftSession(
+  input: UpsertDraftSessionInput
+): Promise<DraftSessionRow> {
   const existing = await prisma.draftSession.findUnique({
     where: {
       riotAccountId_externalSessionId: {
@@ -127,7 +150,14 @@ export async function upsertActiveDraftSession(input: UpsertDraftSessionInput): 
     selectedChampionId: input.selectedChampionId ?? null,
     queueId: input.queueId ?? null,
     gameVersion: input.gameVersion ?? null,
-    patch: input.patch ?? null
+    patch: input.patch ?? null,
+    ...(input.source === "LCU" && input.externalGameId
+      ? {
+          externalGameId: input.externalGameId,
+          externalGameIdSource: "LCU",
+          externalGameIdObservedAt: new Date()
+        }
+      : {})
   };
 
   const row = await prisma.draftSession.upsert({
@@ -158,7 +188,9 @@ export async function findDraftSession(
 }
 
 /** Sessao ainda em andamento (nao terminal), a mais recente. */
-export async function findActiveDraftSession(riotAccountId: string): Promise<DraftSessionRow | null> {
+export async function findActiveDraftSession(
+  riotAccountId: string
+): Promise<DraftSessionRow | null> {
   const row = await prisma.draftSession.findFirst({
     where: { riotAccountId, status: { in: ["ACTIVE", "LOCKED_IN", "IN_GAME"] } },
     orderBy: { startedAt: "desc" }
@@ -166,13 +198,40 @@ export async function findActiveDraftSession(riotAccountId: string): Promise<Dra
   return row ? toRow(row) : null;
 }
 
-export async function listDraftSessions(riotAccountId: string, limit = 20): Promise<DraftSessionRow[]> {
+export async function listDraftSessions(
+  riotAccountId: string,
+  limit = 20
+): Promise<DraftSessionRow[]> {
   const rows = await prisma.draftSession.findMany({
     where: { riotAccountId },
     orderBy: { startedAt: "desc" },
     take: Math.max(1, Math.min(limit, 100))
   });
   return rows.map(toRow);
+}
+
+export async function listDraftMatchLinkRevisions(riotAccountId: string, sessionId: string) {
+  const session = await prisma.draftSession.findFirst({
+    where: { id: sessionId, riotAccountId },
+    select: { id: true }
+  });
+  if (!session) return null;
+  const rows = await prisma.draftMatchLinkRevision.findMany({
+    where: { draftSessionId: sessionId },
+    orderBy: { revision: "desc" }
+  });
+  return rows.map((row) => ({
+    revision: row.revision,
+    status: row.status as DraftMatchLinkStatus,
+    strategy: row.strategy as DraftMatchLinkStrategy | null,
+    matchId: row.matchId,
+    externalGameId: row.externalGameId,
+    evidence: row.evidenceJson as unknown as DraftMatchLinkEvidence[],
+    candidateCount: row.candidateCount,
+    algorithmVersion: row.algorithmVersion,
+    reason: row.reason,
+    decidedAt: row.decidedAt.toISOString()
+  }));
 }
 
 export type TransitionResult =
@@ -184,17 +243,19 @@ export interface TransitionInput {
   sessionId: string;
   status: DraftSessionStatus;
   selectedChampionId?: number;
-  linkedMatchId?: string;
 }
 
 /**
  * Aplica uma transicao de ciclo de vida, recusando o que a maquina de estados
- * nao permite. `COMPLETED` exige `linkedMatchId`: sem identificador confiavel
- * a sessao **nao** e concluida - fica onde estava.
+ * nao permite. `COMPLETED` é reservado ao reconciliador; esta função recebe
+ * somente eventos de ciclo de vida observados pelo cliente.
  */
 export async function transitionDraftSession(input: TransitionInput): Promise<TransitionResult> {
   const current = await prisma.draftSession.findFirst({
-    where: { id: input.sessionId, riotAccountId: input.riotAccountId }
+    where: {
+      riotAccountId: input.riotAccountId,
+      OR: [{ id: input.sessionId }, { externalSessionId: input.sessionId }]
+    }
   });
   if (!current) return { ok: false, reason: "NOT_FOUND" };
 
@@ -202,10 +263,7 @@ export async function transitionDraftSession(input: TransitionInput): Promise<Tr
   if (!canTransitionDraftSession(from, input.status)) {
     return { ok: false, reason: "INVALID_TRANSITION", currentStatus: from };
   }
-
-  const link = decideMatchLink({ matchId: input.linkedMatchId });
-  if (input.status === "COMPLETED" && link.state !== "LINKED") {
-    // Concluir sem identificador seria inventar o desfecho.
+  if (input.status === "COMPLETED") {
     return { ok: false, reason: "INVALID_TRANSITION", currentStatus: from };
   }
 
@@ -214,14 +272,66 @@ export async function transitionDraftSession(input: TransitionInput): Promise<Tr
     where: { id: current.id },
     data: {
       status: input.status,
-      ...(input.selectedChampionId !== undefined ? { selectedChampionId: input.selectedChampionId } : {}),
+      ...(input.selectedChampionId !== undefined
+        ? { selectedChampionId: input.selectedChampionId }
+        : {}),
       ...(input.status === "LOCKED_IN" && current.lockedInAt === null ? { lockedInAt: now } : {}),
-      ...(input.status === "COMPLETED" ? { completedAt: now } : {}),
-      ...(link.state === "LINKED" ? { linkedMatchId: link.matchId } : {})
+      ...(input.status === "ABANDONED"
+        ? {
+            matchLinkStatus: "NOT_APPLICABLE",
+            matchLinkReason: "A sessão foi encerrada sem partida.",
+            matchLinkDecidedAt: now
+          }
+        : {})
     }
   });
 
   return { ok: true, session: toRow(row) };
+}
+
+export type ObserveExternalGameResult =
+  | { ok: true; session: DraftSessionRow }
+  | { ok: false; reason: "NOT_FOUND" | "NOT_LCU_SESSION" | "CONFLICT" };
+
+/**
+ * Persiste o gameId numérico lido do LCU. O primeiro valor observado vence:
+ * um tick divergente nunca sobrescreve silenciosamente a evidência original.
+ */
+export async function observeExternalGameId(input: {
+  riotAccountId: string;
+  /** UUID interno ou chave técnica da sessão, ambos sempre limitados à conta. */
+  sessionRef: string;
+  gameId: string;
+}): Promise<ObserveExternalGameResult> {
+  const gameId = input.gameId.trim();
+  if (!/^\d+$/.test(gameId)) return { ok: false, reason: "CONFLICT" };
+
+  return prisma.$transaction(async (tx) => {
+    const current = await tx.draftSession.findFirst({
+      where: {
+        riotAccountId: input.riotAccountId,
+        OR: [{ id: input.sessionRef }, { externalSessionId: input.sessionRef }]
+      }
+    });
+    if (!current) return { ok: false as const, reason: "NOT_FOUND" as const };
+    if (current.source !== "LCU") return { ok: false as const, reason: "NOT_LCU_SESSION" as const };
+    if (current.externalGameId && current.externalGameId !== gameId) {
+      return { ok: false as const, reason: "CONFLICT" as const };
+    }
+    if (current.externalGameId === gameId) return { ok: true as const, session: toRow(current) };
+
+    const updated = await tx.draftSession.update({
+      where: { id: current.id },
+      data: {
+        externalGameId: gameId,
+        externalGameIdSource: "LCU",
+        externalGameIdObservedAt: new Date(),
+        matchLinkStatus: "PENDING",
+        matchLinkReason: "gameId observado no LCU; aguardando reconciliação com Match-V5."
+      }
+    });
+    return { ok: true as const, session: toRow(updated) };
+  });
 }
 
 export interface SnapshotSummary {
@@ -234,7 +344,9 @@ export interface SnapshotSummary {
   recommendations: PersistedRecommendation[];
 }
 
-type PrismaSnapshot = Prisma.RecommendationSnapshotGetPayload<{ include: { recommendations: true } }>;
+type PrismaSnapshot = Prisma.RecommendationSnapshotGetPayload<{
+  include: { recommendations: true };
+}>;
 
 function toSnapshot(row: PrismaSnapshot): SnapshotSummary {
   return {
