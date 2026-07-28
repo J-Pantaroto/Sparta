@@ -22,6 +22,19 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-07-28 15:45 — Contrato e decisão da fonte global de meta
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0018-fonte-global-meta.md`
+
+Riot, GRID, PandaScore, Abios e scraping foram comparados em fontes oficiais.
+A decisão ficou `SELF_AGGREGATION_CANDIDATE`: agregação própria pela Riot é a
+única candidata adequada à população ranqueada, mas depende de Production
+Key e aprovações jurídica, estatística, financeira e operacional. O core
+agora possui contratos neutros e um provider padrão sem I/O que mantém meta,
+matchup, loadouts e elegibilidade globais `UNAVAILABLE`, sem alterar nenhum
+motor. Foram validados 652 testes TypeScript e 1 Python, além de typecheck,
+lint e build. Implementação funcional: `ba042c9`.
+
 ## 2026-07-28 15:04 — Inteligência pessoal de builds, runas e feitiços
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0017-inteligencia-pessoal-loadouts.md`
