@@ -2,6 +2,7 @@ import type { ChampionTagProvenance } from "./champion-tag-provenance.js";
 import type { ChampionDifficultyEvidence } from "./champion-difficulty.js";
 import type { AvailabilityStatus } from "./provenance.js";
 import type { RecommendationMetric } from "./recommendation-metric.js";
+import type { DraftStrategicAnalysis } from "../draft/draft-strategic-analysis.js";
 
 export type Role = "TOP" | "JUNGLE" | "MID" | "ADC" | "SUPPORT";
 export type Confidence = "low" | "medium" | "high";
@@ -338,6 +339,11 @@ export interface PickRecommendation {
    * disponibilidades diferentes pra mesma métrica.
    */
   metricDetails: RecommendationMetric[];
+  /**
+   * Leitura 5×5 estruturada deste candidato. Opcional para manter respostas
+   * anteriores da API compatíveis sem fabricar uma análise ausente.
+   */
+  strategicAnalysis?: DraftStrategicAnalysis;
 }
 
 export interface PostGameAnalysis {

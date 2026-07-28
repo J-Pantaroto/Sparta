@@ -1,8 +1,16 @@
 import type { ChampionTag, DraftState, MatchupData, Role } from "../types/domain.js";
+import type { ChampionCapabilityProfile } from "../types/champion-capability.js";
 import type { ChampionTagProvenance } from "../types/champion-tag-provenance.js";
 import { CHAMPION_TAG_SOURCE_ID } from "./champion-tag-manifest.js";
 import type { AvailabilityStatus, DataProvenance } from "../types/provenance.js";
 import { toConfidenceScore } from "../types/provenance.js";
+import {
+  analyzeDraftStrategy,
+  STRATEGIC_CAPABILITY_LABELS,
+  type DraftStrategicAnalysis,
+  type StrategicSignal,
+  type TeamCapabilityAnalysis
+} from "./draft-strategic-analysis.js";
 
 /**
  * Análise pré-game: o que os dados **atuais** permitem dizer sobre o campeão
@@ -27,7 +35,7 @@ import { toConfidenceScore } from "../types/provenance.js";
  * vez de a função ler o relógio.
  */
 
-export const PRE_GAME_ANALYSIS_VERSION = "1.0.0";
+export const PRE_GAME_ANALYSIS_VERSION = "2.0.0";
 
 /** Time completo de LoL. Usado pra dizer "3 de 5", nunca pra completar nada. */
 const TEAM_SIZE = 5;
@@ -99,6 +107,8 @@ export interface PreGameAnalysis {
   selectedChampionFit: AnalysisSection;
   knownRisks: AnalysisSection;
   unavailableSignals: AnalysisSignal[];
+  /** Ausente apenas em respostas compatíveis anteriores à Etapa 15. */
+  strategicAnalysis?: DraftStrategicAnalysis;
   generatedAt: string;
   algorithmVersion: string;
 }
@@ -109,6 +119,7 @@ export interface PreGameAnalysisInput {
   selectedChampionTag?: ChampionTag;
   selectedChampionName: string;
   championTags: ChampionTag[];
+  championCapabilityProfiles?: ChampionCapabilityProfile[];
   /** Matchup **pessoal** do jogador neste confronto. Nunca global. */
   personalMatchup?: MatchupData;
   enemyLaneChampionName?: string;
@@ -161,7 +172,15 @@ function draftProvenance(draft: DraftState): DataProvenance {
   };
 }
 
-const DIMENSIONS = ["frontline", "engage", "peel", "waveclear", "pickoff", "scaling", "earlyPressure"] as const;
+const DIMENSIONS = [
+  "frontline",
+  "engage",
+  "peel",
+  "waveclear",
+  "pickoff",
+  "scaling",
+  "earlyPressure"
+] as const;
 export type CompositionDimension = (typeof DIMENSIONS)[number];
 
 const DIMENSION_LABELS: Record<CompositionDimension, string> = {
@@ -201,7 +220,13 @@ function summarizeKnownComposition(names: string[], championTags: ChampionTag[])
     .filter((tag): tag is ChampionTag => tag !== undefined);
 
   if (tags.length === 0) {
-    return { dimensions: {}, tags, provenance: championTagProvenanceOf(tags), taggedCount: 0, knownCount: names.length };
+    return {
+      dimensions: {},
+      tags,
+      provenance: championTagProvenanceOf(tags),
+      taggedCount: 0,
+      knownCount: names.length
+    };
   }
 
   const dimensions: Partial<Record<CompositionDimension, number>> = {};
@@ -219,7 +244,15 @@ function summarizeKnownComposition(names: string[], championTags: ChampionTag[])
   // significar alguma coisa - com 1 campeão conhecido, "AD_HEAVY" seria só
   // uma descrição dele mesmo.
   const damageProfile =
-    tags.length < 3 ? undefined : ad >= 4 ? "AD_HEAVY" : ap >= 4 ? "AP_HEAVY" : ad + ap <= 1 ? "LOW_DAMAGE" : "BALANCED";
+    tags.length < 3
+      ? undefined
+      : ad >= 4
+        ? "AD_HEAVY"
+        : ap >= 4
+          ? "AP_HEAVY"
+          : ad + ap <= 1
+            ? "LOW_DAMAGE"
+            : "BALANCED";
 
   return {
     dimensions,
@@ -284,7 +317,13 @@ function compositionSignals(
       // Parcial enquanto o draft não fechou: a leitura vale, mas sobre um
       // subconjunto.
       status: complete ? "AVAILABLE" : "PARTIAL",
-      tone: present ? (perspective === "ally" ? "POSITIVE" : "WARNING") : perspective === "ally" ? "WARNING" : "NEUTRAL",
+      tone: present
+        ? perspective === "ally"
+          ? "POSITIVE"
+          : "WARNING"
+        : perspective === "ally"
+          ? "WARNING"
+          : "NEUTRAL",
       strength: round(value),
       confidence: null,
       provenance: composition.provenance,
@@ -295,7 +334,9 @@ function compositionSignals(
       evidence:
         composition.taggedCount === composition.knownCount
           ? undefined
-          : [`${composition.taggedCount} de ${composition.knownCount} campeões revelados têm perfil conhecido`]
+          : [
+              `${composition.taggedCount} de ${composition.knownCount} campeões revelados têm perfil conhecido`
+            ]
     });
   }
 
@@ -367,7 +408,12 @@ function buildLaneContext(input: PreGameAnalysisInput): AnalysisSection {
         personalMatchup.score
       )} de 100.`,
       status: "AVAILABLE",
-      tone: personalMatchup.score >= 55 ? "POSITIVE" : personalMatchup.score <= 45 ? "WARNING" : "NEUTRAL",
+      tone:
+        personalMatchup.score >= 55
+          ? "POSITIVE"
+          : personalMatchup.score <= 45
+            ? "WARNING"
+            : "NEUTRAL",
       strength: round(personalMatchup.score),
       confidence: toConfidenceScore(personalMatchup.confidence),
       provenance: {
@@ -383,7 +429,8 @@ function buildLaneContext(input: PreGameAnalysisInput): AnalysisSection {
     signals.push({
       key: "personal_matchup",
       title: "Seu histórico neste confronto",
-      description: "Você ainda não tem partidas registradas com este campeão contra este adversário.",
+      description:
+        "Você ainda não tem partidas registradas com este campeão contra este adversário.",
       status: "UNAVAILABLE",
       unavailableReason: "Nenhuma partida sua neste confronto, nesta posição.",
       strength: null,
@@ -455,7 +502,12 @@ function buildFit(
     const value = allies.dimensions[dimension];
     if (value === undefined || value > DIMENSION_ABSENT) return false;
     const proprio = tag[dimension];
-    if (typeof proprio === "number" && Number.isFinite(proprio) && proprio * 100 >= DIMENSION_PRESENT) return false;
+    if (
+      typeof proprio === "number" &&
+      Number.isFinite(proprio) &&
+      proprio * 100 >= DIMENSION_PRESENT
+    )
+      return false;
     return true;
   }).map((dimension) => DIMENSION_LABELS[dimension]);
 
@@ -485,7 +537,8 @@ function buildFit(
   const trouxe = DIMENSIONS.filter((dimension) => {
     const semJogador = alliesWithoutPlayer.dimensions[dimension];
     const proprio = tag[dimension];
-    if (semJogador === undefined || typeof proprio !== "number" || !Number.isFinite(proprio)) return false;
+    if (semJogador === undefined || typeof proprio !== "number" || !Number.isFinite(proprio))
+      return false;
     return semJogador <= DIMENSION_ABSENT && proprio * 100 >= DIMENSION_PRESENT;
   }).map((dimension) => DIMENSION_LABELS[dimension]);
 
@@ -505,10 +558,17 @@ function buildFit(
   return {
     key: "selected_fit",
     title: "O que sua escolha adiciona",
-    status: signals.length === 0 ? "UNAVAILABLE" : allies.knownCount >= TEAM_SIZE ? "AVAILABLE" : "PARTIAL",
+    status:
+      signals.length === 0
+        ? "UNAVAILABLE"
+        : allies.knownCount >= TEAM_SIZE
+          ? "AVAILABLE"
+          : "PARTIAL",
     signals,
     unavailableReason:
-      signals.length === 0 ? "O perfil do campeão não destaca nem deixa em aberto nenhuma dimensão." : undefined
+      signals.length === 0
+        ? "O perfil do campeão não destaca nem deixa em aberto nenhuma dimensão."
+        : undefined
   };
 }
 
@@ -554,12 +614,14 @@ function buildKnownRisks(
     {
       enemy: "engage",
       ally: "peel",
-      texto: "o time inimigo revelado indica iniciação forte e a composição conhecida tem pouca proteção aos carregadores"
+      texto:
+        "o time inimigo revelado indica iniciação forte e a composição conhecida tem pouca proteção aos carregadores"
     },
     {
       enemy: "pickoff",
       ally: "peel",
-      texto: "o time inimigo revelado indica capacidade de pegar alvos isolados e a composição conhecida tem pouca proteção"
+      texto:
+        "o time inimigo revelado indica capacidade de pegar alvos isolados e a composição conhecida tem pouca proteção"
     },
     {
       enemy: "earlyPressure",
@@ -611,7 +673,12 @@ function buildKnownRisks(
     };
   }
 
-  return { key: "known_risks", title: "Riscos conhecidos", status: draftCompleto ? "AVAILABLE" : "PARTIAL", signals };
+  return {
+    key: "known_risks",
+    title: "Riscos conhecidos",
+    status: draftCompleto ? "AVAILABLE" : "PARTIAL",
+    signals
+  };
 }
 
 /**
@@ -644,7 +711,8 @@ function buildUnavailableSignals(): AnalysisSignal[] {
       title: "Interações específicas entre campeões",
       description: "Como habilidades concretas dos dois times se anulam ou se somam.",
       status: "UNAVAILABLE",
-      unavailableReason: "O Sparta ainda não modela habilidades, tipos de controle nem interações campeão a campeão.",
+      unavailableReason:
+        "O Sparta ainda não modela habilidades, tipos de controle nem interações campeão a campeão.",
       strength: null,
       confidence: null
     }
@@ -661,7 +729,11 @@ function buildUnavailableSignals(): AnalysisSignal[] {
  *
  * **Não é confiança estatística nem probabilidade de vitória.**
  */
-function computeCoverage(input: PreGameAnalysisInput, allies: KnownComposition, enemies: KnownComposition) {
+function computeCoverage(
+  input: PreGameAnalysisInput,
+  allies: KnownComposition,
+  enemies: KnownComposition
+) {
   const breakdown: PreGameCoverageBreakdown = {
     campeaoSelecionado: { weight: 0.1, available: true },
     posicao: { weight: 0.1, available: true },
@@ -675,7 +747,10 @@ function computeCoverage(input: PreGameAnalysisInput, allies: KnownComposition, 
   // Times entram proporcionalmente: 2 de 4 aliados revelados vale metade do
   // peso, em vez de tudo ou nada.
   const alliesExpected = TEAM_SIZE - 1;
-  const alliesRatio = Math.min(1, allies.knownCount > 0 ? (allies.knownCount - 1) / alliesExpected : 0);
+  const alliesRatio = Math.min(
+    1,
+    allies.knownCount > 0 ? (allies.knownCount - 1) / alliesExpected : 0
+  );
   const enemiesRatio = Math.min(1, enemies.knownCount / TEAM_SIZE);
 
   const total =
@@ -695,6 +770,128 @@ function computeCoverage(input: PreGameAnalysisInput, allies: KnownComposition, 
 
 export type PreGameUnavailableReason = "SELECTED_CHAMPION_UNAVAILABLE" | "PLAYER_ROLE_UNAVAILABLE";
 
+function strategicTeamSection(
+  key: string,
+  title: string,
+  team: TeamCapabilityAnalysis
+): AnalysisSection {
+  if (team.knownChampions.length === 0) {
+    return unavailableSection(key, title, "Nenhum campeão conhecido para esta leitura.");
+  }
+  const signals = team.dimensions.flatMap((dimension) => {
+    if (dimension.championsWithEvidence.length === 0) return [];
+    const names = dimension.championsWithEvidence
+      .map((champion) => champion.championName)
+      .join(", ");
+    return [
+      {
+        key: `${key}_${dimension.dimension}`,
+        title: STRATEGIC_CAPABILITY_LABELS[dimension.dimension],
+        description: `Entre ${team.knownChampions.length} campeão(ões) conhecido(s), ${dimension.championsWithEvidence.length} possui(em) evidência de ${STRATEGIC_CAPABILITY_LABELS[dimension.dimension]}.`,
+        status: dimension.status,
+        tone: "NEUTRAL",
+        strength: null,
+        confidence: null,
+        provenance: dimension.evidence[0]?.provenance,
+        evidence: [
+          `${names}`,
+          `${dimension.evidenceCount} evidência(s)`,
+          `${team.unknownPicks} pick(s) ainda desconhecido(s)`
+        ]
+      } satisfies AnalysisSignal
+    ];
+  });
+  return {
+    key,
+    title,
+    status: team.status,
+    signals,
+    knownCount: team.knownChampions.length,
+    expectedCount: team.expectedPicks,
+    ...(signals.length === 0
+      ? {
+          unavailableReason:
+            "Os perfis conhecidos ainda não sustentam capacidades utilizáveis para esta seção."
+        }
+      : {})
+  };
+}
+
+function strategicFitSection(analysis: DraftStrategicAnalysis): AnalysisSection {
+  const signals = [
+    ...analysis.strengths.map(toAnalysisSignal),
+    ...analysis.gaps.map(toAnalysisSignal)
+  ];
+  if (signals.length === 0) {
+    return unavailableSection(
+      "selected_champion_fit",
+      "O que sua escolha adiciona",
+      analysis.teamCompositionScore.unavailableReason ??
+        "As capacidades disponíveis não sustentam uma contribuição estratégica."
+    );
+  }
+  return {
+    key: "selected_champion_fit",
+    title: "O que sua escolha adiciona",
+    status: analysis.status,
+    signals
+  };
+}
+
+function strategicRiskSection(analysis: DraftStrategicAnalysis): AnalysisSection {
+  const responseSignals = analysis.threatResponses.map((response) => ({
+    key: `threat_${response.key}`,
+    title: STRATEGIC_CAPABILITY_LABELS[response.threat],
+    description: response.description,
+    status: response.status,
+    tone: response.responseChampions.length > 0 ? ("POSITIVE" as const) : ("WARNING" as const),
+    strength: response.score,
+    confidence: null,
+    provenance: response.evidence[0]?.provenance,
+    evidence: [response.rationale, `Cobertura ${Math.round(response.coverage * 100)}%`],
+    ...(response.unavailableReason ? { unavailableReason: response.unavailableReason } : {})
+  }));
+  const signals = [...responseSignals, ...analysis.risks.map(toAnalysisSignal)];
+  if (signals.length === 0) {
+    return unavailableSection(
+      "known_risks",
+      "Respostas e lacunas",
+      "Nenhuma relação ameaça–resposta pôde ser avaliada com os campeões revelados."
+    );
+  }
+  return {
+    key: "known_risks",
+    title: "Respostas e lacunas",
+    status: analysis.status,
+    signals
+  };
+}
+
+function toAnalysisSignal(signal: StrategicSignal): AnalysisSignal {
+  return {
+    key: signal.key,
+    title: STRATEGIC_CAPABILITY_LABELS[signal.dimension],
+    description: signal.description,
+    status: signal.status,
+    tone:
+      signal.status === "UNAVAILABLE"
+        ? "NEUTRAL"
+        : signal.key.startsWith("remaining_") ||
+            signal.key.startsWith("unanswered_") ||
+            signal.key.startsWith("conflict_")
+          ? "WARNING"
+          : "POSITIVE",
+    strength: null,
+    confidence: null,
+    provenance: signal.provenance[0],
+    evidence: signal.evidence.map(
+      (entry) =>
+        `${entry.champion.championName}: ${STRATEGIC_CAPABILITY_LABELS[entry.capability]} (${entry.source === "CAPABILITY_PROFILE" ? "perfil específico" : "ChampionTag"})`
+    ),
+    ...(signal.unavailableReason ? { unavailableReason: signal.unavailableReason } : {})
+  };
+}
+
 /**
  * Gera a análise. Devolve o motivo estruturado quando os pré-requisitos não
  * existem - a rota converte isso em `422`.
@@ -705,28 +902,115 @@ export function generatePreGameAnalysis(
   const { draft } = input;
 
   if (!draft.playerRole) return { ok: false, reason: "PLAYER_ROLE_UNAVAILABLE" };
-  if (draft.selectedChampionId === undefined) return { ok: false, reason: "SELECTED_CHAMPION_UNAVAILABLE" };
+  if (draft.selectedChampionId === undefined)
+    return { ok: false, reason: "SELECTED_CHAMPION_UNAVAILABLE" };
+  // Compatibilidade de chamada: consumidores anteriores não enviavam o
+  // catálogo da Etapa 14. Eles preservam a análise estruturada antiga sem
+  // receber `50` novo nem fingir que o motor 5×5 foi executado.
+  if (input.championCapabilityProfiles === undefined) {
+    return generateLegacyPreGameAnalysis(input);
+  }
 
+  const strategicAnalysis = analyzeDraftStrategy({
+    draft,
+    candidate: {
+      championId: draft.selectedChampionId,
+      championName: input.selectedChampionName
+    },
+    capabilityProfiles: input.championCapabilityProfiles ?? [],
+    championTags: input.championTags
+  });
+  const alliedComposition = strategicTeamSection(
+    "allied_composition",
+    "Recursos conhecidos da equipe",
+    strategicAnalysis.alliedProfile
+  );
+  const enemyComposition = strategicTeamSection(
+    "enemy_composition",
+    "Ameaças inimigas conhecidas",
+    strategicAnalysis.enemyProfile
+  );
+  const selectedChampionFit = strategicFitSection(strategicAnalysis);
+  const knownRisks = strategicRiskSection(strategicAnalysis);
+  const laneContext = buildLaneContext(input);
+  const totalConhecidos =
+    strategicAnalysis.alliedProfile.knownChampions.length +
+    strategicAnalysis.enemyProfile.knownChampions.length;
+  const draftCompleto = totalConhecidos >= TEAM_SIZE * 2;
+
+  const summary: AnalysisSignal = {
+    key: "summary",
+    title: "Resumo da escolha",
+    description: draftCompleto
+      ? `Análise de ${input.selectedChampionName} com o draft completo revelado.`
+      : `Análise de ${input.selectedChampionName} com ${totalConhecidos} dos ${TEAM_SIZE * 2} campeões da partida já conhecidos.`,
+    status: draftCompleto ? "AVAILABLE" : "PARTIAL",
+    tone: "NEUTRAL",
+    strength: null,
+    confidence: null,
+    provenance: draftProvenance(draft),
+    evidence: [
+      `${strategicAnalysis.alliedProfile.knownChampions.length} de ${TEAM_SIZE} aliados (incluindo você)`,
+      `${strategicAnalysis.enemyProfile.knownChampions.length} de ${TEAM_SIZE} inimigos revelados`,
+      `Cobertura estratégica ${Math.round(strategicAnalysis.coverage * 100)}%`
+    ]
+  };
+
+  return {
+    ok: true,
+    analysis: {
+      status: strategicAnalysis.status,
+      dataCoverage: strategicAnalysis.coverage,
+      coverageBreakdown: {
+        analiseEstrategica: {
+          weight: 1,
+          available: strategicAnalysis.status !== "UNAVAILABLE"
+        }
+      },
+      selectedChampion: {
+        championId: draft.selectedChampionId,
+        championName: input.selectedChampionName,
+        role: draft.playerRole,
+        profileProvenance: input.selectedChampionTag?.provenance
+      },
+      summary,
+      laneContext,
+      alliedComposition,
+      enemyComposition,
+      selectedChampionFit,
+      knownRisks,
+      unavailableSignals: [
+        ...strategicAnalysis.unavailableSignals.map(toAnalysisSignal),
+        ...buildUnavailableSignals()
+      ],
+      strategicAnalysis,
+      generatedAt: input.now,
+      algorithmVersion: PRE_GAME_ANALYSIS_VERSION
+    }
+  };
+}
+
+function generateLegacyPreGameAnalysis(input: PreGameAnalysisInput): {
+  ok: true;
+  analysis: PreGameAnalysis;
+} {
+  const draft = input.draft as DraftState & {
+    playerRole: Role;
+    selectedChampionId: number;
+  };
   const allyNames = draft.allies.map((pick) => pick.championName);
-  // O próprio jogador **não** está em `draft.allies` (contrato da Fase 16),
-  // então ele entra aqui exatamente uma vez.
-  const allies = summarizeKnownComposition([...allyNames, input.selectedChampionName], input.championTags);
+  const allies = summarizeKnownComposition(
+    [...allyNames, input.selectedChampionName],
+    input.championTags
+  );
   const alliesWithoutPlayer = summarizeKnownComposition(allyNames, input.championTags);
   const enemies = summarizeKnownComposition(
     draft.enemies.map((pick) => pick.championName),
     input.championTags
   );
-
   const { dataCoverage, breakdown } = computeCoverage(input, allies, enemies);
-
   const alliedSignals = compositionSignals(allies, TEAM_SIZE, "ally");
   const enemySignals = compositionSignals(enemies, TEAM_SIZE, "enemy");
-
-  // Sem nenhum companheiro revelado, "a composição" seria o próprio campeão
-  // do jogador descrito duas vezes: uma aqui e outra em `selectedChampionFit`.
-  // Chamar um único campeão de composição é a mesma leitura falsa que a
-  // Fase 15 corrigiu no motor de recomendação (rótulos de composição só com
-  // pelo menos um aliado).
   const alliedComposition: AnalysisSection =
     alliesWithoutPlayer.taggedCount === 0
       ? unavailableSection(
@@ -742,7 +1026,6 @@ export function generatePreGameAnalysis(
           knownCount: allies.knownCount,
           expectedCount: TEAM_SIZE
         };
-
   const enemyComposition: AnalysisSection =
     enemies.taggedCount === 0
       ? unavailableSection(
@@ -758,35 +1041,15 @@ export function generatePreGameAnalysis(
           knownCount: enemies.knownCount,
           expectedCount: TEAM_SIZE
         };
-
   const laneContext = buildLaneContext(input);
   const selectedChampionFit = buildFit(input, allies, alliesWithoutPlayer);
   const knownRisks = buildKnownRisks(allies, alliesWithoutPlayer, enemies);
-
-  const totalConhecidos = allies.knownCount + enemies.knownCount;
-  const draftCompleto = totalConhecidos >= TEAM_SIZE * 2;
-
-  const summary: AnalysisSignal = {
-    key: "summary",
-    title: "Resumo da escolha",
-    description: draftCompleto
-      ? `Análise de ${input.selectedChampionName} com o draft completo revelado.`
-      : `Análise de ${input.selectedChampionName} com ${totalConhecidos} dos ${TEAM_SIZE * 2} campeões da partida já conhecidos.`,
-    status: draftCompleto ? "AVAILABLE" : "PARTIAL",
-    tone: "NEUTRAL",
-    strength: null,
-    confidence: null,
-    provenance: draftProvenance(draft),
-    evidence: [
-      `${allies.knownCount} de ${TEAM_SIZE} aliados (incluindo você)`,
-      `${enemies.knownCount} de ${TEAM_SIZE} inimigos revelados`
-    ]
-  };
-
+  const totalKnown = allies.knownCount + enemies.knownCount;
+  const complete = totalKnown >= TEAM_SIZE * 2;
   return {
     ok: true,
     analysis: {
-      status: draftCompleto ? "AVAILABLE" : "PARTIAL",
+      status: complete ? "AVAILABLE" : "PARTIAL",
       dataCoverage,
       coverageBreakdown: breakdown,
       selectedChampion: {
@@ -795,7 +1058,22 @@ export function generatePreGameAnalysis(
         role: draft.playerRole,
         profileProvenance: input.selectedChampionTag?.provenance
       },
-      summary,
+      summary: {
+        key: "summary",
+        title: "Resumo da escolha",
+        description: complete
+          ? `Análise de ${input.selectedChampionName} com o draft completo revelado.`
+          : `Análise de ${input.selectedChampionName} com ${totalKnown} dos ${TEAM_SIZE * 2} campeões da partida já conhecidos.`,
+        status: complete ? "AVAILABLE" : "PARTIAL",
+        tone: "NEUTRAL",
+        strength: null,
+        confidence: null,
+        provenance: draftProvenance(draft),
+        evidence: [
+          `${allies.knownCount} de ${TEAM_SIZE} aliados (incluindo você)`,
+          `${enemies.knownCount} de ${TEAM_SIZE} inimigos revelados`
+        ]
+      },
       laneContext,
       alliedComposition,
       enemyComposition,

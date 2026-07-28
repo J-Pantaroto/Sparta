@@ -7,7 +7,12 @@ import {
   toRecommendationMetrics
 } from "./recommendation-metrics.js";
 import { unavailableMetric } from "../types/recommendation-metric.js";
-import type { ChampionTag, DraftState, PlayerChampionStats, PlayerProfile } from "../types/domain.js";
+import type {
+  ChampionTag,
+  DraftState,
+  PlayerChampionStats,
+  PlayerProfile
+} from "../types/domain.js";
 
 const metricasNumericas = {
   personalPerformance: 52.2,
@@ -35,7 +40,9 @@ describe("toRecommendationMetrics", () => {
     const porChave = new Map(metricas.map((metric) => [metric.key, metric]));
     expect(porChave.get("PERSONAL_PERFORMANCE")!.provenance?.sourceType).toBe("CALCULATED");
     expect(porChave.get("BLIND_SAFETY")!.provenance?.sourceType).toBe("DERIVED");
-    expect(porChave.get("BLIND_SAFETY")!.provenance?.algorithmVersion).toBe(RECOMMENDATION_ENGINE_VERSION);
+    expect(porChave.get("BLIND_SAFETY")!.provenance?.algorithmVersion).toBe(
+      RECOMMENDATION_ENGINE_VERSION
+    );
     // Meta e matchup global não têm fonte nesta etapa. Matchup pessoal sem
     // amostra também não pode inventar uma origem.
     expect(porChave.get("META_STRENGTH")!.provenance).toBeUndefined();
@@ -119,7 +126,10 @@ describe("recommendPicks com o contrato novo", () => {
       visionScorePerMinute: 0.8,
       killParticipation: 0.55,
       objectiveParticipation: 0.4,
-      coverage: { killParticipation: availableCoverage(10), objectiveParticipation: availableCoverage(10) },
+      coverage: {
+        killParticipation: availableCoverage(10),
+        objectiveParticipation: availableCoverage(10)
+      },
       recentMatches: []
     };
   }
@@ -157,7 +167,9 @@ describe("recommendPicks com o contrato novo", () => {
 
   it("mantém `metrics` numérico compatível com os consumidores atuais", () => {
     const [primeira] = recomendacoes;
-    const estruturada = primeira.metricDetails.find((metric) => metric.key === "PERSONAL_PERFORMANCE")!;
+    const estruturada = primeira.metricDetails.find(
+      (metric) => metric.key === "PERSONAL_PERFORMANCE"
+    )!;
     expect(estruturada.value).toBe(primeira.metrics.personalPerformance);
     expect(primeira.metrics.meta).toBeNull();
   });
@@ -193,20 +205,27 @@ describe("ensureRecommendationMetrics", () => {
       metricDetails: [unavailableMetric("LANE_MATCHUP", "Sem fonte")]
     };
     const metricas = ensureRecommendationMetrics(jaEstruturada);
-    expect(metricas).toHaveLength(4);
+    expect(metricas).toHaveLength(6);
     expect(metricas[0].key).toBe("PERSONAL_MATCHUP");
     expect(metricas[0].value).toBeNull();
     expect(metricas.slice(1)).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ key: "PERSONAL_EXPERIENCE", value: null }),
         expect.objectContaining({ key: "CHAMPION_DIFFICULTY", value: null }),
-        expect.objectContaining({ key: "EXECUTION_RISK", value: null })
+        expect.objectContaining({ key: "EXECUTION_RISK", value: null }),
+        expect.objectContaining({ key: "TEAM_COMPOSITION", value: null }),
+        expect.objectContaining({
+          key: "ENEMY_COMPOSITION_ANSWER",
+          value: null
+        })
       ])
     );
   });
 
   it("devolve lista vazia (não valores inventados) quando não há nada", () => {
-    const semNada = { confidence: "low" as const } as unknown as Parameters<typeof ensureRecommendationMetrics>[0];
+    const semNada = { confidence: "low" as const } as unknown as Parameters<
+      typeof ensureRecommendationMetrics
+    >[0];
     expect(ensureRecommendationMetrics(semNada)).toEqual([]);
   });
 });
@@ -245,7 +264,10 @@ describe("posição ausente não vira MID (Etapa 6)", () => {
       visionScorePerMinute: 0.8,
       killParticipation: 0.55,
       objectiveParticipation: 0.4,
-      coverage: { killParticipation: availableCoverage(10), objectiveParticipation: availableCoverage(10) },
+      coverage: {
+        killParticipation: availableCoverage(10),
+        objectiveParticipation: availableCoverage(10)
+      },
       recentMatches: []
     };
   }

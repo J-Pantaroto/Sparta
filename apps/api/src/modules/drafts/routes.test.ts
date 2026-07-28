@@ -41,7 +41,8 @@ vi.mock("../matches/matchup-repository.js", () => ({
 vi.mock("../players/player-stats-repository.js", () => ({
   findChampionStatsByPuuid: findChampionStatsByPuuidMock,
   findPlayerInsightsByPuuid: findPlayerInsightsByPuuidMock,
-  deriveObservedRoles: (stats: { role: string }[]) => Array.from(new Set(stats.map((entry) => entry.role)))
+  deriveObservedRoles: (stats: { role: string }[]) =>
+    Array.from(new Set(stats.map((entry) => entry.role)))
 }));
 
 vi.mock("../players/player-pool-repository.js", () => ({
@@ -70,7 +71,11 @@ describe("drafts routes", () => {
       getAuthenticatedUserIdMock.mockResolvedValue("user-1");
       const app = await buildApp();
 
-      const response = await app.inject({ method: "POST", url: "/drafts/recommendations", payload: semPosicao });
+      const response = await app.inject({
+        method: "POST",
+        url: "/drafts/recommendations",
+        payload: semPosicao
+      });
       const body = response.json();
 
       expect(response.statusCode).toBe(422);
@@ -97,7 +102,11 @@ describe("drafts routes", () => {
       getAuthenticatedUserIdMock.mockResolvedValue(null);
       const app = await buildApp();
 
-      const response = await app.inject({ method: "POST", url: "/drafts/recommendations", payload: semPosicao });
+      const response = await app.inject({
+        method: "POST",
+        url: "/drafts/recommendations",
+        payload: semPosicao
+      });
 
       expect(response.statusCode).toBe(401);
       await app.close();
@@ -131,7 +140,11 @@ describe("drafts routes", () => {
     getAuthenticatedUserIdMock.mockResolvedValue(null);
     const app = await buildApp();
 
-    const response = await app.inject({ method: "POST", url: "/drafts/recommendations", payload: draftPayload });
+    const response = await app.inject({
+      method: "POST",
+      url: "/drafts/recommendations",
+      payload: draftPayload
+    });
 
     expect(response.statusCode).toBe(401);
     await app.close();
@@ -142,7 +155,11 @@ describe("drafts routes", () => {
     riotAccountFindFirstMock.mockResolvedValue(null);
     const app = await buildApp();
 
-    const response = await app.inject({ method: "POST", url: "/drafts/recommendations", payload: draftPayload });
+    const response = await app.inject({
+      method: "POST",
+      url: "/drafts/recommendations",
+      payload: draftPayload
+    });
     const body = response.json();
 
     expect(response.statusCode).toBe(200);
@@ -183,7 +200,13 @@ describe("drafts routes", () => {
     findPlayerInsightsByPuuidMock.mockResolvedValue({
       strengths: [],
       weaknesses: [],
-      recentForm: { last10Score: 60, last20Score: 58, last50Score: 55, trend: "stable", confidence: "medium" }
+      recentForm: {
+        last10Score: 60,
+        last20Score: 58,
+        last50Score: 55,
+        trend: "stable",
+        confidence: "medium"
+      }
     });
     findPlayerPoolMock.mockResolvedValue({
       entries: [
@@ -200,7 +223,11 @@ describe("drafts routes", () => {
     });
 
     const app = await buildApp();
-    const response = await app.inject({ method: "POST", url: "/drafts/recommendations", payload: draftPayload });
+    const response = await app.inject({
+      method: "POST",
+      url: "/drafts/recommendations",
+      payload: draftPayload
+    });
     const body = response.json();
 
     expect(response.statusCode).toBe(200);
@@ -208,6 +235,12 @@ describe("drafts routes", () => {
     expect(findPlayerPoolMock).toHaveBeenCalledWith("account-1", "puuid-1", "MID");
     expect(body.recommendations.length).toBeGreaterThan(0);
     expect(body.recommendations[0].championName).toBe("Orianna");
+    expect(body.recommendations[0].strategicAnalysis).toBeTruthy();
+    expect(
+      body.recommendations[0].metricDetails.find(
+        (metric: { key: string }) => metric.key === "TEAM_COMPOSITION"
+      )?.value
+    ).toBe(body.recommendations[0].strategicAnalysis.teamCompositionScore.value);
     expect(body.primaryRecommendations).toEqual(body.recommendations);
     expect(body.alternatives).toEqual([]);
     expect(body.poolSummary.primaryCount).toBe(1);
@@ -230,7 +263,11 @@ describe("drafts routes", () => {
       getAuthenticatedUserIdMock.mockResolvedValue(null);
       const app = await buildApp();
 
-      const response = await app.inject({ method: "POST", url: "/drafts/pre-game-analysis", payload: preGamePayload });
+      const response = await app.inject({
+        method: "POST",
+        url: "/drafts/pre-game-analysis",
+        payload: preGamePayload
+      });
 
       expect(response.statusCode).toBe(401);
       await app.close();
@@ -274,7 +311,11 @@ describe("drafts routes", () => {
       findChampionNamesByIdsMock.mockResolvedValue(new Map());
       const app = await buildApp();
 
-      const response = await app.inject({ method: "POST", url: "/drafts/pre-game-analysis", payload: preGamePayload });
+      const response = await app.inject({
+        method: "POST",
+        url: "/drafts/pre-game-analysis",
+        payload: preGamePayload
+      });
 
       expect(response.statusCode).toBe(422);
       expect(response.json().code).toBe("SELECTED_CHAMPION_UNAVAILABLE");
@@ -285,13 +326,23 @@ describe("drafts routes", () => {
       getAuthenticatedUserIdMock.mockResolvedValue("user-1");
       const app = await buildApp();
 
-      const response = await app.inject({ method: "POST", url: "/drafts/pre-game-analysis", payload: preGamePayload });
+      const response = await app.inject({
+        method: "POST",
+        url: "/drafts/pre-game-analysis",
+        payload: preGamePayload
+      });
       const body = response.json();
 
       expect(response.statusCode).toBe(200);
       expect(body.algorithmVersion).toBeTruthy();
       expect(body.summary).toBeTruthy();
-      expect(body.selectedChampion).toEqual({ championId: 61, championName: "Orianna", role: "MID" });
+      expect(body.strategicAnalysis).toBeTruthy();
+      expect(body.strategicAnalysis.algorithmVersion).toMatch(/draft-strategy/);
+      expect(body.selectedChampion).toEqual({
+        championId: 61,
+        championName: "Orianna",
+        role: "MID"
+      });
       expect(body.winCondition).toBeUndefined();
       expect(body.allyStrengths).toBeUndefined();
       expect(JSON.stringify(body)).not.toMatch(/prioridade de rota|spikes de nível 6/i);
@@ -302,7 +353,11 @@ describe("drafts routes", () => {
       getAuthenticatedUserIdMock.mockResolvedValue("user-1");
       const app = await buildApp();
 
-      await app.inject({ method: "POST", url: "/drafts/pre-game-analysis", payload: preGamePayload });
+      await app.inject({
+        method: "POST",
+        url: "/drafts/pre-game-analysis",
+        payload: preGamePayload
+      });
 
       expect(findPersonalLaneMatchupHistoryMock).not.toHaveBeenCalled();
       await app.close();
@@ -347,7 +402,11 @@ describe("drafts routes", () => {
       getAuthenticatedUserIdMock.mockResolvedValue("user-1");
       const app = await buildApp();
 
-      const response = await app.inject({ method: "POST", url: "/drafts/pre-game-analysis", payload: preGamePayload });
+      const response = await app.inject({
+        method: "POST",
+        url: "/drafts/pre-game-analysis",
+        payload: preGamePayload
+      });
       const body = response.json();
 
       expect(response.statusCode).toBe(200);

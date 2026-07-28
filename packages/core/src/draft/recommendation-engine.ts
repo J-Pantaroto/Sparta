@@ -1,9 +1,10 @@
-import { MEDIUM_CONFIDENCE_GAMES, scoreChampionPerformance } from "../scoring/champion-performance.js";
-import { toRecommendationMetrics } from "./recommendation-metrics.js";
 import {
-  assessExecutionRisk,
-  type ExecutionRiskAssessment
-} from "./execution-risk.js";
+  MEDIUM_CONFIDENCE_GAMES,
+  scoreChampionPerformance
+} from "../scoring/champion-performance.js";
+import { toRecommendationMetrics } from "./recommendation-metrics.js";
+import { analyzeDraftStrategy } from "./draft-strategic-analysis.js";
+import { assessExecutionRisk, type ExecutionRiskAssessment } from "./execution-risk.js";
 import type {
   ChampionTag,
   CompositionRules,
@@ -16,6 +17,7 @@ import type {
   RecommendationReason,
   TeamComposition
 } from "../types/domain.js";
+import type { ChampionCapabilityProfile } from "../types/champion-capability.js";
 import type {
   DraftRecommendationResponse,
   PlayerChampionPoolCandidate,
@@ -42,7 +44,8 @@ export function normalizeAvailableWeights(
   );
 
   const normalizedWeights = (Object.keys(weights) as MetricKey[]).reduce((result, key) => {
-    result[key] = weights[key] > 0 && availability[key] && dataCoverage > 0 ? weights[key] / dataCoverage : 0;
+    result[key] =
+      weights[key] > 0 && availability[key] && dataCoverage > 0 ? weights[key] / dataCoverage : 0;
     return result;
   }, {} as RecommendationWeights);
 
@@ -54,6 +57,7 @@ export function recommendPicks(input: {
   player: PlayerProfile;
   championStats: PlayerChampionStats[];
   championTags: ChampionTag[];
+  capabilityProfiles?: ChampionCapabilityProfile[];
   matchups: MatchupData[];
   compositionRules: CompositionRules;
   patchMeta: PatchMetaData | null;
@@ -70,7 +74,9 @@ export function recommendPicks(input: {
 
   const weights = selectWeights(input.draft);
   const banned = new Set(input.draft.bannedChampionIds);
-  const picked = new Set([...input.draft.allies, ...input.draft.enemies].map((pick) => pick.championId));
+  const picked = new Set(
+    [...input.draft.allies, ...input.draft.enemies].map((pick) => pick.championId)
+  );
   const enemyLaneChampionId = input.draft.enemyLaneChampionId;
 
   return input.championStats
@@ -79,7 +85,8 @@ export function recommendPicks(input: {
     .map((stats) => {
       const personal = scoreChampionPerformance(stats);
       const tag = input.championTags.find(
-        (candidate) => candidate.championId === stats.championId || candidate.championName === stats.championName
+        (candidate) =>
+          candidate.championId === stats.championId || candidate.championName === stats.championName
       );
       const personalMatchup = findPersonalMatchup(
         stats.championId,
@@ -88,14 +95,32 @@ export function recommendPicks(input: {
         input.matchups
       );
       const composition = analyzeTeamComposition(input.draft, input.championTags, tag);
+      const strategicAnalysis =
+        input.capabilityProfiles === undefined
+          ? undefined
+          : analyzeDraftStrategy({
+              draft: input.draft,
+              candidate: {
+                championId: stats.championId,
+                championName: stats.championName
+              },
+              capabilityProfiles: input.capabilityProfiles,
+              championTags: input.championTags
+            });
       const allySynergy = calculateAllySynergy(tag, composition, input.draft);
-      const enemyAnswer = calculateEnemyAnswer(tag, input.draft, input.championTags);
+      const enemyAnswer =
+        strategicAnalysis !== undefined
+          ? strategicAnalysis.enemyResponseScore.value
+          : calculateEnemyAnswer(tag, input.draft, input.championTags);
       // PatchMeta ainda não é Meta Intelligence: enquanto não houver fonte
       // estatística observada, a ausência fica null, nunca 50 artificial.
       const meta = null;
       const blindSafety = (tag?.blindSafety ?? 0.5) * 100;
       const recentForm = personal.components.recent ?? 50;
-      const compositionFit = calculateCompositionFit(tag, composition, input.compositionRules);
+      const compositionFit =
+        strategicAnalysis !== undefined
+          ? strategicAnalysis.teamCompositionScore.value
+          : calculateCompositionFit(tag, composition, input.compositionRules);
       const executionRisk = assessExecutionRisk({
         difficulty: tag?.officialDifficulty,
         stats,
@@ -120,8 +145,8 @@ export function recommendPicks(input: {
         matchup: personalMatchup !== undefined,
         blindSafety: true,
         allySynergy: true,
-        enemyDraftAnswer: true,
-        compositionFit: true,
+        enemyDraftAnswer: enemyAnswer !== null,
+        compositionFit: compositionFit !== null,
         meta: false
       });
       const baseScore = round(
@@ -153,8 +178,10 @@ export function recommendPicks(input: {
           personalMatchup,
           playerRole,
           enemyLaneKnown: enemyLaneChampionId !== undefined,
-          executionRisk
-        })
+          executionRisk,
+          strategicAnalysis
+        }),
+        ...(strategicAnalysis ? { strategicAnalysis } : {})
       } satisfies PickRecommendation;
     })
     .filter(
@@ -176,6 +203,7 @@ export function recommendFromPersonalPool(input: {
   candidates: PlayerChampionPoolCandidate[];
   championStats: PlayerChampionStats[];
   championTags: ChampionTag[];
+  capabilityProfiles?: ChampionCapabilityProfile[];
   matchups: MatchupData[];
   compositionRules: CompositionRules;
   patchMeta: PatchMetaData | null;
@@ -213,25 +241,42 @@ export function recommendFromPersonalPool(input: {
       const hasPersonalPerformance = personal?.eligible === true;
       const tag = input.championTags.find(
         (entry) =>
-          entry.championId === candidate.championId ||
-          entry.championName === candidate.championName
+          entry.championId === candidate.championId || entry.championName === candidate.championName
       );
       const personalMatchup = stats
         ? findPersonalMatchup(candidate.championId, enemyLaneChampionId, role, input.matchups)
         : undefined;
       const composition = analyzeTeamComposition(input.draft, input.championTags, tag);
+      const strategicAnalysis =
+        input.capabilityProfiles === undefined
+          ? undefined
+          : analyzeDraftStrategy({
+              draft: input.draft,
+              candidate: {
+                championId: candidate.championId,
+                championName: candidate.championName
+              },
+              capabilityProfiles: input.capabilityProfiles,
+              championTags: input.championTags
+            });
       const metrics: PickRecommendation["metrics"] = {
         personalPerformance: hasPersonalPerformance ? personal.score : null,
         recentForm: hasPersonalPerformance ? (personal.components.recent ?? null) : null,
         matchup: personalMatchup?.score ?? null,
         blindSafety: tag ? tag.blindSafety * 100 : null,
         allySynergy: tag ? calculateAllySynergy(tag, composition, input.draft) : null,
-        enemyDraftAnswer: tag
-          ? calculateEnemyAnswer(tag, input.draft, input.championTags)
-          : null,
-        compositionFit: tag
-          ? calculateCompositionFit(tag, composition, input.compositionRules)
-          : null,
+        enemyDraftAnswer:
+          strategicAnalysis !== undefined
+            ? strategicAnalysis.enemyResponseScore.value
+            : tag
+              ? calculateEnemyAnswer(tag, input.draft, input.championTags)
+              : null,
+        compositionFit:
+          strategicAnalysis !== undefined
+            ? strategicAnalysis.teamCompositionScore.value
+            : tag
+              ? calculateCompositionFit(tag, composition, input.compositionRules)
+              : null,
         meta: null
       };
       const executionRisk = assessExecutionRisk({
@@ -265,8 +310,7 @@ export function recommendFromPersonalPool(input: {
         hasPersonalPerformance,
         tag !== undefined
       );
-      const confidence =
-        hasPersonalPerformance && personal ? personal.confidence : undefined;
+      const confidence = hasPersonalPerformance && personal ? personal.confidence : undefined;
 
       return {
         championId: candidate.championId,
@@ -286,14 +330,15 @@ export function recommendFromPersonalPool(input: {
           personalMatchup,
           playerRole: role,
           enemyLaneKnown: enemyLaneChampionId !== undefined,
-          executionRisk
+          executionRisk,
+          strategicAnalysis
         }),
+        ...(strategicAnalysis ? { strategicAnalysis } : {}),
         rank: 0,
         poolSource: candidate.source,
         poolProvenance: {
           sourceType: candidate.source === "PERSONAL_OBSERVED" ? "OBSERVED" : "USER_PROVIDED",
-          sourceId:
-            candidate.source === "PERSONAL_OBSERVED" ? "riot-match-v5" : "sparta-user-pool",
+          sourceId: candidate.source === "PERSONAL_OBSERVED" ? "riot-match-v5" : "sparta-user-pool",
           resource:
             candidate.source === "PERSONAL_OBSERVED"
               ? "MatchObservation"
@@ -337,7 +382,10 @@ export function recommendFromPersonalPool(input: {
   };
 }
 
-function emptyPoolResponse(totalCandidates: number, shortageReason: string): DraftRecommendationResponse {
+function emptyPoolResponse(
+  totalCandidates: number,
+  shortageReason: string
+): DraftRecommendationResponse {
   return {
     primaryRecommendations: [],
     alternatives: [],
@@ -464,9 +512,7 @@ function buildPoolWarnings(
   return warnings;
 }
 
-function buildExecutionRiskWarnings(
-  assessment: ExecutionRiskAssessment
-): RecommendationReason[] {
+function buildExecutionRiskWarnings(assessment: ExecutionRiskAssessment): RecommendationReason[] {
   if (
     assessment.scorePenalty <= 0 ||
     assessment.riskMetric.value === null ||
@@ -601,7 +647,9 @@ function findPersonalMatchup(
   if (!enemyChampionId) return undefined;
   return matchups.find(
     (matchup) =>
-      matchup.championId === championId && matchup.enemyChampionId === enemyChampionId && matchup.role === role
+      matchup.championId === championId &&
+      matchup.enemyChampionId === enemyChampionId &&
+      matchup.role === role
   );
 }
 
@@ -624,37 +672,31 @@ function calculateAllySynergy(
   draft: DraftState
 ): number {
   if (!tag || draft.allies.length === 0) return 50;
-  return round((tag.engage * composition.engage + tag.peel * composition.peel + tag.waveclear * composition.waveclear) / 3);
+  return round(
+    (tag.engage * composition.engage +
+      tag.peel * composition.peel +
+      tag.waveclear * composition.waveclear) /
+      3
+  );
 }
 
-/**
- * pickoff (45) pesa mais que engage (30) e scaling (25) porque "conseguir
- * isolar/eliminar um alvo" e o jeito mais direto de responder a um draft
- * inimigo fragil, enquanto engage/scaling ajudam mas dependem mais do resto
- * do time. O piso `Math.max(0.8, enemyFragility)` evita que o enemyAnswer
- * despenque a quase 0 quando o time inimigo esta bem formado (frontline
- * alto) - mesmo contra um time solido, um pick de resposta ainda tem algum
- * valor, so nao o valor maximo.
- */
-function calculateEnemyAnswer(tag: ChampionTag | undefined, draft: DraftState, championTags: ChampionTag[]): number {
+/** Compatibilidade interna para chamadas anteriores sem catálogo da Etapa 14. */
+function calculateEnemyAnswer(
+  tag: ChampionTag | undefined,
+  draft: DraftState,
+  championTags: ChampionTag[]
+): number {
   if (!tag || draft.enemies.length === 0) return 50;
   const enemyNames = draft.enemies.map((pick) => pick.championName);
   const enemies = championTags.filter((candidate) => enemyNames.includes(candidate.championName));
-  const enemyFragility = enemies.reduce((sum, enemy) => sum + (1 - enemy.frontline), 0) / Math.max(1, enemies.length);
-  return round((tag.pickoff * 45 + tag.engage * 30 + tag.scaling * 25) * Math.max(0.8, enemyFragility));
+  const enemyFragility =
+    enemies.reduce((sum, enemy) => sum + (1 - enemy.frontline), 0) / Math.max(1, enemies.length);
+  return round(
+    (tag.pickoff * 45 + tag.engage * 30 + tag.scaling * 25) * Math.max(0.8, enemyFragility)
+  );
 }
 
-/**
- * Base 55 (levemente acima do neutro 50) representa "nenhum problema de
- * composicao a resolver" - ja e um encaixe ok por padrao. Os bonus so se
- * aplicam quando a composicao aliada esta abaixo do minimo de uma regra
- * (`CompositionRules`), e a ordem dos bonus (+25 frontline > +20 engage >
- * +15 waveclear) reflete que frontline ausente e o risco mais critico de
- * composicao (time inteiro fica vulneravel), seguido de engage (sem isso,
- * dificil forcar teamfight) e so depois waveclear (perde-se pra push, mas
- * raramente perde-se o jogo so por isso). +10 fixo de dano balanceado é o
- * bonus mais fraco por ser preferencia de time, nao ausencia critica.
- */
+/** Compatibilidade interna para chamadas anteriores sem catálogo da Etapa 14. */
 function calculateCompositionFit(
   tag: ChampionTag | undefined,
   composition: TeamComposition,
@@ -727,7 +769,8 @@ function buildWarnings(
     warnings.push({
       code: "sample_size",
       label: "Amostra pequena",
-      detail: "O campeão passou do mínimo de 5 partidas, mas a confiança estatística ainda é baixa.",
+      detail:
+        "O campeão passou do mínimo de 5 partidas, mas a confiança estatística ainda é baixa.",
       impact: 40
     });
   }
@@ -762,14 +805,11 @@ function selectCategory(
   metrics: PickRecommendation["metrics"],
   hasPersonalPerformance = true
 ): PickRecommendation["category"] {
-  if (
-    draft.pickOrder <= 1 &&
-    metrics.blindSafety !== null &&
-    metrics.blindSafety >= 70
-  ) {
+  if (draft.pickOrder <= 1 && metrics.blindSafety !== null && metrics.blindSafety >= 70) {
     return "best_blind";
   }
-  if (draft.enemyLaneChampionId && metrics.matchup !== null && metrics.matchup >= 60) return "best_matchup";
+  if (draft.enemyLaneChampionId && metrics.matchup !== null && metrics.matchup >= 60)
+    return "best_matchup";
   if (metrics.allySynergy !== null && metrics.allySynergy >= 60) {
     return "best_teamfit";
   }

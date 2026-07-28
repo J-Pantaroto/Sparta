@@ -5,6 +5,19 @@ Rota: `POST /drafts/pre-game-analysis` (autenticada). Tela: `features/PreGameScr
 
 Versão do algoritmo: `PRE_GAME_ANALYSIS_VERSION`, exposta em `algorithmVersion` na resposta.
 
+## Etapa 15 — motor estratégico compartilhado
+
+A composição e a resposta a ameaças agora vêm de `analyzeDraftStrategy`, o
+mesmo motor usado no ranking. `ChampionCapabilityProfile` é a fonte principal;
+`ChampionTag` fica restrita aos fallbacks genéricos explicitamente suportados.
+As seções desta resposta são projeções dos sinais estruturados em
+`strategicAnalysis`; não existe um segundo cálculo de composição no fluxo
+atual da API. A descrição completa, relações versionadas e fórmulas estão em
+`docs/draft-strategic-analysis.md`.
+
+O restante deste documento descreve também a borda compatível usada apenas
+quando um chamador anterior não fornece `championCapabilityProfiles`.
+
 ## O que a análise responde
 
 > O que os dados atuais permitem dizer sobre o campeão escolhido dentro deste draft?

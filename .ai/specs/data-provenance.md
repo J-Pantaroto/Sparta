@@ -1,5 +1,14 @@
 # Origem, disponibilidade e confiança dos dados
 
+## Estratégia 5×5 (Etapa 15)
+
+Cada `StrategicSignal` leva evidências por campeão/capacidade e as
+proveniências concretas usadas. Capacidade específica (`CALCULATED` sobre
+Data Dragon oficial) precede `ChampionTag` (`DERIVED`); as duas nunca aumentam
+o mesmo score juntas. A métrica final é `DERIVED`, com versão do algoritmo e
+amostra de campeões conhecidos. Cobertura permanece separada de confiança e
+de qualidade do candidato. Ver `docs/draft-strategic-analysis.md`.
+
 `DataProvenance.cache` registra estado e datas reais da cópia sem substituir `sourceType`.
 Data Dragon stale continua `OFFICIAL`, marcado `status: STALE`; data histórica ausente não é
 inventada. Ver `.ai/specs/http-resilience.md`.

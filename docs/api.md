@@ -32,8 +32,12 @@ artificiais. Ver `docs/champion-execution-risk.md`.
 
 `GET /catalog/champions/:championId/capabilities` expõe o perfil técnico
 rastreável da Etapa 14, com evidências por passiva/habilidade, dimensões
-indisponíveis, versões e cobertura. A rota é somente consulta e não alimenta
-ranking ou pré-game. Ver `docs/champion-capabilities.md`.
+indisponíveis, versões e cobertura. Desde a Etapa 15, o mesmo manifesto
+alimenta `TEAM_COMPOSITION` e `ENEMY_COMPOSITION_ANSWER` no ranking e no
+pré-game pelo motor `analyzeDraftStrategy`. As recomendações carregam
+`strategicAnalysis` por candidato; o pré-game devolve o mesmo contrato para o
+campeão confirmado. Ver `docs/champion-capabilities.md` e
+`docs/draft-strategic-analysis.md`.
 
 ## Erros externos
 

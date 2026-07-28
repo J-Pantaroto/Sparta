@@ -1,5 +1,32 @@
 # Sparta - Contexto para Continuidade
 
+## Etapa 15: análise estratégica do draft 5×5
+
+`analyzeDraftStrategy` (`draft-strategy/1.0.0`) é o único motor estratégico
+usado pelo ranking atual e pelo pré-game. Ele recebe candidato, picks
+conhecidos, `ChampionCapabilityProfile` e `ChampionTag`; remove duplicatas,
+inclui o candidato uma vez, mantém o adversário direto separado e nunca
+completa picks desconhecidos.
+
+As 19 dimensões estratégicas usam primeiro a evidência específica da Etapa 14.
+Somente engage, peel, frontline, pickoff, waveclear e scaling admitem fallback
+genérico explícito da tag. Fonte específica e fallback não somam; conflito
+fica visível. Ausência de evidência continua indisponível. Alcance oficial é
+preservado numericamente e só valores >= 450 contam como perfil à distância.
+
+`TEAM_COMPOSITION` compara os aliados conhecidos sem/com o candidato e
+distingue lacuna preenchida, recurso adicionado, reforço e lacuna conhecida
+remanescente. `ENEMY_COMPOSITION_ANSWER` usa relações gerais versionadas entre
+ameaças e respostas; não contém nomes de campeão nem afirma counter completo.
+Dimensões indisponíveis saem da média e picks desconhecidos reduzem cobertura,
+não score. Os pesos gerais e todos os demais componentes permanecem iguais.
+
+Principais, alternativas e pré-game carregam o mesmo
+`DraftStrategicAnalysis`. Cards mostram resumo; detalhes expõem campeões,
+evidências, ameaças, respostas, lacunas e cobertura, separados de dificuldade
+e risco pessoal. Respostas antigas continuam aceitas sem criar `50`. Não há
+migration nem persistência de sessão. Ver `docs/draft-strategic-analysis.md`.
+
 ## Etapa 14: capacidades rastreáveis dos campeões
 
 `ChampionCapabilityProfile` é um catálogo técnico separado de `ChampionTag`.
@@ -18,9 +45,10 @@ O manifesto revisável `data/seeds/champion-capabilities.json` cobre 173
 campeões. Cobertura média de 19,15% é apenas proporção de dimensões utilizáveis
 e não entra em score. Geração/verificação:
 `champion-capabilities:generate`/`champion-capabilities:check`. Consulta:
-`GET /catalog/champions/:championId/capabilities`. Ranking, recomendações,
-pré-game e as nove dimensões de `ChampionTag` permanecem inalterados. Ver
-`docs/champion-capabilities.md`.
+`GET /catalog/champions/:championId/capabilities`. Na Etapa 14 o ranking e o
+pré-game permaneceram inalterados; a Etapa 15 passou a consumir o manifesto
+somente nos dois componentes estratégicos. As nove dimensões de `ChampionTag`
+continuam preservadas. Ver `docs/champion-capabilities.md`.
 
 ## Etapa 13: dificuldade e risco pessoal de execução
 

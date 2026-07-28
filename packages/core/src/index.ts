@@ -12,6 +12,7 @@ export * from "./draft/recommendation-metrics.js";
 export * from "./draft/execution-risk.js";
 export * from "./draft/champion-capability-extractor.js";
 export * from "./draft/champion-capability-manifest.js";
+export * from "./draft/draft-strategic-analysis.js";
 export * from "./draft/champion-tag-manifest.js";
 export * from "./types/champion-tag-provenance.js";
 export * from "./types/champion-difficulty.js";

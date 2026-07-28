@@ -1,5 +1,14 @@
 # Draft Recommendation
 
+## Estratégia 5×5 (Etapa 15)
+
+`TEAM_COMPOSITION` e `ENEMY_COMPOSITION_ANSWER` são produzidas por
+`analyzeDraftStrategy` para cada candidato principal e alternativa. O motor
+usa o manifesto de capacidades como fonte principal, compara aliados sem/com
+o candidato e avalia relações gerais de ameaça–resposta. Pesos, pool, cinco
+recomendações, desempenho, matchup, dificuldade e risco não foram alterados.
+Ver `docs/draft-strategic-analysis.md`.
+
 O motor fica em `packages/core/src/draft/recommendation-engine.ts`. Auditado e documentado na "Fase 7" (revisão dos algoritmos de scoring) — ver `CLAUDE.md`. Mesma ressalva de `docs/scoring-model.md`: os números abaixo são julgamento de design informado por conhecimento de LoL, não calibração estatística.
 
 Entradas:

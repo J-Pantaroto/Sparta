@@ -4,8 +4,10 @@ A Etapa 14 cria um catálogo técnico separado de `ChampionTag`. Ele registra
 somente capacidades sustentadas por texto ou metadado explícito do recurso
 oficial completo de cada campeão na Data Dragon.
 
-O perfil ainda não participa de ranking, score, pesos, recomendações,
-pré-game ou análise 5×5.
+Na Etapa 14 o perfil era somente catálogo técnico. Desde a Etapa 15 ele
+alimenta exclusivamente `TEAM_COMPOSITION` e `ENEMY_COMPOSITION_ANSWER` pelo
+motor estratégico 5×5; pesos e todos os demais componentes permanecem
+inalterados.
 
 ## Fonte e versões
 

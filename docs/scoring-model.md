@@ -1,5 +1,14 @@
 # Scoring Model
 
+## Componentes estratégicos (Etapa 15)
+
+Os pesos gerais continuam idênticos. Somente os valores internos de
+`TEAM_COMPOSITION` e `ENEMY_COMPOSITION_ANSWER` passaram a vir do motor
+`draft-strategy/1.0.0`. Dimensões indisponíveis são removidas da média
+estratégica e a normalização de pesos existente continua individual por
+candidato; ausência não recebe `0` nem `50`. Fórmulas e cobertura:
+`docs/draft-strategic-analysis.md`.
+
 Este documento descreve os algoritmos que avaliam desempenho do jogador, com os valores atuais e o raciocínio por trás de cada um. Auditado e documentado na "Fase 7" (revisão dos algoritmos de scoring) — ver `CLAUDE.md`.
 
 **Importante**: os números abaixo (baselines, pesos, thresholds) são **julgamento de design informado por conhecimento de domínio de League of Legends**, não calibração estatística. O Sparta ainda não acumulou dado real suficiente (apenas ~20-25 partidas de uma única conta de teste) para justificar ajustar esses valores com base em estatística. Onde um número tem alguma derivação relativa a outro (ex.: "mesma granularidade de"), isso está indicado explicitamente; o resto é arbitrário mas motivado.

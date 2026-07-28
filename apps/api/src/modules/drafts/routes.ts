@@ -6,11 +6,15 @@ import {
   type MatchupData,
   type PlayerChampionStats
 } from "@sparta/core";
-import { draftRecommendationRequestSchema, preGameAnalysisRequestSchema } from "../../routes/schemas.js";
+import {
+  draftRecommendationRequestSchema,
+  preGameAnalysisRequestSchema
+} from "../../routes/schemas.js";
 import { compositionRules } from "../../config/composition-rules.js";
 import { prisma } from "../../db/prisma.js";
 import { getAuthenticatedUserId } from "../auth/routes.js";
 import { findAllChampionTags, findChampionNamesByIds } from "../catalog/champion-repository.js";
+import { findAllChampionCapabilityProfiles } from "../catalog/champion-capability-repository.js";
 import { findPersonalLaneMatchupHistory } from "../matches/matchup-repository.js";
 import { findChampionStatsByPuuid } from "../players/player-stats-repository.js";
 import { findPlayerPool } from "../players/player-pool-repository.js";
@@ -51,8 +55,9 @@ export const draftsRoutes: FastifyPluginAsync = async (app) => {
       championStats = await findChampionStatsByPuuid(riotAccount.puuid);
     }
 
-    const [championTags, laneHistory, personalPool] = await Promise.all([
+    const [championTags, capabilityProfiles, laneHistory, personalPool] = await Promise.all([
       findAllChampionTags(),
+      findAllChampionCapabilityProfiles(),
       riotAccount
         ? findPersonalLaneMatchupHistory(riotAccount.puuid, payload.draft.playerRole)
         : Promise.resolve([]),
@@ -73,6 +78,7 @@ export const draftsRoutes: FastifyPluginAsync = async (app) => {
       })),
       championStats,
       championTags,
+      capabilityProfiles,
       matchups,
       compositionRules,
       patchMeta: null,
@@ -122,11 +128,14 @@ export const draftsRoutes: FastifyPluginAsync = async (app) => {
     const playerRole = draft.playerRole;
     const selectedChampionId = draft.selectedChampionId;
 
-    const [names, championTags] = await Promise.all([
+    const [names, championTags, capabilityProfiles] = await Promise.all([
       findChampionNamesByIds(
-        [selectedChampionId, draft.enemyLaneChampionId].filter((id): id is number => id !== undefined)
+        [selectedChampionId, draft.enemyLaneChampionId].filter(
+          (id): id is number => id !== undefined
+        )
       ),
-      findAllChampionTags()
+      findAllChampionTags(),
+      findAllChampionCapabilityProfiles()
     ]);
 
     const selectedChampionName = names.get(selectedChampionId);
@@ -165,6 +174,7 @@ export const draftsRoutes: FastifyPluginAsync = async (app) => {
       selectedChampionTag: championTags.find((tag) => tag.championId === selectedChampionId),
       selectedChampionName,
       championTags,
+      championCapabilityProfiles: capabilityProfiles,
       personalMatchup,
       enemyLaneChampionName,
       now: new Date().toISOString()

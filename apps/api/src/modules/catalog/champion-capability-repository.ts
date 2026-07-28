@@ -34,22 +34,24 @@ export function findCapabilityProfileInManifest(
 export async function findChampionCapabilityProfile(
   championId: number
 ): Promise<ChampionCapabilityProfile | undefined> {
+  return (await findAllChampionCapabilityProfiles()).find(
+    (profile) => profile.championId === championId
+  );
+}
+
+/**
+ * Carrega o snapshot inteiro uma vez por operação de draft. Ranking e
+ * pré-game recebem exatamente os mesmos perfis versionados.
+ */
+export async function findAllChampionCapabilityProfiles(): Promise<ChampionCapabilityProfile[]> {
   let raw: string;
   try {
     raw = await readFile(MANIFEST_FILE, "utf-8");
   } catch (error) {
-    if (
-      typeof error === "object" &&
-      error !== null &&
-      "code" in error &&
-      error.code === "ENOENT"
-    ) {
-      return undefined;
+    if (typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT") {
+      return [];
     }
     throw error;
   }
-  return findCapabilityProfileInManifest(
-    parseChampionCapabilityManifest(JSON.parse(raw)),
-    championId
-  );
+  return parseChampionCapabilityManifest(JSON.parse(raw)).profiles;
 }

@@ -106,7 +106,13 @@ describe("Champion Select sem posição identificada (Etapa 6)", () => {
     fireEvent.change(screen.getByLabelText("Posição"), { target: { value: "" } });
 
     const atualizar = setDraft.mock.calls[0][0] as (current: DraftState) => DraftState;
-    const proximo = atualizar({ playerRole: "ADC", pickOrder: 1, allies: [], enemies: [], bannedChampionIds: [] });
+    const proximo = atualizar({
+      playerRole: "ADC",
+      pickOrder: 1,
+      allies: [],
+      enemies: [],
+      bannedChampionIds: []
+    });
     expect(proximo.playerRole).toBeUndefined();
     expect(proximo.playerRoleSource).toBeUndefined();
   });
@@ -134,6 +140,55 @@ describe("Champion Select sem posição identificada (Etapa 6)", () => {
       />
     );
     expect(container.textContent).not.toMatch(/NaN|Infinity|undefined/);
+  });
+});
+
+describe("análise estratégica 5×5 (Etapa 15)", () => {
+  it("mostra resumo no card e evidência/cobertura no detalhe", () => {
+    const strategic = {
+      ...recomendacaoMid,
+      strategicAnalysis: {
+        status: "PARTIAL",
+        coverage: 0.42,
+        alliedProfile: {
+          knownChampions: [
+            { championId: 61, championName: "Orianna" },
+            { championId: 54, championName: "Malphite" }
+          ]
+        },
+        enemyProfile: {
+          knownChampions: [{ championId: 64, championName: "Lee Sin" }]
+        },
+        candidateContribution: {
+          addedCapabilities: ["PEEL"],
+          filledKnownGaps: [],
+          reinforcedCapabilities: [],
+          remainingKnownGaps: ["FRONTLINE"],
+          newlyEnabledResponses: []
+        },
+        strengths: [
+          {
+            key: "added_PEEL",
+            dimension: "PEEL",
+            description: "Orianna adiciona evidência de peel.",
+            status: "PARTIAL",
+            evidence: [],
+            unavailableReason: undefined
+          }
+        ],
+        gaps: [],
+        risks: [],
+        unavailableSignals: []
+      }
+    } as unknown as PickRecommendation;
+
+    renderScreen({ playerRole: "MID", playerRoleSource: "USER" }, [strategic]);
+
+    expect(screen.getAllByText("Adiciona peel").length).toBeGreaterThan(0);
+    expect(screen.getByText("Análise estratégica 5×5")).toBeDefined();
+    expect(screen.getByText(/3 de 10 campeões conhecidos/)).toBeDefined();
+    expect(screen.getByText(/Aliados considerados: Orianna, Malphite/)).toBeDefined();
+    expect(screen.getByText(/Inimigos considerados: Lee Sin/)).toBeDefined();
   });
 });
 
@@ -261,8 +316,7 @@ describe("pool pessoal na selecao de campeoes (Etapa 12)", () => {
     expect(
       screen.getByText(
         (_, element) =>
-          element?.classList.contains("sp-badge") === true &&
-          element.textContent === "Mid: 2"
+          element?.classList.contains("sp-badge") === true && element.textContent === "Mid: 2"
       )
     ).toBeDefined();
   });
@@ -280,8 +334,7 @@ describe("dificuldade e risco na Champion Select (Etapa 13)", () => {
           value: 80,
           status: "AVAILABLE",
           confidence: null,
-          explanation:
-            "Valor original 8/10 da Data Dragon; normalizado linearmente pelo Sparta."
+          explanation: "Valor original 8/10 da Data Dragon; normalizado linearmente pelo Sparta."
         },
         {
           key: "EXECUTION_RISK",
@@ -311,8 +364,7 @@ describe("dificuldade e risco na Champion Select (Etapa 13)", () => {
           value: 30,
           status: "AVAILABLE",
           confidence: null,
-          explanation:
-            "Dificuldade geral baixa e nenhuma partida observada nesta posição."
+          explanation: "Dificuldade geral baixa e nenhuma partida observada nesta posição."
         }
       ]
     } as unknown as PickRecommendation;
@@ -349,9 +401,7 @@ describe("dificuldade e risco na Champion Select (Etapa 13)", () => {
       )
     ).toBeDefined();
     expect(
-      screen.getByTitle(
-        "Dificuldade geral baixa e nenhuma partida observada nesta posição."
-      )
+      screen.getByTitle("Dificuldade geral baixa e nenhuma partida observada nesta posição.")
     ).toBeDefined();
   });
 });
