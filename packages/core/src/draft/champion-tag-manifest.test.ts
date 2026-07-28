@@ -240,7 +240,7 @@ describe("manifesto de ChampionTag - formato antigo", () => {
     const manifest = parseChampionTagManifest(legado);
     expect(manifest.champions).toHaveLength(1);
     expect(manifest.champions[0].pickoff).toBe(0.85);
-    expect(manifest.champions[0].roles).toEqual(["MID"]);
+    expect(manifest.champions[0].roles).toEqual([]);
   });
 
   it("registro histórico sai sem proveniência - origem não informada", () => {
@@ -330,14 +330,14 @@ describe("manifesto de ChampionTag - gerador", () => {
     expect(manifest.champions[0].roles).toEqual([]);
   });
 
-  it("roles curado sobrevive quando registrado como override", () => {
+  it("roles legado não sobrevive como ChampionTag", () => {
     const previous: ChampionTagManifest = {
       metadata: METADATA,
-      champions: [entry("Ahri", 103, { roles: ["MID"], review: { overrides: { roles: {} } } })]
+      champions: [entry("Ahri", 103, { roles: ["MID"] })]
     };
 
     const { manifest } = build(previous, [derived("Ahri", 103)]);
-    expect(manifest.champions[0].roles).toEqual(["MID"]);
+    expect(manifest.champions[0].roles).toEqual([]);
   });
 });
 

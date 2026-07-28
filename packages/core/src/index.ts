@@ -19,4 +19,5 @@ export * from "./draft/pre-game-analysis.js";
 export * from "./scoring/weight-normalization.js";
 export * from "./types/recommendation-metric.js";
 export * from "./types/match-observation.js";
+export * from "./types/champion-role-evidence.js";
 export * from "./postgame/post-game-analysis.js";

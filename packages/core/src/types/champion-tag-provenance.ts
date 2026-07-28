@@ -26,8 +26,9 @@ import type { DataProvenance } from "./provenance.js";
  */
 
 /**
- * As 9 dimensões numéricas do `ChampionTag` mais os três campos
- * descritivos. São exatamente os campos que um override pode cobrir.
+ * As 9 dimensões numéricas do `ChampionTag` mais os dois campos
+ * descritivos. `roles` não é uma dimensão curável: sem fonte global
+ * aprovada, nem override manual pode promovê-lo a elegibilidade.
  */
 export const CHAMPION_TAG_DIMENSIONS = [
   "blindSafety",
@@ -40,8 +41,7 @@ export const CHAMPION_TAG_DIMENSIONS = [
   "scaling",
   "earlyPressure",
   "damageProfile",
-  "tags",
-  "roles"
+  "tags"
 ] as const;
 
 export type ChampionTagDimension = (typeof CHAMPION_TAG_DIMENSIONS)[number];

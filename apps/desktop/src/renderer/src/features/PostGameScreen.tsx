@@ -13,9 +13,11 @@ import { useAsyncData } from "../hooks/use-async-data";
 import {
   analyzePostgame,
   ApiError,
+  fetchChampionRoleEvidence,
   fetchPostgameReport,
   fetchMatchObservation,
   fetchRecentMatches,
+  type ChampionRoleEvidenceResponse,
   type RiotAccountSummary
 } from "../services/api-client";
 import { fetchAllChampions, type DataDragonChampionSummary } from "../services/datadragon";
@@ -64,6 +66,7 @@ export function PostGameScreen({
   const [reportStatus, setReportStatus] = useState<"idle" | "loading" | "error">("idle");
   const [reportError, setReportError] = useState<string | null>(null);
   const [observation, setObservation] = useState<MatchLoadoutObservation | null>(null);
+  const [roleEvidence, setRoleEvidence] = useState<ChampionRoleEvidenceResponse | null>(null);
 
   const matches = useAsyncData<{ puuid: string; matches: RecentChampionMatch[] }>(
     () => (account ? fetchRecentMatches(account.puuid, 10) : undefined),
@@ -74,13 +77,18 @@ export function PostGameScreen({
     [ddragonVersion]
   );
 
-  async function openMatch(matchId: string) {
+  async function openMatch(match: RecentChampionMatch) {
     if (!sessionToken) return;
+    const matchId = match.matchId;
     setSelectedMatchId(matchId);
     setObservation(null);
+    setRoleEvidence(null);
     void fetchMatchObservation(sessionToken, matchId)
       .then(setObservation)
       .catch(() => setObservation(null));
+    void fetchChampionRoleEvidence(account.puuid, match.championId, match.role)
+      .then(setRoleEvidence)
+      .catch(() => setRoleEvidence(null));
     setReportStatus("loading");
     setReportError(null);
     try {
@@ -183,7 +191,7 @@ export function PostGameScreen({
                     key={match.matchId}
                     pad="sm"
                     selected={match.matchId === selectedMatchId}
-                    onClick={() => void openMatch(match.matchId)}
+                    onClick={() => void openMatch(match)}
                     label={`Analisar partida de ${champion?.name ?? match.championId}`}
                   >
                     <span
@@ -253,6 +261,7 @@ export function PostGameScreen({
                   )}
                   ddragonVersion={ddragonVersion}
                   observation={observation}
+                  roleEvidence={roleEvidence}
                   onReanalyze={() => void reanalyze()}
                 />
               )
@@ -279,6 +288,7 @@ function MatchReport({
   champion,
   ddragonVersion,
   observation,
+  roleEvidence,
   onReanalyze
 }: {
   report: PostGameAnalysis;
@@ -286,6 +296,7 @@ function MatchReport({
   champion?: DataDragonChampionSummary;
   ddragonVersion: string;
   observation: MatchLoadoutObservation | null;
+  roleEvidence: ChampionRoleEvidenceResponse | null;
   onReanalyze: () => void;
 }) {
   const baseline = roleBaselines[match.role];
@@ -385,6 +396,8 @@ function MatchReport({
 
       {observation && <MatchObservationCard observation={observation} />}
 
+      {roleEvidence && <ChampionRoleEvidenceCard evidence={roleEvidence} />}
+
       {priority && (
         <Card>
           <SectionHeader
@@ -463,6 +476,43 @@ function MatchReport({
         </Button>
       </div>
     </div>
+  );
+}
+
+export function ChampionRoleEvidenceCard({
+  evidence
+}: {
+  evidence: ChampionRoleEvidenceResponse;
+}) {
+  const personal = evidence.personalRoleEvidence;
+  const lastPlayedAt = personal.lastPlayedAt
+    ? new Date(personal.lastPlayedAt).toLocaleDateString("pt-BR")
+    : null;
+
+  return (
+    <Card>
+      <SectionHeader
+        title="Experiência observada"
+        description={
+          personal.status === "UNAVAILABLE"
+            ? personal.unavailableReason
+            : `${personal.games} ${
+                personal.games === 1 ? "partida observada" : "partidas observadas"
+              } como ${roleLabels[personal.role]} · ${personal.wins}V/${personal.losses}D${
+                lastPlayedAt ? ` · última em ${lastPlayedAt}` : ""
+              }`
+        }
+      />
+      {personal.status !== "UNAVAILABLE" && (
+        <p className="sp-observation__muted">
+          Patches {personal.patches.join(", ") || "indisponíveis"} · filas{" "}
+          {personal.queueIds.join(", ") || "indisponíveis"} · origem Match-V5 normalizada
+        </p>
+      )}
+      <p className="sp-observation__muted">
+        Elegibilidade global: {evidence.globalRoleEligibility.unavailableReason}
+      </p>
+    </Card>
   );
 }
 

@@ -39,7 +39,7 @@ vi.mock("../matches/matchup-repository.js", () => ({
 vi.mock("../players/player-stats-repository.js", () => ({
   findChampionStatsByPuuid: findChampionStatsByPuuidMock,
   findPlayerInsightsByPuuid: findPlayerInsightsByPuuidMock,
-  derivePreferredRoles: (stats: { role: string }[]) => Array.from(new Set(stats.map((entry) => entry.role)))
+  deriveObservedRoles: (stats: { role: string }[]) => Array.from(new Set(stats.map((entry) => entry.role)))
 }));
 
 import { buildApp } from "../../app.js";

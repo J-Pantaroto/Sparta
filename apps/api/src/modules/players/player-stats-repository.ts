@@ -32,7 +32,7 @@ export async function ensurePlayerProfile(riotAccountId: string): Promise<string
   return profile.id;
 }
 
-export interface ChampionRolePair {
+export interface PlayerChampionObservedRolePair {
   championId: number;
   role: string;
 }
@@ -45,7 +45,7 @@ export interface ChampionRolePair {
 export async function recomputeChampionStats(
   riotAccountId: string,
   puuid: string,
-  touchedPairs: ChampionRolePair[],
+  touchedPairs: PlayerChampionObservedRolePair[],
   matchAnalysisLimit?: number
 ): Promise<void> {
   if (touchedPairs.length === 0) return;
@@ -305,7 +305,7 @@ function toStatCoverage(
  * uma preferencia declarada pelo usuario, e so o que os dados mostram) -
  * ordenadas da mais jogada pra menos jogada.
  */
-export function derivePreferredRoles(championStats: PlayerChampionStats[]): Role[] {
+export function deriveObservedRoles(championStats: PlayerChampionStats[]): Role[] {
   const gamesByRole = new Map<Role, number>();
   for (const stats of championStats) {
     gamesByRole.set(stats.role, (gamesByRole.get(stats.role) ?? 0) + stats.games);
@@ -314,3 +314,6 @@ export function derivePreferredRoles(championStats: PlayerChampionStats[]): Role
     .sort((a, b) => b[1] - a[1])
     .map(([role]) => role);
 }
+
+/** Alias legado: o resultado é volume pessoal observado, não preferência declarada. */
+export const derivePreferredRoles = deriveObservedRoles;

@@ -10,7 +10,8 @@ const {
   setMatchAnalysisLimitMock,
   getAuthenticatedUserIdMock,
   riotAccountFindFirstMock,
-  syncPlayerMatchesMock
+  syncPlayerMatchesMock,
+  findPlayerChampionRoleEvidenceMock
 } = vi.hoisted(() => ({
   findRiotAccountByRiotIdMock: vi.fn(),
   findChampionStatsByPuuidMock: vi.fn(),
@@ -21,7 +22,8 @@ const {
   setMatchAnalysisLimitMock: vi.fn(),
   getAuthenticatedUserIdMock: vi.fn(),
   riotAccountFindFirstMock: vi.fn(),
-  syncPlayerMatchesMock: vi.fn()
+  syncPlayerMatchesMock: vi.fn(),
+  findPlayerChampionRoleEvidenceMock: vi.fn()
 }));
 
 vi.mock("./player-stats-repository.js", () => ({
@@ -32,7 +34,7 @@ vi.mock("./player-stats-repository.js", () => ({
   setMatchAnalysisLimit: setMatchAnalysisLimitMock,
   MIN_MATCH_ANALYSIS_LIMIT: 1,
   MAX_MATCH_ANALYSIS_LIMIT: 200,
-  derivePreferredRoles: (stats: { role: string }[]) => Array.from(new Set(stats.map((entry) => entry.role)))
+  deriveObservedRoles: (stats: { role: string }[]) => Array.from(new Set(stats.map((entry) => entry.role)))
 }));
 
 vi.mock("../matches/match-repository.js", () => ({
@@ -56,6 +58,10 @@ vi.mock("../../db/prisma.js", () => ({
 
 vi.mock("../sync/riot-sync-service.js", () => ({
   syncPlayerMatches: syncPlayerMatchesMock
+}));
+
+vi.mock("./player-champion-role-evidence-repository.js", () => ({
+  findPlayerChampionRoleEvidence: findPlayerChampionRoleEvidenceMock
 }));
 
 import { buildApp } from "../../app.js";
@@ -116,8 +122,64 @@ describe("players routes", () => {
     expect(response.statusCode).toBe(200);
     expect(body.id).toBe("puuid-1");
     expect(body.championStats).toHaveLength(1);
+    expect(body.observedRoles).toEqual(["MID"]);
     expect(body.preferredRoles).toEqual(["MID"]);
     expect(body.recentForm.confidence).toBe("low");
+    await app.close();
+  });
+
+  it("separa evidência pessoal de elegibilidade global indisponível", async () => {
+    findPlayerChampionRoleEvidenceMock.mockResolvedValue({
+      championId: 161,
+      role: "SUPPORT",
+      status: "AVAILABLE",
+      games: 1,
+      wins: 1,
+      losses: 0,
+      lastPlayedAt: "2026-07-20T12:00:00.000Z",
+      patches: ["16.14"],
+      queueIds: [420],
+      normalization: {
+        extractorVersions: ["match-observation/1.0.0"],
+        sources: ["TEAM_POSITION"]
+      },
+      provenance: {
+        sourceType: "CALCULATED",
+        sourceId: "sparta",
+        resource: "MatchObservation",
+        sampleSize: 1,
+        status: "AVAILABLE"
+      },
+      observationSource: {
+        sourceType: "OBSERVED",
+        sourceId: "riot-match-v5",
+        status: "AVAILABLE"
+      }
+    });
+    const app = await buildApp();
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/players/puuid-1/champions/161/role-evidence?role=SUPPORT&patch=16.14&queueId=420"
+    });
+    const body = response.json();
+
+    expect(response.statusCode).toBe(200);
+    expect(body.personalRoleEvidence.games).toBe(1);
+    expect(body.globalRoleEligibility).toEqual({
+      championId: 161,
+      role: "SUPPORT",
+      status: "UNAVAILABLE",
+      eligible: null,
+      unavailableReason: "Elegibilidade global por posição ainda não está disponível."
+    });
+    expect(body).not.toHaveProperty("roles");
+    expect(findPlayerChampionRoleEvidenceMock).toHaveBeenCalledWith(
+      "puuid-1",
+      161,
+      "SUPPORT",
+      expect.objectContaining({ patches: ["16.14"], queueIds: [420] })
+    );
     await app.close();
   });
 

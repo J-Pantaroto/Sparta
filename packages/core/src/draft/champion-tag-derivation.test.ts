@@ -136,7 +136,7 @@ describe("mergeChampionTags", () => {
   it("preserva a entrada curada por cima da derivada", () => {
     const resultado = mergeChampionTags([derivado], [curado]);
     expect(resultado).toHaveLength(1);
-    expect(resultado[0]).toEqual(curado);
+    expect(resultado[0]).toEqual({ ...curado, roles: [] });
   });
 
   it("mantem os derivados que nao tem curadoria", () => {

@@ -14,7 +14,7 @@ import { getAuthenticatedUserId } from "../auth/routes.js";
 import { findAllChampionTags, findChampionNamesByIds } from "../catalog/champion-repository.js";
 import { findPersonalLaneMatchupHistory } from "../matches/matchup-repository.js";
 import {
-  derivePreferredRoles,
+  deriveObservedRoles,
   findChampionStatsByPuuid,
   findPlayerInsightsByPuuid
 } from "../players/player-stats-repository.js";
@@ -77,7 +77,7 @@ export const draftsRoutes: FastifyPluginAsync = async (app) => {
           platformRegion: riotAccount.platformRegion,
           regionalRouting: riotAccount.regionalRouting
         },
-        preferredRoles: derivePreferredRoles(championStats),
+        preferredRoles: deriveObservedRoles(championStats),
         championStats,
         ...insights
       };

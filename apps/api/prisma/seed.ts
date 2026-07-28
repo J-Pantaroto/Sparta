@@ -84,10 +84,9 @@ async function main() {
      * Garante que o `Champion` existe antes do `ChampionTag` (a FK exige).
      * O nome/`key` so sao definidos na criacao: quando o campeao ja veio do
      * `catalog:sync`, os dados de la (nome real, key da Data Dragon, versao)
-     * sao melhores e nao devem ser sobrescritos pelo seed. `roles` e
-     * atualizado apenas quando a entrada de fato traz rotas - a derivacao
-     * automatica deixa o campo vazio de proposito (a Data Dragon nao publica
-     * rota), e sobrescrever com `[]` apagaria curadoria existente.
+     * sao melhores e nao devem ser sobrescritos pelo seed. `roles` é sempre
+     * esvaziado: o campo histórico não tem origem global aprovada e não pode
+     * ser promovido a elegibilidade.
      *
      * `version` vem do manifesto quando conhecido. A versao anterior gravava
      * a string fixa `"seed"`, que nao e versao de coisa nenhuma; sem
@@ -95,12 +94,12 @@ async function main() {
      */
     await prisma.champion.upsert({
       where: { id: entry.championId },
-      update: entry.roles.length > 0 ? { roles: entry.roles } : {},
+      update: { roles: [] },
       create: {
         id: entry.championId,
         key: entry.championName,
         name: entry.championName,
-        roles: entry.roles,
+        roles: [],
         version: manifest.metadata?.dataDragonVersion ?? null
       }
     });

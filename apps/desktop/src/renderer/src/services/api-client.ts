@@ -8,9 +8,11 @@ import {
 import type {
   ChampionPerformanceScore,
   DraftState,
+  GlobalChampionRoleEligibility,
   GrowthJourney,
   MatchLoadoutObservation,
   PickRecommendation,
+  PlayerChampionRoleEvidence,
   PlayerChampionStats,
   PlayerStrength,
   PlayerWeakness,
@@ -35,10 +37,24 @@ export interface PlayerProfileResponse {
   id: string;
   account: RiotAccountSummary;
   preferredRoles: Role[];
+  observedRoles?: Role[];
   championStats: PlayerChampionStats[];
   strengths: PlayerStrength[];
   weaknesses: PlayerWeakness[];
   recentForm: RecentForm;
+}
+
+export interface ChampionRoleEvidenceResponse {
+  personalRoleEvidence: PlayerChampionRoleEvidence;
+  globalRoleEligibility: GlobalChampionRoleEligibility;
+  scope: {
+    patches?: string[];
+    queueIds?: number[];
+    playedAtFrom?: string;
+    playedAtTo?: string;
+    gameModes?: string[];
+    gameTypes?: string[];
+  };
 }
 
 export interface RiotAccountSummary {
@@ -317,6 +333,16 @@ export function fetchMatchObservation(token: string, matchId: string) {
   return request<MatchLoadoutObservation>(`/matches/${encodeURIComponent(matchId)}/observation`, {
     headers: { Authorization: `Bearer ${token}` }
   });
+}
+
+export function fetchChampionRoleEvidence(
+  puuid: string,
+  championId: number,
+  role: Role
+) {
+  return request<ChampionRoleEvidenceResponse>(
+    `/players/${encodeURIComponent(puuid)}/champions/${championId}/role-evidence?role=${role}`
+  );
 }
 
 export function fetchSettings(token: string) {

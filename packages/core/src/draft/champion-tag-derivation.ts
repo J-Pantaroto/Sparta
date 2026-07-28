@@ -159,7 +159,8 @@ function buildDescriptiveTags(
  * `roles` sai **vazio** de proposito: a Data Dragon nao publica em que rota
  * o campeao joga, e chutar (Marksman -> ADC, Mage -> MID) erraria em todo
  * campeao flex. Nenhum motor consome `tag.roles` hoje; inventar o campo so
- * criaria dado falso. Entradas curadas a mao continuam podendo preencher.
+ * criaria dado falso. Curadoria manual também não é uma fonte global
+ * aprovada; elegibilidade por posição vive em contrato separado.
  */
 export function deriveChampionTag(profile: ChampionClassProfile): ChampionTag {
   const classes = knownClasses(profile);
@@ -208,10 +209,10 @@ export function deriveChampionTag(profile: ChampionClassProfile): ChampionTag {
 export function mergeChampionTags(derived: ChampionTag[], curated: ChampionTag[]): ChampionTag[] {
   const byId = new Map<number, ChampionTag>();
   derived.forEach((tag) => {
-    if (tag.championId !== undefined) byId.set(tag.championId, tag);
+    if (tag.championId !== undefined) byId.set(tag.championId, { ...tag, roles: [] });
   });
   curated.forEach((tag) => {
-    if (tag.championId !== undefined) byId.set(tag.championId, tag);
+    if (tag.championId !== undefined) byId.set(tag.championId, { ...tag, roles: [] });
   });
   return [...byId.values()].sort((a, b) => a.championName.localeCompare(b.championName));
 }

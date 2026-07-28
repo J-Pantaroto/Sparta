@@ -30,9 +30,7 @@
     {
       "championId": 103,
       "championName": "Ahri",
-      "roles": [
-        "MID"
-      ],
+      "roles": [],
       "damageProfile": "AP",
       "tags": [
         "pickoff",
@@ -81,9 +79,6 @@
             "reason": "Curada manualmente antes da Etapa 8; a data da revisao nao foi registrada."
           },
           "tags": {
-            "reason": "Curada manualmente antes da Etapa 8; a data da revisao nao foi registrada."
-          },
-          "roles": {
             "reason": "Curada manualmente antes da Etapa 8; a data da revisao nao foi registrada."
           }
         }
@@ -2171,9 +2166,7 @@
     {
       "championId": 61,
       "championName": "Orianna",
-      "roles": [
-        "MID"
-      ],
+      "roles": [],
       "damageProfile": "AP",
       "tags": [
         "control_mage",
@@ -2223,9 +2216,6 @@
             "reason": "Curada manualmente antes da Etapa 8; a data da revisao nao foi registrada."
           },
           "tags": {
-            "reason": "Curada manualmente antes da Etapa 8; a data da revisao nao foi registrada."
-          },
-          "roles": {
             "reason": "Curada manualmente antes da Etapa 8; a data da revisao nao foi registrada."
           }
         }

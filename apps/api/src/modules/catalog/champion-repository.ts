@@ -13,8 +13,7 @@ import {
   type ChampionTagProvenance,
   type CacheMetadata,
   type DataProvenance,
-  type DamageProfile,
-  type Role
+  type DamageProfile
 } from "@sparta/core";
 import { prisma } from "../../db/prisma.js";
 import { readCache, setCached } from "../../db/api-cache.js";
@@ -218,8 +217,8 @@ export async function findChampionNamesByIds(ids: number[]): Promise<Map<number,
 }
 
 /**
- * Todos os ChampionTag persistidos (join com Champion pro nome/roles reais
- * do catalogo). Hoje so cobre os campeoes do seed manual
+ * Todos os ChampionTag persistidos (join com Champion para o nome real do
+ * catálogo). Hoje cobre os campeões do manifesto versionado
  * (data/seeds/champion-tags.json) - o motor de recomendacao ja tolera
  * campeoes sem tag (fica com valores neutros).
  */
@@ -230,7 +229,9 @@ export async function findAllChampionTags(): Promise<ChampionTag[]> {
     provenance: toChampionTagProvenance(row),
     championId: row.championId,
     championName: row.champion.name,
-    roles: row.champion.roles as Role[],
+    // Campo legado de Champion não possui origem global aprovada. Um
+    // ChampionTag nunca o promove a elegibilidade por posição.
+    roles: [],
     damageProfile: row.damageProfile as DamageProfile,
     tags: row.tags,
     blindSafety: row.blindSafety,

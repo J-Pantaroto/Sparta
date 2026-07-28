@@ -1,6 +1,12 @@
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { computeGrowthJourney, rankChampionPool, type RecentChampionMatch, type Role } from "@sparta/core";
+import {
+  computeGrowthJourney,
+  rankChampionPool,
+  unavailableGlobalChampionRoleEligibility,
+  type RecentChampionMatch,
+  type Role
+} from "@sparta/core";
 import { prisma } from "../../db/prisma.js";
 import { safeExternalErrorLog } from "../../http/external-error-response.js";
 import { getAuthenticatedUserId } from "../auth/routes.js";
@@ -8,7 +14,7 @@ import { findParticipationHistory } from "../matches/match-repository.js";
 import { findPostgameReportsByPuuid } from "../postgame/postgame-repository.js";
 import { lookupRiotAccount } from "../riot-integration/account-lookup.js";
 import {
-  derivePreferredRoles,
+  deriveObservedRoles,
   findChampionStatsByPuuid,
   findMatchAnalysisLimitByPuuid,
   findPlayerInsightsByPuuid,
@@ -18,6 +24,7 @@ import {
   setMatchAnalysisLimit
 } from "./player-stats-repository.js";
 import { syncPlayerMatches } from "../sync/riot-sync-service.js";
+import { findPlayerChampionRoleEvidence } from "./player-champion-role-evidence-repository.js";
 
 export const linkRiotAccountSchema = z.object({
   gameName: z.string().min(3, "Informe o nome do invocador"),
@@ -25,6 +32,24 @@ export const linkRiotAccountSchema = z.object({
   platformRegion: z.string().min(2).default("br1"),
   regionalRouting: z.string().min(2).default("americas")
 });
+
+const roleSchema = z.enum(["TOP", "JUNGLE", "MID", "ADC", "SUPPORT"]);
+const commaSeparatedStrings = z
+  .string()
+  .optional()
+  .transform((value) => value?.split(",").map((item) => item.trim()).filter(Boolean));
+const commaSeparatedNumbers = z
+  .string()
+  .optional()
+  .transform((value, context) => {
+    if (value === undefined) return undefined;
+    const values = value.split(",").map((item) => Number(item.trim()));
+    if (values.some((item) => !Number.isInteger(item))) {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: "queueId deve conter inteiros." });
+      return z.NEVER;
+    }
+    return values;
+  });
 
 export const playersRoutes: FastifyPluginAsync = async (app) => {
   app.get("/players/:riotName/:tagLine/profile", async (request, reply) => {
@@ -38,12 +63,60 @@ export const playersRoutes: FastifyPluginAsync = async (app) => {
     const championStats = await findChampionStatsByPuuid(account.puuid);
     const insights = await findPlayerInsightsByPuuid(account.puuid);
 
+    const observedRoles = deriveObservedRoles(championStats);
     return {
       id: account.puuid,
       account,
-      preferredRoles: derivePreferredRoles(championStats),
+      observedRoles,
+      // Alias legado: representa volume pessoal observado, nunca
+      // elegibilidade global de campeões.
+      preferredRoles: observedRoles,
       championStats,
       ...insights
+    };
+  });
+
+  app.get("/players/:puuid/champions/:championId/role-evidence", async (request) => {
+    const params = z
+      .object({ puuid: z.string().min(1), championId: z.coerce.number().int().positive() })
+      .parse(request.params);
+    const query = z
+      .object({
+        role: roleSchema,
+        patch: commaSeparatedStrings,
+        queueId: commaSeparatedNumbers,
+        from: z.string().datetime().optional(),
+        to: z.string().datetime().optional(),
+        gameMode: commaSeparatedStrings,
+        gameType: commaSeparatedStrings
+      })
+      .refine((value) => !value.from || !value.to || value.from <= value.to, {
+        message: "from deve ser anterior ou igual a to."
+      })
+      .parse(request.query);
+
+    const filters = {
+      patches: query.patch,
+      queueIds: query.queueId,
+      playedAtFrom: query.from,
+      playedAtTo: query.to,
+      gameModes: query.gameMode,
+      gameTypes: query.gameType
+    };
+    const personalRoleEvidence = await findPlayerChampionRoleEvidence(
+      params.puuid,
+      params.championId,
+      query.role,
+      filters
+    );
+
+    return {
+      personalRoleEvidence,
+      globalRoleEligibility: unavailableGlobalChampionRoleEligibility(
+        params.championId,
+        query.role
+      ),
+      scope: filters
     };
   });
 

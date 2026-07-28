@@ -14,7 +14,7 @@ import {
   computeAndPersistPlayerInsights,
   findMatchAnalysisLimitByPuuid,
   recomputeChampionStats,
-  type ChampionRolePair
+  type PlayerChampionObservedRolePair
 } from "../players/player-stats-repository.js";
 
 export interface SyncFailure {
@@ -74,7 +74,7 @@ export async function syncPlayerMatches(
     failed: [],
     skippedParticipants: []
   };
-  const touchedPairs: ChampionRolePair[] = [];
+  const touchedPairs: PlayerChampionObservedRolePair[] = [];
 
   for (const matchId of idsToProcess) {
     try {

@@ -95,7 +95,10 @@ function readEntry(raw: unknown): ChampionTagManifestEntry | null {
   const entry: ChampionTagManifestEntry = {
     championId: raw.championId,
     championName: raw.championName,
-    roles: Array.isArray(raw.roles) ? (raw.roles as Role[]) : [],
+    // Campo legado pode existir no JSON, mas não possui semântica global
+    // conhecida. O adaptador público de compatibilidade pode lê-lo; o
+    // manifesto de ChampionTag nunca o promove.
+    roles: [],
     damageProfile: (raw.damageProfile as DamageProfile) ?? "MIXED",
     tags: Array.isArray(raw.tags) ? (raw.tags as string[]) : [],
     blindSafety: Number(raw.blindSafety),
@@ -197,7 +200,7 @@ export function toChampionTags(manifest: ChampionTagManifest): ChampionTag[] {
   return manifest.champions.map((entry) => ({
     championId: entry.championId,
     championName: entry.championName,
-    roles: entry.roles,
+    roles: [],
     damageProfile: entry.damageProfile,
     tags: entry.tags,
     blindSafety: entry.blindSafety,
@@ -274,7 +277,7 @@ function normalizeEntry(entry: ChampionTagManifestEntry): ChampionTagManifestEnt
   const normalized: ChampionTagManifestEntry = {
     championId: entry.championId,
     championName: entry.championName,
-    roles: entry.roles,
+    roles: [],
     damageProfile: entry.damageProfile,
     tags: entry.tags,
     blindSafety: entry.blindSafety,
@@ -344,7 +347,7 @@ export function buildChampionTagManifest(
     const entry: ChampionTagManifestEntry = {
       championId: tag.championId,
       championName: tag.championName,
-      roles: tag.roles,
+      roles: [],
       damageProfile: tag.damageProfile,
       tags: tag.tags,
       blindSafety: tag.blindSafety,

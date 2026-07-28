@@ -1,5 +1,19 @@
 # Sparta - Contexto para Continuidade
 
+## Etapa 11: experiência pessoal e elegibilidade global por posição
+
+`PlayerChampionRoleEvidence` agrega exclusivamente
+`MatchObservation.normalizedRole` da Etapa 10 e expõe partidas, V/D, última
+partida, patches, filas e normalização. `GlobalChampionRoleEligibility`
+permanece `UNAVAILABLE`, com `eligible: null`; nenhuma partida, Smite,
+classe, tag ou curadoria manual cria elegibilidade global.
+
+`ChampionTag.roles` é sempre vazio, inclusive para os dois valores MID
+legados do manifesto. O alias `preferredRoles` continua legível, mas aponta
+para `observedRoles` pessoal. Pool, pesos e scores não mudaram. Rota:
+`GET /players/:puuid/champions/:championId/role-evidence`. Detalhes em
+`docs/champion-role-evidence.md`.
+
 ## Etapa 10: observações reais de partida
 
 Os `rawJson` Match-V5 agora são reprocessados por
@@ -156,7 +170,7 @@ divergências**). As métricas do Viego no app real continuam 67/65/64/50/50/43,
 
 Validado contra o Postgres e o Electron reais: 173 linhas históricas sem proveniência
 respondendo normalmente **antes** do seed (`profileProvenance` ausente, sinal `DERIVED` sem
-versão inventada); depois do seed, 171 `UNREVIEWED` e 2 `REVIEWED` (Ahri e Orianna, 12 dimensões
+versão inventada); depois do seed, 171 `UNREVIEWED` e 2 `REVIEWED` (Ahri e Orianna, 11 dimensões
 cada), todas com `16.14.1` / `champion-tag-derivation/1.0.0`; o app real exibindo "Perfil
 derivado das classes da Data Dragon, sem revisão específica deste campeão. Fonte: champion.json
 16.14.1." 0 imagens quebradas, 0 `NaN`/`undefined`.

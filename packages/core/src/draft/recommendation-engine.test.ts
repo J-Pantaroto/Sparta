@@ -81,6 +81,36 @@ describe("recommendation engine", () => {
     expect(recommendations[0].reasons.length).toBeGreaterThan(0);
   });
 
+  it("ChampionTag.roles vazio não altera pool nem scores", () => {
+    const input = {
+      draft: {
+        playerRole: "MID" as const,
+        pickOrder: 1,
+        allies: [],
+        enemies: [],
+        bannedChampionIds: []
+      },
+      player,
+      championStats,
+      matchups: [],
+      compositionRules: {
+        minimumFrontline: 35,
+        minimumEngage: 35,
+        minimumWaveclear: 35,
+        preferDamageBalance: true
+      },
+      patchMeta: null
+    };
+
+    const withLegacyRole = recommendPicks({ ...input, championTags: tags });
+    const withoutGlobalRole = recommendPicks({
+      ...input,
+      championTags: tags.map((tag) => ({ ...tag, roles: [] }))
+    });
+
+    expect(withoutGlobalRole).toEqual(withLegacyRole);
+  });
+
   it("detects composition risks", () => {
     // Precisa de pelo menos um aliado: risco de composicao e afirmacao
     // sobre o TIME, e sem ninguem escolhido a analise descreveria so o
