@@ -22,6 +22,19 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-07-28 15:04 — Inteligência pessoal de builds, runas e feitiços
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0017-inteligencia-pessoal-loadouts.md`
+
+Os dados normalizados de partidas agora geram evidência pessoal, factual e
+versionada por jogador, campeão e posição observada para inventários finais,
+runas e feitiços. A API autenticada restringe a consulta à própria conta e a
+interface apresenta o histórico apenas no detalhe da recomendação e no
+pré-game, sem alterar score, ranking, cobertura, risco, estratégia ou
+snapshots. Foram validados 645 testes TypeScript e 1 Python, além de typecheck,
+lint, build e uma consulta real com amostra 8 e bloqueio `403` para outro
+jogador. Implementação funcional: `d8758b8`.
+
 ## 2026-07-28 13:10 — Persistência de drafts e recomendações
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0016-persistencia-drafts-recomendacoes.md`
 

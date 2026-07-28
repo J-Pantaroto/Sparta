@@ -1,7 +1,7 @@
 ---
-status: EM_ANDAMENTO
+status: IMPLEMENTADA
 solicitado_em: 2026-07-28 14:43
-implementado_em:
+implementado_em: 2026-07-28 15:04
 ---
 
 # Inteligência pessoal de builds, runas e feitiços
@@ -48,4 +48,15 @@ implementado_em:
 
 ## Notas de implementação
 
-Em andamento.
+Implementada no commit `d8758b8`. A Etapa 17 adiciona um agregador puro e
+versionado por jogador, campeão e posição observada, com assinaturas canônicas
+separadas para inventário final, runas e feitiços; filtros auditáveis; estados
+estruturados de disponibilidade; resolução de catálogo; proveniência; endpoint
+autenticado restrito à própria conta; e apresentação factual no detalhe da
+recomendação e no pré-game.
+
+O histórico pessoal permanece fora do score, ranking, cobertura, risco,
+estratégia e snapshots de recomendação. A validação cobriu 645 testes
+TypeScript e 1 teste Python, além de typecheck, lint e build. Em execução real
+contra o banco, a rota retornou amostra 8 para a própria conta e `403` para
+outro jogador.
