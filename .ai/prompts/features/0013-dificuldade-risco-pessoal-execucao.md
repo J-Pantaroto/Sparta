@@ -1,7 +1,7 @@
 ---
-status: EM_ANDAMENTO
+status: IMPLEMENTADA
 solicitado_em: 2026-07-28 00:19
-implementado_em:
+implementado_em: 2026-07-28 00:42
 ---
 
 # Dificuldade do campeão e risco pessoal de execução
@@ -18,6 +18,8 @@ implementado_em:
 > compatibilidade com respostas antigas e todas as restrições da Etapa 13.
 
 ## Notas de implementação
+
+Implementado no commit `e43c943`, enviado para `origin/main`.
 
 - `info.difficulty` é preservado na escala 0-10, com versão do catálogo,
   recurso e proveniência oficial, e normalizado para 0-100 pelo algoritmo

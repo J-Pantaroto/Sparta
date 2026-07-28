@@ -22,6 +22,21 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-07-28 00:42 — Dificuldade do campeão e risco pessoal de execução
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0013-dificuldade-risco-pessoal-execucao.md`
+
+O ranking agora preserva a dificuldade oficial 0-10 da Data Dragon, sua
+normalização versionada e a proveniência, separadas da dificuldade estratégica
+curável. Familiaridade usa apenas amostra e recência na posição; risco de
+execução combina essas evidências sem win rate ou desempenho e aplica
+penalização explicável de no máximo oito pontos. Candidato manual sem histórico
+continua elegível, e respostas antigas ou catálogos sem dificuldade permanecem
+`UNAVAILABLE`, sem neutro artificial. Migration aplicada; 173/173 campeões
+confirmados no Postgres e no manifesto. 539 testes TypeScript, 1 teste Python,
+typecheck, lint, build e validação do catálogo aprovados. Detalhes em
+`docs/champion-execution-risk.md`.
+
 ## 2026-07-27 23:38 — Pool pessoal por posição e recomendações 5+3
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0012-pool-pessoal-cinco-recomendacoes.md`
