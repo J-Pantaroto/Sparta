@@ -258,6 +258,7 @@ model DraftSession {
   riotAccount               RiotAccount                       @relation(fields: [riotAccountId], references: [id])
   linkedMatch               Match?                            @relation("DraftSessionLinkedMatch", fields: [linkedMatchId], references: [matchId], onDelete: SetNull)
   snapshots                 RecommendationSnapshot[]
+  reviews                   DraftReview[]
   matchLinkRevisions        DraftMatchLinkRevision[]
   postgameComparisons       DraftPostGameComparisonRevision[]
 
@@ -336,6 +337,41 @@ model PersistedRecommendation {
 
   @@unique([snapshotId, championId])
   @@index([championId])
+}
+
+/// Revisao humana de um draft ja registrado (Etapa 24).
+///
+/// Vive numa tabela SEPARADA de proposito: nada aqui altera sessao, snapshot,
+/// ranking, metrica ou relatorio pos-game. Uma correcao nao sobrescreve - cria
+/// outra linha apontando pra anterior em "supersedesReviewId".
+model DraftReview {
+  id                  String   @id @default(uuid())
+  riotAccountId       String
+  draftSessionId      String
+  /// Snapshot vigente no lock-in. Nulo quando a sessao nao tinha nenhum.
+  snapshotId          String?
+  /// Partida vinculada no momento da revelacao. Nulo enquanto cega ou sem vinculo.
+  matchId             String?
+  /// IN_PROGRESS | PRE_MATCH_REVIEWED | COMPLETED | NEEDS_INVESTIGATION
+  status              String
+  reviewVersion       String
+  preMatchJson        Json?
+  postMatchJson       Json?
+  /// Instante da revelacao explicita. Nulo = revisao ainda cega.
+  resultRevealedAt    DateTime?
+  createdAt           DateTime @default(now())
+  completedAt         DateTime?
+  /// Revisao que esta corrige, quando e uma correcao.
+  supersedesReviewId  String?
+  correctionReason    String?
+  /// Preenchido quando outra revisao passa a valer no lugar desta.
+  supersededAt        DateTime?
+  /// Tags desnormalizadas so pra consulta agregada; a fonte e o JSON.
+  issueTags           String[]
+  draftSession        DraftSession @relation(fields: [draftSessionId], references: [id], onDelete: Cascade)
+
+  @@index([riotAccountId, status])
+  @@index([draftSessionId, createdAt])
 }
 
 model PostgameReport {

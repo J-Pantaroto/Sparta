@@ -727,3 +727,123 @@ export function transitionDraftSessionStatus(
     }
   );
 }
+
+/* ── Revisão humana do motor (Etapa 24) ───────────────────────────────── */
+
+export type ReviewRatingValue = "STRONG" | "ADEQUATE" | "WEAK" | "INSUFFICIENT_DATA" | "NOT_APPLICABLE";
+
+export interface DraftReviewSummaryResponse {
+  reviewsConsidered: number;
+  completed: { count: number; total: number };
+  blind: { count: number; total: number };
+  needsInvestigation: { count: number; total: number };
+  withInsufficientData: { count: number; total: number };
+  issueTagFrequencies: { tag: string; count: number; total: number }[];
+  algorithmVersions: { version: string; reviews: number }[];
+  formVersions: { version: string; reviews: number }[];
+  summaryVersion: string;
+}
+
+export interface DraftReviewRecord {
+  id: string;
+  draftSessionId: string;
+  snapshotId: string | null;
+  matchId: string | null;
+  status: "IN_PROGRESS" | "PRE_MATCH_REVIEWED" | "COMPLETED" | "NEEDS_INVESTIGATION";
+  resultRevealedAt: string | null;
+  createdAt: string;
+  completedAt: string | null;
+  reviewVersion: string;
+  supersedesReviewId: string | null;
+  correctionReason?: string;
+}
+
+/**
+ * Contexto da fase cega. **Não tem campo de resultado** - o backend não
+ * envia partida, KDA nem estatística enquanto a revisão está cega, e o tipo
+ * reflete isso: para exibir resultado alguém teria que mudá-lo.
+ */
+export interface BlindReviewContextResponse {
+  draftSessionId: string;
+  snapshotId: string | null;
+  role: string;
+  roleSource: string;
+  source: string;
+  lockedInAt: string | null;
+  selectedChampionId: number | null;
+  knownDraft: unknown;
+  snapshot: { id: string; createdAt: string; dataCoverage: number; recommendations: unknown[] } | null;
+  algorithmVersions: Record<string, string>;
+  hasLinkedMatch: boolean;
+}
+
+export function fetchDraftReviewForm(token: string) {
+  return request<{
+    reviewRatings: Record<string, string>;
+    preMatchDimensions: Record<string, string>;
+    postMatchDimensions: Record<string, string>;
+    issueTags: Record<string, string>;
+  }>("/draft-reviews/form", { headers: { Authorization: `Bearer ${token}` } });
+}
+
+export function openDraftReview(
+  token: string,
+  sessionId: string,
+  correction?: { supersedesReviewId: string; correctionReason?: string }
+) {
+  return request<{ review: DraftReviewRecord; context: BlindReviewContextResponse }>(
+    `/draft-sessions/${encodeURIComponent(sessionId)}/reviews`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify(correction ?? {})
+    }
+  );
+}
+
+export function fetchDraftReviews(token: string, sessionId: string) {
+  return request<{ reviews: DraftReviewRecord[] }>(
+    `/draft-sessions/${encodeURIComponent(sessionId)}/reviews`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+}
+
+export function submitPreMatchReview(
+  token: string,
+  reviewId: string,
+  assessment: Record<string, unknown>
+) {
+  return request<{ review: DraftReviewRecord }>(
+    `/draft-reviews/${encodeURIComponent(reviewId)}/pre-match`,
+    { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify(assessment) }
+  );
+}
+
+/** Ação explícita. Só depois dela a partida entra na resposta. */
+export function revealDraftReviewResult(token: string, reviewId: string) {
+  return request<{
+    review: DraftReviewRecord;
+    match: { matchId: string; postgameReport: unknown | null } | null;
+    matchUnavailableReason?: string;
+  }>(`/draft-reviews/${encodeURIComponent(reviewId)}/reveal-result`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
+export function submitPostMatchReview(
+  token: string,
+  reviewId: string,
+  assessment: Record<string, unknown>
+) {
+  return request<{ review: DraftReviewRecord }>(
+    `/draft-reviews/${encodeURIComponent(reviewId)}/post-match`,
+    { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify(assessment) }
+  );
+}
+
+export function fetchDraftReviewSummary(token: string) {
+  return request<{ summary: DraftReviewSummaryResponse }>("/players/draft-review-summary", {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}

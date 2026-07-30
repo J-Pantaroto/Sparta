@@ -1,5 +1,34 @@
 # Sparta - Contexto para Continuidade
 
+## Etapa 24: revisão humana auditável do motor
+
+Antes de mexer em peso, fórmula ou threshold, o Sparta passou a permitir **revisão humana
+estruturada** dos casos reais. Nada disso existia: busca por `DraftReview` no repositório
+retornava zero.
+
+`draft-review/1.0.0` tem escala qualitativa (`STRONG`/`ADEQUATE`/`WEAK`/`INSUFFICIENT_DATA`/
+`NOT_APPLICABLE`) com definição por nível, seis dimensões cegas, quatro pós-resultado e 13 tags de
+problema — todas documentadas e publicadas em `GET /draft-reviews/form`. **A escala nunca vira
+número**: não há nota geral, percentual de acerto nem versão vencedora.
+
+**O modo cego é do backend, não do CSS.** Enquanto `resultRevealedAt` é nulo o repositório não
+consulta partida, relatório pós-game nem estatística, e o contexto devolvido é do tipo
+`BlindReviewContext`, que não tem campo de resultado — vazar exigiria mudar o tipo, e a mudança
+aparece no diff. Medido na API real: revelar antes da fase cega → **409**; reescrever a fase cega
+depois de submetida → **409**; pós-partida sem revelar → **409**.
+
+**Correção não sobrescreve**: cria revisão nova com `supersedesReviewId` + `correctionReason`, e a
+anterior recebe `supersededAt` com o conteúdo intacto (medido: as duas coexistem, a antiga com
+`strategicExplanation: WEAK` preservado). O agregado só conta revisões atuais — o mesmo caso nunca
+é contado duas vezes.
+
+Sessão sem snapshot vigente no lock-in recusa avaliação de ranking (`422 RANKING_NOT_ASSESSABLE`);
+sessão sem partida vinculada continua válida como revisão só-pré-resultado, com o motivo, sem
+inventar desfecho. Toda contagem do resumo sai com denominador.
+
+**Nenhum peso, fórmula, threshold ou ranking mudou**; nenhum snapshot foi recalculado; nenhuma
+recomendação de calibração é gerada. Ver `docs/draft-review.md`.
+
 ## Etapa 23: avaliação longitudinal e observabilidade do motor
 
 `buildLongitudinalRecommendationReport`

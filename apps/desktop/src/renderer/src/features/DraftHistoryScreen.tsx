@@ -8,6 +8,7 @@ import {
   type DraftSessionDetail,
   type DraftSessionSummary
 } from "../services/api-client";
+import { DraftReviewPanel } from "./DraftReviewPanel";
 import {
   Card,
   EmptyState,
@@ -110,7 +111,15 @@ export function DraftHistoryScreen({
                 }
               />
               {session.id === selectedId && (
-                <SessionDetail state={detail} onOpenMatch={onOpenMatch} />
+                <>
+                  <SessionDetail state={detail} onOpenMatch={onOpenMatch} />
+                  {/* Revisão humana (Etapa 24): a ação vive aqui porque é esta
+                      a tela com drafts individuais. O Histórico do Motor é
+                      agregado e não tem linha por sessão. */}
+                  <div style={{ marginTop: "var(--space-4)" }}>
+                    <DraftReviewPanel sessionToken={sessionToken} draftSessionId={session.id} />
+                  </div>
+                </>
               )}
             </InteractiveCard>
           ))}

@@ -22,6 +22,20 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-07-30 16:40 — Revisão humana auditável do motor
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0024-revisao-humana-auditavel-do-motor.md`
+
+Fluxo de revisão manual em duas fases para drafts já registrados. A fase cega avalia seis
+dimensões qualitativas sem receber **nenhum** dado da partida — garantido pelo backend, não por
+CSS: o contexto devolvido não tem campo de resultado, e revelar é ação explícita e única. A
+avaliação prévia fica imutável depois da revelação; corrigir cria revisão nova preservando a
+anterior. Escala qualitativa com definição por nível, 13 tags de problema como itens de
+investigação, e agregado descritivo sempre com denominador — sem nota geral, percentual de acerto
+ou versão vencedora. Vitória e derrota não rotulam nada. Nenhum peso, fórmula, threshold ou
+ranking foi alterado, e nenhum snapshot foi recalculado. 47 testes novos (780 no total).
+Ver `docs/draft-review.md`.
+
+
 ## 2026-07-28 18:39 — Avaliação longitudinal e observabilidade do motor
 
 **Status:** IMPLEMENTADA · Prompt:

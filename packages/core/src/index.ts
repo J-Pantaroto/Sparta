@@ -17,6 +17,7 @@ export * from "./draft/champion-tag-manifest.js";
 export * from "./draft/draft-session.js";
 export * from "./draft/draft-match-link.js";
 export * from "./draft/recommendation-snapshot.js";
+export * from "./review/draft-review.js";
 export * from "./types/champion-tag-provenance.js";
 export * from "./types/champion-difficulty.js";
 export * from "./types/champion-capability.js";

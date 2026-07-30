@@ -29,6 +29,7 @@ Snapshot gerado em: 2026-07-25 (atualizado em 2026-07-27).
 - `pre-game-analysis.md` — análise pré-game derivada do draft atual.
 - `champion-tags.md` — origem, derivação e revisão das `ChampionTag`.
 - `draft-persistence.md` — sessões de draft e snapshots imutáveis de recomendação.
+- `draft-review.md` — revisão humana auditável do motor.
 - `personal-loadout-evidence.md` — inventários finais, runas e feitiços pessoais agregados por posição.
 - `adr/0002-global-meta-source.md` — decisão da fonte global, contratos e condições para integração.
 - `replay-analysis.md` — análise de replay (experimental).
