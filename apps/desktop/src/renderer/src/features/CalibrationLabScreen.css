@@ -1,0 +1,210 @@
+.sp-calib-weights {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.sp-calib-validation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: var(--space-3) 0;
+}
+
+.sp-calib-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.sp-calib-roles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.sp-calib-roles label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.sp-calib-blocked {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.sp-calib-blocked li {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.sp-calib-blocked strong {
+  display: block;
+  color: var(--color-text-primary);
+}
+
+.sp-calib-blocked em {
+  display: block;
+  font-style: normal;
+  color: var(--color-text-tertiary);
+}
+
+.sp-calib-list {
+  list-style: none;
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.sp-calib-list button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition: border-color var(--transition-fast);
+}
+
+.sp-calib-list button.is-selected,
+.sp-calib-list button:hover {
+  border-color: var(--color-accent);
+}
+
+.sp-calib-metric {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.sp-calib-metric span {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.sp-calib-metric strong {
+  font-size: var(--font-size-lg);
+}
+
+.sp-calib-segments {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-1);
+  font-size: var(--font-size-sm);
+}
+
+.sp-calib-segments span {
+  color: var(--color-text-secondary);
+  margin-left: var(--space-2);
+}
+
+.sp-calib-note {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.sp-calib-feedback {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.sp-calib-raw {
+  max-height: 260px;
+  overflow: auto;
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+.sp-calib-cases {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.sp-calib-cases > li > button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  cursor: pointer;
+}
+
+.sp-calib-case-detail {
+  padding: var(--space-3);
+  border-left: 2px solid var(--color-accent);
+  margin-top: var(--space-2);
+  display: grid;
+  gap: var(--space-2);
+}
+
+.sp-calib-side-by-side {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
+
+@media (max-width: 900px) {
+  .sp-calib-side-by-side {
+    grid-template-columns: 1fr;
+  }
+}
+
+.sp-calib-ranking {
+  margin: 0;
+  padding-left: var(--space-4);
+  display: grid;
+  gap: var(--space-1);
+  font-size: var(--font-size-sm);
+}
+
+.sp-calib-ranking li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  justify-content: space-between;
+}
+
+.sp-calib-diff {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-1);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}

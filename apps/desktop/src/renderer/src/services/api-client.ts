@@ -847,3 +847,180 @@ export function fetchDraftReviewSummary(token: string) {
     headers: { Authorization: `Bearer ${token}` }
   });
 }
+
+/* Laboratório offline de calibração do motor (Etapa 25b). */
+
+export interface CalibrationParameterEntry {
+  parameter: string;
+  capability:
+    | "EXACT_REWEIGHT"
+    | "EXACT_POST_AGGREGATION"
+    | "REQUIRES_HISTORICAL_DERIVATION_INPUT"
+    | "UNSUPPORTED";
+  description: string;
+  missingHistoricalInputs?: string[];
+  range?: { min: number; max: number };
+}
+
+export interface CalibrationParameterCatalog {
+  laboratoryVersion: string;
+  maxPromotionStatus: string;
+  weightableMetrics: string[];
+  postAggregationThresholds: CalibrationParameterEntry[];
+  registry: CalibrationParameterEntry[];
+}
+
+export interface CalibrationCandidateRow {
+  id: string;
+  lineageId: string;
+  revision: number;
+  name: string;
+  description?: string;
+  status: string;
+  configHash: string;
+  laboratoryVersion: string;
+  candidate: {
+    metricWeights: Record<string, number>;
+    disabledMetrics?: string[];
+    postAggregationThresholds?: Record<string, number>;
+    baselineAggregationVersion: string;
+    candidateVersion: string;
+  };
+  createdAt: string;
+  supersededAt?: string;
+  decision?: { by: string; at: string; note?: string; experimentId?: string };
+}
+
+export interface CalibrationExperimentRow {
+  id: string;
+  candidateId: string;
+  status: "PENDING" | "RUNNING" | "COMPLETED" | "FAILED";
+  filters: Record<string, unknown>;
+  inputHash: string;
+  laboratoryVersion: string;
+  totalCases: number;
+  exactReplayCases: number;
+  integrityFailedCases: number;
+  unsupportedCases: number;
+  missingInputCases: number;
+  excludedCases: number;
+  report?: Record<string, unknown>;
+  failureReason?: string;
+  createdAt: string;
+  completedAt?: string;
+}
+
+export interface CalibrationCandidateInput {
+  name: string;
+  description?: string;
+  baselineAggregationVersion: string;
+  candidateVersion: string;
+  metricWeights: Record<string, number>;
+  disabledMetrics?: string[];
+  postAggregationThresholds?: Record<string, number>;
+  status: "DRAFT" | "READY";
+}
+
+export interface CalibrationValidationResult {
+  valid: boolean;
+  rejections: {
+    code: string;
+    parameter: string;
+    reason: string;
+    missingHistoricalInputs?: string[];
+  }[];
+  accepted: { parameter: string; capability: string }[];
+}
+
+const auth = (token: string) => ({ Authorization: `Bearer ${token}` });
+
+export function fetchCalibrationParameters(token: string) {
+  return request<CalibrationParameterCatalog>("/calibration/parameters", { headers: auth(token) });
+}
+
+export function validateCalibrationCandidateRemote(
+  token: string,
+  candidate: CalibrationCandidateInput
+) {
+  return request<CalibrationValidationResult>("/calibration/candidates/validate", {
+    method: "POST",
+    headers: auth(token),
+    body: JSON.stringify(candidate)
+  });
+}
+
+export function listCalibrationCandidates(token: string) {
+  return request<{ candidates: CalibrationCandidateRow[] }>("/calibration/candidates", {
+    headers: auth(token)
+  });
+}
+
+export function createCalibrationCandidate(token: string, candidate: CalibrationCandidateInput) {
+  return request<CalibrationCandidateRow>("/calibration/candidates", {
+    method: "POST",
+    headers: auth(token),
+    body: JSON.stringify(candidate)
+  });
+}
+
+export function createCalibrationRevision(
+  token: string,
+  candidateId: string,
+  candidate: CalibrationCandidateInput
+) {
+  return request<CalibrationCandidateRow>(
+    `/calibration/candidates/${encodeURIComponent(candidateId)}/revisions`,
+    { method: "POST", headers: auth(token), body: JSON.stringify(candidate) }
+  );
+}
+
+export function runCalibrationExperiment(
+  token: string,
+  candidateId: string,
+  filters: Record<string, unknown>
+) {
+  return request<{ experiment: CalibrationExperimentRow; reused: boolean }>(
+    "/calibration/experiments",
+    { method: "POST", headers: auth(token), body: JSON.stringify({ candidateId, filters }) }
+  );
+}
+
+export function listCalibrationExperiments(token: string, candidateId?: string) {
+  const query = candidateId ? `?candidateId=${encodeURIComponent(candidateId)}` : "";
+  return request<{ experiments: CalibrationExperimentRow[] }>(
+    `/calibration/experiments${query}`,
+    { headers: auth(token) }
+  );
+}
+
+export function fetchCalibrationExperimentCases(
+  token: string,
+  experimentId: string,
+  options: { limit?: number; offset?: number; replayStatus?: string } = {}
+) {
+  const params: string[] = [];
+  if (options.limit) params.push(`limit=${options.limit}`);
+  if (options.offset) params.push(`offset=${options.offset}`);
+  if (options.replayStatus) params.push(`replayStatus=${encodeURIComponent(options.replayStatus)}`);
+  const query = params.length ? `?${params.join("&")}` : "";
+  return request<{
+    total: number;
+    limit: number;
+    offset: number;
+    cases: Record<string, unknown>[];
+  }>(`/calibration/experiments/${encodeURIComponent(experimentId)}/cases${query}`, {
+    headers: auth(token)
+  });
+}
+
+export function decideCalibrationCandidate(
+  token: string,
+  candidateId: string,
+  decision: "reject" | "approve-for-future-release",
+  body: { experimentId?: string; note?: string } = {}
+) {
+  return request<CalibrationCandidateRow & { activation?: string }>(
+    `/calibration/candidates/${encodeURIComponent(candidateId)}/${decision}`,
+    { method: "POST", headers: auth(token), body: JSON.stringify(body) }
+  );
+}

@@ -12,6 +12,7 @@ import { playersRoutes } from "./modules/players/routes.js";
 import { postgameRoutes } from "./modules/postgame/routes.js";
 import { recommendationObservabilityRoutes } from "./modules/observability/routes.js";
 import { draftReviewRoutes } from "./modules/reviews/routes.js";
+import { calibrationRoutes } from "./modules/calibration/routes.js";
 import { replaysRoutes } from "./modules/replays/routes.js";
 import { matchesRoutes } from "./modules/matches/routes.js";
 import { catalogRoutes } from "./modules/catalog/routes.js";
@@ -61,6 +62,7 @@ export async function buildApp() {
   await app.register(postgameRoutes);
   await app.register(recommendationObservabilityRoutes);
   await app.register(draftReviewRoutes);
+  await app.register(calibrationRoutes);
   await app.register(matchesRoutes);
   await app.register(catalogRoutes);
   await app.register(patchesRoutes);

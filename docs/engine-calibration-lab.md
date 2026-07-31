@@ -273,3 +273,92 @@ matchup, inputs do risco e a versão de cada derivação.
 
 A captura é **prospectiva**: não torna snapshots antigos reproduzíveis e não reconstrói dado
 histórico a partir do estado atual. Não faz parte da 25a nem da 25b.
+
+---
+
+# Etapa 25b — persistência, API e interface
+
+O domínio acima ficou utilizável, sem que nenhuma linha do motor operacional mudasse.
+
+## Persistência
+
+Migration `20260731100000_calibration_lab`, três tabelas novas e isoladas. Nenhuma tabela
+existente foi alterada, e **nenhuma linha delas é lida pelo motor**.
+
+| Tabela                       | Papel                                                         |
+| ---------------------------- | ------------------------------------------------------------- |
+| `CalibrationCandidateConfig` | Configuração validada, versionada por `lineageId` + `revision` |
+| `CalibrationExperiment`      | Execução, com `inputHash` único por conta                      |
+| `CalibrationExperimentCase`  | Resultado individual por snapshot                              |
+
+**Revisão em vez de edição**: alterar peso, threshold ou métrica desligada cria uma linha nova
+com `revision + 1` e marca a anterior com `supersededAt`, preservando o conteúdo. O `configHash`
+é o que define alteração funcional — renomear atualiza o rótulo e **não** cria revisão, então
+experimentos já executados contra aquele hash continuam válidos.
+
+**Configuração inválida não é persistida como pronta**: a validação do domínio roda antes da
+escrita e a rejeição estruturada volta ao chamador.
+
+## Execução
+
+O executor carrega apenas snapshots **não substituídos** de sessões da própria conta — a análise
+que valia quando a sessão terminou; incluir os ticks intermediários contaria a mesma decisão
+várias vezes.
+
+Não consulta estatística pessoal atual, catálogo atual, resultado da partida, timeline nem
+revisão pós-resultado. A revisão humana entra somente na fase pré-resultado e apenas quando já
+submetida — a query nem seleciona as colunas pós-resultado.
+
+**Concorrência sem lock aplicativo**: a transição `PENDING → RUNNING` é um `updateMany`
+condicional, atômico no Postgres. Duas chamadas simultâneas produzem uma reivindicação e uma
+recusa (`409`). Não há retry automático.
+
+**Falha não deixa resultado parcial**: os casos da tentativa são removidos e o experimento fica
+`FAILED` sem relatório e com contadores zerados, com motivo sanitizado (sem stack nem payload).
+Reexecutar depois de uma falha é seguro: a claim aceita `PENDING` e `FAILED`, e a gravação apaga
+os casos anteriores dentro da mesma transação.
+
+**Imutabilidade**: `COMPLETED` nunca é reescrito. Um mesmo `inputHash` já concluído é devolvido
+como `reused: true`, com `200` em vez de `201`.
+
+## API
+
+Todas autenticadas e isoladas por conta — nenhuma rota aceita identificador de jogador vindo do
+cliente, e nenhum resultado calculado pelo cliente é aceito.
+
+```txt
+GET    /calibration/parameters                 registro de capacidade e teto de promoção
+POST   /calibration/candidates/validate        valida sem persistir
+POST   /calibration/candidates
+GET    /calibration/candidates
+GET    /calibration/candidates/:id
+POST   /calibration/candidates/:id/revisions
+POST   /calibration/experiments                cria e executa
+GET    /calibration/experiments
+GET    /calibration/experiments/:id
+GET    /calibration/experiments/:id/cases      paginado, filtrável por status de replay
+POST   /calibration/candidates/:id/reject
+POST   /calibration/candidates/:id/approve-for-future-release
+```
+
+Códigos: `409` para experimento em execução ou revisão substituída, `422` para configuração não
+reproduzível (com as rejeições estruturadas no corpo), `404` para recurso de outra conta.
+
+## Interface
+
+Tela **Laboratório do motor** (grupo Análise): edita apenas pesos dos sinais congelados e as
+regras pós-agregação; lista os parâmetros bloqueados com a dependência histórica que falta;
+define filtros; executa; mostra o resumo (casos totais, replays exatos, falhas de integridade,
+versão não suportada, input ausente, excluídos, top 1 preservado, sobreposição do top 5,
+deslocamento médio e mediano, entradas e saídas do grupo principal, segmentos); abre casos
+individuais lado a lado (histórico × candidato × diferenças); e registra a decisão.
+
+**O resultado da partida não é exibido** — o detalhe do caso não tem campo onde ele caiba.
+
+## Aprovação
+
+`APPROVED_FOR_FUTURE_RELEASE` exige um experimento **concluído** da própria conta e registra
+quem, quando, qual experimento e a observação. A resposta declara `activation: "NOT_ACTIVATED"`.
+
+Não existe endpoint de ativação. Nenhuma rota escreve peso operacional, e o motor não lê nenhuma
+tabela deste módulo.

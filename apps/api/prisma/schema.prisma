@@ -583,3 +583,98 @@ model MatchSummonerSpellSlot {
   @@unique([matchObservationId, slot])
   @@index([spellId])
 }
+
+/// Configuracao candidata do laboratorio offline de calibracao (Etapa 25b).
+///
+/// NAO e configuracao do motor: nenhuma linha desta tabela e lida por
+/// `recommendFromPersonalPool`. Aprovar aqui e ato documental, nao ativacao.
+model CalibrationCandidateConfig {
+  id                         String                  @id @default(uuid())
+  /// Conta Riot dona da configuracao. Todo acesso e filtrado por ela.
+  riotAccountId              String
+  /// Identidade estavel entre revisoes da mesma configuracao.
+  lineageId                  String
+  revision                   Int
+  name                       String
+  description                String?
+  baselineAggregationVersion String
+  candidateVersion           String
+  /// Contrato `CalibrationCandidate` ja validado pelo dominio da Etapa 25a.
+  configJson                 Json
+  /// SHA-256 da serializacao canonica. Define o que e alteracao funcional:
+  /// renomear nao muda o hash e portanto nao cria revisao.
+  configHash                 String
+  /// DRAFT | READY | EVALUATED | REJECTED | APPROVED_FOR_FUTURE_RELEASE
+  status                     String
+  laboratoryVersion          String
+  createdAt                  DateTime                @default(now())
+  /// Quando uma revisao posterior passou a valer. Nulo enquanto e a atual.
+  supersededAt               DateTime?
+  /// Decisao humana. Apenas documental - nao ativa nada.
+  decisionBy                 String?
+  decisionAt                 DateTime?
+  decisionNote               String?
+  decisionExperimentId       String?
+  experiments                CalibrationExperiment[]
+
+  @@unique([lineageId, revision])
+  @@index([riotAccountId, lineageId])
+  @@index([riotAccountId, createdAt])
+}
+
+/// Execucao offline de uma configuracao candidata sobre snapshots historicos.
+///
+/// Resultado concluido e imutavel: `COMPLETED` nunca e reescrito, e falha nao
+/// deixa resultado parcial consultavel.
+model CalibrationExperiment {
+  id                   String                      @id @default(uuid())
+  riotAccountId        String
+  candidateId          String
+  /// PENDING | RUNNING | COMPLETED | FAILED
+  status               String                      @default("PENDING")
+  filtersJson          Json
+  /// SHA-256 do input canonico (configuracao + filtros + snapshots + versoes).
+  inputHash            String
+  laboratoryVersion    String
+  /// Snapshots efetivamente incluidos, congelados no momento da criacao.
+  snapshotIdsJson      Json
+  totalCases           Int                         @default(0)
+  exactReplayCases     Int                         @default(0)
+  integrityFailedCases Int                         @default(0)
+  unsupportedCases     Int                         @default(0)
+  missingInputCases    Int                         @default(0)
+  excludedCases        Int                         @default(0)
+  /// Relatorio agregado. Nulo enquanto nao concluiu.
+  reportJson           Json?
+  /// Motivo sanitizado da falha. Nunca carrega credencial ou stack.
+  failureReason        String?
+  createdAt            DateTime                    @default(now())
+  startedAt            DateTime?
+  completedAt          DateTime?
+  candidate            CalibrationCandidateConfig  @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  cases                CalibrationExperimentCase[]
+
+  /// Mesmo input funcional nao gera um segundo experimento.
+  @@unique([riotAccountId, inputHash])
+  @@index([riotAccountId, createdAt])
+  @@index([candidateId])
+}
+
+/// Resultado individual por snapshot. Imutavel depois de concluido.
+model CalibrationExperimentCase {
+  id             String                @id @default(uuid())
+  experimentId   String
+  draftSessionId String
+  snapshotId     String
+  /// EXACT_REPLAY | REPLAY_INTEGRITY_FAILED | REPLAY_UNSUPPORTED_VERSION |
+  /// REPLAY_MISSING_HISTORICAL_INPUT
+  replayStatus   String
+  role           String
+  patch          String?
+  /// `CalibrationCaseComparison` completo produzido pelo dominio da 25a.
+  comparisonJson Json
+  experiment     CalibrationExperiment @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+
+  @@unique([experimentId, snapshotId])
+  @@index([experimentId, replayStatus])
+}

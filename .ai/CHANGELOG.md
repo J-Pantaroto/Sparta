@@ -22,6 +22,17 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-07-31 09:55 — Laboratório de calibração: persistência, API e interface (Etapa 25b)
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0026-laboratorio-calibracao-persistencia-api-tela.md`
+
+Migration `20260731100000_calibration_lab` (três tabelas novas e isoladas), repositório com
+execução transacional, doze rotas autenticadas e a tela "Laboratório do motor". Configuração
+alterada cria revisão nova preservando a anterior; experimento é identificado por `inputHash`
+único por conta e, concluído, é imutável; falha não deixa resultado parcial. Aprovação é
+documental (`activation: NOT_ACTIVATED`) e não existe endpoint de ativação. 18 testes novos de
+rota (867 no total). Ver `docs/engine-calibration-lab.md`.
+
 ## 2026-07-31 07:45 — Laboratório de calibração alinhado ao contrato detalhado da Etapa 25a
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0025-laboratorio-offline-calibracao-motor.md`

@@ -36,6 +36,7 @@ import { AuthScreen } from "./features/AuthScreen";
 import { ChampionSelectScreen } from "./features/ChampionSelectScreen";
 import { DashboardScreen } from "./features/DashboardScreen";
 import { DraftHistoryScreen } from "./features/DraftHistoryScreen";
+import { CalibrationLabScreen } from "./features/CalibrationLabScreen";
 import { GrowthJourneyScreen } from "./features/GrowthJourneyScreen";
 import { MotorHistoryScreen } from "./features/MotorHistoryScreen";
 import { LinkRiotAccountScreen } from "./features/LinkRiotAccountScreen";
@@ -600,6 +601,9 @@ function SpartaApp() {
       {page === "growth" && <GrowthJourneyScreen riotAccounts={riotAccounts} />}
       {page === "motor" && (
         <MotorHistoryScreen riotAccounts={riotAccounts} sessionToken={sessionToken} />
+      )}
+      {page === "calibration" && sessionToken && (
+        <CalibrationLabScreen token={sessionToken} />
       )}
       {page === "settings" && (
         <SettingsScreen ddragonVersion={ddragonVersion} sessionToken={sessionToken} />

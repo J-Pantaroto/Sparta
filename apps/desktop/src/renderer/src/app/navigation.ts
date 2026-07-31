@@ -4,6 +4,7 @@ import {
   Crosshair,
   Gauge,
   History,
+  FlaskConical,
   Settings,
   Shield,
   TrendingUp,
@@ -19,6 +20,7 @@ export type Page =
   | "drafts"
   | "growth"
   | "motor"
+  | "calibration"
   | "settings";
 
 interface NavEntry {
@@ -40,7 +42,8 @@ export const navGroups: { label: string; items: NavEntry[] }[] = [
       { page: "dashboard", label: "Dashboard", icon: Gauge },
       { page: "profile", label: "Perfil", icon: Activity },
       { page: "motor", label: "Histórico do motor", icon: History },
-      { page: "growth", label: "Evolução", icon: TrendingUp }
+      { page: "growth", label: "Evolução", icon: TrendingUp },
+      { page: "calibration", label: "Laboratório do motor", icon: FlaskConical }
     ]
   },
   {

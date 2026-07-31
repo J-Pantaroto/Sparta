@@ -1,5 +1,38 @@
 # Sparta - Contexto para Continuidade
 
+## Etapa 25b: laboratório de calibração utilizável (persistência, API e tela)
+
+Migration `20260731100000_calibration_lab`: **três tabelas novas e isoladas**
+(`CalibrationCandidateConfig`, `CalibrationExperiment`, `CalibrationExperimentCase`). Nenhuma
+tabela existente foi alterada e **nenhuma linha delas é lida pelo motor**.
+
+**Revisão em vez de edição**: mudar peso, threshold ou métrica desligada cria linha nova com
+`revision + 1` e marca a anterior com `supersededAt`. O `configHash` define o que é alteração
+funcional — renomear atualiza o rótulo e não cria revisão, então experimento já executado
+contra aquele hash continua válido.
+
+**Execução**: só snapshots **não substituídos** da própria conta (a análise que valia quando a
+sessão terminou; ticks intermediários contariam a mesma decisão várias vezes). Não consulta
+estatística atual, catálogo atual, resultado, timeline nem revisão pós-resultado — a query da
+revisão humana nem seleciona as colunas pós-resultado.
+
+**Concorrência sem lock aplicativo**: `PENDING → RUNNING` é um `updateMany` condicional, atômico
+no Postgres; duas chamadas simultâneas dão uma reivindicação e um `409`. Falha apaga os casos da
+tentativa e grava `FAILED` sem relatório — não existe resultado parcial consultável. `COMPLETED`
+nunca é reescrito; mesmo `inputHash` devolve o existente com `reused: true` e `200`.
+
+Doze rotas autenticadas sob `/calibration/*`, todas isoladas por conta e validando configuração
+e filtros no backend. Tela **Laboratório do motor** (grupo Análise) edita só o que é
+reproduzível, lista os parâmetros bloqueados com a dependência ausente, executa, mostra o resumo
+e abre casos lado a lado — **sem exibir resultado da partida**.
+
+**Aprovação é documental**: exige experimento concluído, registra quem/quando/qual, e a resposta
+declara `activation: "NOT_ACTIVATED"`. Não existe endpoint de ativação.
+
+18 testes de rota (867 no total). **Não validado**: execução ponta a ponta contra a API em
+execução com a conta real — exigiria reconstruir a imagem Docker da API. Ver
+`docs/engine-calibration-lab.md`.
+
 ## Etapa 25a: laboratório offline de calibração do motor (domínio puro)
 
 Antes de mexer em peso, o Sparta ganhou um lugar para **testar** uma mudança de peso contra o
