@@ -1,5 +1,45 @@
 # Sparta - Contexto para Continuidade
 
+## Etapa 25a: laboratório offline de calibração do motor (domínio puro)
+
+Antes de mexer em peso, o Sparta ganhou um lugar para **testar** uma mudança de peso contra o
+histórico real, sem tocar no motor. `packages/core/src/calibration/` (`calibration-lab/1.0.0`)
+não tem migration, rota, tela nem execução operacional — isso é a Etapa 25b.
+
+**A auditoria encontrou a restrição que define o desenho**: `PersistedRecommendation` congela as
+métricas *já calculadas*, os pesos efetivos e o score, mas **nada** preserva `PlayerChampionStats`,
+`ChampionTag`, capacidades ou agregados de matchup *como estavam no instante do draft* — essas
+tabelas são recalculadas a cada sync e sobrescritas. Reexecutar uma derivação com o dado de hoje
+leria um histórico maior do que o jogador tinha, e produziria uma comparação que parece válida e
+não é. Apresentado ao usuário, ele escolheu o **caminho A** (só replay historicamente honesto) e
+rejeitou usar dado atual como substituto.
+
+Por isso a capacidade de reprodução é **declarada por parâmetro** e verificada na validação:
+`EXACT_REWEIGHT` (pesos e inclusão/exclusão de sinal congelado), `EXACT_POST_AGGREGATION`
+(`primaryCount`, pisos de score/cobertura, curva de penalização de risco),
+`REQUIRES_HISTORICAL_DERIVATION_INPUT` (`minGamesForRanking`, `maxFamiliarityRiskRelief`,
+`recentFormDecayFactor`, `matchupShrinkageK`, tags, capacidades, formação de pool) e `UNSUPPORTED`
+(meta global, resultado como rótulo). **Thresholds não são uma categoria só**: a curva de
+penalização é aplicada a um risco *já congelado* (pós-agregação), enquanto
+`MAX_FAMILIARITY_RISK_RELIEF` muda como esse risco é produzido (exige histórico ausente).
+Configuração com parâmetro não reproduzível é **rejeitada antes de executar**, com a dependência
+nomeada — não se roda um experimento inteiro pra marcar tudo como impossível.
+
+**A verificação de integridade é real, não circular**: a penalização é recalculada de forma
+independente a partir da métrica `EXECUTION_RISK` congelada, e não obtida como resíduo. Medido
+contra o Postgres real (só leitura): **11 de 11 candidatos de 2 snapshots reconstruídos com
+diferença zero**, com penalizações não triviais e todas distintas (0.4, 1.5, 1.8, 3.5, 4.6).
+Tolerância documentada: 0.05 ponto. Um único candidato reprovado exclui o caso inteiro.
+
+Reponderar usa a disponibilidade **histórica**: ligar um sinal indisponível no snapshot não cria
+valor, o peso é redistribuído. A comparação reporta top-1, sobreposição do grupo primário,
+deslocamento médio/máximo, promovidos/rebaixados, inversões conforto × estratégico e a escolha
+real entrando/saindo — **score maior não é melhoria**, e vitória/derrota não existem em nenhum
+tipo do módulo. Promoção máxima expressável: `APPROVED_FOR_FUTURE_RELEASE`.
+
+**Nenhuma linha do motor operacional mudou.** 51 testes novos (831 no total). Ver
+`docs/engine-calibration-lab.md`.
+
 ## Etapa 24: revisão humana auditável do motor
 
 Antes de mexer em peso, fórmula ou threshold, o Sparta passou a permitir **revisão humana

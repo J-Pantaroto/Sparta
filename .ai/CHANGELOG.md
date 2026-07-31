@@ -22,6 +22,20 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-07-31 00:52 — Laboratório offline de calibração do motor (Etapa 25a: domínio puro)
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0025-laboratorio-offline-calibracao-motor.md`
+
+`packages/core/src/calibration/` (`calibration-lab/1.0.0`) compara configurações candidatas contra
+a linha de base histórica usando somente o que o snapshot da Etapa 16 congela. Cada parâmetro
+declara sua capacidade de replay (`EXACT_REWEIGHT`, `EXACT_POST_AGGREGATION`,
+`REQUIRES_HISTORICAL_DERIVATION_INPUT`, `UNSUPPORTED`) e os não reproduzíveis são rejeitados na
+validação da configuração, com a dependência histórica nomeada. O baseline é reconstruído antes de
+qualquer comparação, com a penalização de risco recalculada de forma independente a partir da
+métrica congelada — medido contra o Postgres real: 11 de 11 candidatos de 2 snapshots
+reconstruídos com diferença zero. Nada do motor operacional mudou; promoção máxima expressável é
+`APPROVED_FOR_FUTURE_RELEASE`. 51 testes novos (831 no total). Ver `docs/engine-calibration-lab.md`.
+
 ## 2026-07-30 16:40 — Revisão humana auditável do motor
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0024-revisao-humana-auditavel-do-motor.md`
 

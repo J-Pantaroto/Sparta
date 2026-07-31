@@ -16,6 +16,7 @@ Leitura recomendada:
 - `champion-tags.md` para a origem, derivação e revisão dos perfis de campeão.
 - `draft-persistence.md` para as sessões de draft e os snapshots de recomendação.
 - `draft-review.md` para a revisão humana auditável do motor.
+- `engine-calibration-lab.md` para o laboratório offline de calibração do motor.
 - `data-provenance.md` para origem, disponibilidade e confiança dos dados.
 - `database.md` para o schema inicial.
 - `match-observations.md` para itens, runas, feitiços e posições observados em cada partida.
