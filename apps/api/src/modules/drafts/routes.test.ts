@@ -548,7 +548,8 @@ describe("persistência de draft (Etapa 16)", () => {
     expect(body.persistence).toEqual({
       status: "SAVED",
       sessionId: "sessao-1",
-      snapshotId: "snap-1"
+      snapshotId: "snap-1",
+      historyPreserved: true
     });
     expect(upsertActiveDraftSessionMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -609,7 +610,12 @@ describe("persistência de draft (Etapa 16)", () => {
     const body = response.json();
 
     expect(response.statusCode).toBe(200);
-    expect(body.persistence).toEqual({ status: "FAILED" });
+    expect(body.persistence.status).toBe("FAILED");
+    // A falha e declarada, nao escondida - e sem detalhe interno.
+    expect(body.persistence.historyPreserved).toBe(false);
+    expect(body.persistence.reason).toBe(
+      "A preservação histórica falhou; a análise ao vivo não foi afetada."
+    );
     expect(JSON.stringify(body)).not.toMatch(/connection refused/i);
     expect(JSON.stringify(body)).not.toMatch(/5432/);
     await app.close();

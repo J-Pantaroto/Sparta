@@ -308,6 +308,7 @@ model RecommendationSnapshot {
   supersededAt          DateTime?
   draftSession          DraftSession                      @relation(fields: [draftSessionId], references: [id], onDelete: Cascade)
   recommendations       PersistedRecommendation[]
+  replayBundle          ReplayInputBundleRecord?
   postgameComparisons   DraftPostGameComparisonRevision[]
 
   @@unique([draftSessionId, inputHash])
@@ -677,4 +678,32 @@ model CalibrationExperimentCase {
 
   @@unique([experimentId, snapshotId])
   @@index([experimentId, replayStatus])
+}
+
+/// Captura prospectiva dos inputs de derivacao (Etapa 26b).
+///
+/// Um bundle por snapshot, gravado na MESMA transacao. Nao existe bundle
+/// isolado, e snapshot novo nao e persistido sem ele. Conteudo canonico
+/// validado, nunca payload bruto da Riot ou do LCU.
+model ReplayInputBundleRecord {
+  id                String                 @id @default(uuid())
+  snapshotId        String                 @unique
+  schemaVersion     String
+  /// SHA-256 recalculado no backend antes da escrita.
+  contentHash       String
+  /// Contrato `ReplayInputBundle` validado. Nao carrega puuid nem credencial.
+  contentJson       Json
+  /// Instante da avaliacao: participa do hash e da recencia do risco.
+  evaluatedAt       DateTime
+  /// Instante da captura: metadado, fora do hash.
+  capturedAt        DateTime
+  /// Tamanho do conteudo canonico, para observabilidade.
+  contentBytes      Int
+  algorithmVersions Json
+  createdAt         DateTime               @default(now())
+  /// Ultimo resultado da verificacao offline. Nao altera o bundle.
+  lastVerification  Json?
+  snapshot          RecommendationSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+
+  @@index([contentHash])
 }

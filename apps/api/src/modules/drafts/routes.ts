@@ -2,18 +2,10 @@ import type { FastifyPluginAsync } from "fastify";
 import {
   aggregateMatchupData,
   buildCanonicalSnapshotInput,
-  CHAMPION_TAG_DERIVATION_VERSION,
-  DRAFT_STRATEGIC_ANALYSIS_VERSION,
-  EXECUTION_RISK_VERSION,
   generatePreGameAnalysis,
-  RECOMMENDATION_ENGINE_VERSION,
-  recommendFromPersonalPool,
   summarizeKnownDraftState,
-  THREAT_RESPONSE_MODEL_VERSION,
   toPersistedRecommendations,
-  type ChampionTag,
-  type MatchupData,
-  type PlayerChampionStats
+  type MatchupData
 } from "@sparta/core";
 import {
   draftRecommendationRequestSchemaWithSession,
@@ -36,14 +28,18 @@ import {
   upsertActiveDraftSession
 } from "./draft-session-repository.js";
 import { reconcileDraftSessionsForAccount } from "./draft-match-reconciler.js";
-import { compositionRules } from "../../config/composition-rules.js";
+import {
+  buildEvaluationContext,
+  buildReplayBundle,
+  catalogVersionsOf,
+  runEngine,
+  type EvaluationContext
+} from "./evaluation-context.js";
 import { prisma } from "../../db/prisma.js";
 import { getAuthenticatedUserId } from "../auth/routes.js";
 import { findAllChampionTags, findChampionNamesByIds } from "../catalog/champion-repository.js";
 import { findAllChampionCapabilityProfiles } from "../catalog/champion-capability-repository.js";
 import { findPersonalLaneMatchupHistory } from "../matches/matchup-repository.js";
-import { findChampionStatsByPuuid } from "../players/player-stats-repository.js";
-import { findPlayerPool } from "../players/player-pool-repository.js";
 
 export const draftsRoutes: FastifyPluginAsync = async (app) => {
   /**
@@ -73,43 +69,20 @@ export const draftsRoutes: FastifyPluginAsync = async (app) => {
 
     const riotAccount = await prisma.riotAccount.findFirst({ where: { userId } });
 
-    let championStats: PlayerChampionStats[];
-
-    if (!riotAccount) {
-      championStats = [];
-    } else {
-      championStats = await findChampionStatsByPuuid(riotAccount.puuid);
-    }
-
-    const [championTags, capabilityProfiles, laneHistory, personalPool] = await Promise.all([
-      findAllChampionTags(),
-      findAllChampionCapabilityProfiles(),
-      riotAccount
-        ? findPersonalLaneMatchupHistory(riotAccount.puuid, payload.draft.playerRole)
-        : Promise.resolve([]),
-      riotAccount
-        ? findPlayerPool(riotAccount.id, riotAccount.puuid, payload.draft.playerRole)
-        : Promise.resolve({ entries: [], roleSummaries: [] })
-    ]);
-    const matchups = aggregateMatchupData(laneHistory);
-
-    const result = recommendFromPersonalPool({
+    /**
+     * Contexto de avaliacao imutavel (Etapa 26b): as fontes mutaveis sao lidas
+     * **uma unica vez** aqui, e a mesma instancia alimenta motor, snapshot e
+     * bundle. Antes, a persistencia recebia um subconjunto re-derivado e uma
+     * escrita concorrente podia produzir snapshot e bundle de momentos
+     * diferentes.
+     */
+    const context = await buildEvaluationContext({
       draft: payload.draft,
-      candidates: personalPool.entries.map((entry) => ({
-        championId: entry.championId,
-        championName: entry.championName,
-        role: entry.role,
-        source: entry.source,
-        enabled: entry.enabled
-      })),
-      championStats,
-      championTags,
-      capabilityProfiles,
-      matchups,
-      compositionRules,
-      patchMeta: null,
-      evaluatedAt: new Date().toISOString()
+      role: payload.draft.playerRole,
+      ...(riotAccount ? { riotAccount: { id: riotAccount.id, puuid: riotAccount.puuid } } : {})
     });
+
+    const result = runEngine(context);
     /**
      * Persistencia (Etapa 16). E **efeito colateral** da orquestracao: roda
      * depois de a analise estar pronta, nunca antes, e qualquer falha aqui
@@ -117,15 +90,7 @@ export const draftsRoutes: FastifyPluginAsync = async (app) => {
      * Sem `session` no payload nada e gravado - o cliente que nao identifica a
      * sessao continua recebendo recomendacao normalmente.
      */
-    const persistence = await persistDraftAnalysis({
-      session: payload.session,
-      draft: payload.draft,
-      riotAccountId: riotAccount?.id,
-      pool: personalPool.entries,
-      championTags,
-      capabilityProfiles,
-      result
-    });
+    const persistence = await persistDraftAnalysis({ context, session: payload.session, result });
 
     return {
       ...result,
@@ -439,55 +404,6 @@ async function resolveAccount(
   return { id: account.id, puuid: account.puuid, platformRegion: account.platformRegion };
 }
 
-/**
- * Versoes de catalogo que sustentaram a analise. So declara a versao quando
- * **todas** as tags concordam - com perfis de versoes diferentes, anunciar uma
- * delas atribuiria ao conjunto uma origem que ele nao tem (mesma regra da
- * Etapa 8).
- */
-function catalogVersionsOf(
-  championTags: readonly ChampionTag[],
-  capabilityProfiles: readonly { algorithmVersion?: string }[]
-): Record<string, string> {
-  const versions: Record<string, string> = {};
-
-  const patches = new Set(
-    championTags
-      .map((tag) => tag.provenance?.source.patch)
-      .filter((patch): patch is string => !!patch)
-  );
-  // Uma unica versao E todas as tags declarando-a: com uma tag sem versao nao
-  // da pra afirmar a versao do conjunto.
-  if (
-    patches.size === 1 &&
-    championTags.every((tag) => tag.provenance?.source.patch !== undefined)
-  ) {
-    versions.dataDragon = [...patches][0];
-  }
-
-  const capabilityVersions = new Set(
-    capabilityProfiles
-      .map((profile) => profile.algorithmVersion)
-      .filter((version): version is string => !!version)
-  );
-  if (capabilityVersions.size === 1) {
-    versions.championCapabilities = [...capabilityVersions][0];
-  }
-
-  return versions;
-}
-
-/** Versoes de algoritmo que produziram esta execucao. */
-function algorithmVersionsOf(): Record<string, string> {
-  return {
-    recommendationEngine: RECOMMENDATION_ENGINE_VERSION,
-    championTagDerivation: CHAMPION_TAG_DERIVATION_VERSION,
-    executionRisk: EXECUTION_RISK_VERSION,
-    draftStrategy: DRAFT_STRATEGIC_ANALYSIS_VERSION,
-    threatResponseModel: THREAT_RESPONSE_MODEL_VERSION
-  };
-}
-
 export type DraftPersistenceStatus =
   /** Snapshot novo gravado. */
   | "SAVED"
@@ -502,6 +418,10 @@ export interface DraftPersistenceResult {
   status: DraftPersistenceStatus;
   sessionId?: string;
   snapshotId?: string;
+  /** `false` quando o snapshot/bundle nao pode ser gravado. */
+  historyPreserved?: boolean;
+  /** Motivo sanitizado: nunca stack trace nem detalhe do banco. */
+  reason?: string;
 }
 
 /**
@@ -512,6 +432,7 @@ export interface DraftPersistenceResult {
  * stack trace nem detalhe do banco.
  */
 async function persistDraftAnalysis(input: {
+  context: EvaluationContext;
   session?: {
     sessionKey: string;
     source: "LCU" | "USER";
@@ -519,56 +440,43 @@ async function persistDraftAnalysis(input: {
     gameVersion?: string;
     gameId?: string;
   };
-  draft: Parameters<typeof summarizeKnownDraftState>[0];
-  riotAccountId?: string;
-  pool: readonly {
-    championId: number;
-    championName: string;
-    role: string;
-    source: string;
-    enabled: boolean;
-  }[];
-  championTags: readonly ChampionTag[];
-  capabilityProfiles: readonly { algorithmVersion?: string }[];
   result: {
     primaryRecommendations: readonly never[] | readonly unknown[];
     alternatives: readonly unknown[];
   };
 }): Promise<DraftPersistenceResult> {
-  if (!input.session || !input.riotAccountId) return { status: "NOT_TRACKED" };
+  const { context } = input;
+  if (!input.session || !context.riotAccountId) return { status: "NOT_TRACKED" };
 
   try {
-    const role = input.draft.playerRole;
-    if (!role) return { status: "NOT_TRACKED" };
-
     const session = await upsertActiveDraftSession({
-      riotAccountId: input.riotAccountId,
+      riotAccountId: context.riotAccountId,
       externalSessionId: input.session.sessionKey,
       source: input.session.source,
-      role,
+      role: context.role,
       // Ausencia de origem da posicao no modo manual e "USER", nunca "LCU".
-      roleSource: input.draft.playerRoleSource ?? "USER",
-      knownDraft: summarizeKnownDraftState(input.draft),
-      ...(input.draft.selectedChampionId !== undefined
-        ? { selectedChampionId: input.draft.selectedChampionId }
+      roleSource: context.draft.playerRoleSource ?? "USER",
+      knownDraft: summarizeKnownDraftState(context.draft),
+      ...(context.draft.selectedChampionId !== undefined
+        ? { selectedChampionId: context.draft.selectedChampionId }
         : {}),
       ...(input.session.queueId !== undefined ? { queueId: input.session.queueId } : {}),
       ...(input.session.gameVersion ? { gameVersion: input.session.gameVersion } : {}),
       ...(input.session.gameId ? { externalGameId: input.session.gameId } : {}),
-      ...(input.draft.patch ? { patch: input.draft.patch } : {})
+      ...(context.draft.patch ? { patch: context.draft.patch } : {})
     });
 
     const canonicalInput = buildCanonicalSnapshotInput({
-      draft: input.draft,
-      pool: input.pool.map((entry) => ({
+      draft: context.draft,
+      pool: context.pool.map((entry) => ({
         championId: entry.championId,
         championName: entry.championName,
-        role: entry.role as never,
-        source: entry.source as never,
+        role: entry.role,
+        source: entry.source,
         enabled: entry.enabled
       })),
-      catalogVersions: catalogVersionsOf(input.championTags, input.capabilityProfiles),
-      algorithmVersions: algorithmVersionsOf()
+      catalogVersions: catalogVersionsOf(context),
+      algorithmVersions: context.algorithmVersions
     });
     if (!canonicalInput) return { status: "NOT_TRACKED", sessionId: session.id };
 
@@ -587,16 +495,31 @@ async function persistDraftAnalysis(input: {
       canonicalInput,
       algorithmVersions: canonicalInput.algorithmVersions,
       dataCoverage: coverage,
-      recommendations
+      recommendations,
+      // Mesmo contexto que produziu as recomendacoes: `evaluatedAt` e identico
+      // no calculo e no bundle, e nada e relido do banco aqui.
+      buildReplayBundle: (snapshotId) => buildReplayBundle({ context, snapshotId })
     });
 
-    if (persisted.status === "FAILED") return { status: "FAILED", sessionId: session.id };
+    if (persisted.status === "FAILED") {
+      return {
+        status: "FAILED",
+        sessionId: session.id,
+        historyPreserved: false,
+        reason: "A preservação histórica falhou; a análise ao vivo não foi afetada."
+      };
+    }
     return {
       status: persisted.status === "CREATED" ? "SAVED" : "UNCHANGED",
       sessionId: session.id,
-      snapshotId: persisted.snapshotId
+      snapshotId: persisted.snapshotId,
+      historyPreserved: true
     };
   } catch {
-    return { status: "FAILED" };
+    return {
+      status: "FAILED",
+      historyPreserved: false,
+      reason: "A preservação histórica falhou; a análise ao vivo não foi afetada."
+    };
   }
 }

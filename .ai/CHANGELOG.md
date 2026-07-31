@@ -22,6 +22,18 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-07-31 17:05 — Contexto unico de avaliacao e captura atomica do bundle (Etapa 26b, parcial)
+
+**Status:** PARCIAL · Prompt: `.ai/prompts/features/0028-replay-bundle-captura-operacional.md`
+
+`evaluation-context.ts` lê as seis fontes mutáveis **uma única vez** e congela o contexto; a mesma
+instância alimenta motor, snapshot e bundle, com `evaluatedAt` idêntico nos três. Migration
+`20260731160000_replay_input_bundle` (aplicada ao Postgres real) cria a relação um-para-um, e
+snapshot e bundle passam a ser gravados na mesma transação — falha derruba as duas escritas e a
+recomendação ao vivo volta inteira, com `historyPreserved: false` e motivo sanitizado. Nenhum peso,
+threshold ou ordenação mudou. 10 testes novos (915 no total). **Faltam** as três rotas de consulta,
+os cinco estados no laboratório, a interface, a observabilidade e a validação real.
+
 ## 2026-07-31 15:10 — ReplayInputBundle prospectivo: domínio puro (Etapa 26a)
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0027-replay-input-bundle-prospectivo.md`

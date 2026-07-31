@@ -5,6 +5,7 @@ import {
   compareSelectedChampion,
   isTerminalDraftSessionStatus,
   type CanonicalSnapshotInput,
+  type ReplayInputBundle,
   type DraftSessionSource,
   type DraftSessionStatus,
   type DraftMatchLinkStatus,
@@ -393,6 +394,12 @@ export type PersistSnapshotResult =
   | { status: "FAILED" };
 
 export interface PersistSnapshotInput {
+  /**
+   * Constroi o bundle a partir do MESMO contexto que produziu as recomendacoes.
+   * Recebe o `snapshotId` recem-criado, dentro da transacao. Ausente = sessao
+   * nao rastreada; presente = snapshot e bundle sao atomicos.
+   */
+  buildReplayBundle?: (snapshotId: string) => ReplayInputBundle;
   draftSessionId: string;
   canonicalInput: CanonicalSnapshotInput;
   algorithmVersions: Record<string, string>;
@@ -431,7 +438,7 @@ export async function persistRecommendationSnapshot(
         data: { supersededAt: new Date() }
       });
 
-      return tx.recommendationSnapshot.create({
+      const snapshot = await tx.recommendationSnapshot.create({
         data: {
           draftSessionId: input.draftSessionId,
           inputHash,
@@ -455,6 +462,27 @@ export async function persistRecommendationSnapshot(
           }
         }
       });
+
+      // Captura prospectiva (Etapa 26b). Depois desta etapa, snapshot novo
+      // **nao existe sem bundle**: qualquer falha aqui derruba a transacao
+      // inteira, e nem snapshot nem bundle ficam gravados pela metade.
+      if (input.buildReplayBundle) {
+        const bundle = input.buildReplayBundle(snapshot.id);
+        await tx.replayInputBundleRecord.create({
+          data: {
+            snapshotId: snapshot.id,
+            schemaVersion: bundle.schemaVersion,
+            contentHash: bundle.contentHash,
+            contentJson: bundle as unknown as Prisma.InputJsonValue,
+            evaluatedAt: new Date(bundle.evaluatedAt),
+            capturedAt: new Date(bundle.capturedAt),
+            contentBytes: Buffer.byteLength(JSON.stringify(bundle), "utf8"),
+            algorithmVersions: bundle.algorithmVersions as unknown as Prisma.InputJsonValue
+          }
+        });
+      }
+
+      return snapshot;
     });
 
     return { status: "CREATED", snapshotId: created.id };
