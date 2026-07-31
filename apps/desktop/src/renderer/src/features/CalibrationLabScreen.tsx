@@ -320,7 +320,14 @@ export function CalibrationLabScreen({ token }: Props): ReactElement {
                     ...(roles.length ? { roles } : {})
                   });
                   const list = await listCalibrationExperiments(token, selected.id);
-                  setExperiments(list.experiments);
+                  // O experimento devolvido pela execução pode pertencer a outra
+                  // configuração funcionalmente idêntica (mesmo `inputHash`), e
+                  // nesse caso não aparece na lista filtrada por esta. Ele vem
+                  // na frente para o resumo sempre mostrar o que acabou de rodar.
+                  setExperiments([
+                    result.experiment,
+                    ...list.experiments.filter((entry) => entry.id !== result.experiment.id)
+                  ]);
                   setFeedback(
                     result.reused
                       ? "Mesmo input funcional: experimento existente reaproveitado."

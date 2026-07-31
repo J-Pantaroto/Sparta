@@ -752,12 +752,17 @@ export async function decideCandidate(input: {
         }
       };
     }
+    // O experimento precisa ser concluido, da propria conta e da MESMA
+    // configuracao funcional. Nao se exige a mesma linha: `inputHash` ignora
+    // identidade e nome, entao duas configuracoes funcionalmente identicas
+    // compartilham o experimento - exigir a linha exata deixaria a segunda sem
+    // caminho de aprovacao, sem nenhum ganho de garantia.
     const experiment = await prisma.calibrationExperiment.findFirst({
       where: {
         id: input.experimentId,
         riotAccountId: input.riotAccountId,
-        candidateId: candidateRow.id,
-        status: "COMPLETED"
+        status: "COMPLETED",
+        candidate: { configHash: candidateRow.configHash }
       },
       select: { id: true }
     });
