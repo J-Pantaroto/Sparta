@@ -1,133 +1,186 @@
 import { describe, expect, it } from "vitest";
 import {
   CALIBRATION_LAB_VERSION,
-  CANDIDATE_WEIGHT_KEYS,
   MAX_PROMOTION_STATUS,
-  OPERATIONAL_POST_AGGREGATION,
+  OPERATIONAL_POST_AGGREGATION_THRESHOLDS,
   REPLAY_CAPABILITY_REGISTRY,
+  WEIGHTABLE_METRIC_KEYS,
   canonicalCandidateString,
   findReplayCapability,
   isReplayableCapability,
-  validateEngineCandidate,
-  type RecommendationEngineCandidate
+  resolvePostAggregationThresholds,
+  validateCalibrationCandidate,
+  type CalibrationCandidate
 } from "./engine-candidate.js";
 
-function baseCandidate(
-  overrides: Partial<RecommendationEngineCandidate> = {}
-): RecommendationEngineCandidate {
+function candidate(overrides: Partial<CalibrationCandidate> = {}): CalibrationCandidate {
   return {
+    id: "cand-1",
     name: "candidata-teste",
-    labVersion: CALIBRATION_LAB_VERSION,
-    supportedAggregationVersion: "1.0.0",
-    weights: {
-      personalPerformance: 0.3,
-      recentForm: 0.2,
-      matchup: 0.1,
-      blindSafety: 0.1,
-      allySynergy: 0.1,
-      enemyDraftAnswer: 0.1,
-      compositionFit: 0.1,
-      meta: 0
+    baselineAggregationVersion: "1.0.0",
+    candidateVersion: "1.0.0",
+    metricWeights: {
+      PERSONAL_PERFORMANCE: 0.3,
+      RECENT_FORM: 0.2,
+      PERSONAL_MATCHUP: 0.1,
+      BLIND_SAFETY: 0.1,
+      ALLY_SYNERGY: 0.1,
+      ENEMY_COMPOSITION_ANSWER: 0.1,
+      TEAM_COMPOSITION: 0.1
     },
-    metricEnabled: {
-      personalPerformance: true,
-      recentForm: true,
-      matchup: true,
-      blindSafety: true,
-      allySynergy: true,
-      enemyDraftAnswer: true,
-      compositionFit: true,
-      meta: false
-    },
-    postAggregation: { ...OPERATIONAL_POST_AGGREGATION },
+    status: "DRAFT",
     ...overrides
   };
 }
 
-describe("validateEngineCandidate", () => {
-  it("aceita uma configuração que só mexe em pesos e regras pós-agregação", () => {
-    const result = validateEngineCandidate(baseCandidate());
+describe("validateCalibrationCandidate", () => {
+  it("aceita configuração que só mexe em pesos de métricas congeladas", () => {
+    const result = validateCalibrationCandidate(candidate());
 
     expect(result.valid).toBe(true);
     expect(result.rejections).toEqual([]);
-    expect(result.accepted.some((entry) => entry.parameter === "weights.personalPerformance")).toBe(
+    expect(
+      result.accepted.every((entry) => isReplayableCapability(entry.capability))
+    ).toBe(true);
+  });
+
+  it("aceita threshold estritamente pós-agregação", () => {
+    const result = validateCalibrationCandidate(
+      candidate({ postAggregationThresholds: { primaryCount: 3 } })
+    );
+
+    expect(result.valid).toBe(true);
+    expect(result.accepted).toContainEqual({
+      parameter: "primaryCount",
+      capability: "EXACT_POST_AGGREGATION"
+    });
+  });
+
+  it("trata exclusão de métrica congelada como reponderação", () => {
+    const result = validateCalibrationCandidate(
+      candidate({ disabledMetrics: ["PERSONAL_MATCHUP"] })
+    );
+
+    expect(result.valid).toBe(true);
+    expect(result.accepted).toContainEqual({
+      parameter: "disabledMetrics.PERSONAL_MATCHUP",
+      capability: "EXACT_REWEIGHT"
+    });
+  });
+
+  it("rejeita métrica desconhecida do score congelado", () => {
+    const result = validateCalibrationCandidate(
+      candidate({ metricWeights: { ...candidate().metricWeights, CHAMPION_DIFFICULTY: 0.2 } })
+    );
+
+    expect(result.valid).toBe(false);
+    expect(result.rejections[0]?.code).toBe("UNKNOWN_METRIC");
+  });
+
+  it("rejeita peso negativo sem normalizar em silêncio", () => {
+    const result = validateCalibrationCandidate(
+      candidate({ metricWeights: { ...candidate().metricWeights, PERSONAL_MATCHUP: -0.1 } })
+    );
+
+    expect(result.valid).toBe(false);
+    expect(result.rejections[0]?.code).toBe("NEGATIVE_WEIGHT");
+  });
+
+  it("rejeita valor não finito", () => {
+    const infinite = validateCalibrationCandidate(
+      candidate({
+        metricWeights: { ...candidate().metricWeights, RECENT_FORM: Number.POSITIVE_INFINITY }
+      })
+    );
+    const notANumber = validateCalibrationCandidate(
+      candidate({ postAggregationThresholds: { primaryCount: Number.NaN } })
+    );
+
+    expect(infinite.rejections[0]?.code).toBe("NON_FINITE_VALUE");
+    expect(notANumber.rejections[0]?.code).toBe("NON_FINITE_VALUE");
+  });
+
+  it("rejeita configuração sem nenhum componente disponível", () => {
+    const zeroed = validateCalibrationCandidate(candidate({ metricWeights: { META_STRENGTH: 0 } }));
+    const allDisabled = validateCalibrationCandidate(
+      candidate({ disabledMetrics: [...WEIGHTABLE_METRIC_KEYS] })
+    );
+
+    expect(zeroed.rejections.some((entry) => entry.code === "NO_AVAILABLE_COMPONENT")).toBe(true);
+    expect(allDisabled.rejections.some((entry) => entry.code === "NO_AVAILABLE_COMPONENT")).toBe(
       true
     );
   });
 
-  it("rejeita parâmetro que depende de input histórico ausente, nomeando a dependência", () => {
-    const result = validateEngineCandidate(
-      baseCandidate({ extraParameters: { minGamesForRanking: 3 } })
+  it("rejeita threshold não suportado", () => {
+    const result = validateCalibrationCandidate(
+      candidate({ postAggregationThresholds: { limiarInventado: 3 } })
     );
 
-    expect(result.valid).toBe(false);
+    expect(result.rejections[0]?.code).toBe("UNSUPPORTED_THRESHOLD");
+  });
+
+  it("rejeita threshold fora da faixa declarada", () => {
+    const result = validateCalibrationCandidate(
+      candidate({ postAggregationThresholds: { minimumDataCoverageToRecommend: 1.5 } })
+    );
+
+    expect(result.rejections[0]?.code).toBe("THRESHOLD_OUT_OF_RANGE");
+  });
+
+  it("rejeita parâmetro que altera a derivação, nomeando a dependência ausente", () => {
+    const result = validateCalibrationCandidate(
+      candidate({ postAggregationThresholds: { minGamesForRanking: 3 } })
+    );
+
     const rejection = result.rejections.find((entry) => entry.parameter === "minGamesForRanking");
-    expect(rejection?.code).toBe("REQUIRES_HISTORICAL_DERIVATION_INPUT");
+    expect(rejection?.code).toBe("DERIVATION_PARAMETER");
+    expect(rejection?.capability).toBe("REQUIRES_HISTORICAL_DERIVATION_INPUT");
     expect(rejection?.missingHistoricalInputs).toEqual([
       "PlayerChampionStats.games no instante do draft"
     ]);
   });
 
-  it("rejeita parâmetro não suportado sem inventar dependência histórica", () => {
-    const result = validateEngineCandidate(
-      baseCandidate({ extraParameters: { useMatchResultAsLabel: true } })
-    );
+  it("rejeita todo parâmetro da lista proibida pelo escopo", () => {
+    const forbidden = [
+      "poolFormation",
+      "snapshotCandidateCount",
+      "metricAvailabilityOverride",
+      "personalPerformanceFormula",
+      "maxFamiliarityRiskRelief",
+      "executionRiskDerivation",
+      "matchupShrinkageK",
+      "championTagDerivation",
+      "capabilityExtraction",
+      "strategyDimensionWeights",
+      "provenancePolicy"
+    ];
 
-    const rejection = result.rejections.find(
-      (entry) => entry.parameter === "useMatchResultAsLabel"
-    );
-    expect(rejection?.code).toBe("UNSUPPORTED_PARAMETER");
-    expect(rejection?.missingHistoricalInputs).toBeUndefined();
+    for (const parameter of forbidden) {
+      const result = validateCalibrationCandidate(
+        candidate({ postAggregationThresholds: { [parameter]: 1 } })
+      );
+      expect(result.valid, parameter).toBe(false);
+      expect(result.rejections[0]?.code, parameter).toBe("DERIVATION_PARAMETER");
+    }
   });
 
-  it("rejeita parâmetro fora do registro de capacidade", () => {
-    const result = validateEngineCandidate(
-      baseCandidate({ extraParameters: { parametroInventado: 1 } })
+  it("rejeita parâmetro explicitamente não suportado sem inventar dependência", () => {
+    const result = validateCalibrationCandidate(
+      candidate({ postAggregationThresholds: { useMatchResultAsLabel: 1 } })
     );
 
-    expect(result.rejections[0]?.code).toBe("UNKNOWN_PARAMETER");
-  });
-
-  it("rejeita peso negativo e peso não finito", () => {
-    const negative = validateEngineCandidate(
-      baseCandidate({ weights: { ...baseCandidate().weights, matchup: -0.1 } })
-    );
-    const infinite = validateEngineCandidate(
-      baseCandidate({ weights: { ...baseCandidate().weights, matchup: Number.POSITIVE_INFINITY } })
-    );
-
-    expect(negative.rejections[0]?.code).toBe("INVALID_WEIGHT");
-    expect(infinite.rejections[0]?.code).toBe("INVALID_WEIGHT");
-  });
-
-  it("rejeita configuração sem nenhum sinal habilitado com peso positivo", () => {
-    const weights = Object.fromEntries(
-      CANDIDATE_WEIGHT_KEYS.map((key) => [key, 0])
-    ) as RecommendationEngineCandidate["weights"];
-    const result = validateEngineCandidate(baseCandidate({ weights }));
-
-    expect(result.rejections.some((entry) => entry.code === "NO_ENABLED_METRIC")).toBe(true);
+    expect(result.rejections[0]?.code).toBe("UNSUPPORTED_PARAMETER");
+    expect(result.rejections[0]?.missingHistoricalInputs).toBeUndefined();
   });
 
   it("rejeita versão de agregação que o laboratório não sabe reconstruir", () => {
-    const result = validateEngineCandidate(baseCandidate({ supportedAggregationVersion: "9.9.9" }));
-
-    expect(
-      result.rejections.some((entry) => entry.code === "UNSUPPORTED_AGGREGATION_VERSION")
-    ).toBe(true);
-  });
-
-  it("rejeita regra pós-agregação fora da faixa", () => {
-    const result = validateEngineCandidate(
-      baseCandidate({
-        postAggregation: { ...OPERATIONAL_POST_AGGREGATION, minimumDataCoverageToRecommend: 1.5 }
-      })
+    const result = validateCalibrationCandidate(
+      candidate({ baselineAggregationVersion: "9.9.9" })
     );
 
     expect(
-      result.rejections.some(
-        (entry) => entry.parameter === "postAggregation.minimumDataCoverageToRecommend"
-      )
+      result.rejections.some((entry) => entry.code === "UNSUPPORTED_AGGREGATION_VERSION")
     ).toBe(true);
   });
 });
@@ -143,11 +196,14 @@ describe("registro de capacidade de replay", () => {
     expect(findReplayCapability("maxFamiliarityRiskRelief")?.capability).toBe(
       "REQUIRES_HISTORICAL_DERIVATION_INPUT"
     );
+    expect(findReplayCapability("executionRiskDerivation")?.capability).toBe(
+      "REQUIRES_HISTORICAL_DERIVATION_INPUT"
+    );
   });
 
-  it("classifica todo peso como reponderação exata", () => {
-    for (const key of CANDIDATE_WEIGHT_KEYS) {
-      expect(findReplayCapability(`weights.${key}`)?.capability).toBe("EXACT_REWEIGHT");
+  it("classifica todo peso de métrica congelada como reponderação exata", () => {
+    for (const metric of WEIGHTABLE_METRIC_KEYS) {
+      expect(findReplayCapability(`metricWeights.${metric}`)?.capability).toBe("EXACT_REWEIGHT");
     }
   });
 
@@ -158,7 +214,7 @@ describe("registro de capacidade de replay", () => {
 
     expect(requiring.length).toBeGreaterThan(0);
     for (const entry of requiring) {
-      expect(entry.missingHistoricalInputs?.length ?? 0).toBeGreaterThan(0);
+      expect(entry.missingHistoricalInputs?.length ?? 0, entry.parameter).toBeGreaterThan(0);
     }
   });
 
@@ -170,31 +226,61 @@ describe("registro de capacidade de replay", () => {
   });
 });
 
+describe("resolvePostAggregationThresholds", () => {
+  it("não altera a configuração operacional ao resolver a candidata", () => {
+    const before = { ...OPERATIONAL_POST_AGGREGATION_THRESHOLDS };
+    const resolved = resolvePostAggregationThresholds(
+      candidate({ postAggregationThresholds: { primaryCount: 2 } })
+    );
+
+    expect(resolved.primaryCount).toBe(2);
+    expect(resolved.alternativeCount).toBe(before.alternativeCount);
+    expect(OPERATIONAL_POST_AGGREGATION_THRESHOLDS).toEqual(before);
+  });
+});
+
 describe("canonicalCandidateString", () => {
-  it("produz a mesma string independentemente da ordem dos parâmetros extras", () => {
+  it("ignora identidade, nome, descrição e status", () => {
+    expect(
+      canonicalCandidateString(candidate({ id: "a", name: "a", status: "DRAFT" }))
+    ).toBe(
+      canonicalCandidateString(
+        candidate({ id: "b", name: "b", description: "outra", status: "EVALUATED" })
+      )
+    );
+  });
+
+  it("independe da ordem de declaração de pesos e métricas desligadas", () => {
     const first = canonicalCandidateString(
-      baseCandidate({ extraParameters: { primaryCount: 5, alternativeCount: 3 } })
+      candidate({
+        metricWeights: { RECENT_FORM: 0.5, PERSONAL_PERFORMANCE: 0.5 },
+        disabledMetrics: ["META_STRENGTH", "PERSONAL_MATCHUP"]
+      })
     );
     const second = canonicalCandidateString(
-      baseCandidate({ extraParameters: { alternativeCount: 3, primaryCount: 5 } })
+      candidate({
+        metricWeights: { PERSONAL_PERFORMANCE: 0.5, RECENT_FORM: 0.5 },
+        disabledMetrics: ["PERSONAL_MATCHUP", "META_STRENGTH"]
+      })
     );
 
     expect(first).toBe(second);
   });
 
-  it("muda quando um peso muda", () => {
-    const before = canonicalCandidateString(baseCandidate());
-    const after = canonicalCandidateString(
-      baseCandidate({ weights: { ...baseCandidate().weights, matchup: 0.2 } })
-    );
-
-    expect(before).not.toBe(after);
+  it("muda quando um peso ou threshold muda", () => {
+    const base = canonicalCandidateString(candidate());
+    expect(
+      canonicalCandidateString(
+        candidate({ metricWeights: { ...candidate().metricWeights, PERSONAL_MATCHUP: 0.2 } })
+      )
+    ).not.toBe(base);
+    expect(
+      canonicalCandidateString(candidate({ postAggregationThresholds: { primaryCount: 3 } }))
+    ).not.toBe(base);
   });
 
-  it("ignora o nome da configuração, que não altera o resultado do experimento", () => {
-    expect(canonicalCandidateString(baseCandidate({ name: "a" }))).toBe(
-      canonicalCandidateString(baseCandidate({ name: "b" }))
-    );
+  it("declara a versão do laboratório", () => {
+    expect(canonicalCandidateString(candidate())).toContain(CALIBRATION_LAB_VERSION);
   });
 });
 

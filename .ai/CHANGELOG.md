@@ -22,6 +22,21 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-07-31 07:45 — Laboratório de calibração alinhado ao contrato detalhado da Etapa 25a
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0025-laboratorio-offline-calibracao-motor.md`
+
+Domínio puro reescrito para o contrato `CalibrationCandidate` (pesos por
+`RecommendationMetricKey`, `disabledMetrics`, `postAggregationThresholds`, `status`) e para os
+quatro status de replay (`EXACT_REPLAY`, `REPLAY_INTEGRITY_FAILED`, `REPLAY_UNSUPPORTED_VERSION`,
+`REPLAY_MISSING_HISTORICAL_INPUT`). A lista proibida do escopo virou registro verificável: os onze
+parâmetros de derivação são rejeitados por teste. Novos: cobertura candidata separada da histórica,
+motivos estruturados de diferença por candidato, deslocamento mediano, estabilidade do conjunto
+recomendado, transições principal↔alternativa, contagens de revisão humana pré-resultado e dez
+dimensões de segmentação. Revalidado contra o Postgres real: 11 de 11 candidatos reconstruídos com
+diferença zero, string canônica e relatório idênticos para o mesmo input funcional. 69 testes
+(849 no total). Ver `docs/engine-calibration-lab.md`.
+
 ## 2026-07-31 00:52 — Laboratório offline de calibração do motor (Etapa 25a: domínio puro)
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0025-laboratorio-offline-calibracao-motor.md`

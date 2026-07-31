@@ -7,8 +7,8 @@ O laboratório compara configurações candidatas do motor de recomendação con
 histórica, usando **exclusivamente** o que os snapshots da Etapa 16 preservam. Ele não altera o
 motor operacional, não recalcula snapshots, não publica pesos e não promove nada.
 
-Esta página descreve a **Etapa 25a**: o domínio puro. Persistência, API, tela, validação real e
-fluxo de aprovação são da Etapa 25b.
+Esta página descreve a **Etapa 25a**: o domínio puro. Persistência, API, tela, execução
+operacional e fluxo de aprovação são da Etapa 25b.
 
 ## Por que nem todo parâmetro pode ser calibrado aqui
 
@@ -35,47 +35,87 @@ Thresholds e feature flags **não** são tratados como uma categoria só. Uma fl
 ou exclui uma métrica já congelada é reponderação; uma flag que muda como a métrica é produzida
 não é reproduzível.
 
-### Registro atual (`REPLAY_CAPABILITY_REGISTRY`)
+### Registro (`REPLAY_CAPABILITY_REGISTRY`)
 
 **Exatamente reproduzíveis**
 
-| Parâmetro                                  | Capacidade                 |
-| ------------------------------------------ | -------------------------- |
-| `weights.*` (os oito sinais)                | `EXACT_REWEIGHT`           |
-| `metricEnabled.*` (os oito sinais)          | `EXACT_REWEIGHT`           |
-| `primaryCount`, `alternativeCount`          | `EXACT_POST_AGGREGATION`   |
-| `minimumScoreToRecommend`                   | `EXACT_POST_AGGREGATION`   |
-| `minimumDataCoverageToRecommend`            | `EXACT_POST_AGGREGATION`   |
-| `executionRiskPenaltyStart`                 | `EXACT_POST_AGGREGATION`   |
-| `executionRiskMaxPenalty`                   | `EXACT_POST_AGGREGATION`   |
+| Parâmetro                                   | Capacidade               |
+| ------------------------------------------- | ------------------------ |
+| `metricWeights.*` (os oito sinais do score) | `EXACT_REWEIGHT`         |
+| `disabledMetrics.*` (os mesmos oito)        | `EXACT_REWEIGHT`         |
+| `primaryCount`, `alternativeCount`          | `EXACT_POST_AGGREGATION` |
+| `minimumScoreToRecommend`                   | `EXACT_POST_AGGREGATION` |
+| `minimumDataCoverageToRecommend`            | `EXACT_POST_AGGREGATION` |
+| `executionRiskPenaltyStart`                 | `EXACT_POST_AGGREGATION` |
+| `executionRiskMaxPenalty`                   | `EXACT_POST_AGGREGATION` |
 
 **Rejeitados por dependerem de input histórico ausente**
 
-| Parâmetro                     | Dependência ausente                                     |
-| ----------------------------- | ------------------------------------------------------- |
-| `minGamesForRanking`          | `PlayerChampionStats.games` no instante do draft         |
-| `maxFamiliarityRiskRelief`    | `PlayerChampionStats.games` e `.recentMatches` do draft  |
-| `recentFormDecayFactor`       | Histórico de partidas no instante do draft               |
-| `matchupShrinkageK`           | `MatchParticipant` do confronto no instante do draft     |
-| `championTagDimensionWeights` | `ChampionTag` vigente no instante do draft               |
-| `strategyDimensionWeights`    | `ChampionCapabilityProfile` e `ChampionTag` do draft     |
-| `poolSourcePriority`          | `PlayerChampionPoolEntry` vigente no instante do draft   |
+| Parâmetro                    | Dependência ausente                                        |
+| ---------------------------- | ---------------------------------------------------------- |
+| `minGamesForRanking`         | `PlayerChampionStats.games` no instante do draft            |
+| `poolFormation`              | `PlayerChampionPoolEntry` vigente no instante do draft      |
+| `snapshotCandidateCount`     | Pool e estatísticas do instante do draft                    |
+| `metricAvailabilityOverride` | Fontes que determinaram a disponibilidade naquele instante  |
+| `personalPerformanceFormula` | `PlayerChampionStats` no instante do draft                  |
+| `recentFormDecayFactor`      | Histórico de partidas no instante do draft                  |
+| `maxFamiliarityRiskRelief`   | `games` e `recentMatches` no instante do draft              |
+| `executionRiskDerivation`    | Dificuldade oficial e estatísticas do instante do draft     |
+| `matchupShrinkageK`          | `MatchParticipant` do confronto no instante do draft        |
+| `championTagDerivation`      | `ChampionTag` vigente no instante do draft                  |
+| `capabilityExtraction`       | `ChampionCapabilityProfile` vigente no instante do draft    |
+| `strategyDimensionWeights`   | Capacidades e tags vigentes no instante do draft            |
+| `provenancePolicy`           | Catálogos e fontes vigentes no instante do draft            |
 
 **Não suportados**
 
-| Parâmetro               | Motivo                                                       |
-| ----------------------- | ------------------------------------------------------------ |
-| `globalMetaWeightSource`| Fonte global de meta permanece indisponível (ADR 0002)        |
-| `useMatchResultAsLabel` | Vitória e derrota não são rótulo de recomendação correta      |
+| Parâmetro               | Motivo                                                   |
+| ----------------------- | -------------------------------------------------------- |
+| `globalMetaSource`      | Fonte global de meta permanece indisponível (ADR 0002)    |
+| `useMatchResultAsLabel` | Vitória e derrota não são rótulo de recomendação correta  |
 
 A distinção mais fina do registro está no risco de execução: a **curva de penalização** é aplicada
 a um valor de risco que já está congelado no snapshot, então é pós-agregação; já
-`maxFamiliarityRiskRelief` muda como esse risco é produzido, e por isso exige o histórico ausente.
-Tratar os três como "thresholds de risco" apagaria essa diferença.
+`maxFamiliarityRiskRelief` e `executionRiskDerivation` mudam como esse risco é produzido, e por
+isso exigem o histórico ausente.
 
 A rejeição acontece na **validação da configuração**, antes de qualquer execução: rodar um
 experimento inteiro para depois marcar todos os casos como impossíveis gastaria trabalho e
 produziria um relatório que parece um resultado.
+
+## Configuração candidata
+
+```ts
+type CalibrationCandidate = {
+  id: string;
+  name: string;
+  description?: string;
+  baselineAggregationVersion: string;
+  candidateVersion: string;
+  metricWeights: Partial<Record<RecommendationMetricKey, number>>;
+  disabledMetrics?: RecommendationMetricKey[];
+  postAggregationThresholds?: Record<string, number>;
+  status: "DRAFT" | "READY" | "EVALUATED" | "REJECTED" | "APPROVED_FOR_FUTURE_RELEASE";
+};
+```
+
+`validateCalibrationCandidate` rejeita, com código estruturado:
+
+| Código                            | Situação                                                     |
+| --------------------------------- | ------------------------------------------------------------ |
+| `UNKNOWN_METRIC`                  | Métrica que não participa do score congelado                  |
+| `NEGATIVE_WEIGHT`                 | Peso negativo                                                 |
+| `NON_FINITE_VALUE`                | Peso ou threshold não finito                                  |
+| `NO_AVAILABLE_COMPONENT`          | Nenhuma métrica habilitada com peso positivo                  |
+| `UNSUPPORTED_THRESHOLD`           | Threshold fora do registro                                    |
+| `THRESHOLD_OUT_OF_RANGE`          | Threshold reproduzível, mas fora da faixa declarada           |
+| `DERIVATION_PARAMETER`            | Parâmetro que altera a derivação, com dependência nomeada     |
+| `UNSUPPORTED_PARAMETER`           | Parâmetro sem caminho de avaliação                            |
+| `UNCLASSIFIED_PARAMETER`          | Parâmetro sem classificação de replay                         |
+| `UNSUPPORTED_AGGREGATION_VERSION` | Versão da agregação que o laboratório não reconstrói          |
+
+**Configuração inválida não é normalizada em silêncio**: peso negativo ou threshold fora de faixa
+vira rejeição, nunca um valor corrigido por conta própria.
 
 ## Fórmula reconstruída
 
@@ -88,114 +128,148 @@ penalty    = 0                                     se risco <= executionRiskPena
 totalScore = round( clamp( baseScore - penalty, 0, 100 ) )
 ```
 
-O mapeamento entre chave de peso e métrica congelada é 1:1:
+Mapeamento 1:1 entre chave de peso do motor e métrica congelada:
 
-| Chave de peso          | Métrica congelada          |
-| ---------------------- | -------------------------- |
-| `personalPerformance`  | `PERSONAL_PERFORMANCE`     |
-| `recentForm`           | `RECENT_FORM`              |
-| `matchup`              | `PERSONAL_MATCHUP`         |
-| `blindSafety`          | `BLIND_SAFETY`             |
-| `allySynergy`          | `ALLY_SYNERGY`             |
-| `enemyDraftAnswer`     | `ENEMY_COMPOSITION_ANSWER` |
-| `compositionFit`       | `TEAM_COMPOSITION`         |
-| `meta`                 | `META_STRENGTH`            |
+| Chave do motor        | Métrica congelada          |
+| --------------------- | -------------------------- |
+| `personalPerformance` | `PERSONAL_PERFORMANCE`     |
+| `recentForm`          | `RECENT_FORM`              |
+| `matchup`             | `PERSONAL_MATCHUP`         |
+| `blindSafety`         | `BLIND_SAFETY`             |
+| `allySynergy`         | `ALLY_SYNERGY`             |
+| `enemyDraftAnswer`    | `ENEMY_COMPOSITION_ANSWER` |
+| `compositionFit`      | `TEAM_COMPOSITION`         |
+| `meta`                | `META_STRENGTH`            |
 
 ## Verificação de integridade
 
-Antes de testar qualquer configuração candidata, o baseline é reconstruído a partir do congelado
-e comparado com o `totalScore` persistido.
+Antes de aplicar qualquer configuração candidata, o baseline é reconstruído a partir do congelado
+— métricas, disponibilidade, pesos efetivos, normalização histórica, penalização e o ranking e
+grupo registrados — e comparado com o `totalScore` persistido.
 
 A verificação é real, não circular: a penalização é recalculada **de forma independente** a partir
-da métrica `EXECUTION_RISK` congelada, e não obtida como resíduo entre o score reconstruído e o
-persistido.
+da métrica `EXECUTION_RISK` congelada, e não obtida como resíduo. O resultado reconstruído
+**nunca** é ajustado para coincidir com o persistido.
 
-**Tolerância documentada**: `REPLAY_SCORE_TOLERANCE = 0.05` ponto de score (o motor arredonda em
-uma casa decimal, então a reprodução exata cabe folgadamente dentro disso).
-`REPLAY_WEIGHT_SUM_TOLERANCE = 1e-6` para a soma dos pesos normalizados.
+**Tolerâncias documentadas**: `REPLAY_SCORE_TOLERANCE = 0.05` ponto de score (o motor arredonda em
+uma casa decimal, então a reprodução exata cabe folgadamente dentro disso; a tolerância existe para
+absorver ponto flutuante, não divergência de conteúdo) e `REPLAY_WEIGHT_SUM_TOLERANCE = 1e-6` para
+a soma dos pesos normalizados.
 
-`EXACT_REPLAY` só é atribuído quando **todas** estas condições valem:
+### Status de replay
 
-- todos os componentes necessários estão congelados;
-- a versão da agregação histórica é suportada (`SUPPORTED_AGGREGATION_VERSIONS`);
-- o baseline é reproduzido dentro da tolerância;
-- nenhum dado posterior ao draft foi consultado — garantido pela forma das funções, que não
-  recebem resultado, KDA, timeline, build, observação posterior nem revisão pós-resultado.
+| Status                           | Quando                                                        |
+| -------------------------------- | ------------------------------------------------------------- |
+| `EXACT_REPLAY`                   | Baseline reproduzido dentro da tolerância                     |
+| `REPLAY_INTEGRITY_FAILED`        | Score ou normalização divergentes do persistido               |
+| `REPLAY_UNSUPPORTED_VERSION`     | Versão da agregação histórica não suportada                   |
+| `REPLAY_MISSING_HISTORICAL_INPUT`| Falta componente congelado necessário para reproduzir         |
+
+`EXACT_REPLAY` só é atribuído quando todos os componentes necessários estão congelados, a versão da
+agregação é suportada, o baseline é reproduzido e nenhum dado posterior ao draft foi consultado —
+a última condição é garantida pela forma das funções, que não recebem resultado, KDA, timeline,
+build, observação posterior nem revisão pós-resultado, e não consultam repositório nenhum.
 
 ### Motivos de exclusão
 
-| Código                            | Quando acontece                                                       |
+| Código                            | Situação                                                              |
 | --------------------------------- | --------------------------------------------------------------------- |
 | `NO_FROZEN_METRICS`               | O snapshot não preserva nenhuma métrica com valor                     |
 | `NO_EFFECTIVE_WEIGHTS`            | O snapshot não preserva os pesos efetivos                             |
 | `MISSING_WEIGHTED_METRIC`         | Um sinal tem peso mas nenhum valor congelado                          |
-| `NORMALIZATION_MISMATCH`          | Os pesos efetivos não somam 1                                         |
-| `SCORE_MISMATCH`                  | O score persistido não é reproduzível dentro da tolerância            |
 | `MISSING_EXECUTION_RISK`          | Há diferença de score e o risco congelado que a explicaria não existe |
 | `PENALTY_NOT_REPRODUCIBLE`        | A configuração muda a curva e o risco não está congelado              |
-| `UNSUPPORTED_AGGREGATION_VERSION` | O laboratório não sabe reconstruir aquela versão da agregação         |
+| `NORMALIZATION_MISMATCH`          | Os pesos efetivos não somam 1                                         |
+| `SCORE_MISMATCH`                  | O score persistido não é reproduzível dentro da tolerância            |
+| `UNSUPPORTED_AGGREGATION_VERSION` | O laboratório não sabe reconstruir aquela versão                      |
 
 Um único candidato reprovado exclui o **caso inteiro**: comparar um ranking em que parte das
 posições não é reproduzível produziria deslocamentos que não são da configuração candidata.
 
 Quando o risco de execução não está congelado, o baseline só é aceito se o próprio score provar
-que a penalização foi zero (`penaltyReconstruction: "ABSENT_AND_ZERO"`). Esses casos ficam
-inelegíveis para configurações que mexem na curva de risco.
+que a penalização foi zero (`penaltyReconstruction: "ABSENT_AND_PROVEN_ZERO"`). Esses candidatos
+ficam inelegíveis para configurações que mexem na curva de risco.
 
 ## Reponderação
 
-A disponibilidade continua sendo a **histórica**. Desligar um sinal na configuração pode removê-lo
-do score; ligar um sinal que estava indisponível no snapshot **não cria valor** — o peso é
-redistribuído entre os sinais que de fato têm número, em vez de entrar como zero ou como neutro
-inventado.
+A disponibilidade continua sendo a **histórica**. Desligar um sinal remove-o do score; nenhum peso
+consegue trazer de volta um sinal que o snapshot não tem. Métrica ausente **não recebe peso efetivo
+nem valor substituto** — não existe 0 nem 50 de preenchimento. O peso restante é normalizado
+proporcionalmente e a escala final é preservada.
+
+**Cobertura histórica e cobertura candidata são campos separados.** `baselineDataCoverage` vem do
+snapshot e não é recalculada; `candidateDataCoverage` é a soma dos pesos candidatos que tinham dado
+congelado. Fundi-las esconderia que a candidata usa menos sinais.
+
+Cada candidato preserva `baselineRank`, `baselineGroup`, `baselineScore`, `reconstructedScore`,
+`candidateScore`, as duas coberturas, os pesos e valores efetivamente usados, e
+`differenceReasons` (`WEIGHT_CHANGED`, `METRIC_DISABLED`, `METRIC_UNAVAILABLE_HISTORICALLY`,
+`PENALTY_CURVE_CHANGED`).
 
 ## Comparação e estabilidade
 
-Por caso reproduzido: `top1Preserved`, `primaryOverlap` e `primaryOverlapRatio`,
-`meanRankDisplacement`, `maxRankDisplacement`, `promoted`, `demoted`, `enteredPrimary`,
-`leftPrimary`, `comfortStrategicInversions` e, quando o snapshot registrou a escolha,
-`realChoice` (posição antes e depois, entrou ou saiu do grupo recomendado).
+Por caso (`CalibrationCaseComparison`): `topOnePreserved`, `topFiveOverlap`,
+`averageRankDisplacement`, `medianRankDisplacement`, `maxRankDisplacement`,
+`recommendedSetStability` (Jaccard entre os conjuntos principais), `promotedChampionIds`,
+`demotedChampionIds`, `enteredPrimaryChampionIds`, `leftPrimaryChampionIds`,
+`primaryToAlternativeChampionIds`, `alternativeToPrimaryChampionIds`,
+`comfortStrategicInversions` e, quando o snapshot registrou a escolha, `chosenChampion`.
+
+Casos não reproduzidos saem com `candidate: null` e todas as métricas em `null` — nunca com zero,
+que se confundiria com "não mudou".
 
 Inversão conforto × estratégico usa a categoria que o próprio motor já atribuiu:
 `comfort_pick`/`safe_pick` de um lado, `best_blind`/`best_matchup`/`best_teamfit`/
 `strategic_option` do outro. `best_matchup` fica do lado estratégico porque só existe quando o
 adversário de rota foi revelado.
 
-**Score maior não é melhoria.** Um candidato subir de posição é deslocamento, não acerto. O
-laboratório mede quanto a ordenação se move, para onde e em que segmentos; a leitura sobre se isso
-é desejável é humana e acontece fora do módulo.
+**Estabilidade não é qualidade e mudança não é melhoria.** O laboratório mede quanto a ordenação se
+move, para onde e em que segmentos; a leitura sobre se isso é desejável é humana e acontece fora do
+módulo.
+
+## Revisões humanas
+
+Somente avaliação **pré-resultado** da Etapa 24. `PreMatchReviewReference` não tem campo de
+desfecho, e o domínio não acessa revisão pós-resultado.
+
+`HumanReviewSummary` produz contagens — `strongCasesPreserved`, `strongCasesAltered`,
+`weakCasesPreserved`, `weakCasesAltered`, `issueTagsAffected`, `casesWithoutReview` — e **nunca**
+converte a escala qualitativa em score numérico.
 
 ## Segmentação
 
-O resumo segmenta por posição, patch e faixa de cobertura (`0.9-1.0`, `0.7-0.9`, `0.5-0.7`,
-`<0.5`). Casos excluídos **nunca** entram nas médias, e os motivos de exclusão saem agregados por
-código com a dependência histórica nomeada.
+`role`, `patch`, `queue`, `period` (mês do snapshot), `poolSize` (faixa), `baselineDataCoverage`
+(faixa `0.9-1.0` / `0.7-0.9` / `0.5-0.7` / `<0.5`), `chosenChampionGroup`, `engineVersion`,
+`preMatchRating` e `issueTag`.
 
-O cruzamento com revisão humana usa somente a avaliação **pré-partida** da Etapa 24, que por
-construção não conhece o resultado. `PreMatchReviewReference` não tem campo de desfecho.
+Ausência de um fato não vira valor inventado: o caso simplesmente não entra naquela dimensão.
+Casos excluídos nunca entram nas médias, e os motivos de exclusão saem agregados por código com a
+dependência histórica nomeada.
+
+## Determinismo e hash
+
+`canonicalCandidateString` e `canonicalExperimentInputString` produzem serializações estáveis.
+Ficam de fora: ordem acidental de arrays e filtros, `id`, `name`, `description`, `status` e
+qualquer instante de geração. O mesmo input funcional produz a mesma string e o mesmo relatório.
+
+O hash em si fica na Etapa 25b, que roda na API e tem `node:crypto` — `packages/core` também roda
+no renderer.
 
 ## Promoção
 
 ```txt
-DRAFT → EVALUATED → REJECTED | APPROVED_FOR_FUTURE_RELEASE
+DRAFT → READY → EVALUATED → REJECTED | APPROVED_FOR_FUTURE_RELEASE
 ```
 
 `APPROVED_FOR_FUTURE_RELEASE` é o **maior** valor que o tipo expressa. Não existe estado que
-signifique "em produção", de propósito. O status entra como parâmetro em
-`summarizeCalibrationExperiment` e nunca é derivado dos números — não há caminho, neste domínio,
-que promova uma configuração a partir de um resultado.
-
-## Canonicalização
-
-`canonicalCandidateString` e `canonicalExperimentInputString` produzem serializações estáveis
-(ordem de chaves e de snapshots normalizada; o nome da configuração não entra, porque não altera o
-resultado). O hash em si fica na Etapa 25b, que roda na API e tem `node:crypto` —
-`packages/core` também roda no renderer.
+signifique "em produção", de propósito. O status vem da própria configuração e nunca é derivado dos
+números — não há caminho, neste domínio, que promova uma configuração a partir de um resultado.
 
 ## Etapa futura registrada
 
-Criar um `ReplayInputBundle` imutável gravado junto de **novos** snapshots, com os inputs
-necessários para reproduzir derivações (`PlayerChampionStats` do momento, `ChampionTag`,
-capacidades, agregados de matchup). A captura é **prospectiva**: não torna snapshots antigos
-reproduzíveis e não reconstrói dado histórico a partir do estado atual. Não faz parte da 25a nem
-da 25b.
+Criar um `ReplayInputBundle` imutável gravado junto de **novos** snapshots, preservando os inputs
+de derivação: estatísticas pessoais utilizadas, `ChampionTag`, capacidades, catálogos, contexto de
+matchup, inputs do risco e a versão de cada derivação.
+
+A captura é **prospectiva**: não torna snapshots antigos reproduzíveis e não reconstrói dado
+histórico a partir do estado atual. Não faz parte da 25a nem da 25b.

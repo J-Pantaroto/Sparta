@@ -16,14 +16,20 @@ rejeitou usar dado atual como substituto.
 
 Por isso a capacidade de reprodução é **declarada por parâmetro** e verificada na validação:
 `EXACT_REWEIGHT` (pesos e inclusão/exclusão de sinal congelado), `EXACT_POST_AGGREGATION`
-(`primaryCount`, pisos de score/cobertura, curva de penalização de risco),
-`REQUIRES_HISTORICAL_DERIVATION_INPUT` (`minGamesForRanking`, `maxFamiliarityRiskRelief`,
-`recentFormDecayFactor`, `matchupShrinkageK`, tags, capacidades, formação de pool) e `UNSUPPORTED`
-(meta global, resultado como rótulo). **Thresholds não são uma categoria só**: a curva de
-penalização é aplicada a um risco *já congelado* (pós-agregação), enquanto
-`MAX_FAMILIARITY_RISK_RELIEF` muda como esse risco é produzido (exige histórico ausente).
-Configuração com parâmetro não reproduzível é **rejeitada antes de executar**, com a dependência
-nomeada — não se roda um experimento inteiro pra marcar tudo como impossível.
+(`primaryCount`, `alternativeCount`, pisos de score/cobertura, curva de penalização de risco),
+`REQUIRES_HISTORICAL_DERIVATION_INPUT` (os onze parâmetros de derivação: formação/elegibilidade do
+pool, disponibilidade, desempenho pessoal, forma recente, familiaridade, risco, matchup, tags,
+capacidades, estratégia e proveniência) e `UNSUPPORTED` (meta global, resultado como rótulo).
+**Thresholds não são uma categoria só**: a curva de penalização é aplicada a um risco *já
+congelado* (pós-agregação), enquanto `maxFamiliarityRiskRelief` e `executionRiskDerivation` mudam
+como esse risco é produzido (exigem histórico ausente). Configuração com parâmetro não reproduzível
+é **rejeitada antes de executar**, com a dependência nomeada — não se roda um experimento inteiro
+pra marcar tudo como impossível. Configuração inválida também não é normalizada em silêncio.
+
+O contrato é `CalibrationCandidate` (pesos por `RecommendationMetricKey`, `disabledMetrics`,
+`postAggregationThresholds`, `status`), e o replay tem quatro status: `EXACT_REPLAY`,
+`REPLAY_INTEGRITY_FAILED` (divergência), `REPLAY_UNSUPPORTED_VERSION` e
+`REPLAY_MISSING_HISTORICAL_INPUT` (ausência) — divergir e faltar não são a mesma coisa.
 
 **A verificação de integridade é real, não circular**: a penalização é recalculada de forma
 independente a partir da métrica `EXECUTION_RISK` congelada, e não obtida como resíduo. Medido
@@ -32,12 +38,16 @@ diferença zero**, com penalizações não triviais e todas distintas (0.4, 1.5,
 Tolerância documentada: 0.05 ponto. Um único candidato reprovado exclui o caso inteiro.
 
 Reponderar usa a disponibilidade **histórica**: ligar um sinal indisponível no snapshot não cria
-valor, o peso é redistribuído. A comparação reporta top-1, sobreposição do grupo primário,
-deslocamento médio/máximo, promovidos/rebaixados, inversões conforto × estratégico e a escolha
-real entrando/saindo — **score maior não é melhoria**, e vitória/derrota não existem em nenhum
-tipo do módulo. Promoção máxima expressável: `APPROVED_FOR_FUTURE_RELEASE`.
+valor nem recebe peso efetivo, e não existe 0 nem 50 de preenchimento. Cobertura histórica e
+cobertura candidata são campos **separados**. A comparação reporta top-1, sobreposição do top 5,
+deslocamento médio/mediano/máximo, estabilidade do conjunto recomendado (Jaccard),
+promovidos/rebaixados, entradas e saídas do grupo principal, transições principal↔alternativa,
+inversões conforto × estratégico e a escolha real — **estabilidade não é qualidade e mudança não é
+melhoria**, e vitória/derrota não existem em nenhum tipo do módulo. Revisão humana entra só como
+contagem pré-resultado, nunca como nota. Segmentação por dez dimensões. Promoção máxima
+expressável: `APPROVED_FOR_FUTURE_RELEASE`.
 
-**Nenhuma linha do motor operacional mudou.** 51 testes novos (831 no total). Ver
+**Nenhuma linha do motor operacional mudou.** 69 testes (849 no total). Ver
 `docs/engine-calibration-lab.md`.
 
 ## Etapa 24: revisão humana auditável do motor

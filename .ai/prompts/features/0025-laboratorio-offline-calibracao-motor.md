@@ -1,7 +1,7 @@
 ---
 status: IMPLEMENTADA
 solicitado_em: 2026-07-30 17:05
-implementado_em: 2026-07-31 00:52
+implementado_em: 2026-07-31 07:45
 ---
 
 # Laboratório offline de calibração do motor (Etapa 25a — domínio puro)
@@ -228,3 +228,71 @@ limita bastante o que a amostra atual sustenta.
 Nenhuma migration, persistência, repositório, rota, tela ou execução operacional. O motor ativo
 não foi alterado: `recommendation-engine.ts`, `champion-performance.ts` e `execution-risk.ts` não
 aparecem no diff.
+
+## Segunda rodada: alinhamento ao contrato detalhado da 25a
+
+O usuário enviou a especificação detalhada da 25a depois da primeira entrega. Comparando com o que
+estava em `main` (`c18daf0`), a decisão arquitetural e a verificação de integridade já batiam, mas
+o contrato e parte das saídas divergiam. Foram alinhados:
+
+### Contrato
+
+- `CalibrationCandidate` com `id`, `name`, `description?`, `baselineAggregationVersion`,
+  `candidateVersion`, `metricWeights` por `RecommendationMetricKey` (parcial),
+  `disabledMetrics?`, `postAggregationThresholds?` e `status` — substituindo a forma anterior,
+  que era chaveada pelas chaves internas do motor e exigia os oito pesos declarados.
+- Status de replay passaram a ser exatamente `EXACT_REPLAY`, `REPLAY_INTEGRITY_FAILED`,
+  `REPLAY_UNSUPPORTED_VERSION` e `REPLAY_MISSING_HISTORICAL_INPUT`. A separação entre integridade
+  (score/normalização divergentes) e input faltante (componente não preservado) é semântica, não
+  cosmética: a primeira indica divergência, a segunda indica ausência.
+- `CalibrationCaseComparison` com `baseline`/`candidate: CalibrationRanking | null`, os quatro
+  arrays de movimento e `algorithmVersions`.
+
+### A lista proibida virou registro verificável
+
+Os onze parâmetros que o escopo manda rejeitar (`poolFormation`, `snapshotCandidateCount`,
+`metricAvailabilityOverride`, `personalPerformanceFormula`, `minGamesForRanking`,
+`maxFamiliarityRiskRelief`, `executionRiskDerivation`, `matchupShrinkageK`,
+`championTagDerivation`, `capabilityExtraction`, `strategyDimensionWeights`, `provenancePolicy`)
+estão no registro e são cobertos por um teste que percorre a lista inteira.
+
+### Saídas novas
+
+- Cobertura candidata (`candidateDataCoverage`) separada da histórica (`baselineDataCoverage`).
+- `differenceReasons` por candidato: `WEIGHT_CHANGED`, `METRIC_DISABLED`,
+  `METRIC_UNAVAILABLE_HISTORICALLY`, `PENALTY_CURVE_CHANGED`.
+- `medianRankDisplacement`, `recommendedSetStability` (Jaccard), `primaryToAlternativeChampionIds`
+  e `alternativeToPrimaryChampionIds`.
+- `HumanReviewSummary` com `strongCasesPreserved`/`strongCasesAltered`,
+  `weakCasesPreserved`/`weakCasesAltered`, `issueTagsAffected` e `casesWithoutReview` — contagens,
+  nunca score.
+- Segmentação por dez dimensões: `role`, `patch`, `queue`, `period`, `poolSize`,
+  `baselineDataCoverage`, `chosenChampionGroup`, `engineVersion`, `preMatchRating`, `issueTag`.
+- `canonicalExperimentInputString` canonicaliza filtros e arrays; identidade, nome, descrição e
+  status ficam fora, porque não alteram o resultado.
+
+### Revalidação contra o Postgres real (só leitura)
+
+- **11 de 11 candidatos de 2 snapshots reconstruídos com diferença zero**, todos por
+  `FROM_FROZEN_RISK`, com penalizações 0.4 / 1.5 / 1.8 / 3.5 / 4.6.
+- Configuração só de pesos: válida. Com `minGamesForRanking`: rejeitada com
+  `DERIVATION_PARAMETER` e a dependência nomeada. Com `disabledMetrics: ["PERSONAL_MATCHUP"]`:
+  válida, tratada como reponderação.
+- Experimento real: 2 de 2 casos reproduzidos, `topOnePreservedCases` 0, deslocamento médio 1.17 e
+  mediano 1, `averageTopFiveOverlap` 5, estabilidade do conjunto 1.0, 4 promoções e 3
+  rebaixamentos, 2 inversões conforto × estratégico, nenhuma entrada ou saída do grupo principal.
+- Determinismo medido: string canônica idêntica com snapshots em ordem inversa e configuração
+  renomeada; relatório idêntico entre duas execuções.
+
+### Testes
+
+69 determinísticos (23 + 20 + 26), incluindo os casos críticos exigidos pelo escopo: baseline
+íntegro reproduzido, baseline divergente excluído, snapshot histórico não alterado
+(comparação profunda antes/depois), ordem dos candidatos irrelevante para score e ranking,
+métrica indisponível sem peso efetivo nem valor substituto, flag de métrica congelada aceita como
+reponderação, flag de derivação rejeitada, ausência de qualquer campo de resultado na saída
+(varredura da serialização), configuração operacional intocada e mesmo input funcional produzindo
+o mesmo hash e o mesmo relatório.
+
+Suíte completa: **849 testes**. `typecheck`, `lint`, `test` e `build` completos. Nenhuma migration,
+rota, tela ou alteração do motor operacional.
