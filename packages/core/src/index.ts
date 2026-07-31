@@ -21,6 +21,8 @@ export * from "./review/draft-review.js";
 export * from "./calibration/engine-candidate.js";
 export * from "./calibration/snapshot-replay.js";
 export * from "./calibration/ranking-comparison.js";
+export * from "./calibration/replay-input-bundle.js";
+export * from "./calibration/replay-verifier.js";
 export * from "./types/champion-tag-provenance.js";
 export * from "./types/champion-difficulty.js";
 export * from "./types/champion-capability.js";

@@ -31,6 +31,7 @@ Snapshot gerado em: 2026-07-25 (atualizado em 2026-07-27).
 - `draft-persistence.md` — sessões de draft e snapshots imutáveis de recomendação.
 - `draft-review.md` — revisão humana auditável do motor.
 - `engine-calibration-lab.md` — laboratório offline de calibração do motor (domínio puro).
+- `replay-input-bundle.md` — captura prospectiva dos inputs de derivação (domínio puro).
 - `personal-loadout-evidence.md` — inventários finais, runas e feitiços pessoais agregados por posição.
 - `adr/0002-global-meta-source.md` — decisão da fonte global, contratos e condições para integração.
 - `replay-analysis.md` — análise de replay (experimental).

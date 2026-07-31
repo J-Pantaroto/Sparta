@@ -22,6 +22,19 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-07-31 15:10 — ReplayInputBundle prospectivo: domínio puro (Etapa 26a)
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0027-replay-input-bundle-prospectivo.md`
+
+`replay-input-bundle/1.0.0` em `packages/core/src/calibration/`: contrato versionado,
+canonicalização, validação com dez códigos estruturados, manifesto de dependências por métrica,
+registro explícito de implementações de replay e verificador offline. A auditoria do grafo real
+mudou três coisas do contrato esboçado: o bundle guarda o perfil de **todos** os campeões
+consultados (aliados e inimigos inclusos), `evaluatedAt` entra no hash por alimentar a recência do
+risco (`capturedAt` não entra), e tags/capacidades são **embutidas** por não terem artefato
+imutável. 38 testes novos (905 no total). Sem migration, rota, API ou tela — isso é a 26b.
+Ver `docs/replay-input-bundle.md`.
+
 ## 2026-07-31 09:55 — Laboratório de calibração: persistência, API e interface (Etapa 25b)
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0026-laboratorio-calibracao-persistencia-api-tela.md`

@@ -1,5 +1,35 @@
 # Sparta - Contexto para Continuidade
 
+## Etapa 26a: domínio do ReplayInputBundle (captura prospectiva)
+
+A Etapa 25 provou que o snapshot permite **reponderar**, mas não reproduzir como as métricas foram
+**produzidas**. `packages/core/src/calibration/replay-input-bundle.ts` +
+`replay-verifier.ts` (`replay-input-bundle/1.0.0`) criam o contrato do que será capturado junto de
+cada snapshot **novo**. Sem migration, rota, API ou tela — isso é a 26b.
+
+**A auditoria do grafo real mudou três coisas do contrato esboçado no pedido**: (1) não basta o
+candidato — `analyzeTeamComposition` e `analyzeDraftStrategy` leem tags e capacidades de aliados e
+inimigos, então `referencedChampions` cobre todo campeão consultado, com papel explícito e uma
+entrada por campeão; (2) `evaluatedAt` é **input**, não metadado — `assessExecutionRisk` o usa para
+recência, então ele **entra** no `contentHash`, ao contrário de `capturedAt`; (3) nenhum catálogo é
+endereçável por conteúdo (tags e capacidades são linhas mutáveis semeadas de arquivos
+regeneráveis), o que obriga a **embutir** os campos normalizados.
+
+O bundle **não carrega `puuid`** nem qualquer dado pós-partida — não existe campo onde
+coubessem. Canonicalização ordena o que é conjunto (pool, aliados, inimigos, bans, candidatos,
+campeões referenciados) e **preserva** o que é ordenado (`recentMatches`, porque a forma recente
+pondera por índice). O hash é injetado: `packages/core` roda no renderer e não pode usar
+`node:crypto`; sem a função, a verificação é pulada e **declarada**.
+
+`replayEngines` é um registro explícito: versão histórica ausente devolve
+`UNSUPPORTED_ALGORITHM_VERSION` e **nunca** cai no motor atual. `verifyReplayBundle` recebe só
+bundle, snapshot e registro — nenhum parâmetro por onde um repositório entraria — e relata
+divergência com esperado/reconstruído/delta, sem corrigir. Tolerâncias: 0.05 ponto de score,
+1e-6 de cobertura. Snapshot antigo fica `REWEIGHT_ONLY` ou
+`FULL_DERIVATION_REPLAY_UNAVAILABLE`, nunca corrompido, e **não há backfill**.
+
+38 testes (905 no total). Ver `docs/replay-input-bundle.md`.
+
 ## Etapa 25b: laboratório de calibração utilizável (persistência, API e tela)
 
 Migration `20260731100000_calibration_lab`: **três tabelas novas e isoladas**

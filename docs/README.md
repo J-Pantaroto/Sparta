@@ -17,6 +17,7 @@ Leitura recomendada:
 - `draft-persistence.md` para as sessões de draft e os snapshots de recomendação.
 - `draft-review.md` para a revisão humana auditável do motor.
 - `engine-calibration-lab.md` para o laboratório offline de calibração do motor.
+- `replay-input-bundle.md` para a captura prospectiva dos inputs de derivação.
 - `data-provenance.md` para origem, disponibilidade e confiança dos dados.
 - `database.md` para o schema inicial.
 - `match-observations.md` para itens, runas, feitiços e posições observados em cada partida.
