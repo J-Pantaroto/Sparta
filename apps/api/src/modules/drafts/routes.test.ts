@@ -20,7 +20,10 @@ const {
   describeSelectedChampionMock,
   listDraftMatchLinkRevisionsMock,
   observeExternalGameIdMock,
-  reconcileDraftSessionsForAccountMock
+  reconcileDraftSessionsForAccountMock,
+  findSessionReplayCapabilityMock,
+  findReplayBundleSummaryMock,
+  verifySnapshotReplayMock
 } = vi.hoisted(() => ({
   getAuthenticatedUserIdMock: vi.fn(),
   riotAccountFindFirstMock: vi.fn(),
@@ -41,7 +44,16 @@ const {
   describeSelectedChampionMock: vi.fn(),
   listDraftMatchLinkRevisionsMock: vi.fn(),
   observeExternalGameIdMock: vi.fn(),
-  reconcileDraftSessionsForAccountMock: vi.fn()
+  reconcileDraftSessionsForAccountMock: vi.fn(),
+  findSessionReplayCapabilityMock: vi.fn(),
+  findReplayBundleSummaryMock: vi.fn(),
+  verifySnapshotReplayMock: vi.fn()
+}));
+
+vi.mock("./replay-bundle-repository.js", () => ({
+  findSessionReplayCapability: findSessionReplayCapabilityMock,
+  findReplayBundleSummary: findReplayBundleSummaryMock,
+  verifySnapshotReplay: verifySnapshotReplayMock
 }));
 
 vi.mock("./draft-session-repository.js", () => ({
@@ -807,6 +819,215 @@ describe("consultas de sessão (Etapa 16)", () => {
 
     expect(response.statusCode).toBe(409);
     expect(response.json().code).toBe("INVALID_TRANSITION");
+    await app.close();
+  });
+});
+
+describe("replay bundle routes (Etapa 26b)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getAuthenticatedUserIdMock.mockResolvedValue("user-1");
+    riotAccountFindFirstMock.mockResolvedValue({ id: "conta-1", puuid: "puuid-1" });
+  });
+
+  it("GET replay-capability exige autenticação", async () => {
+    getAuthenticatedUserIdMock.mockResolvedValue(null);
+    const app = await buildApp();
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/draft-sessions/sessao-1/replay-capability"
+    });
+
+    expect(response.statusCode).toBe(401);
+    expect(findSessionReplayCapabilityMock).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("GET replay-capability devolve 404 quando a sessão não existe ou não é da conta", async () => {
+    findSessionReplayCapabilityMock.mockResolvedValue(null);
+    const app = await buildApp();
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/draft-sessions/sessao-de-outro/replay-capability"
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(findSessionReplayCapabilityMock).toHaveBeenCalledWith("conta-1", "sessao-de-outro");
+    await app.close();
+  });
+
+  it("GET replay-capability repassa o relatório de capacidade isolado por conta", async () => {
+    findSessionReplayCapabilityMock.mockResolvedValue({
+      sessionId: "sessao-1",
+      snapshotId: "snap-1",
+      capability: "FULL_DERIVATION_REPLAY_AVAILABLE",
+      reason: "Replay completo disponível.",
+      reweightAvailable: true,
+      bundleSchemaVersion: "replay-input-bundle/1.0.0",
+      missingDependencies: []
+    });
+    const app = await buildApp();
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/draft-sessions/sessao-1/replay-capability"
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      capability: "FULL_DERIVATION_REPLAY_AVAILABLE",
+      reweightAvailable: true
+    });
+    // Nunca o contentJson do bundle: só campos de resumo.
+    expect(response.json()).not.toHaveProperty("draft");
+    expect(response.json()).not.toHaveProperty("player");
+    await app.close();
+  });
+
+  it("GET replay-bundle-summary devolve 404 quando o snapshot não é da conta", async () => {
+    findReplayBundleSummaryMock.mockResolvedValue(null);
+    const app = await buildApp();
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/recommendation-snapshots/snap-de-outro/replay-bundle-summary"
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(findReplayBundleSummaryMock).toHaveBeenCalledWith("conta-1", "snap-de-outro");
+    await app.close();
+  });
+
+  it("GET replay-bundle-summary devolve schema, hash, tamanho e última verificação sem o conteúdo", async () => {
+    findReplayBundleSummaryMock.mockResolvedValue({
+      snapshotId: "snap-1",
+      hasBundle: true,
+      capability: "FULL_DERIVATION_REPLAY_AVAILABLE",
+      reason: "Replay completo disponível.",
+      reweightAvailable: true,
+      bundleSchemaVersion: "replay-input-bundle/1.0.0",
+      contentHash: "abc123",
+      contentBytes: 4096,
+      evaluatedAt: "2026-07-31T17:15:54.000Z",
+      createdAt: "2026-07-31T17:15:55.000Z",
+      lastVerification: { status: "EXACT_REPLAY", verifiedAt: "2026-07-31T17:16:00.000Z" },
+      missingDependencies: []
+    });
+    const app = await buildApp();
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/recommendation-snapshots/snap-1/replay-bundle-summary"
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json();
+    expect(body.contentHash).toBe("abc123");
+    expect(body.contentBytes).toBe(4096);
+    expect(body.lastVerification.status).toBe("EXACT_REPLAY");
+    expect(body).not.toHaveProperty("draft");
+    expect(body).not.toHaveProperty("referencedChampions");
+    await app.close();
+  });
+
+  it("POST verify-replay devolve 422 quando o snapshot não tem bundle", async () => {
+    verifySnapshotReplayMock.mockResolvedValue({ ok: false, reason: "NO_BUNDLE" });
+    const app = await buildApp();
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/recommendation-snapshots/snap-1/verify-replay"
+    });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json().code).toBe("NO_BUNDLE");
+    await app.close();
+  });
+
+  it("POST verify-replay devolve 404 quando o snapshot não é da conta", async () => {
+    verifySnapshotReplayMock.mockResolvedValue({ ok: false, reason: "NOT_FOUND" });
+    const app = await buildApp();
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/recommendation-snapshots/snap-de-outro/verify-replay"
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(verifySnapshotReplayMock).toHaveBeenCalledWith("conta-1", "snap-de-outro");
+    await app.close();
+  });
+
+  it("POST verify-replay devolve o resultado exato do replay, sem o bundle", async () => {
+    verifySnapshotReplayMock.mockResolvedValue({
+      ok: true,
+      result: {
+        status: "EXACT_REPLAY",
+        divergences: [],
+        rejections: [],
+        missingDependencies: [],
+        replayImplementation: "recommendation-engine/1.0.0"
+      },
+      report: {
+        capability: "FULL_DERIVATION_REPLAY_AVAILABLE",
+        reason: "Replay completo disponível.",
+        reweightAvailable: true,
+        missingDependencies: []
+      },
+      durationMs: 3.2,
+      bundleSchemaVersion: "replay-input-bundle/1.0.0"
+    });
+    const app = await buildApp();
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/recommendation-snapshots/snap-1/verify-replay"
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json();
+    expect(body.status).toBe("EXACT_REPLAY");
+    expect(body.capability).toBe("FULL_DERIVATION_REPLAY_AVAILABLE");
+    expect(body.reweightAvailable).toBe(true);
+    expect(body).not.toHaveProperty("draft");
+    await app.close();
+  });
+
+  it("POST verify-replay relata divergência real, sem corrigir", async () => {
+    verifySnapshotReplayMock.mockResolvedValue({
+      ok: true,
+      result: {
+        status: "REPLAY_INTEGRITY_FAILED",
+        divergences: [
+          { championId: 234, field: "totalScore", expected: 53, reconstructed: 62, delta: 9 }
+        ],
+        rejections: [],
+        missingDependencies: [],
+        replayImplementation: "recommendation-engine/1.0.0"
+      },
+      report: {
+        capability: "FULL_DERIVATION_REPLAY_INVALID",
+        reason: "O replay reconstruído diverge do resultado persistido.",
+        reweightAvailable: true,
+        missingDependencies: []
+      },
+      durationMs: 1.1,
+      bundleSchemaVersion: "replay-input-bundle/1.0.0"
+    });
+    const app = await buildApp();
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/recommendation-snapshots/snap-1/verify-replay"
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json();
+    expect(body.status).toBe("REPLAY_INTEGRITY_FAILED");
+    expect(body.capability).toBe("FULL_DERIVATION_REPLAY_INVALID");
+    expect(body.divergences).toHaveLength(1);
     await app.close();
   });
 });

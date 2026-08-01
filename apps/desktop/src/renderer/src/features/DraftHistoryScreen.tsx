@@ -9,6 +9,7 @@ import {
   type DraftSessionSummary
 } from "../services/api-client";
 import { DraftReviewPanel } from "./DraftReviewPanel";
+import { ReplayCapabilitySummary } from "./ReplayCapabilitySummary";
 import {
   Card,
   EmptyState,
@@ -112,7 +113,7 @@ export function DraftHistoryScreen({
               />
               {session.id === selectedId && (
                 <>
-                  <SessionDetail state={detail} onOpenMatch={onOpenMatch} />
+                  <SessionDetail state={detail} onOpenMatch={onOpenMatch} sessionToken={sessionToken} />
                   {/* Revisão humana (Etapa 24): a ação vive aqui porque é esta
                       a tela com drafts individuais. O Histórico do Motor é
                       agregado e não tem linha por sessão. */}
@@ -157,10 +158,12 @@ function describeKnownDraft(session: DraftSessionSummary): string {
 
 function SessionDetail({
   state,
-  onOpenMatch
+  onOpenMatch,
+  sessionToken
 }: {
   state: { data: DraftSessionDetail | null; status: string; error: string | null };
   onOpenMatch?: (matchId: string) => void;
+  sessionToken: string | null;
 }) {
   if (state.status === "loading") return <Loading label="Carregando sessão..." />;
   if (state.status === "error" || !state.data) {
@@ -211,6 +214,11 @@ function SessionDetail({
           </div>
         ) : (
           <EmptyState inline title="Sem recomendações gravadas" />
+        )}
+        {latestSnapshot && sessionToken && (
+          <div style={{ marginTop: "var(--space-3)" }}>
+            <ReplayCapabilitySummary token={sessionToken} snapshotId={latestSnapshot.id} />
+          </div>
         )}
       </div>
 

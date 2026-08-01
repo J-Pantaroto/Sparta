@@ -690,6 +690,89 @@ export function fetchDraftSessionDetail(token: string, sessionId: string) {
   });
 }
 
+/* ── Capacidade de replay do ReplayInputBundle (Etapa 26b) ──────────────── */
+
+export type ReplayCapability =
+  | "REWEIGHT_ONLY"
+  | "FULL_DERIVATION_REPLAY_AVAILABLE"
+  | "FULL_DERIVATION_REPLAY_UNAVAILABLE"
+  | "FULL_DERIVATION_REPLAY_INVALID"
+  | "FULL_DERIVATION_REPLAY_UNSUPPORTED_VERSION";
+
+export interface ReplayCapabilityReport {
+  capability: ReplayCapability;
+  reason: string;
+  reweightAvailable: boolean;
+  bundleSchemaVersion?: string;
+  contentHash?: string;
+  capturedAt?: string;
+  algorithmVersions?: Record<string, string>;
+  verificationStatus?: string;
+  missingDependencies: { metric: string; reason: string }[];
+}
+
+export interface SessionReplayCapability extends ReplayCapabilityReport {
+  sessionId: string;
+  snapshotId: string | null;
+}
+
+export interface ReplayBundleSummary extends ReplayCapabilityReport {
+  snapshotId: string;
+  hasBundle: boolean;
+  contentBytes?: number;
+  evaluatedAt?: string;
+  createdAt?: string;
+  lastVerification?: { status: string; verifiedAt: string } | null;
+}
+
+export interface ReplayVerificationResponse {
+  snapshotId: string;
+  status: string;
+  divergences: {
+    championId?: number;
+    field: string;
+    expected: number | string | null;
+    reconstructed: number | string | null;
+    delta?: number;
+  }[];
+  missingDependencies: { metric: string; reason: string }[];
+  replayImplementation?: string;
+  capability: ReplayCapability;
+  reason: string;
+  reweightAvailable: boolean;
+}
+
+/** Capacidade de replay do snapshot mais recente de uma sessão. */
+export function fetchSessionReplayCapability(token: string, sessionId: string) {
+  return request<SessionReplayCapability>(
+    `/draft-sessions/${encodeURIComponent(sessionId)}/replay-capability`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+}
+
+/** Resumo do bundle de um snapshot, sem o conteúdo funcional completo. */
+export function fetchReplayBundleSummary(token: string, snapshotId: string) {
+  return request<ReplayBundleSummary>(
+    `/recommendation-snapshots/${encodeURIComponent(snapshotId)}/replay-bundle-summary`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+}
+
+/** Roda a verificação offline de fato — reconstrói o motor a partir do bundle. */
+export function verifySnapshotReplay(token: string, snapshotId: string) {
+  return request<ReplayVerificationResponse>(
+    `/recommendation-snapshots/${encodeURIComponent(snapshotId)}/verify-replay`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      // `request()` sempre manda Content-Type: application/json; sem corpo o
+      // Fastify recusa com FST_ERR_CTP_EMPTY_JSON_BODY antes de a rota rodar
+      // (achado real na validação desta etapa, via UI real, não via curl).
+      body: "{}"
+    }
+  );
+}
+
 /** Registra o campeão confirmado na sessão. Não emite julgamento nenhum. */
 export function lockInDraftSession(token: string, sessionId: string, championId: number) {
   return request<{

@@ -17,6 +17,7 @@ import {
   type CalibrationValidationResult
 } from "../services/api-client";
 import { useAsyncData } from "../hooks/use-async-data";
+import { ReplayCapabilitySummary } from "./ReplayCapabilitySummary";
 import { Button } from "../ui/Button";
 import { Card, SectionHeader } from "../ui/Card";
 import { EmptyState, ErrorState, Loading } from "../ui/States";
@@ -431,7 +432,7 @@ export function CalibrationLabScreen({ token }: Props): ReactElement {
                         {String(entry.replayStatus)}
                       </StatusBadge>
                     </button>
-                    {open ? <CaseDetail comparison={entry} /> : null}
+                    {open ? <CaseDetail comparison={entry} token={token} /> : null}
                   </li>
                 );
               })}
@@ -507,9 +508,16 @@ function num(value: unknown): string {
   return typeof value === "number" ? String(value) : "—";
 }
 
-function CaseDetail({ comparison }: { comparison: Record<string, unknown> }): ReactElement {
+function CaseDetail({
+  comparison,
+  token
+}: {
+  comparison: Record<string, unknown>;
+  token: string;
+}): ReactElement {
   const baseline = (comparison.baseline ?? {}) as { entries?: Record<string, unknown>[] };
   const candidate = (comparison.candidate ?? null) as { entries?: Record<string, unknown>[] } | null;
+  const snapshotId = comparison.snapshotId ? String(comparison.snapshotId) : null;
 
   if (!candidate) {
     return (
@@ -520,12 +528,22 @@ function CaseDetail({ comparison }: { comparison: Record<string, unknown> }): Re
         <pre className="sp-calib-raw">
           {JSON.stringify(comparison.exclusionReasons ?? [], null, 2)}
         </pre>
+        {snapshotId && (
+          <div style={{ marginTop: "var(--space-3)" }}>
+            <ReplayCapabilitySummary token={token} snapshotId={snapshotId} />
+          </div>
+        )}
       </div>
     );
   }
 
   return (
     <div className="sp-calib-case-detail">
+      {snapshotId && (
+        <div style={{ marginBottom: "var(--space-3)" }}>
+          <ReplayCapabilitySummary token={token} snapshotId={snapshotId} />
+        </div>
+      )}
       <div className="sp-calib-side-by-side">
         <div>
           <h4>Histórico</h4>

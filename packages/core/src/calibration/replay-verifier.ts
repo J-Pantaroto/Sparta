@@ -346,17 +346,31 @@ export function verifyReplayBundle(input: VerifyReplayInput): ReplayVerification
 }
 
 /**
- * Capacidade de replay de um snapshot, para a Etapa 25 distinguir os três casos
- * sem habilitar nenhum parâmetro novo de derivação.
+ * Capacidade de replay de um snapshot (Etapa 26b completa os cinco estados).
+ *
+ * `REWEIGHT_ONLY` e `FULL_DERIVATION_REPLAY_UNAVAILABLE` cobrem ausência de
+ * bundle ou de dependência histórica — a Etapa 25 continua reponderando o
+ * congelado quando possível. `FULL_DERIVATION_REPLAY_INVALID` é distinto de
+ * "indisponível": o bundle existe e foi verificado, mas não passou (violação
+ * estrutural ou divergência entre reconstruído e persistido) — um sinal de
+ * problema real, não de ausência. `FULL_DERIVATION_REPLAY_UNSUPPORTED_VERSION`
+ * é sobre a versão declarada, não sobre o conteúdo.
  */
 export type SnapshotReplayCapability =
   | "REWEIGHT_ONLY"
   | "FULL_DERIVATION_REPLAY_AVAILABLE"
-  | "FULL_DERIVATION_REPLAY_UNAVAILABLE";
+  | "FULL_DERIVATION_REPLAY_UNAVAILABLE"
+  | "FULL_DERIVATION_REPLAY_INVALID"
+  | "FULL_DERIVATION_REPLAY_UNSUPPORTED_VERSION";
 
 export interface SnapshotReplayCapabilityReport {
   capability: SnapshotReplayCapability;
   reason: string;
+  /**
+   * Se a reponderação da Etapa 25 continua possível, independente da
+   * capacidade acima — informação que se perderia se fosse só o `capability`.
+   */
+  reweightAvailable: boolean;
   bundleSchemaVersion?: string;
   contentHash?: string;
   capturedAt?: string;
@@ -380,6 +394,7 @@ export function describeSnapshotReplayCapability(input: {
     return {
       capability: input.reweightAvailable ? "REWEIGHT_ONLY" : "FULL_DERIVATION_REPLAY_UNAVAILABLE",
       reason: "Os inputs de derivação não eram preservados nesta versão.",
+      reweightAvailable: input.reweightAvailable,
       missingDependencies: []
     };
   }
@@ -389,6 +404,7 @@ export function describeSnapshotReplayCapability(input: {
     contentHash: input.bundle.contentHash,
     capturedAt: input.bundle.capturedAt,
     algorithmVersions: { ...input.bundle.algorithmVersions },
+    reweightAvailable: input.reweightAvailable,
     missingDependencies: input.verification?.missingDependencies ?? []
   };
 
@@ -400,30 +416,48 @@ export function describeSnapshotReplayCapability(input: {
     };
   }
 
-  if (input.verification.status === "EXACT_REPLAY") {
+  const status = input.verification.status;
+
+  if (status === "EXACT_REPLAY") {
     return {
       ...common,
       capability: "FULL_DERIVATION_REPLAY_AVAILABLE",
       reason: "Replay completo disponível.",
-      verificationStatus: input.verification.status
+      verificationStatus: status
     };
   }
 
-  const reason =
-    input.verification.status === "UNSUPPORTED_ALGORITHM_VERSION"
-      ? "Versão histórica do motor não suportada."
-      : input.verification.status === "UNSUPPORTED_BUNDLE_SCHEMA"
-        ? "Schema do bundle não suportado por esta versão."
-        : input.verification.status === "MISSING_DEPENDENCY"
-          ? "Dependência histórica ausente no bundle."
-          : "Replay limitado à reponderação.";
+  if (status === "UNSUPPORTED_ALGORITHM_VERSION" || status === "UNSUPPORTED_BUNDLE_SCHEMA") {
+    return {
+      ...common,
+      capability: "FULL_DERIVATION_REPLAY_UNSUPPORTED_VERSION",
+      reason:
+        status === "UNSUPPORTED_ALGORITHM_VERSION"
+          ? "Versão histórica do motor não suportada."
+          : "Schema do bundle não suportado por esta versão.",
+      verificationStatus: status
+    };
+  }
 
+  if (status === "INVALID_BUNDLE" || status === "REPLAY_INTEGRITY_FAILED") {
+    return {
+      ...common,
+      capability: "FULL_DERIVATION_REPLAY_INVALID",
+      reason:
+        status === "INVALID_BUNDLE"
+          ? "O bundle não passou na validação estrutural."
+          : "O replay reconstruído diverge do resultado persistido.",
+      verificationStatus: status
+    };
+  }
+
+  // MISSING_DEPENDENCY: dependência histórica ausente, não violação nem versão.
   return {
     ...common,
     capability: input.reweightAvailable
       ? "REWEIGHT_ONLY"
       : "FULL_DERIVATION_REPLAY_UNAVAILABLE",
-    reason,
-    verificationStatus: input.verification.status
+    reason: "Dependência histórica ausente no bundle.",
+    verificationStatus: status
   };
 }

@@ -7,6 +7,7 @@ import { ExternalServiceError } from "@sparta/riot";
 import { safeExternalErrorLog, sendExternalError } from "./http/external-error-response.js";
 import { authRoutes } from "./modules/auth/routes.js";
 import { draftsRoutes } from "./modules/drafts/routes.js";
+import { replayBundleRoutes } from "./modules/drafts/replay-bundle-routes.js";
 import { healthRoutes } from "./modules/health/routes.js";
 import { playersRoutes } from "./modules/players/routes.js";
 import { postgameRoutes } from "./modules/postgame/routes.js";
@@ -59,6 +60,7 @@ export async function buildApp() {
   await app.register(authRoutes);
   await app.register(playersRoutes);
   await app.register(draftsRoutes);
+  await app.register(replayBundleRoutes);
   await app.register(postgameRoutes);
   await app.register(recommendationObservabilityRoutes);
   await app.register(draftReviewRoutes);

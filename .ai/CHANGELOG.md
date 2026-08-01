@@ -22,6 +22,21 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-07-31 23:01 — Superfície de leitura e verificação do ReplayInputBundle (Etapa 26b, encerra)
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0028-replay-bundle-captura-operacional.md`
+
+Cinco estados de capacidade de replay (`FULL_DERIVATION_REPLAY_INVALID` e
+`_UNSUPPORTED_VERSION` completam os três da 26a), três rotas autenticadas de leitura/verificação
+que nunca expõem o bundle completo, resumo mínimo reaproveitado no Histórico de drafts e no
+Laboratório do motor, e observabilidade sanitizada de captura/verificação. Validado real contra
+Docker + Postgres com a conta Zekerus#117: replay novo reproduziu `EXACT_REPLAY` com zero
+divergência, snapshot pré-26a respondeu `REWEIGHT_ONLY` sem corromper. Dois bugs reais corrigidos
+na validação pela UI: POST sem corpo rejeitado pelo Fastify (`FST_ERR_CTP_EMPTY_JSON_BODY`) e
+clique no botão de verificar colapsando o card pai por falta de `stopPropagation`.
+
+---
+
 ## 2026-07-31 17:05 — Contexto unico de avaliacao e captura atomica do bundle (Etapa 26b, parcial)
 
 **Status:** PARCIAL · Prompt: `.ai/prompts/features/0028-replay-bundle-captura-operacional.md`

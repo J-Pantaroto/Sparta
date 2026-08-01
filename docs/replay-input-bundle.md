@@ -3,8 +3,10 @@
 Versão do schema: `replay-input-bundle/1.0.0`
 (`packages/core/src/calibration/replay-input-bundle.ts`, `replay-verifier.ts`)
 
-Esta página descreve a **Etapa 26a**: o domínio puro. Captura operacional, persistência, API e
-tela são da Etapa 26b. Nada aqui toca a rota ao vivo, o banco ou o motor.
+Esta página cobre o domínio puro (Etapa 26a) **e** a superfície operacional (Etapa 26b):
+`apps/api/src/modules/drafts/evaluation-context.ts` (contexto único de avaliação),
+`draft-session-repository.ts` (captura atômica) e `replay-bundle-repository.ts` +
+`replay-bundle-routes.ts` (leitura e verificação).
 
 ## Por que o bundle existe
 
@@ -127,22 +129,69 @@ Tolerâncias documentadas: `REPLAY_VERIFICATION_TOLERANCE = 0.05` ponto de score
 `REPLAY_COVERAGE_TOLERANCE = 1e-6` para a cobertura (escala 0-1). Divergência é **relatada com
 esperado, reconstruído e delta**, nunca corrigida.
 
-## Compatibilidade histórica
+## Compatibilidade histórica: os cinco estados
 
-`describeSnapshotReplayCapability` classifica sem inventar:
+`describeSnapshotReplayCapability` classifica sem inventar. Cada estado tem uma frase própria; um
+snapshot inválido nunca aparece como "indisponível", e "versão não suportada" nunca aparece como
+reponderação — misturar essas leituras esconderia um sinal de problema real atrás de um estado
+neutro.
 
-| Capacidade | Quando |
-| ---------- | ------ |
-| `FULL_DERIVATION_REPLAY_AVAILABLE` | Bundle presente e verificado como `EXACT_REPLAY` |
-| `REWEIGHT_ONLY` | Sem bundle (ou com bundle não verificável) mas com reponderação da Etapa 25 |
-| `FULL_DERIVATION_REPLAY_UNAVAILABLE` | Sem bundle e sem reponderação |
+| Capacidade | Quando | Frase na interface |
+| ---------- | ------ | ------------------- |
+| `FULL_DERIVATION_REPLAY_AVAILABLE` | Bundle presente e verificado como `EXACT_REPLAY` | "Replay completo disponível" |
+| `REWEIGHT_ONLY` | Sem bundle, ou dependência histórica ausente, mas com reponderação da Etapa 25 | "Replay limitado à reponderação" |
+| `FULL_DERIVATION_REPLAY_UNAVAILABLE` | Sem bundle e sem reponderação (inclui "ainda não verificado") | "Inputs históricos não preservados nesta versão" |
+| `FULL_DERIVATION_REPLAY_INVALID` | Verificado e reprovado: `INVALID_BUNDLE` (violação estrutural/hash) ou `REPLAY_INTEGRITY_FAILED` (reconstruído diverge do persistido) | "Bundle inválido" |
+| `FULL_DERIVATION_REPLAY_UNSUPPORTED_VERSION` | `UNSUPPORTED_ALGORITHM_VERSION` ou `UNSUPPORTED_BUNDLE_SCHEMA` | "Versão histórica não suportada" |
 
-Textos: "Replay completo disponível", "Replay limitado à reponderação", "Os inputs de derivação
-não eram preservados nesta versão", "Versão histórica do motor não suportada".
+`SnapshotReplayCapabilityReport.reweightAvailable` é exposto **à parte** do `capability`: mesmo
+quando o estado principal é `FULL_DERIVATION_REPLAY_INVALID` ou `_UNSUPPORTED_VERSION`, o chamador
+ainda sabe se o fallback de reponderação continua funcionando.
 
-Snapshot antigo **não é corrompido** — ele apenas não tinha os inputs preservados.
+Snapshot antigo **não é corrompido** — ele apenas não tinha os inputs preservados. Não há
+backfill: `describeCapability` (na API) só lê o que já está persistido; a rota `GET
+.../replay-capability` nunca dispara uma verificação nova.
 
-## Fora desta subetapa
+## Rotas (Etapa 26b)
 
-Captura operacional, contexto de avaliação único na rota, migration, persistência atômica, API,
-tela e habilitação de thresholds ou flags de derivação no laboratório. Tudo isso é a Etapa 26b.
+Todas autenticadas e isoladas por conta (`draftSession.riotAccountId`); nenhuma expõe o
+`contentJson` do bundle inteiro.
+
+| Rota | O que devolve |
+| ---- | -------------- |
+| `GET /draft-sessions/:sessionId/replay-capability` | Capacidade do snapshot mais recente da sessão |
+| `GET /recommendation-snapshots/:snapshotId/replay-bundle-summary` | Capacidade + schema, hash, tamanho, datas e última verificação persistida |
+| `POST /recommendation-snapshots/:snapshotId/verify-replay` | Roda `verifyReplayBundle` de fato, persiste o resultado em `ReplayInputBundleRecord.lastVerification` e devolve status/divergências |
+
+`verify-replay` só lê `RecommendationSnapshot`, `PersistedRecommendation` e
+`ReplayInputBundleRecord` — os três registros imutáveis da Etapa 26a. Nenhuma tabela mutável
+(`PlayerChampionStats`, `ChampionTag`, catálogo) entra na verificação.
+
+## Interface
+
+O detalhe de sessão em "Histórico de drafts" e o caso aberto no "Laboratório do motor" mostram o
+mesmo componente (`ReplayCapabilitySummary.tsx`): a frase da capacidade, schema/motor/tamanho/
+captura quando há bundle, e um botão "Verificar replay" que chama a rota `POST` ao vivo.
+
+## Observabilidade
+
+Captura (`persistDraftAnalysis`, `apps/api/src/modules/drafts/routes.ts`): evento
+`replay_bundle_captured` ou `replay_bundle_capture_failed` com schema, tamanho em bytes, duração
+da canonicalização e duração da persistência — nunca o conteúdo. Verificação
+(`replay-bundle-routes.ts`): evento `replay_bundle_verified` com schema, status, contagem de
+divergências e duração — nunca as divergências em si nem o bundle.
+
+## Bug real corrigido na validação: POST sem corpo
+
+O cliente do desktop (`services/api-client.ts`) sempre manda `Content-Type: application/json`,
+mesmo em chamadas `POST` sem `body`. O Fastify recusa isso com `FST_ERR_CTP_EMPTY_JSON_BODY`
+(400) **antes** de a rota rodar — achado testando "Verificar replay" pela UI real, não por curl
+(curl não manda esse header por padrão, então o teste manual inicial não pegou o bug).
+`verifySnapshotReplay` no cliente passou a mandar `body: "{}"`. As outras duas funções do arquivo
+com o mesmo padrão (`generateDraftComparison`, `revealDraftReviewResult`) não foram tocadas —
+ficaram fora do escopo desta etapa, sinalizadas para correção separada.
+
+Um segundo achado, também só visível pela UI real: o botão "Verificar replay" fica dentro do
+`<button>` do `InteractiveCard` pai (mesmo padrão já usado pelo botão de revisão humana da Etapa
+24) — sem `event.stopPropagation()`, o clique também alternava o card e escondia o resultado que
+acabara de chegar. Corrigido em `ReplayCapabilitySummary.tsx`.

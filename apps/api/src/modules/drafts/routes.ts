@@ -1,4 +1,5 @@
-import type { FastifyPluginAsync } from "fastify";
+import { performance } from "node:perf_hooks";
+import type { FastifyBaseLogger, FastifyPluginAsync } from "fastify";
 import {
   aggregateMatchupData,
   buildCanonicalSnapshotInput,
@@ -90,7 +91,12 @@ export const draftsRoutes: FastifyPluginAsync = async (app) => {
      * Sem `session` no payload nada e gravado - o cliente que nao identifica a
      * sessao continua recebendo recomendacao normalmente.
      */
-    const persistence = await persistDraftAnalysis({ context, session: payload.session, result });
+    const persistence = await persistDraftAnalysis({
+      context,
+      session: payload.session,
+      result,
+      log: request.log
+    });
 
     return {
       ...result,
@@ -387,7 +393,7 @@ export const draftsRoutes: FastifyPluginAsync = async (app) => {
 };
 
 /** Conta Riot do usuario autenticado, ou `null` com a resposta ja marcada. */
-async function resolveAccount(
+export async function resolveAccount(
   request: Parameters<typeof getAuthenticatedUserId>[0],
   reply: { code: (status: number) => unknown }
 ): Promise<{ id: string; puuid: string; platformRegion: string } | null> {
@@ -444,6 +450,8 @@ async function persistDraftAnalysis(input: {
     primaryRecommendations: readonly never[] | readonly unknown[];
     alternatives: readonly unknown[];
   };
+  /** Sanitizado por construção: só evento, schema, tamanho e duração. */
+  log: Pick<FastifyBaseLogger, "info" | "error">;
 }): Promise<DraftPersistenceResult> {
   const { context } = input;
   if (!input.session || !context.riotAccountId) return { status: "NOT_TRACKED" };
@@ -490,6 +498,13 @@ async function persistDraftAnalysis(input: {
         : recommendations.reduce((total, entry) => total + entry.dataCoverage, 0) /
           recommendations.length;
 
+    // Observabilidade sanitizada da captura (Etapa 26b): nunca o conteudo do
+    // bundle, so evento, schema, tamanho e as duas duracoes pedidas.
+    let bundleSchemaVersion: string | undefined;
+    let contentBytes: number | undefined;
+    let canonicalizationMs: number | undefined;
+
+    const persistenceStartedAt = performance.now();
     const persisted = await persistRecommendationSnapshot({
       draftSessionId: session.id,
       canonicalInput,
@@ -498,10 +513,35 @@ async function persistDraftAnalysis(input: {
       recommendations,
       // Mesmo contexto que produziu as recomendacoes: `evaluatedAt` e identico
       // no calculo e no bundle, e nada e relido do banco aqui.
-      buildReplayBundle: (snapshotId) => buildReplayBundle({ context, snapshotId })
+      buildReplayBundle: (snapshotId) => {
+        const bundleStartedAt = performance.now();
+        const bundle = buildReplayBundle({ context, snapshotId });
+        canonicalizationMs = performance.now() - bundleStartedAt;
+        bundleSchemaVersion = bundle.schemaVersion;
+        contentBytes = Buffer.byteLength(JSON.stringify(bundle), "utf8");
+        return bundle;
+      }
     });
+    const persistenceMs = performance.now() - persistenceStartedAt;
+
+    if (persisted.status === "CREATED") {
+      input.log.info({
+        event: "replay_bundle_captured",
+        snapshotId: persisted.snapshotId,
+        schemaVersion: bundleSchemaVersion,
+        contentBytes,
+        canonicalizationMs:
+          canonicalizationMs !== undefined ? Math.round(canonicalizationMs) : null,
+        persistenceMs: Math.round(persistenceMs)
+      });
+    }
 
     if (persisted.status === "FAILED") {
+      input.log.error({
+        event: "replay_bundle_capture_failed",
+        sessionId: session.id,
+        persistenceMs: Math.round(persistenceMs)
+      });
       return {
         status: "FAILED",
         sessionId: session.id,
@@ -516,6 +556,7 @@ async function persistDraftAnalysis(input: {
       historyPreserved: true
     };
   } catch {
+    input.log.error({ event: "replay_bundle_capture_failed" });
     return {
       status: "FAILED",
       historyPreserved: false,

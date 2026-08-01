@@ -545,7 +545,7 @@ describe("describeSnapshotReplayCapability", () => {
     expect(report.contentHash).toBe(current.contentHash);
   });
 
-  it("versão não suportada é dita com essas palavras", () => {
+  it("versão não suportada é seu próprio estado, não reponderação disfarçada", () => {
     const report = describeSnapshotReplayCapability({
       bundle: bundle(),
       verification: {
@@ -556,7 +556,85 @@ describe("describeSnapshotReplayCapability", () => {
       },
       reweightAvailable: true
     });
-    expect(report.capability).toBe("REWEIGHT_ONLY");
+    expect(report.capability).toBe("FULL_DERIVATION_REPLAY_UNSUPPORTED_VERSION");
     expect(report.reason).toBe("Versão histórica do motor não suportada.");
+    // A reponderação continua exposta separadamente: perder essa informação
+    // faria a tela esconder um fallback que ainda funciona.
+    expect(report.reweightAvailable).toBe(true);
+  });
+
+  it("schema não suportado também vira UNSUPPORTED_VERSION", () => {
+    const report = describeSnapshotReplayCapability({
+      bundle: bundle(),
+      verification: {
+        status: "UNSUPPORTED_BUNDLE_SCHEMA",
+        divergences: [],
+        rejections: [],
+        missingDependencies: []
+      },
+      reweightAvailable: false
+    });
+    expect(report.capability).toBe("FULL_DERIVATION_REPLAY_UNSUPPORTED_VERSION");
+    expect(report.reason).toBe("Schema do bundle não suportado por esta versão.");
+  });
+
+  it("bundle estruturalmente inválido vira FULL_DERIVATION_REPLAY_INVALID, não indisponível", () => {
+    const report = describeSnapshotReplayCapability({
+      bundle: bundle(),
+      verification: {
+        status: "INVALID_BUNDLE",
+        divergences: [],
+        rejections: [{ code: "CONTENT_HASH_MISMATCH", detail: "hash não bate" }],
+        missingDependencies: []
+      },
+      reweightAvailable: true
+    });
+    expect(report.capability).toBe("FULL_DERIVATION_REPLAY_INVALID");
+    expect(report.reason).toBe("O bundle não passou na validação estrutural.");
+  });
+
+  it("divergência entre reconstruído e persistido também vira FULL_DERIVATION_REPLAY_INVALID", () => {
+    const current = bundle();
+    const divergentSnapshot = replayRecommendationEngineV1(current).map((entry) => ({
+      championId: entry.championId,
+      championName: entry.championName,
+      rank: entry.rank,
+      group: entry.group,
+      totalScore: entry.totalScore + 9,
+      dataCoverage: entry.dataCoverage,
+      poolSource: "PERSONAL_OBSERVED" as const,
+      personalGames: 12,
+      metricDetails: [],
+      effectiveWeights: {},
+      category: "comfort_pick",
+      reasons: [],
+      warnings: [],
+      limitations: []
+    }));
+    const verification = verifyReplayBundle({ bundle: current, snapshot: divergentSnapshot });
+    expect(verification.status).toBe("REPLAY_INTEGRITY_FAILED");
+
+    const report = describeSnapshotReplayCapability({
+      bundle: current,
+      verification,
+      reweightAvailable: true
+    });
+    expect(report.capability).toBe("FULL_DERIVATION_REPLAY_INVALID");
+    expect(report.reason).toBe("O replay reconstruído diverge do resultado persistido.");
+  });
+
+  it("dependência histórica ausente ainda cai em reponderação quando ela é possível", () => {
+    const report = describeSnapshotReplayCapability({
+      bundle: bundle(),
+      verification: {
+        status: "MISSING_DEPENDENCY",
+        divergences: [],
+        rejections: [],
+        missingDependencies: [{ metric: "META_STRENGTH", reason: "Fonte global indisponível." }]
+      },
+      reweightAvailable: true
+    });
+    expect(report.capability).toBe("REWEIGHT_ONLY");
+    expect(report.missingDependencies).toHaveLength(1);
   });
 });

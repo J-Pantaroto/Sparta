@@ -1,11 +1,82 @@
 # Sparta - Contexto para Continuidade
 
+## Etapa 26b: superfície de leitura e verificação do ReplayInputBundle (encerra a Etapa 26)
+
+A Etapa 26a entregou o domínio puro e uma primeira passada desta sessão já tinha fechado o núcleo
+de risco (contexto único de avaliação, captura atômica snapshot+bundle na mesma transação — ver
+logo abaixo). Esta segunda passada fecha o que faltava: **cinco** estados de capacidade (não três),
+três rotas, o resumo na interface e observabilidade sanitizada.
+
+`describeSnapshotReplayCapability` (`packages/core/src/calibration/replay-verifier.ts`) ganhou
+`FULL_DERIVATION_REPLAY_INVALID` (bundle verificado e **reprovado** — `INVALID_BUNDLE` por
+violação estrutural/hash, ou `REPLAY_INTEGRITY_FAILED` por o reconstruído divergir do persistido)
+e `FULL_DERIVATION_REPLAY_UNSUPPORTED_VERSION` (`UNSUPPORTED_ALGORITHM_VERSION`/
+`UNSUPPORTED_BUNDLE_SCHEMA`). Antes, os dois caíam dentro de `REWEIGHT_ONLY`/`UNAVAILABLE` — um
+bundle inválido (sinal de problema real) ficava indistinguível de "não tínhamos os inputs". O
+relatório ganhou `reweightAvailable` como campo **próprio**, separado do `capability`: mesmo num
+estado `INVALID`/`UNSUPPORTED_VERSION`, o chamador ainda sabe se a reponderação da Etapa 25
+continua funcionando como fallback.
+
+**Três rotas novas** (`apps/api/src/modules/drafts/replay-bundle-repository.ts` +
+`replay-bundle-routes.ts`), autenticadas e isoladas por conta: `GET
+/draft-sessions/:sessionId/replay-capability`, `GET
+/recommendation-snapshots/:snapshotId/replay-bundle-summary`, `POST
+/recommendation-snapshots/:snapshotId/verify-replay`. Nenhuma expõe o `contentJson` completo — só
+capacidade, schema, versões, hash, tamanho, datas, última verificação e dependências ausentes.
+`verify-replay` é a única que reconstrói de fato: lê **exclusivamente**
+`RecommendationSnapshot`/`PersistedRecommendation`/`ReplayInputBundleRecord` (os três registros
+imutáveis da 26a — nenhuma tabela mutável entra) e persiste o resultado em
+`ReplayInputBundleRecord.lastVerification`, sem reescrever bundle nem snapshot. As duas rotas
+`GET` **nunca** disparam verificação nova — só leem o que já foi persistido, pra ficarem baratas e
+sem efeito colateral.
+
+**Interface**: `ReplayCapabilitySummary.tsx` (novo, compartilhado) — a frase da capacidade,
+schema/motor/tamanho/captura quando há bundle, botão "Verificar replay". Reaproveitado sem
+redesenhar nenhuma tela: o detalhe de sessão em "Histórico de drafts" e o caso aberto no
+"Laboratório do motor" (Etapa 25b).
+
+**Observabilidade**: captura (`persistDraftAnalysis`, `apps/api/src/modules/drafts/routes.ts`)
+loga `replay_bundle_captured`/`_capture_failed` com schema, `contentBytes`, duração da
+canonicalização e da persistência; verificação loga `replay_bundle_verified` com schema, status,
+contagem de divergências e duração — nunca o conteúdo do bundle nem as divergências detalhadas.
+
+**Dois bugs reais encontrados só na validação pela UI real do Electron (não pelo curl inicial,
+que não reproduzia o problema)**: (1) o cliente do desktop (`services/api-client.ts`) sempre manda
+`Content-Type: application/json`, mesmo em `POST` sem corpo — o Fastify recusa isso com
+`FST_ERR_CTP_EMPTY_JSON_BODY` (400) **antes** de a rota rodar. `verifySnapshotReplay` passou a
+mandar `body: "{}"`. As outras duas ocorrências do mesmo padrão no arquivo
+(`generateDraftComparison`, `revealDraftReviewResult`) ficaram fora do escopo desta etapa,
+sinalizadas à parte pra correção separada. (2) o botão "Verificar replay" fica dentro do
+`<button>` do `InteractiveCard` pai (mesmo padrão que o botão de revisão humana da Etapa 24 já
+usa) — sem `event.stopPropagation()`, o clique também alternava o card e escondia o resultado que
+acabara de chegar. Os dois corrigidos.
+
+**Validado real** (Docker reconstruído, Postgres real, conta Zekerus#117): nova recomendação via
+`POST /drafts/recommendations` gravou snapshot+bundle atomicamente (confirmado por query direta —
+1 bundle por snapshot, 0 duplicados); as três rotas responderam corretas tanto pro snapshot novo
+(com bundle) quanto pro snapshot da sessão `cs-teste-etapa16-aaa`, anterior à 26a (sem bundle,
+`REWEIGHT_ONLY`, motivo "Os inputs de derivação não eram preservados nesta versão" — nunca
+corrompido); `POST verify-replay` no snapshot novo devolveu `EXACT_REPLAY` com **zero
+divergências** — o motor reconstruído offline só a partir do bundle reproduziu exatamente
+`totalScore`/`dataCoverage`/`rank`/`group`/cada métrica do resultado operacional. A independência
+de fontes mutáveis está coberta por teste automatizado (alterar `PlayerChampionStats` depois da
+captura não muda o replay do bundle original) — não repetida contra o Postgres real pra não tocar
+dado pessoal de verdade. No Electron real (dev, CDP): 0 erros de console vindos do código novo, 0
+`NaN`/`Infinity`/`undefined`, ranking/scores/cobertura/grupos idênticos ao anterior.
+
+Testes por pacote, todos passando isoladamente: `packages/core` 526 (42 em
+`replay-input-bundle.test.ts`, +4 desta etapa), `packages/riot` 96, `apps/desktop` 73, `apps/api`
+241. A suíte agregada via `pnpm -r test` mostrou flakiness intermitente sob contenção de recursos
+rodando os quatro pacotes em paralelo — não reproduzível isolando cada pacote, e não é regressão
+desta etapa. `typecheck`, `lint` e `build` completos nos quatro pacotes TypeScript. Ver
+`docs/replay-input-bundle.md`.
+
 ## Etapa 26a: domínio do ReplayInputBundle (captura prospectiva)
 
 A Etapa 25 provou que o snapshot permite **reponderar**, mas não reproduzir como as métricas foram
 **produzidas**. `packages/core/src/calibration/replay-input-bundle.ts` +
 `replay-verifier.ts` (`replay-input-bundle/1.0.0`) criam o contrato do que será capturado junto de
-cada snapshot **novo**. Sem migration, rota, API ou tela — isso é a 26b.
+cada snapshot **novo**. Migration, rota, API e tela vieram na Etapa 26b (acima).
 
 **A auditoria do grafo real mudou três coisas do contrato esboçado no pedido**: (1) não basta o
 candidato — `analyzeTeamComposition` e `analyzeDraftStrategy` leem tags e capacidades de aliados e

@@ -112,3 +112,16 @@ export const categoryLabels: Record<PickRecommendation["category"], string> = {
   comfort_pick: "Zona de conforto",
   strategic_option: "Opção estratégica"
 };
+
+/**
+ * As cinco frases da capacidade de replay do `ReplayInputBundle` (Etapa 26b).
+ * Um estado só, sem mistura: "inválido" nunca aparece como "indisponível", e
+ * "versão não suportada" nunca aparece como "reponderação".
+ */
+export const replayCapabilityLabels: Record<string, string> = {
+  FULL_DERIVATION_REPLAY_AVAILABLE: "Replay completo disponível",
+  REWEIGHT_ONLY: "Replay limitado à reponderação",
+  FULL_DERIVATION_REPLAY_UNAVAILABLE: "Inputs históricos não preservados nesta versão",
+  FULL_DERIVATION_REPLAY_INVALID: "Bundle inválido",
+  FULL_DERIVATION_REPLAY_UNSUPPORTED_VERSION: "Versão histórica não suportada"
+};
