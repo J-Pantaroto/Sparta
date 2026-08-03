@@ -1,5 +1,91 @@
 # Sparta - Contexto para Continuidade
 
+## Etapa 27a: domínio de releases operacionais (domínio puro)
+
+A Etapa 25 deixou o laboratório aprovar uma candidata (`APPROVED_FOR_FUTURE_RELEASE`) e a Etapa 26
+deixou reproduzir os inputs históricos exatos de um snapshot — mas nada ainda transformava uma
+candidata aprovada num artefato operacional ativável. `packages/core/src/release/` (cinco
+arquivos novos) fecha esse contrato, **sem** migration, tabela, provider, rota, tela ou ativação
+real — isso fica pra Etapa 27b. Decisão arquitetural explícita do pedido: `packages/core`
+continua sem acesso a banco/cache/env; a 27b será quem resolve a configuração ativa, valida/
+aplica fallback e injeta no motor. O core só recebe uma configuração **já resolvida**.
+
+**`effective-configuration.ts`** — `EffectiveRecommendationConfiguration` (versão, `configHash`,
+pesos por métrica, métricas desligadas, regras pós-agregação, origem `BUILT_IN_BASELINE`/
+`RELEASE`, compatibilidade do motor). `WeightableMetricKey` é uma união literal própria — derivar
+do tipo largo de `calibration/engine-candidate.ts` devolveria o próprio tipo largo, já que aquele
+export é intencionalmente amplo. `buildEffectiveConfigurationFromCandidate` deriva de uma
+`CalibrationCandidate` aprovada, reaproveitando `resolvePostAggregationThresholds` da Etapa 25a.
+
+**`recommendation-engine.ts` ganhou `input.configuration?` opcional** (aditivo — sem ela, caminho
+idêntico a sempre). Com ela, pesos vêm de `engineWeightsFromConfiguration` e os thresholds pós-
+agregação passam a ler da configuração em vez de constante fixa. Nova `buildBaselineConfiguration
+(draft, options)` exportada — a baseline continua **dependente do cenário do draft** de propósito
+(blind/lane revelada/meio do draft usam tabelas diferentes; só uma release já calibrada usa pesos
+uniformes, mesma premissa que o laboratório já assume desde a Etapa 25 ao reponderar).
+
+**Achado real: não associatividade de ponto flutuante.** A primeira versão quebrou "baseline
+explícita reproduz exatamente o resultado atual" silenciosamente na última casa decimal
+(`dataCoverage: 0.7999999999999999` vs `0.8`). `normalizeAvailableWeights` (pré-existente,
+intocada) soma pesos com `Object.keys(weights).reduce(...)`, e a ordem de inserção de chaves de
+`selectWeights` difere entre os três cenários e da ordem canônica de reconstrução — somar as
+mesmas parcelas em ordem diferente muda o resultado em ponto flutuante. Corrigido preservando a
+ordem de inserção original (nunca tocando `normalizeAvailableWeights`, fora de escopo alterar):
+`buildBaselineConfiguration` grava `metricWeights` na ordem de `Object.keys(weights)` do cenário,
+e `engineWeightsFromConfiguration` reconstrói na mesma ordem de `Object.keys(configuration.
+metricWeights)` (chave ausente entra por último, valendo zero). Round-trip agora é bit a bit
+idêntico — provado por teste `toEqual` na resposta inteira do motor.
+
+**`release-artifact.ts`** — `RecommendationReleaseArtifact` congela candidata (id/revisão exata),
+experimento (`ReleaseExperimentEvidence`, reaproveita `CalibrationExperimentReport` da Etapa 25b
+inteiro), configuração efetiva, versões e compatibilidade. `artifactHash` exclui `createdAt`;
+inclui tudo o mais, com filtros do experimento canonicalizados (ordem não importa).
+
+**`laboratory-equivalence.ts`** — roda o motor operacional de verdade (`replayRecommendationEngineV1`,
+ganhou parâmetro opcional `configuration`, mudança aditiva em `calibration/replay-verifier.ts`)
+alimentado pelo `ReplayInputBundle` real (Etapa 26) de cada caso, e compara contra o ranking que
+o laboratório persistiu. Prova que a reponderação por métrica congelada (Etapa 25, aproximada)
+concorda com o motor de verdade executado com dado histórico real — não só consigo mesma. Ignora
+candidatos `NOT_RECOMMENDED` do laboratório (o motor nunca os devolve). `draftStateFrom` exportado
+de `replay-verifier.ts` pra reuso.
+
+**`release-validation.ts`** — `validateReleaseArtifact`, nove estados checados em ordem (`VALID`,
+`INVALID_CANDIDATE_STATE`, `EXPERIMENT_NOT_COMPLETED`, `CONFIG_HASH_MISMATCH`,
+`UNSUPPORTED_PARAMETER`, `INCOMPATIBLE_ENGINE_VERSION`, `ARTIFACT_HASH_MISMATCH`,
+`LABORATORY_RESULT_MISMATCH`, `NO_EXACT_REPLAY_CASES`) — a checagem mais cara (equivalência com o
+motor) só roda depois de todas as estruturais passarem. Reaproveita `validateCalibrationCandidate`
+(Etapa 25a) pra `UNSUPPORTED_PARAMETER` em vez de duplicar a classificação de capacidade de
+replay. Nunca ajusta resultado divergente pra fazer bater.
+
+**`release-state-machine.ts`** — `DRAFT → VALIDATING → {VALIDATION_FAILED,
+READY_FOR_ACTIVATION} → ACTIVE → ROLLED_BACK`, mais `REJECTED` alcançável de
+`VALIDATION_FAILED`/`READY_FOR_ACTIVATION`. `ACTIVE` só a partir de `READY_FOR_ACTIVATION`;
+`ROLLED_BACK` só a partir de `ACTIVE`; `READY_FOR_ACTIVATION` exige `validation.status ===
+"VALID"` explicitamente passada — o grafo permitir a transição não basta. Guarda extra de
+`ARTIFACT_CHANGED` quando o hash do artefato não bate com o hash validado (artefato não pode ser
+alterado depois de pronto).
+
+**Não implementado nesta subetapa** (conforme escopo): migration, tabela, provider, rota, tela,
+ativação real, rollback real, invalidação de cache, ou qualquer alteração da configuração
+efetivamente usada pela API hoje. As duas ocorrências pendentes do bug de `POST` sem corpo em
+`generateDraftComparison`/`revealDraftReviewResult` (sinalizadas na Etapa 26b) continuam fora de
+escopo, não tocadas aqui.
+
+68 testes novos em `packages/core` (24 configuração efetiva, 8 no motor + baseline explícita, 7
+artefato/hash, 7 equivalência laboratório×motor, 11 validação dos 9 estados, 13 máquina de
+estados) — 596 no total do pacote (996 agregados no monorepo: core 596, riot 96, desktop 73,
+api 241). Cobrem a lista completa pedida: baseline reproduz resultado atual (com o bug de ponto
+flutuante corrigido), configuração candidata reproduz o laboratório via bundle real (não só
+métrica congelada), peso muda `configHash`/`artifactHash`, nome não muda, threshold de derivação
+rejeitado, versão incompatível rejeitada (candidata com versão não reconhecida vs. artefato com
+manifesto desatualizado — dois casos distintos), artefato adulterado falha, zero casos exatos
+impede prontidão, release validada chega a `READY_FOR_ACTIVATION`, não fica ativa sozinha,
+transição inválida bloqueada, `core` sem I/O, mesma entrada produz o mesmo ranking, baseline
+preserva scores/ordenação anteriores.
+
+`pnpm typecheck && pnpm lint && pnpm test && pnpm build` completos nos quatro pacotes TypeScript,
+sem regressão em nenhum teste pré-existente. Ver `docs/release-domain.md`.
+
 ## Etapa 26b: superfície de leitura e verificação do ReplayInputBundle (encerra a Etapa 26)
 
 A Etapa 26a entregou o domínio puro e uma primeira passada desta sessão já tinha fechado o núcleo

@@ -2,11 +2,16 @@ import { availableCoverage } from "../types/stat-coverage.js";
 import { describe, expect, it } from "vitest";
 import {
   analyzeTeamComposition,
+  buildBaselineConfiguration,
   normalizeAvailableWeights,
   recommendFromPersonalPool,
   recommendPicks,
   selectWeights
 } from "./recommendation-engine.js";
+import {
+  buildEffectiveConfiguration,
+  type WeightableMetricKey
+} from "../release/effective-configuration.js";
 import type {
   ChampionTag,
   DraftState,
@@ -968,5 +973,235 @@ describe("dificuldade e risco pessoal no ranking (Etapa 13)", () => {
         ])
       );
     }
+  });
+});
+
+describe("configuração efetiva explícita (Etapa 27a)", () => {
+  function fakeHash(canonical: string): string {
+    let hash = 0;
+    for (let index = 0; index < canonical.length; index += 1) {
+      hash = (hash * 31 + canonical.charCodeAt(index)) | 0;
+    }
+    return `h${hash}`;
+  }
+
+  const draft: DraftState = {
+    playerRole: "MID",
+    pickOrder: 3,
+    allies: [],
+    enemies: [],
+    bannedChampionIds: []
+  };
+  const compositionRules = {
+    minimumFrontline: 40,
+    minimumEngage: 40,
+    minimumWaveclear: 40,
+    preferDamageBalance: true
+  };
+
+  function candidates(count: number): PlayerChampionPoolCandidate[] {
+    return Array.from({ length: count }, (_, index) => ({
+      championId: 200 + index,
+      championName: `Efetiva ${index + 1}`,
+      role: "MID" as const,
+      source: "PERSONAL_OBSERVED" as const,
+      enabled: true
+    }));
+  }
+
+  function statsFor(pool: PlayerChampionPoolCandidate[]): PlayerChampionStats[] {
+    return pool.map((candidate, index) => ({
+      ...championStats[0],
+      championId: candidate.championId,
+      championName: candidate.championName,
+      games: 8 + index,
+      wins: 4 + index
+    }));
+  }
+
+  function tagsFor(pool: PlayerChampionPoolCandidate[]): ChampionTag[] {
+    return pool.map((candidate, index) => ({
+      ...tags[0],
+      championId: candidate.championId,
+      championName: candidate.championName,
+      roles: [],
+      blindSafety: 0.4 + index * 0.03
+    }));
+  }
+
+  function baseInput(pool: PlayerChampionPoolCandidate[]) {
+    return {
+      draft,
+      candidates: pool,
+      championStats: statsFor(pool),
+      championTags: tagsFor(pool),
+      matchups: [],
+      compositionRules,
+      patchMeta: null
+    };
+  }
+
+  it("passar a baseline explicitamente reproduz exatamente o resultado sem configuração", () => {
+    const pool = candidates(8);
+    const withoutConfiguration = recommendFromPersonalPool(baseInput(pool));
+    const baseline = buildBaselineConfiguration(draft, { computeHash: fakeHash });
+    const withBaseline = recommendFromPersonalPool({ ...baseInput(pool), configuration: baseline });
+
+    expect(withBaseline).toEqual(withoutConfiguration);
+  });
+
+  it("a baseline reproduz o resultado também no cenário de blind pick e de lane revelada", () => {
+    const pool = candidates(3);
+    for (const draftOverride of [
+      { ...draft, pickOrder: 1 },
+      { ...draft, enemyLaneChampionId: 64 }
+    ]) {
+      const input = { ...baseInput(pool), draft: draftOverride };
+      const withoutConfiguration = recommendFromPersonalPool(input);
+      const baseline = buildBaselineConfiguration(draftOverride, { computeHash: fakeHash });
+      const withBaseline = recommendFromPersonalPool({ ...input, configuration: baseline });
+      expect(withBaseline).toEqual(withoutConfiguration);
+    }
+  });
+
+  it("configuração candidata com pesos diferentes muda o ranking", () => {
+    const pool = candidates(3);
+    const baseline = buildBaselineConfiguration(draft, { computeHash: fakeHash });
+    const onlyBlindSafety = buildEffectiveConfiguration({
+      version: "candidate-1",
+      metricWeights: {
+        PERSONAL_PERFORMANCE: 0,
+        RECENT_FORM: 0,
+        PERSONAL_MATCHUP: 0,
+        BLIND_SAFETY: 1,
+        ALLY_SYNERGY: 0,
+        ENEMY_COMPOSITION_ANSWER: 0,
+        TEAM_COMPOSITION: 0,
+        META_STRENGTH: 0
+      },
+      disabledMetrics: [],
+      postAggregationRules: baseline.postAggregationRules,
+      source: { type: "RELEASE", releaseId: "release-1" },
+      algorithmCompatibility: baseline.algorithmCompatibility,
+      computeHash: fakeHash
+    });
+
+    const withBaseline = recommendFromPersonalPool({ ...baseInput(pool), configuration: baseline });
+    const withCandidate = recommendFromPersonalPool({
+      ...baseInput(pool),
+      configuration: onlyBlindSafety
+    });
+
+    // O campeão com maior blindSafety (último da lista, ver tagsFor) precisa
+    // liderar quando SÓ blindSafety pesa — não lidera na baseline, que
+    // pondera desempenho pessoal mais forte.
+    const topByBlindSafety = [...pool].sort((a, b) => b.championId - a.championId)[0];
+    expect(withCandidate.primaryRecommendations[0].championId).toBe(topByBlindSafety.championId);
+    expect(withCandidate.primaryRecommendations[0].totalScore).not.toBe(
+      withBaseline.primaryRecommendations.find(
+        (r) => r.championId === topByBlindSafety.championId
+      )?.totalScore
+    );
+  });
+
+  it("disabledMetrics zera o peso mesmo com peso positivo declarado", () => {
+    const pool = candidates(2);
+    const baseline = buildBaselineConfiguration(draft, { computeHash: fakeHash });
+    const disabled = buildEffectiveConfiguration({
+      version: "candidate-2",
+      metricWeights: baseline.metricWeights,
+      disabledMetrics: ["PERSONAL_PERFORMANCE"],
+      postAggregationRules: baseline.postAggregationRules,
+      source: { type: "RELEASE", releaseId: "release-2" },
+      algorithmCompatibility: baseline.algorithmCompatibility,
+      computeHash: fakeHash
+    });
+
+    const result = recommendFromPersonalPool({ ...baseInput(pool), configuration: disabled });
+    for (const recommendation of result.primaryRecommendations) {
+      expect(recommendation.effectiveWeights.personalPerformance ?? 0).toBe(0);
+    }
+  });
+
+  it("configuração sem peso declarado para uma métrica nunca produz pesos vazios (trata ausência como zero)", () => {
+    const pool = candidates(2);
+    const configuration = buildEffectiveConfiguration({
+      version: "candidate-3",
+      // `META_STRENGTH` fica de fora do objeto de propósito — simula um
+      // objeto vindo de fora (ex.: JSON) sem a chave declarada.
+      metricWeights: {
+        PERSONAL_PERFORMANCE: 0.5,
+        RECENT_FORM: 0.5,
+        PERSONAL_MATCHUP: 0,
+        BLIND_SAFETY: 0,
+        ALLY_SYNERGY: 0,
+        ENEMY_COMPOSITION_ANSWER: 0,
+        TEAM_COMPOSITION: 0
+      } as unknown as Record<WeightableMetricKey, number>,
+      disabledMetrics: [],
+      postAggregationRules: {
+        primaryCount: 5,
+        alternativeCount: 3,
+        minimumScoreToRecommend: 0,
+        minimumDataCoverageToRecommend: 0,
+        executionRiskPenaltyStart: 25,
+        executionRiskMaxPenalty: 8
+      },
+      source: { type: "RELEASE", releaseId: "release-3" },
+      algorithmCompatibility: {},
+      computeHash: fakeHash
+    });
+
+    const result = recommendFromPersonalPool({ ...baseInput(pool), configuration });
+    for (const recommendation of result.primaryRecommendations) {
+      expect(Number.isFinite(recommendation.totalScore)).toBe(true);
+      expect(Number.isNaN(recommendation.totalScore)).toBe(false);
+    }
+  });
+
+  it("thresholds pós-agregação reconfigurados mudam o tamanho dos grupos", () => {
+    const pool = candidates(6);
+    const baseline = buildBaselineConfiguration(draft, { computeHash: fakeHash });
+    const smallerGroups = buildEffectiveConfiguration({
+      version: "candidate-4",
+      metricWeights: baseline.metricWeights,
+      disabledMetrics: baseline.disabledMetrics,
+      postAggregationRules: { ...baseline.postAggregationRules, primaryCount: 2, alternativeCount: 1 },
+      source: { type: "RELEASE", releaseId: "release-4" },
+      algorithmCompatibility: baseline.algorithmCompatibility,
+      computeHash: fakeHash
+    });
+
+    const result = recommendFromPersonalPool({ ...baseInput(pool), configuration: smallerGroups });
+    expect(result.primaryRecommendations).toHaveLength(2);
+    expect(result.alternatives).toHaveLength(1);
+  });
+
+  it("alterar peso muda o configHash da configuração", () => {
+    const baseline = buildBaselineConfiguration(draft, { computeHash: fakeHash });
+    const changed = buildEffectiveConfiguration({
+      version: baseline.version,
+      metricWeights: { ...baseline.metricWeights, BLIND_SAFETY: baseline.metricWeights.BLIND_SAFETY + 0.1 },
+      disabledMetrics: baseline.disabledMetrics,
+      postAggregationRules: baseline.postAggregationRules,
+      source: baseline.source,
+      algorithmCompatibility: baseline.algorithmCompatibility,
+      computeHash: fakeHash
+    });
+    expect(changed.configHash).not.toBe(baseline.configHash);
+  });
+
+  it("alterar só o nome/versão não muda a configuração funcional (o conteúdo é o mesmo)", () => {
+    const baseline = buildBaselineConfiguration(draft, { computeHash: fakeHash });
+    const renamed = buildEffectiveConfiguration({
+      version: "outro-nome-qualquer",
+      metricWeights: baseline.metricWeights,
+      disabledMetrics: baseline.disabledMetrics,
+      postAggregationRules: baseline.postAggregationRules,
+      source: baseline.source,
+      algorithmCompatibility: baseline.algorithmCompatibility,
+      computeHash: fakeHash
+    });
+    expect(renamed.configHash).toBe(baseline.configHash);
   });
 });

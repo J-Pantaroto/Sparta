@@ -2,6 +2,7 @@ import { recommendFromPersonalPool } from "../draft/recommendation-engine.js";
 import type { PersistedRecommendation } from "../draft/recommendation-snapshot.js";
 import type { DraftPick, DraftState } from "../types/domain.js";
 import type { RecommendationMetricKey } from "../types/recommendation-metric.js";
+import type { EffectiveRecommendationConfiguration } from "../release/effective-configuration.js";
 import {
   REPLAY_BUNDLE_SCHEMA_VERSION,
   validateReplayInputBundle,
@@ -61,8 +62,12 @@ export type ReplayImplementation = (
  *
  * `championName` de aliados e inimigos vem de `referencedChampions`: guardar o
  * nome duas vezes criaria duas cópias que poderiam divergir.
+ *
+ * Exportada (Etapa 27a) para `release/laboratory-equivalence.ts` reusar a
+ * mesma reconstrução em vez de duplicá-la — mudança puramente aditiva, o
+ * comportamento da 26a não muda.
  */
-function draftStateFrom(bundle: ReplayInputBundle): DraftState {
+export function draftStateFrom(bundle: ReplayInputBundle): DraftState {
   const names = new Map(bundle.referencedChampions.map((entry) => [entry.championId, entry.championName]));
   const pick =
     (team: DraftPick["team"]) =>
@@ -96,9 +101,17 @@ function draftStateFrom(bundle: ReplayInputBundle): DraftState {
  * Chama exatamente `recommendFromPersonalPool`, a mesma função do caminho
  * operacional, alimentada só pelo bundle. `evaluatedAt` vem congelado — usar
  * `new Date()` aqui faria a recência do risco mudar a cada execução.
+ *
+ * `configuration` (Etapa 27a, opcional) permite rodar o mesmo bundle com uma
+ * configuração de release em vez da baseline — usado por
+ * `release/laboratory-equivalence.ts` para provar que o motor operacional,
+ * alimentado por dado histórico real, reproduz o que o laboratório calculou
+ * a partir de métricas congeladas. Omitido, o comportamento é exatamente o
+ * de antes desta etapa.
  */
 export function replayRecommendationEngineV1(
-  bundle: ReplayInputBundle
+  bundle: ReplayInputBundle,
+  configuration?: EffectiveRecommendationConfiguration
 ): ReturnType<ReplayImplementation> {
   const tags = bundle.referencedChampions
     .map((entry) => entry.championTag)
@@ -122,7 +135,8 @@ export function replayRecommendationEngineV1(
     matchups: bundle.player.matchups,
     compositionRules: bundle.activeParameters.compositionRules,
     patchMeta: null,
-    evaluatedAt: bundle.evaluatedAt
+    evaluatedAt: bundle.evaluatedAt,
+    ...(configuration ? { configuration } : {})
   });
 
   const collect = (

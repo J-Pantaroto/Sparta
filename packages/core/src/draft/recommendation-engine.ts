@@ -2,9 +2,22 @@ import {
   MEDIUM_CONFIDENCE_GAMES,
   scoreChampionPerformance
 } from "../scoring/champion-performance.js";
-import { toRecommendationMetrics } from "./recommendation-metrics.js";
+import { RECOMMENDATION_ENGINE_VERSION, toRecommendationMetrics } from "./recommendation-metrics.js";
 import { analyzeDraftStrategy } from "./draft-strategic-analysis.js";
 import { assessExecutionRisk, type ExecutionRiskAssessment } from "./execution-risk.js";
+import {
+  SUPPORTED_AGGREGATION_VERSIONS,
+  WEIGHT_KEY_TO_METRIC
+} from "../calibration/engine-candidate.js";
+import {
+  BASELINE_POST_AGGREGATION_RULES,
+  buildEffectiveConfiguration,
+  computeExecutionRiskPenalty,
+  engineWeightsFromConfiguration,
+  type EffectiveRecommendationConfiguration,
+  type SupportedPostAggregationRules,
+  type WeightableMetricKey
+} from "../release/effective-configuration.js";
 import type {
   ChampionTag,
   CompositionRules,
@@ -194,9 +207,72 @@ export function recommendPicks(input: {
 }
 
 /**
+ * Constrói a configuração efetiva **baseline** (Etapa 27a): os pesos que
+ * `selectWeights` escolheria para este draft, mais os thresholds
+ * pós-agregação que hoje estão hardcoded (`slice(0,5)`, `slice(5,8)`, curva
+ * de risco 25/8), expressos como `EffectiveRecommendationConfiguration`.
+ *
+ * A baseline **depende do draft**, de propósito: qual das três tabelas de
+ * `selectWeights` vale é uma decisão de contexto do draft (blind, lane
+ * revelada, meio do draft), não de configuração — só uma release já
+ * calibrada declara um único conjunto de pesos válido para qualquer
+ * cenário (mesma premissa que o laboratório de calibração já assume desde a
+ * Etapa 25 ao reponderar um snapshot congelado). Passar o resultado desta
+ * função de volta para `recommendFromPersonalPool` reproduz **exatamente**
+ * o resultado que o motor produziria sem nenhuma configuração explícita —
+ * é o que prova que a extração não mudou o ranking operacional.
+ */
+export function buildBaselineConfiguration(
+  draft: DraftState,
+  options: { computeHash: (canonical: string) => string; version?: string }
+): EffectiveRecommendationConfiguration {
+  const weights = selectWeights(draft);
+  // Preserva a ORDEM de insercao original de `weights` (a tabela literal que
+  // `selectWeights` devolveu pro cenario deste draft), nao uma ordem
+  // canonica qualquer: a soma ponderada em `normalizeAvailableWeights`
+  // itera `Object.keys(weights)`, e soma em ponto flutuante nao e
+  // associativa — reordenar as mesmas parcelas muda o ultimo digito do
+  // resultado. Sem preservar a ordem aqui, `recommendFromPersonalPool`
+  // chamado com a baseline explicita produziria `dataCoverage`/
+  // `effectiveWeights` com diferenca de ponto flutuante em relacao ao
+  // caminho sem configuracao — quebraria "passar a baseline explicitamente
+  // reproduz exatamente o resultado atual" (comprovado por teste).
+  const metricWeights = (Object.keys(weights) as (keyof RecommendationWeights)[]).reduce(
+    (result, key) => {
+      result[WEIGHT_KEY_TO_METRIC[key] as WeightableMetricKey] = weights[key];
+      return result;
+    },
+    {} as Record<WeightableMetricKey, number>
+  );
+
+  return buildEffectiveConfiguration({
+    version: options.version ?? RECOMMENDATION_ENGINE_VERSION,
+    metricWeights,
+    disabledMetrics: [],
+    postAggregationRules: BASELINE_POST_AGGREGATION_RULES,
+    source: { type: "BUILT_IN_BASELINE" },
+    algorithmCompatibility: {
+      recommendationEngine: RECOMMENDATION_ENGINE_VERSION,
+      aggregation: SUPPORTED_AGGREGATION_VERSIONS[0]
+    },
+    computeHash: options.computeHash
+  });
+}
+
+/**
  * Avalia a união explícita do pool observado/manual. Candidato sem amostra
  * pessoal continua no ranking, mas seus três sinais pessoais ficam ausentes
  * e os pesos restantes são normalizados só para ele.
+ *
+ * `configuration` (Etapa 27a) é **opcional e explicitamente resolvida**: sem
+ * ela, o comportamento é idêntico ao de sempre (`selectWeights(draft)` mais
+ * os thresholds hoje hardcoded). Passá-la explicitamente — inclusive a
+ * própria baseline via `buildBaselineConfiguration` — nunca produz pesos
+ * vazios nem resultado diferente: os thresholds padrão
+ * (`BASELINE_POST_AGGREGATION_RULES`) são os mesmos números já hardcoded, e
+ * a penalização de risco é recomputada a partir do `EXECUTION_RISK` já
+ * calculado por `assessExecutionRisk` (nunca sua derivação), pela mesma
+ * fórmula — comprovado por teste (`recommendation-engine.test.ts`).
  */
 export function recommendFromPersonalPool(input: {
   draft: DraftState;
@@ -208,6 +284,7 @@ export function recommendFromPersonalPool(input: {
   compositionRules: CompositionRules;
   patchMeta: PatchMetaData | null;
   evaluatedAt?: string;
+  configuration?: EffectiveRecommendationConfiguration;
 }): DraftRecommendationResponse {
   const role = input.draft.playerRole;
   if (!role) return emptyPoolResponse(0, "A posição do jogador ainda não foi identificada.");
@@ -229,7 +306,15 @@ export function recommendFromPersonalPool(input: {
   const evaluable = pool.filter(
     (candidate) => !banned.has(candidate.championId) && !picked.has(candidate.championId)
   );
-  const weights = selectWeights(input.draft);
+  // Sem `configuration`, resolução idêntica a sempre. Com ela, os pesos vêm
+  // da release (uniformes por cenário, mesma premissa do laboratório) e os
+  // thresholds pós-agregação passam a valer os declarados — ambos com o
+  // mesmo valor do hardcoded quando a configuração é a baseline explícita.
+  const weights = input.configuration
+    ? engineWeightsFromConfiguration(input.configuration)
+    : selectWeights(input.draft);
+  const rules: SupportedPostAggregationRules =
+    input.configuration?.postAggregationRules ?? BASELINE_POST_AGGREGATION_RULES;
   const enemyLaneChampionId = input.draft.enemyLaneChampionId;
 
   const ranked = evaluable
@@ -302,7 +387,15 @@ export function recommendFromPersonalPool(input: {
           0
         )
       );
-      const totalScore = round(clamp(baseScore - executionRisk.scorePenalty));
+      // Recomputado a partir do EXECUTION_RISK já calculado (nunca da
+      // derivação): pela mesma fórmula de `assessExecutionRisk`, então com
+      // os thresholds baseline o número é idêntico a `executionRisk.scorePenalty`
+      // — só passa a divergir quando `rules` vem de uma release calibrada.
+      const executionRiskScorePenalty =
+        executionRisk.riskMetric.value === null
+          ? 0
+          : computeExecutionRiskPenalty(executionRisk.riskMetric.value, rules);
+      const totalScore = round(clamp(baseScore - executionRiskScorePenalty));
       const personalGames = stats?.games ?? 0;
       const limitations = buildPoolLimitations(
         candidate,
@@ -323,7 +416,7 @@ export function recommendFromPersonalPool(input: {
         reasons: buildPoolReasons(candidate, stats, metrics, composition),
         warnings: [
           ...buildPoolWarnings(limitations, metrics, composition),
-          ...buildExecutionRiskWarnings(executionRisk)
+          ...buildExecutionRiskWarnings({ ...executionRisk, scorePenalty: executionRiskScorePenalty })
         ],
         metrics,
         metricDetails: toRecommendationMetrics(metrics, confidence, {
@@ -357,9 +450,27 @@ export function recommendFromPersonalPool(input: {
     .sort((left, right) => right.totalScore - left.totalScore || left.championId - right.championId)
     .map((recommendation, index) => ({ ...recommendation, rank: index + 1 }));
 
-  const primaryRecommendations = ranked.slice(0, 5);
-  const alternatives = ranked.slice(5, 8);
-  const shortage = ranked.length < 5 ? 5 - ranked.length : 0;
+  // Piso de score/cobertura (0/0 na baseline, nunca exclui ninguém) decide
+  // quem é ELEGÍVEL; `rank` continua sobre TODOS os candidatos avaliados,
+  // elegíveis ou não — mesma convenção já usada por `candidateRanking` no
+  // laboratório de calibração (`calibration/ranking-comparison.ts`), pra as
+  // duas leituras concordarem quando comparadas (Etapa 27a).
+  const eligible = ranked.filter(
+    (recommendation) =>
+      recommendation.totalScore >= rules.minimumScoreToRecommend &&
+      recommendation.dataCoverage >= rules.minimumDataCoverageToRecommend
+  );
+  const primarySet = new Set(
+    eligible.slice(0, rules.primaryCount).map((recommendation) => recommendation.championId)
+  );
+  const alternativeSet = new Set(
+    eligible
+      .slice(rules.primaryCount, rules.primaryCount + rules.alternativeCount)
+      .map((recommendation) => recommendation.championId)
+  );
+  const primaryRecommendations = ranked.filter((recommendation) => primarySet.has(recommendation.championId));
+  const alternatives = ranked.filter((recommendation) => alternativeSet.has(recommendation.championId));
+  const shortage = eligible.length < rules.primaryCount ? rules.primaryCount - eligible.length : 0;
   const roleName: Record<NonNullable<DraftState["playerRole"]>, string> = {
     TOP: "Top",
     JUNGLE: "Jungle",
@@ -378,7 +489,7 @@ export function recommendFromPersonalPool(input: {
       status: ranked.length === 0 ? "UNAVAILABLE" : shortage > 0 ? "PARTIAL" : "AVAILABLE",
       ...(shortage > 0
         ? {
-            shortageReason: `Seu pool de ${roleName[role]} possui ${ranked.length} candidato(s) disponível(is). Adicione pelo menos mais ${shortage} para receber cinco recomendações.`
+            shortageReason: `Seu pool de ${roleName[role]} possui ${eligible.length} candidato(s) disponível(is). Adicione pelo menos mais ${shortage} para receber ${rules.primaryCount === 5 ? "cinco" : rules.primaryCount} recomendações.`
           }
         : {})
     }

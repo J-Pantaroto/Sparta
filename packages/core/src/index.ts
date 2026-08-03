@@ -44,3 +44,8 @@ export * from "./global/global-statistics.js";
 export * from "./global/global-statistics-provider.js";
 export * from "./patch/patch-intelligence.js";
 export * from "./patch/theoretical-patch-impact.js";
+export * from "./release/effective-configuration.js";
+export * from "./release/release-artifact.js";
+export * from "./release/laboratory-equivalence.js";
+export * from "./release/release-validation.js";
+export * from "./release/release-state-machine.js";

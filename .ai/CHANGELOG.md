@@ -22,6 +22,21 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-08-03 14:40 — Etapa 27a: domínio de releases operacionais (domínio puro)
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0029-dominio-releases-operacionais.md`
+
+Novo domínio puro em `packages/core/src/release/`: `EffectiveRecommendationConfiguration`,
+`RecommendationReleaseArtifact` (congela candidata/experimento/configuração com hash), motor
+capaz de rodar com configuração explícita (`buildBaselineConfiguration` reproduz exatamente o
+comportamento atual — achado e corrigido um bug real de não associatividade de ponto flutuante
+na reconstrução dos pesos), equivalência laboratório×motor via bundle real (Etapa 26), validação
+pré-ativação em 9 estados e máquina de estados de 7 estados. Sem migration, rota, tela ou
+ativação real — fica pra Etapa 27b. 68 testes novos (596 em `packages/core`). Ver
+`docs/release-domain.md`.
+
+---
+
 ## 2026-07-31 23:01 — Superfície de leitura e verificação do ReplayInputBundle (Etapa 26b, encerra)
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0028-replay-bundle-captura-operacional.md`
