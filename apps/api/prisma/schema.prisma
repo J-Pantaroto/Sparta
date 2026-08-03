@@ -306,6 +306,18 @@ model RecommendationSnapshot {
   createdAt             DateTime                          @default(now())
   /// Quando um snapshot posterior passou a valer. Nulo enquanto e o atual.
   supersededAt          DateTime?
+  /// Configuracao efetiva usada nesta execucao (Etapa 27b). Tudo nullable:
+  /// snapshot anterior a esta etapa nao tem o eco gravado, e isso nunca e
+  /// preenchido retroativamente. "RELEASE" carrega releaseId; ausencia de
+  /// release ativa grava "BUILT_IN_BASELINE" sem releaseId.
+  configurationSource        String?
+  configurationReleaseId     String?
+  configurationVersion       String?
+  configHash                 String?
+  /// `EffectiveRecommendationConfiguration` completa - os parametros efetivos
+  /// (pesos, metricas desligadas, regras pos-agregacao) sobrevivem mesmo se a
+  /// release referenciada mudar de estado depois.
+  effectiveConfigurationJson Json?
   draftSession          DraftSession                      @relation(fields: [draftSessionId], references: [id], onDelete: Cascade)
   recommendations       PersistedRecommendation[]
   replayBundle          ReplayInputBundleRecord?
@@ -617,6 +629,7 @@ model CalibrationCandidateConfig {
   decisionNote               String?
   decisionExperimentId       String?
   experiments                CalibrationExperiment[]
+  releases                   RecommendationEngineRelease[]
 
   @@unique([lineageId, revision])
   @@index([riotAccountId, lineageId])
@@ -706,4 +719,101 @@ model ReplayInputBundleRecord {
   snapshot          RecommendationSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
 
   @@index([contentHash])
+}
+
+/// Release operacional (Etapa 27b). Congela o `RecommendationReleaseArtifact`
+/// puro da Etapa 27a e acrescenta o que e exclusivamente operacional: ciclo
+/// de vida, ativacao, rollback e autoria.
+///
+/// `status` segue exatamente os 7 estados de `ReleaseLifecycleStatus`
+/// (`packages/core`). Uma vez `READY_FOR_ACTIVATION`, `artifactJson` nunca e
+/// reescrito - candidata alterada depois disso gera uma release NOVA, nunca
+/// modifica esta linha.
+///
+/// Uma release cuja `status` e "ACTIVE" pode nao ser mais a **atualmente**
+/// apontada por `RecommendationEngineActivePointer` (uma release mais nova
+/// pode ter assumido o ponteiro depois): o dominio da 27a so permite
+/// `ACTIVE -> ROLLED_BACK` como transicao de saida, entao uma release
+/// superada continua com `status = "ACTIVE"` ate ser explicitamente revertida
+/// - "esta ativa" (ponteiro) e "foi ativada e nunca revertida" (status) sao
+/// fatos distintos de proposito.
+model RecommendationEngineRelease {
+  id                    String    @id @default(uuid())
+  riotAccountId         String
+  /// Identidade estavel da candidata (`CalibrationCandidateConfig.lineageId`).
+  /// Sem FK de proposito: a lineage sobrevive a revisoes, e nenhuma coluna
+  /// unica isolada existe pra ela referenciar.
+  candidateId           String
+  /// Revisao EXATA da candidata (`CalibrationCandidateConfig.id`) referenciada
+  /// pelo artefato - nunca "a candidata atual". E o alvo real do FK abaixo.
+  candidateRevisionId   String
+  experimentId          String
+  releaseVersion        String
+  baselineVersion       String
+  candidateVersion      String
+  artifactSchemaVersion String
+  /// `RecommendationReleaseArtifact` completo (Etapa 27a).
+  artifactJson          Json
+  artifactHash          String
+  configHash            String
+  /// DRAFT | VALIDATING | VALIDATION_FAILED | READY_FOR_ACTIVATION | ACTIVE |
+  /// ROLLED_BACK | REJECTED - mesmos 7 estados de `ReleaseLifecycleStatus`.
+  status                String    @default("DRAFT")
+  /// Ultimo `ReleaseValidationResult`. Uma nova tentativa sobrescreve; o
+  /// historico de tentativas vive em `RecommendationEngineReleaseEvent`.
+  validationJson        Json?
+  /// `artifactHash` no momento em que `validationJson` foi calculado - usado
+  /// pra detectar artefato alterado depois da validacao.
+  validatedArtifactHash String?
+  validatedAt           DateTime?
+  createdBy             String
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  activatedBy           String?
+  activatedAt           DateTime?
+  /// Release que era a ativa no instante em que esta foi ativada - alvo exato
+  /// do rollback. Nulo quando esta foi ativada a partir da baseline.
+  previousReleaseId     String?
+  rolledBackBy          String?
+  rolledBackAt          DateTime?
+  rolledBackReason      String?
+  candidate             CalibrationCandidateConfig @relation(fields: [candidateRevisionId], references: [id])
+  events                RecommendationEngineReleaseEvent[]
+
+  @@unique([riotAccountId, artifactHash])
+  @@index([riotAccountId, status])
+  @@index([riotAccountId, candidateId])
+}
+
+/// Ponteiro unico por conta para a release ativa. Ausencia de linha significa
+/// "nenhuma release ativa" - a baseline explicita da Etapa 27a resolve nesse
+/// caso. Nunca reescreve historico por si so: toda troca tambem grava um
+/// evento em `RecommendationEngineReleaseEvent`.
+model RecommendationEngineActivePointer {
+  riotAccountId String   @id
+  releaseId     String
+  updatedAt     DateTime @updatedAt
+  updatedBy     String
+}
+
+/// Historico auditavel append-only de toda mudanca material de uma release.
+/// Nunca e reescrito nem apagado.
+model RecommendationEngineReleaseEvent {
+  id            String   @id @default(uuid())
+  riotAccountId String
+  releaseId     String
+  /// CREATED | VALIDATION_STARTED | VALIDATION_COMPLETED | VALIDATION_FAILED |
+  /// ACTIVATED | ROLLED_BACK | REJECTED
+  eventType     String
+  fromStatus    String?
+  toStatus      String?
+  actor         String?
+  /// Motivo sanitizado - nunca stack trace nem detalhe de banco.
+  reason        String?
+  metadataJson  Json     @default("{}")
+  createdAt     DateTime @default(now())
+  release       RecommendationEngineRelease @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+
+  @@index([riotAccountId, createdAt])
+  @@index([releaseId, createdAt])
 }

@@ -1107,3 +1107,114 @@ export function decideCalibrationCandidate(
     { method: "POST", headers: auth(token), body: JSON.stringify(body) }
   );
 }
+
+/* Persistência e operação segura de releases (Etapa 27b). */
+
+export interface EffectiveConfigurationView {
+  version: string;
+  configHash: string;
+  metricWeights: Record<string, number>;
+  disabledMetrics: string[];
+  postAggregationRules: Record<string, number>;
+  source: { type: "BUILT_IN_BASELINE" } | { type: "RELEASE"; releaseId: string };
+}
+
+export interface ReleaseValidationView {
+  status: string;
+  reason: string;
+  laboratoryEquivalence?: {
+    status: string;
+    caseResults: { snapshotId: string; status: string; divergences: unknown[] }[];
+  };
+}
+
+export interface ReleaseRow {
+  id: string;
+  riotAccountId: string;
+  candidateId: string;
+  candidateRevisionId: string;
+  experimentId: string;
+  releaseVersion: string;
+  baselineVersion: string;
+  candidateVersion: string;
+  status:
+    | "DRAFT"
+    | "VALIDATING"
+    | "VALIDATION_FAILED"
+    | "READY_FOR_ACTIVATION"
+    | "ACTIVE"
+    | "ROLLED_BACK"
+    | "REJECTED";
+  artifact: {
+    configuration: EffectiveConfigurationView;
+    experimentEvidence: { knownLimitations: string[]; sampleSize: number; exactReplayCases: number };
+  };
+  artifactHash: string;
+  configHash: string;
+  validation?: ReleaseValidationView;
+  validatedArtifactHash?: string;
+  validatedAt?: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  activatedBy?: string;
+  activatedAt?: string;
+  previousReleaseId?: string;
+  rolledBackBy?: string;
+  rolledBackAt?: string;
+  rolledBackReason?: string;
+  currentlyActive: boolean;
+}
+
+export interface ActiveReleaseResponse {
+  source: "RELEASE" | "BUILT_IN_BASELINE";
+  release?: ReleaseRow;
+  note?: string;
+  scenarios?: { label: string; configuration: EffectiveConfigurationView }[];
+}
+
+export function createRelease(token: string, candidateId: string, releaseVersion: string) {
+  return request<ReleaseRow>(`/calibration/candidates/${encodeURIComponent(candidateId)}/releases`, {
+    method: "POST",
+    headers: auth(token),
+    body: JSON.stringify({ releaseVersion })
+  });
+}
+
+export function listReleases(token: string) {
+  return request<{ releases: ReleaseRow[] }>("/calibration/releases", { headers: auth(token) });
+}
+
+export function fetchRelease(token: string, releaseId: string) {
+  return request<ReleaseRow & { events: Record<string, unknown>[] }>(
+    `/calibration/releases/${encodeURIComponent(releaseId)}`,
+    { headers: auth(token) }
+  );
+}
+
+export function validateRelease(token: string, releaseId: string) {
+  return request<ReleaseRow>(`/calibration/releases/${encodeURIComponent(releaseId)}/validate`, {
+    method: "POST",
+    headers: auth(token)
+  });
+}
+
+export function activateRelease(token: string, releaseId: string, reason?: string) {
+  return request<ReleaseRow>(`/calibration/releases/${encodeURIComponent(releaseId)}/activate`, {
+    method: "POST",
+    headers: auth(token),
+    body: JSON.stringify(reason ? { reason } : {})
+  });
+}
+
+export function rollbackRelease(token: string, releaseId: string, reason?: string) {
+  return request<ReleaseRow>(`/calibration/releases/${encodeURIComponent(releaseId)}/rollback`, {
+    method: "POST",
+    headers: auth(token),
+    body: JSON.stringify(reason ? { reason } : {})
+  });
+}
+
+export function fetchActiveRelease(token: string) {
+  return request<ActiveReleaseResponse>("/recommendation-engine/active-release", { headers: auth(token) });
+}

@@ -22,6 +22,23 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-08-03 15:40 — Etapa 27b: persistência e operação segura de releases (encerra a Etapa 27)
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0030-persistencia-operacao-releases.md`
+
+Três tabelas novas (release, ponteiro ativo, eventos), provider da configuração ativa com cache
+por conta/TTL/fallback e validação de hash antes do uso, integração no fluxo real (configuração
+resolvida uma vez e compartilhada por motor/snapshot/bundle), validação pré-ativação persistida,
+ativação e rollback transacionais serializáveis, sete rotas autenticadas e interface mínima sem
+campo de peso. Bug real encontrado só contra o Postgres real: `decideCandidate` grava o status na
+coluna, mas o `configJson` congelado guarda o da criação — a validação lia o JSON e reprovava toda
+candidata aprovada. Validado real: 3 snapshots pré-27b com `EXACT_REPLAY` e zero divergências,
+equivalência laboratório×motor `MATCH`, 4 ativações concorrentes com 1 vencedora, ativação/rollback
+em conta isolada e removida depois. A candidata real permanece em `READY_FOR_ACTIVATION`, nunca
+ativada. 22 testes novos (263 em `apps/api`; core inalterado em 596).
+
+---
+
 ## 2026-08-03 14:40 — Etapa 27a: domínio de releases operacionais (domínio puro)
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0029-dominio-releases-operacionais.md`

@@ -5,6 +5,7 @@ import {
   compareSelectedChampion,
   isTerminalDraftSessionStatus,
   type CanonicalSnapshotInput,
+  type EffectiveRecommendationConfiguration,
   type ReplayInputBundle,
   type DraftSessionSource,
   type DraftSessionStatus,
@@ -405,6 +406,14 @@ export interface PersistSnapshotInput {
   algorithmVersions: Record<string, string>;
   dataCoverage: number;
   recommendations: PersistedRecommendation[];
+  /** Eco da configuração efetiva usada (Etapa 27b) — nunca recalculada aqui. */
+  configuration: {
+    source: "BUILT_IN_BASELINE" | "RELEASE";
+    releaseId?: string;
+    version: string;
+    configHash: string;
+    effective: EffectiveRecommendationConfiguration;
+  };
 }
 
 /**
@@ -445,6 +454,11 @@ export async function persistRecommendationSnapshot(
           canonicalInputJson: input.canonicalInput as unknown as Prisma.InputJsonValue,
           algorithmVersionsJson: input.algorithmVersions as unknown as Prisma.InputJsonValue,
           dataCoverage: input.dataCoverage,
+          configurationSource: input.configuration.source,
+          configurationReleaseId: input.configuration.releaseId ?? null,
+          configurationVersion: input.configuration.version,
+          configHash: input.configuration.configHash,
+          effectiveConfigurationJson: input.configuration.effective as unknown as Prisma.InputJsonValue,
           recommendations: {
             create: input.recommendations.map((recommendation) => ({
               championId: recommendation.championId,

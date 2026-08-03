@@ -1,20 +1,29 @@
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from "react";
-import { AlertTriangle, FlaskConical, Lock, Play } from "lucide-react";
+import { AlertTriangle, FlaskConical, Lock, Play, Rocket, RotateCcw, ShieldCheck } from "lucide-react";
 import {
+  activateRelease,
   createCalibrationCandidate,
   createCalibrationRevision,
+  createRelease,
   decideCalibrationCandidate,
+  fetchActiveRelease,
   fetchCalibrationExperimentCases,
   fetchCalibrationParameters,
   listCalibrationCandidates,
   listCalibrationExperiments,
+  listReleases,
+  rollbackRelease,
   runCalibrationExperiment,
   validateCalibrationCandidateRemote,
+  validateRelease,
+  type ActiveReleaseResponse,
   type CalibrationCandidateInput,
   type CalibrationCandidateRow,
   type CalibrationExperimentRow,
   type CalibrationParameterCatalog,
-  type CalibrationValidationResult
+  type CalibrationValidationResult,
+  type EffectiveConfigurationView,
+  type ReleaseRow
 } from "../services/api-client";
 import { useAsyncData } from "../hooks/use-async-data";
 import { ReplayCapabilitySummary } from "./ReplayCapabilitySummary";
@@ -83,6 +92,10 @@ export function CalibrationLabScreen({ token }: Props): ReactElement {
   const [openCaseId, setOpenCaseId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [activeConfig, setActiveConfig] = useState<ActiveReleaseResponse | null>(null);
+  const [releases, setReleases] = useState<ReleaseRow[]>([]);
+  const [releaseVersion, setReleaseVersion] = useState("release-1");
+  const [confirming, setConfirming] = useState<{ releaseId: string; action: "activate" | "rollback" } | null>(null);
 
   const candidateInput = useMemo<CalibrationCandidateInput>(
     () => ({
@@ -101,9 +114,19 @@ export function CalibrationLabScreen({ token }: Props): ReactElement {
     setCandidates(result.candidates);
   }, [token]);
 
+  const refreshReleases = useCallback(async () => {
+    const [active, list] = await Promise.all([fetchActiveRelease(token), listReleases(token)]);
+    setActiveConfig(active);
+    setReleases(list.releases);
+  }, [token]);
+
   useEffect(() => {
     void refreshCandidates();
   }, [refreshCandidates]);
+
+  useEffect(() => {
+    void refreshReleases();
+  }, [refreshReleases]);
 
   useEffect(() => {
     let cancelled = false;
@@ -143,6 +166,43 @@ export function CalibrationLabScreen({ token }: Props): ReactElement {
             title="Laboratório do motor"
             description="Testa uma configuração candidata contra os drafts já registrados, sem tocar no motor em uso."
           />
+        </Card>
+      </PageSection>
+
+      <PageSection>
+        <Card>
+          <SectionHeader
+            title="Configuração operacional atual"
+            description="O que o motor realmente usa agora para gerar recomendações — só leitura, nunca editável aqui."
+          />
+          {activeConfig?.source === "RELEASE" && activeConfig.release ? (
+            <>
+              <p className="sp-calib-note">
+                <ShieldCheck size={14} aria-hidden /> Release ativa: {activeConfig.release.releaseVersion} ·
+                candidata {activeConfig.release.candidateVersion} · hash {activeConfig.release.configHash.slice(0, 12)}…
+              </p>
+              <div className="sp-calib-weights">
+                {Object.entries(activeConfig.release.artifact.configuration.metricWeights).map(([metric, value]) => (
+                  <Metric key={metric} label={METRIC_LABELS[metric] ?? metric} value={value} />
+                ))}
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="sp-calib-note">
+                Fallback para baseline em uso — nenhuma release está ativa. A baseline varia por
+                cenário do draft; as três tabelas reais abaixo mostram cada uma.
+              </p>
+              <div className="sp-calib-side-by-side">
+                {(activeConfig?.scenarios ?? []).map((scenario) => (
+                  <div key={scenario.label}>
+                    <h4>{scenario.label}</h4>
+                    <BaselineWeights configuration={scenario.configuration} />
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </Card>
       </PageSection>
 
@@ -491,7 +551,172 @@ export function CalibrationLabScreen({ token }: Props): ReactElement {
           </Card>
         </PageSection>
       ) : null}
+
+      {selected?.status === "APPROVED_FOR_FUTURE_RELEASE" ? (
+        <PageSection>
+          <Card>
+            <SectionHeader
+              title="Preparar release"
+              description="Aprovação não significa ativação. Congela o artefato (candidata + experimento + configuração), pronto para validar."
+            />
+            <Field label="Versão da release">
+              <TextField value={releaseVersion} onChange={setReleaseVersion} />
+            </Field>
+            <div className="sp-calib-actions">
+              <Button
+                disabled={busy || !releaseVersion.trim()}
+                onClick={() =>
+                  withBusy(async () => {
+                    await createRelease(token, selected.id, releaseVersion.trim());
+                    await refreshReleases();
+                    setFeedback("Release criada em DRAFT. Valide antes de ativar.");
+                  })
+                }
+              >
+                Criar release
+              </Button>
+            </div>
+          </Card>
+        </PageSection>
+      ) : null}
+
+      <PageSection>
+        <Card>
+          <SectionHeader
+            title="Releases"
+            description="Ciclo de vida completo: DRAFT → VALIDATING → READY_FOR_ACTIVATION → ACTIVE → ROLLED_BACK. Nenhum peso é editável aqui."
+          />
+          {releases.length === 0 ? (
+            <EmptyState
+              title="Nenhuma release preparada"
+              description="Aprove uma configuração para versão futura e prepare uma release acima."
+            />
+          ) : (
+            <ul className="sp-calib-list">
+              {releases.map((release) => (
+                <li key={release.id}>
+                  <div className="sp-calib-release-row">
+                    <span>
+                      {release.releaseVersion} · candidata {release.candidateVersion}
+                      {release.currentlyActive ? " · Release ativa" : ""}
+                    </span>
+                    <StatusBadge state={release.status === "ACTIVE" ? "live" : "offline"}>
+                      {release.status === "READY_FOR_ACTIVATION" ? "Release pronta para ativação" : release.status}
+                    </StatusBadge>
+                  </div>
+                  {release.validation && release.status === "VALIDATION_FAILED" ? (
+                    <p className="sp-calib-note">
+                      <AlertTriangle size={14} aria-hidden /> {release.validation.reason}
+                    </p>
+                  ) : null}
+                  {release.status === "ROLLED_BACK" ? (
+                    <p className="sp-calib-note">Release revertida em {release.rolledBackAt ?? "—"}.</p>
+                  ) : null}
+                  <div className="sp-calib-actions">
+                    {release.status === "DRAFT" || release.status === "VALIDATION_FAILED" ? (
+                      <Button
+                        variant="secondary"
+                        disabled={busy}
+                        onClick={() =>
+                          withBusy(async () => {
+                            const result = await validateRelease(token, release.id);
+                            await refreshReleases();
+                            setFeedback(`Validação: ${result.validation?.status ?? "desconhecida"}.`);
+                          })
+                        }
+                      >
+                        Validar
+                      </Button>
+                    ) : null}
+
+                    {release.status === "READY_FOR_ACTIVATION" &&
+                    confirming?.releaseId === release.id &&
+                    confirming.action === "activate" ? (
+                      <>
+                        <Button
+                          disabled={busy}
+                          onClick={() =>
+                            withBusy(async () => {
+                              await activateRelease(token, release.id);
+                              setConfirming(null);
+                              await refreshReleases();
+                              setFeedback("Release ativa.");
+                            })
+                          }
+                        >
+                          Confirmar ativação
+                        </Button>
+                        <Button variant="secondary" disabled={busy} onClick={() => setConfirming(null)}>
+                          Cancelar
+                        </Button>
+                      </>
+                    ) : null}
+                    {release.status === "READY_FOR_ACTIVATION" &&
+                    !(confirming?.releaseId === release.id && confirming.action === "activate") ? (
+                      <Button
+                        disabled={busy}
+                        onClick={() => setConfirming({ releaseId: release.id, action: "activate" })}
+                      >
+                        <Rocket size={14} aria-hidden /> Ativar
+                      </Button>
+                    ) : null}
+
+                    {release.currentlyActive &&
+                    confirming?.releaseId === release.id &&
+                    confirming.action === "rollback" ? (
+                      <>
+                        <Button
+                          variant="secondary"
+                          disabled={busy}
+                          onClick={() =>
+                            withBusy(async () => {
+                              await rollbackRelease(token, release.id);
+                              setConfirming(null);
+                              await refreshReleases();
+                              setFeedback("Release revertida para a configuração anterior.");
+                            })
+                          }
+                        >
+                          Confirmar rollback
+                        </Button>
+                        <Button variant="secondary" disabled={busy} onClick={() => setConfirming(null)}>
+                          Cancelar
+                        </Button>
+                      </>
+                    ) : null}
+                    {release.currentlyActive &&
+                    !(confirming?.releaseId === release.id && confirming.action === "rollback") ? (
+                      <Button
+                        variant="secondary"
+                        disabled={busy}
+                        onClick={() => setConfirming({ releaseId: release.id, action: "rollback" })}
+                      >
+                        <RotateCcw size={14} aria-hidden /> Reverter
+                      </Button>
+                    ) : null}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      </PageSection>
     </PageLayout>
+  );
+}
+
+function BaselineWeights({ configuration }: { configuration: EffectiveConfigurationView }): ReactElement {
+  return (
+    <ul className="sp-calib-ranking">
+      {Object.entries(configuration.metricWeights)
+        .filter(([, value]) => value > 0)
+        .map(([metric, value]) => (
+          <li key={metric}>
+            <span>{METRIC_LABELS[metric] ?? metric}</span>
+            <span>{value}</span>
+          </li>
+        ))}
+    </ul>
   );
 }
 

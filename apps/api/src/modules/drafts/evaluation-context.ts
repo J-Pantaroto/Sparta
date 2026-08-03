@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { performance } from "node:perf_hooks";
 import {
   CHAMPION_TAG_DERIVATION_VERSION,
   DRAFT_STRATEGIC_ANALYSIS_VERSION,
@@ -6,12 +7,14 @@ import {
   RECOMMENDATION_ENGINE_VERSION,
   REPLAY_BUNDLE_SCHEMA_VERSION,
   THREAT_RESPONSE_MODEL_VERSION,
+  buildBaselineConfiguration,
   buildDependencyManifest,
   canonicalBundleContent,
   recommendFromPersonalPool,
   type ChampionTag,
   type DraftRecommendationResponse,
   type DraftState,
+  type EffectiveRecommendationConfiguration,
   type MatchupData,
   type PlayerChampionStats,
   type ReplayChampionContext,
@@ -27,6 +30,11 @@ import { findPersonalLaneMatchupHistory } from "../matches/matchup-repository.js
 import { findChampionStatsByPuuid } from "../players/player-stats-repository.js";
 import { findPlayerPool } from "../players/player-pool-repository.js";
 import { aggregateMatchupData } from "@sparta/core";
+import {
+  resolveActiveConfiguration,
+  type ResolvedRecommendationConfiguration
+} from "../release/active-configuration-provider.js";
+import type { FastifyBaseLogger } from "fastify";
 
 /**
  * Contexto de avaliacao imutavel (Etapa 26b).
@@ -67,17 +75,34 @@ export interface EvaluationContext {
   readonly matchups: readonly MatchupData[];
   readonly algorithmVersions: Record<string, string>;
   readonly unavailableReasons: { input: string; reason: string }[];
+  /** Configuração efetiva resolvida (Etapa 27b) — a mesma instância alimenta motor, snapshot e bundle. */
+  readonly configuration: EffectiveRecommendationConfiguration;
+  readonly configurationMeta: ResolvedRecommendationConfiguration;
 }
 
-/** Versoes de algoritmo que produziram esta execucao. */
-export function algorithmVersionsOf(): Record<string, string> {
+/**
+ * Versoes de algoritmo que produziram esta execucao.
+ *
+ * `configHash` (Etapa 27b, opcional) entra como mais uma chave do mesmo
+ * `Record<string,string>` — não é campo novo em nenhum tipo do core: é o que
+ * permite a mesma configuração efetiva "viajar" pro hash do snapshot (uma
+ * troca de release força um snapshot novo, mesmo com o draft idêntico) e pro
+ * `algorithmVersions` do `ReplayInputBundle` (que já aceita chaves extras),
+ * sem tocar `packages/core`.
+ */
+export function algorithmVersionsOf(configHash?: string): Record<string, string> {
   return {
     recommendationEngine: RECOMMENDATION_ENGINE_VERSION,
     championTagDerivation: CHAMPION_TAG_DERIVATION_VERSION,
     executionRisk: EXECUTION_RISK_VERSION,
     draftStrategy: DRAFT_STRATEGIC_ANALYSIS_VERSION,
-    threatResponseModel: THREAT_RESPONSE_MODEL_VERSION
+    threatResponseModel: THREAT_RESPONSE_MODEL_VERSION,
+    ...(configHash ? { recommendationConfiguration: configHash } : {})
   };
+}
+
+function hashCanonical(canonical: string): string {
+  return createHash("sha256").update(canonical).digest("hex");
 }
 
 /**
@@ -89,6 +114,8 @@ export async function buildEvaluationContext(input: {
   draft: DraftState;
   role: Role;
   riotAccount?: { id: string; puuid: string };
+  /** Sanitizado por construção: só evento e campos estruturados, nunca stack. */
+  log?: Pick<FastifyBaseLogger, "info" | "warn" | "error">;
 }): Promise<EvaluationContext> {
   const evaluatedAt = new Date().toISOString();
   const unavailableReasons: { input: string; reason: string }[] = [];
@@ -103,7 +130,8 @@ export async function buildEvaluationContext(input: {
     });
   }
 
-  const [championTags, capabilityProfiles, laneHistory, personalPool] = await Promise.all([
+  const configurationResolutionStartedAt = performance.now();
+  const [championTags, capabilityProfiles, laneHistory, personalPool, configurationMeta] = await Promise.all([
     findAllChampionTags(),
     findAllChampionCapabilityProfiles(),
     input.riotAccount
@@ -111,8 +139,16 @@ export async function buildEvaluationContext(input: {
       : Promise.resolve([]),
     input.riotAccount
       ? findPlayerPool(input.riotAccount.id, input.riotAccount.puuid, input.role)
-      : Promise.resolve({ entries: [], roleSummaries: [] })
+      : Promise.resolve({ entries: [], roleSummaries: [] }),
+    // Resolvida UMA vez aqui, junto de todas as outras fontes mutáveis: o
+    // motor, o snapshot e o bundle reaproveitam exatamente esta instância.
+    resolveActiveConfiguration({ riotAccountId: input.riotAccount?.id, ...(input.log ? { log: input.log } : {}) })
   ]);
+  // Aproximação deliberada: mede o `Promise.all` inteiro (as consultas rodam
+  // em paralelo, então o tempo de `resolveActiveConfiguration` sozinho não é
+  // isolável sem serializar as chamadas só para medir). Suficiente pra
+  // observabilidade — não é um SLA por consulta.
+  const configurationResolutionMs = performance.now() - configurationResolutionStartedAt;
 
   const matchups = aggregateMatchupData(laneHistory);
   if (matchups.length === 0) {
@@ -122,11 +158,33 @@ export async function buildEvaluationContext(input: {
     });
   }
 
+  // Ausência de release ativa resolve pra baseline explícita (Etapa 27a),
+  // dependente do cenário deste draft — nunca pesos vazios ou parciais.
+  const configuration =
+    configurationMeta.source === "RELEASE"
+      ? configurationMeta.configuration
+      : buildBaselineConfiguration(input.draft, { computeHash: hashCanonical });
+
+  if (input.log) {
+    input.log.info({
+      event: "recommendation_configuration_resolved",
+      source: configurationMeta.source,
+      releaseId: configurationMeta.source === "RELEASE" ? configurationMeta.release.id : null,
+      cacheState: configurationMeta.cacheState,
+      fallbackUsed: configurationMeta.fallbackUsed,
+      fallbackReason: configurationMeta.fallbackUsed ? configurationMeta.fallbackReason ?? null : null,
+      configHash: configuration.configHash,
+      resolutionMs: Math.round(configurationResolutionMs)
+    });
+  }
+
   return Object.freeze({
     evaluatedAt,
     ...(input.riotAccount ? { riotAccountId: input.riotAccount.id } : {}),
     role: input.role,
     draft: input.draft,
+    configuration,
+    configurationMeta,
     pool: personalPool.entries.map((entry) => ({
       championId: entry.championId,
       championName: entry.championName,
@@ -138,7 +196,7 @@ export async function buildEvaluationContext(input: {
     championTags,
     capabilityProfiles,
     matchups,
-    algorithmVersions: algorithmVersionsOf(),
+    algorithmVersions: algorithmVersionsOf(configuration.configHash),
     unavailableReasons
   });
 }
@@ -165,7 +223,8 @@ export function runEngine(context: EvaluationContext): DraftRecommendationRespon
     matchups: [...context.matchups],
     compositionRules,
     patchMeta: null,
-    evaluatedAt: context.evaluatedAt
+    evaluatedAt: context.evaluatedAt,
+    configuration: context.configuration
   });
 }
 

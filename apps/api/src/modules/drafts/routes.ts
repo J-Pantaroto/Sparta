@@ -80,7 +80,8 @@ export const draftsRoutes: FastifyPluginAsync = async (app) => {
     const context = await buildEvaluationContext({
       draft: payload.draft,
       role: payload.draft.playerRole,
-      ...(riotAccount ? { riotAccount: { id: riotAccount.id, puuid: riotAccount.puuid } } : {})
+      ...(riotAccount ? { riotAccount: { id: riotAccount.id, puuid: riotAccount.puuid } } : {}),
+      log: request.log
     });
 
     const result = runEngine(context);
@@ -511,6 +512,17 @@ async function persistDraftAnalysis(input: {
       algorithmVersions: canonicalInput.algorithmVersions,
       dataCoverage: coverage,
       recommendations,
+      // Eco da configuração efetiva (Etapa 27b): mesma instância que já
+      // alimentou o motor acima, nunca relida nem recalculada aqui.
+      configuration: {
+        source: context.configurationMeta.source,
+        ...(context.configurationMeta.source === "RELEASE"
+          ? { releaseId: context.configurationMeta.release.id }
+          : {}),
+        version: context.configuration.version,
+        configHash: context.configuration.configHash,
+        effective: context.configuration
+      },
       // Mesmo contexto que produziu as recomendacoes: `evaluatedAt` e identico
       // no calculo e no bundle, e nada e relido do banco aqui.
       buildReplayBundle: (snapshotId) => {

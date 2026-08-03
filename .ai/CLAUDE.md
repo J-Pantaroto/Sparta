@@ -1,5 +1,84 @@
 # Sparta - Contexto para Continuidade
 
+## Etapa 27b: persistência e operação segura de releases (encerra a Etapa 27)
+
+A 27a deixou o domínio puro pronto (configuração efetiva, baseline explícita, artefato imutável,
+equivalência laboratório×motor, hashes, máquina de estados). Esta etapa constrói a camada
+operacional em volta dele **sem contaminar `packages/core`** — que continua em 596 testes,
+inalterado, sem nenhum acesso a banco, cache, ambiente ou provider.
+
+**Migration `20260803150000_recommendation_engine_releases`**: `RecommendationEngineRelease`
+(artefato completo + ciclo de vida + autoria + validação), `RecommendationEngineActivePointer`
+(uma linha por conta; **ausência = baseline**, é o que garante "só uma ativa" estruturalmente) e
+`RecommendationEngineReleaseEvent` (append-only). Mais cinco colunas **nullable** de eco da
+configuração em `RecommendationSnapshot` — snapshot antigo fica nulo e **nunca** é preenchido
+retroativamente (medido: 15 snapshots, 0 com `configHash`).
+
+**`candidateId` vs `candidateRevisionId`**: o primeiro é o `lineageId` (identidade estável entre
+revisões, sem FK); o segundo é a revisão **exata** congelada pelo artefato, e é o único com FK.
+Candidata alterada depois não muda release nenhuma.
+
+**`status = "ACTIVE"` não significa "é a ativa agora".** O grafo da 27a só permite `ACTIVE →
+ROLLED_BACK`, então uma release superada por outra mais nova continua com esse status até ser
+revertida. Quem é a ativa agora é o **ponteiro** — `ReleaseRow` expõe os dois fatos separados
+(`status` e `currentlyActive`), e rollback só aceita a release efetivamente apontada.
+
+**Provider** (`active-configuration-provider.ts`): `resolve`/`invalidate`, cache por conta com TTL
+de 30 s, recanonicalização e comparação de hash **antes do uso**, fallback pra última configuração
+válida conhecida quando o banco falha e pra baseline sem ela. Nunca devolve configuração inválida
+nem pesos vazios, e nunca lança. Resolvido **uma vez por avaliação** dentro de
+`buildEvaluationContext`, junto das outras fontes mutáveis: a mesma instância congelada alimenta
+motor, snapshot, bundle e observabilidade — nenhuma consulta dentro de função de score.
+
+**Decisão sobre a baseline**: o provider **não** a resolve — devolve só `BUILT_IN_BASELINE`, e quem
+tem o `DraftState` chama `buildBaselineConfiguration`. A baseline depende do cenário do draft
+(blind/lane revelada/meio do draft usam tabelas diferentes), e resolvê-la no provider exigiria
+passar o draft inteiro pra um componente cujo trabalho é só ler a release ativa. `GET
+/recommendation-engine/active-release` sem release ativa devolve as **três tabelas reais**, uma por
+cenário, em vez de fabricar "a" baseline única que não existe.
+
+**`configHash` entra em `algorithmVersions`** (chave `recommendationConfiguration`), que já é
+`Record<string,string>` livre — nenhum tipo do core mudou. Consequência deliberada: trocar de
+release força snapshot novo mesmo com draft idêntico, porque o hash do input canônico muda.
+
+**Ativação e rollback**: transação **serializável** com reivindicação atômica por `updateMany`
+condicional no status (mesmo padrão de `PENDING → RUNNING` da 25b). Ativação exige
+`READY_FOR_ACTIVATION`, revalida `validatedArtifactHash === artifactHash`, grava
+`previousReleaseId`, e invalida o cache **depois do commit**. Rollback restaura o ponteiro pro
+anterior **sem reconstruir parâmetro nenhum** (o artefato anterior já está persistido e imutável);
+sem anterior, apaga o ponteiro e volta à baseline. As rotas de ativação/rollback aceitam só
+`releaseId` (na URL) e `reason` — o schema zod não tem campo de peso, então peso no corpo é
+ignorado por construção.
+
+**Bug real encontrado só na validação contra o Postgres real**: `decideCandidate` (25b) grava a
+decisão na **coluna** `status`, mas o `configJson` congelado guarda o status da **criação** (que a
+25b só permite ser `DRAFT`/`READY`). A primeira versão lia o JSON e reprovava toda candidata
+aprovada com `INVALID_CANDIDATE_STATE`. Nenhum teste sintético pegaria — o fixture monta o
+candidato já com o status certo. Corrigido sobrepondo a coluna (autoritativa).
+
+**Interface**: dois blocos novos no Laboratório do motor, sem redesenhar a tela — "Configuração
+operacional atual" (só leitura: a release ativa com pesos reais, ou "Fallback para baseline em uso"
+com as três tabelas) e "Releases" (preparar/validar/ativar/reverter, com **confirmação em dois
+passos**). **Zero campos de peso** em qualquer tela de release.
+
+**Validado real** (Docker reconstruído, Postgres real, Zekerus#117): baseline confirmada em uso;
+**3 snapshots pré-27b replayados pelo motor novo com `EXACT_REPLAY` e zero divergências** — prova
+direta de que o resultado operacional anterior foi preservado exatamente, mais forte que comparar
+scores à mão; release validada até `READY_FOR_ACTIVATION` com equivalência laboratório×motor
+**`MATCH` em 2 casos reais, 0 divergências**; `NO_EXACT_REPLAY_CASES` bloqueou corretamente um
+experimento cujo único caso não tinha bundle; transições inválidas → 409/404/401; ativação e
+rollback exercitados numa **conta isolada** (baseline → v1 → v2 → rollback restaura v1 → rollback
+volta à baseline), removida por completo depois; **4 ativações concorrentes → 1 sucesso e 3
+conflitos**, 1 ponteiro, 1 evento; hash adulterado caiu pra baseline sem chegar ao motor; cache
+`MISS` → `HIT` e invalidação refletida na hora; Electron com 0 erros de console, 0
+`NaN`/`undefined`, 0 imagens quebradas.
+
+**A candidata real permanece `APPROVED_FOR_FUTURE_RELEASE` e a release dela em
+`READY_FOR_ACTIVATION`, nunca ativada** — a configuração operacional continua sendo a baseline.
+
+22 testes novos em `apps/api` (263 no total do pacote; core 596, riot 96, desktop 73). Ver
+`docs/release-operations.md`.
+
 ## Etapa 27a: domínio de releases operacionais (domínio puro)
 
 A Etapa 25 deixou o laboratório aprovar uma candidata (`APPROVED_FOR_FUTURE_RELEASE`) e a Etapa 26
