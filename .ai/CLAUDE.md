@@ -1,5 +1,55 @@
 # Sparta - Contexto para Continuidade
 
+## Ativação real de `release-etapa27b-v2`: ativada, reprovada no replay, revertida
+
+Autorizada explicitamente pelo usuário depois da Etapa 27b. A ativação **funcionou como
+projetado**; o que reprovou foi uma consequência estrutural que só aparece com uma release de fato
+ativa — nenhuma validação anterior podia tê-la visto, porque todas rodaram com a baseline em uso
+(a ativação da 27b foi exercitada numa conta isolada onde nenhuma recomendação nova foi gerada e
+replayada).
+
+**Achado bloqueante: o `ReplayInputBundle` não preserva a configuração efetiva, só o
+`configHash`.** `verifyReplayBundle` chama `implementation(bundle)`, e o tipo do registro
+(`ReplayImplementation = (bundle) => ...`) **apaga** o segundo parâmetro opcional `configuration`
+que `replayRecommendationEngineV1` aceita desde a 27a — ele é sempre `undefined` na verificação, e
+o motor reconstrói com `selectWeights(draft)`, a **baseline**. O snapshot, porém, foi produzido com
+os pesos da **release**. O contrato do bundle não tem campo para a configuração: guarda só
+`algorithmVersions.recommendationConfiguration = <configHash>`, e um hash **identifica** mas não
+**reconstrói**. Com qualquer release ativa, todo snapshot novo fica irreplayável — quebra a
+garantia central da Etapa 26.
+
+**Medido na conta real**: snapshot de origem `RELEASE` → `REPLAY_INTEGRITY_FAILED` com **10
+divergências**; snapshot `BUILT_IN_BASELINE` (pós-rollback) → `EXACT_REPLAY` com **0**. A prova de
+causa: os valores `reconstruido` das divergências (Viego 60.4, Udyr 54.3, Vi 51, Nocturne 49.6) são
+**exatamente** os scores que a baseline produz, medidos na recomendação gerada logo após o
+rollback. Divergiram score **e** cobertura (0.9 vs 0.7; 0.5 vs 0.2), porque a release pontua
+métricas que as tabelas de blind/lane revelada da baseline zeram.
+
+**Tudo o mais passou**: ativação atômica (200, transação serializável); 1 ponteiro / 1 release
+`ACTIVE` / ponteiro apontando pra ela; `artifactHash` e `configHash` **idênticos** antes e depois e
+`validatedArtifactHash == artifactHash` (artefato jamais tocado); cache invalidado nas duas
+transições, com a resolução seguinte vindo `MISS` e nunca `HIT` de valor velho; configuração
+operacional alternando `BUILT_IN_BASELINE` → `RELEASE` → `BUILT_IN_BASELINE`; recomendação real
+`SAVED`; as **7 conferências cruzadas** de origem/releaseId/versão/`configHash` entre coluna, JSON
+da configuração, `algorithmVersions` do snapshot e do bundle todas `t`; logs com **0** fallback, 0
+`hash_mismatch`, 0 `resolve_failed`, 0 erro, 0 HTTP 4xx/5xx (9/9 em 200), 0
+`NaN`/`Infinity`/`undefined`.
+
+**Rollback** imediato conforme instruído, motivo gravado em `rolledBackReason` e no evento
+append-only. Estado final: **0 ponteiros, 0 releases `ACTIVE`, configuração operacional
+`BUILT_IN_BASELINE`**, replay de volta a `EXACT_REPLAY`. `release-etapa27b-v2` fica em
+`ROLLED_BACK` (terminal pelo grafo da 27a) — reativar exige artefato novo, o que é correto: o
+artefato está íntegro, mas o **sistema** ainda não sabe replayar o que ela produz.
+
+**Correção necessária antes de qualquer reativação**: embutir a configuração efetiva no
+`ReplayInputBundle` (novo campo, dentro da canonicalização e do `contentHash`, nova
+`schemaVersion`; bundles antigos seguem válidos como baseline) e repassá-la ao motor no replay. A
+alternativa — alargar o tipo do registro e carregar a configuração pelo `configHash` — é mais
+barata mas reintroduz dependência de fonte externa no caminho de verificação, exatamente o que a
+Etapa 26 evitou. Nenhuma das duas foi implementada: o pedido era ativar e validar, e a instrução em
+caso de falha crítica era reverter e registrar. Ver
+`.ai/prompts/features/0031-ativacao-release-etapa27b-v2.md`.
+
 ## Etapa 27b: persistência e operação segura de releases (encerra a Etapa 27)
 
 A 27a deixou o domínio puro pronto (configuração efetiva, baseline explícita, artefato imutável,
@@ -73,8 +123,10 @@ conflitos**, 1 ponteiro, 1 evento; hash adulterado caiu pra baseline sem chegar 
 `MISS` → `HIT` e invalidação refletida na hora; Electron com 0 erros de console, 0
 `NaN`/`undefined`, 0 imagens quebradas.
 
-**A candidata real permanece `APPROVED_FOR_FUTURE_RELEASE` e a release dela em
-`READY_FOR_ACTIVATION`, nunca ativada** — a configuração operacional continua sendo a baseline.
+**A candidata real permanece `APPROVED_FOR_FUTURE_RELEASE`.** A release dela ficou em
+`READY_FOR_ACTIVATION` ao fim desta etapa — mas foi **ativada depois**, sob autorização explícita
+do usuário, reprovou na integridade do replay e foi revertida; hoje está em `ROLLED_BACK`. Ver a
+seção no topo deste arquivo. A configuração operacional continua sendo a baseline.
 
 22 testes novos em `apps/api` (263 no total do pacote; core 596, riot 96, desktop 73). Ver
 `docs/release-operations.md`.

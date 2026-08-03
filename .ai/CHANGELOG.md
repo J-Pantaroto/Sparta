@@ -22,6 +22,20 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-08-03 22:35 — Ativação de `release-etapa27b-v2`: revertida por falha de integridade do replay
+
+**Status:** BLOQUEADA · Prompt: `.ai/prompts/features/0031-ativacao-release-etapa27b-v2.md`
+
+Ativação autorizada explicitamente e executada com sucesso (atômica, artefato intocado, ponteiro
+único, cache invalidado, snapshot e bundle com `releaseId`/versão/`configHash` corretos). Reprovou
+no replay offline: snapshot produzido pela release deu `REPLAY_INTEGRITY_FAILED` com 10
+divergências, porque o `ReplayInputBundle` guarda só o `configHash` e não a configuração efetiva —
+o replay reconstrói com a baseline. Rollback imediato; sistema de volta a `BUILT_IN_BASELINE` com
+replay em `EXACT_REPLAY` e 0 divergências. Correção proposta (embutir a configuração no bundle) não
+implementada — fora do escopo do pedido.
+
+---
+
 ## 2026-08-03 15:40 — Etapa 27b: persistência e operação segura de releases (encerra a Etapa 27)
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0030-persistencia-operacao-releases.md`
