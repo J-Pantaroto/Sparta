@@ -11,7 +11,7 @@ GitHub Release, não há distribuição externa e o empacotamento roda sempre co
 
 | Campo | Valor |
 | --- | --- |
-| Commit | `95f3a89c286ce9e8fe9cd9a1ab32547e9893afc2` (árvore com alterações não commitadas no momento da geração) |
+| Commit | `f7c62d78ba4026ae2488326db5b8fa40906168f2` |
 | Versão do app | 0.1.0 |
 | Versão do monorepo | 0.1.0 |
 | Electron | 39.8.10 |
