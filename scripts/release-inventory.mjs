@@ -27,6 +27,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { sbomDe as sbomLib } from "./lib/sbom.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const SAIDA = join(ROOT, "docs", "release-candidate.md");
@@ -50,75 +51,12 @@ function lerJson(caminho) {
   return JSON.parse(readFileSync(caminho, "utf-8"));
 }
 
-/**
- * Achata o grafo que o `pnpm list --json` devolve. Um mesmo pacote pode
- * aparecer em várias versões; cada par nome@versão é uma entrada distinta,
- * porque é isso que um alerta de vulnerabilidade endereça.
- */
-function achatar(dependencias, destino) {
-  for (const [nome, dado] of Object.entries(dependencias ?? {})) {
-    if (!dado || typeof dado.version !== "string") continue;
-    // Pacote do próprio monorepo entra como `link:<caminho relativo>`. Listar
-    // esse caminho como se fosse versão publicada seria enganoso: não há
-    // artefato de terceiro por trás dele. Sai identificado como workspace,
-    // com a versão real declarada no package.json do pacote.
-    const versao = dado.version.startsWith("link:")
-      ? `${lerVersaoLocal(dado.path)} (workspace)`
-      : dado.version;
-    destino.set(`${nome}@${versao}`, dado.path ?? null);
-    if (dado.dependencies) achatar(dado.dependencies, destino);
-  }
-  return destino;
-}
-
-function lerVersaoLocal(caminho) {
-  try {
-    return lerJson(join(caminho, "package.json")).version ?? "?";
-  } catch {
-    return "?";
-  }
-}
-
-function licencaDe(caminho) {
-  if (!caminho) return "não declarada";
-  const pkg = join(caminho, "package.json");
-  if (!existsSync(pkg)) return "não declarada";
-  try {
-    const j = lerJson(pkg);
-    if (typeof j.license === "string") return j.license;
-    if (j.license && typeof j.license.type === "string") return j.license.type;
-    if (Array.isArray(j.licenses)) return j.licenses.map((l) => l.type ?? l).join(" OR ");
-  } catch {
-    /* pacote sem package.json legível fica como não declarada */
-  }
-  return "não declarada";
-}
-
-/**
- * O pnpm não está no PATH deste ambiente e o repositório não o instala como
- * dependência — o padrão do projeto é `npx pnpm@<versão fixada>`. Invocar o
- * `npx-cli.js` que acompanha o Node evita depender de shell e de extensão
- * `.cmd` no Windows. A versão vem de `packageManager`, então o inventário é
- * gerado exatamente pelo resolvedor que instalou a árvore.
- */
-function pnpm(args) {
-  const npx = join(dirname(process.execPath), "node_modules", "npm", "bin", "npx-cli.js");
-  if (!existsSync(npx)) return null;
-  return run(process.execPath, [npx, "--yes", rootPkg.packageManager, ...args], {
-    env: { ...process.env, CI: "true" }
-  });
-}
+// A montagem do SBOM vive em `lib/sbom.mjs`, compartilhada com
+// `generate-sbom.mjs`. Duas implementacoes da mesma coisa divergiriam, e o
+// documento legivel e o arquivo de maquina precisam descrever o mesmo grafo.
 
 function sbomDe(filtro) {
-  const bruto = pnpm(["--filter", filtro, "list", "--prod", "--depth", "Infinity", "--json"]);
-  if (!bruto) return null;
-  const pacotes = new Map();
-  for (const projeto of JSON.parse(bruto)) {
-    achatar(projeto.dependencies, pacotes);
-  }
-  return [...pacotes.entries()]
-    .map(([id, caminho]) => ({ id, licenca: licencaDe(caminho) }))
-    .sort((a, b) => a.id.localeCompare(b.id));
+  return sbomLib(ROOT, rootPkg.packageManager, filtro);
 }
 
 function sha256(caminho) {

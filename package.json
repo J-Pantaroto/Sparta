@@ -1,6 +1,6 @@
 {
   "name": "sparta",
-  "version": "0.1.0",
+  "version": "0.9.0",
   "private": true,
   "type": "module",
   "description": "Sparta desktop assistant for League of Legends profile, draft and post-game analysis.",
@@ -13,10 +13,15 @@
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint",
     "test": "vitest run scripts/read-git-remote.test.ts && pnpm -r test",
+    "version:sync": "node scripts/sync-version.mjs",
+    "version:check": "node scripts/sync-version.mjs --check",
+    "release:manifest": "node scripts/release-manifest.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "github:setup": "tsx scripts/read-git-remote.ts",
-    "github:push": "bash scripts/push-to-github.sh"
+    "github:push": "bash scripts/push-to-github.sh",
+    "release:sbom": "node scripts/generate-sbom.mjs",
+    "release:build": "node scripts/build-release.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.30.1",

@@ -18,6 +18,10 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # A versão tem uma fonte de verdade só (package.json da raiz) e oito
+      # lugares derivados dela, dois deles literais em código. Verificar aqui é
+      # o que impede o conserto de um lugar só passar despercebido.
+      - run: pnpm version:check
       - run: pnpm --filter @sparta/api prisma:generate
       - run: pnpm lint
       - run: pnpm typecheck

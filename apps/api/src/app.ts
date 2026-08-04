@@ -94,7 +94,7 @@ export async function buildApp() {
       openapi: {
         info: {
           title: "Sparta API",
-          version: "0.1.0"
+          version: "0.9.0"
         }
       }
     });

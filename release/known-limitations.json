@@ -1,0 +1,69 @@
+{
+  "//": "Limitações conhecidas do Sparta, versionadas como entrada da release (Etapa 29). O manifesto do candidato lê este arquivo; nada aqui é gerado nem inventado no momento da geração. Classificações: KNOWN_LIMITATION (o produto funciona, mas não faz isso), ACCEPTED_RISK (risco real, avaliado e aceito), PUBLICATION_BLOCKER (impede publicar), FUTURE_FEATURE (planejado, ainda não existe).",
+  "limitations": [
+    {
+      "id": "installer-unsigned",
+      "classification": "ACCEPTED_RISK",
+      "title": "Instalador Windows não assinado",
+      "detail": "Não existe certificado de assinatura de código no projeto. `Get-AuthenticodeSignature` devolve `NotSigned`. O SmartScreen exibe \"O Windows protegeu o computador\" e exige \"Mais informações\" → \"Executar assim mesmo\". Um binário não assinado também não acumula reputação, então o aviso não some sozinho.",
+      "impact": "Atrito e desconfiança na primeira execução. Não impede instalar.",
+      "resolution": "Certificado OV ou EV de autoridade reconhecida. Decisão de negócio."
+    },
+    {
+      "id": "global-meta-unavailable",
+      "classification": "KNOWN_LIMITATION",
+      "title": "Sem matchup global, meta global, builds e runas globais",
+      "detail": "`GLOBAL_MATCHUP`, `META_STRENGTH`, elegibilidade global por posição e loadouts globais são declarados `UNAVAILABLE` por contrato, não estimados. A fonte candidata (agregação própria sobre APIs oficiais) exige Riot Production Key e aprovação explícita de uso estatístico, retenção, população e privacidade — ver `docs/adr/0002-global-meta-source.md`.",
+      "impact": "As recomendações são pessoais e de composição, nunca comparadas com a ladder. Nenhum número é inventado no lugar.",
+      "resolution": "Production Key aprovada e pipeline de agregação. Etapa própria."
+    },
+    {
+      "id": "lcu-live-session-unvalidated",
+      "classification": "KNOWN_LIMITATION",
+      "title": "Detecção dentro de um champion select real nunca validada ponta a ponta",
+      "detail": "A derivação de posição, ordem de pick, troca de lane e importação do draft foi validada com sessão sintética e por teste automatizado em todo o caminho a partir da derivação. A chamada HTTP ao cliente do League dentro de uma partida de verdade exige o League aberto e em champion select, indisponível no ambiente de desenvolvimento.",
+      "impact": "Se o vocabulário do LCU mudar, o Sparta cai no modo manual em vez de errar — mas isso não foi observado num champion select real.",
+      "resolution": "Sessão de validação com o cliente do League aberto."
+    },
+    {
+      "id": "no-auto-update",
+      "classification": "FUTURE_FEATURE",
+      "title": "Sem atualização automática",
+      "detail": "Não há `electron-updater` nem canal de publicação configurado. Atualizar significa baixar e executar o instalador novo, que instala por cima preservando os dados do usuário.",
+      "impact": "Atualização é manual e depende de o usuário saber que existe versão nova.",
+      "resolution": "Depende de decidir onde os artefatos serão publicados."
+    },
+    {
+      "id": "no-os-package-scanner",
+      "classification": "ACCEPTED_RISK",
+      "title": "Auditoria de dependências não cobre pacotes do sistema operacional",
+      "detail": "`pnpm audit` enxerga só o grafo npm. Os pacotes dentro de `node:20-slim` não são varridos. Fixar a imagem-base por digest torna a base reproduzível e auditável, não isenta.",
+      "impact": "Uma vulnerabilidade em biblioteca do sistema da imagem-base não seria detectada por este repositório.",
+      "resolution": "Adotar scanner de imagem (Trivy, Grype) no fluxo de build."
+    },
+    {
+      "id": "api-not-published",
+      "classification": "KNOWN_LIMITATION",
+      "title": "A API não é distribuída junto do instalador",
+      "detail": "O instalador entrega só o aplicativo desktop. A API roda em container e precisa estar acessível em `VITE_API_URL` (padrão `http://localhost:3333`). Não há instalação da API pelo instalador nem registry público de imagem.",
+      "impact": "Quem instalar o desktop sem a API no ar fica na tela de login sem conseguir autenticar.",
+      "resolution": "Publicação da imagem num registry e runbook de operação — ver `docs/runbook-publication.md`."
+    },
+    {
+      "id": "riot-dev-key-expiry",
+      "classification": "KNOWN_LIMITATION",
+      "title": "Chave de desenvolvimento da Riot expira em 24 h",
+      "detail": "Enquanto o projeto usar chave de desenvolvimento, o sync de partidas para de funcionar diariamente até a chave ser regerada no Riot Developer Portal. A chave vive só no backend, nunca no desktop.",
+      "impact": "Sem chave válida, não entram partidas novas. O que já está persistido continua servindo análise, histórico e replay.",
+      "resolution": "Production Key."
+    },
+    {
+      "id": "installer-nondeterministic-bytes",
+      "classification": "KNOWN_LIMITATION",
+      "title": "O instalador não é reproduzível byte a byte",
+      "detail": "O NSIS e o empacotamento gravam timestamp de build e ordenação de compressão que variam entre execuções. O conteúdo funcional (árvore do asar, versões, dependências) é reproduzível; o SHA-256 do `.exe` não.",
+      "impact": "Dois builds do mesmo commit têm checksums diferentes. O checksum publicado identifica um artefato específico, não a árvore.",
+      "resolution": "Exigiria build determinístico ponta a ponta no NSIS. Fora do controle do projeto."
+    }
+  ]
+}

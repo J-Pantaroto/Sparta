@@ -37,3 +37,13 @@ __pycache__/
 
 # Candidato de release local (Etapa 28b). Nunca versionado.
 dist-installer/
+
+# Artefatos de release. O diretorio inteiro e gerado; so o manifesto, os SBOM e
+# os checksums sao versionados — eles descrevem o candidato e cabem num diff.
+# O instalador, a imagem exportada e qualquer intermediario ficam de fora.
+artifacts/
+!artifacts/releases/
+!artifacts/releases/*/
+!artifacts/releases/*/sparta-release-manifest.json
+!artifacts/releases/*/sbom-*.json
+!artifacts/releases/*/checksums.txt

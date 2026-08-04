@@ -11,9 +11,9 @@ GitHub Release, não há distribuição externa e o empacotamento roda sempre co
 
 | Campo | Valor |
 | --- | --- |
-| Commit | `f7c62d78ba4026ae2488326db5b8fa40906168f2` |
-| Versão do app | 0.1.0 |
-| Versão do monorepo | 0.1.0 |
+| Commit | `f8f784b1294110d1bb8a92e311f85b6986363dca` (árvore com alterações não commitadas no momento da geração) |
+| Versão do app | 0.9.0 |
+| Versão do monorepo | 0.9.0 |
 | Electron | 39.8.10 |
 | Gerenciador de pacotes | pnpm@10.34.4 |
 | Imagem-base da API | `node:20-slim@sha256:2cf067cfed83d5ea958367df9f966191a942351a2df77d6f0193e162b5febfc0` |
@@ -110,8 +110,8 @@ para a imagem nem para o instalador.
 | `@prisma/engines@6.19.3` | Apache-2.0 |
 | `@prisma/fetch-engine@6.19.3` | Apache-2.0 |
 | `@prisma/get-platform@6.19.3` | Apache-2.0 |
-| `@sparta/core@0.1.0 (workspace)` | não declarada |
-| `@sparta/riot@0.1.0 (workspace)` | não declarada |
+| `@sparta/core@0.9.0 (workspace)` | não declarada |
+| `@sparta/riot@0.9.0 (workspace)` | não declarada |
 | `@standard-schema/spec@1.1.0` | MIT |
 | `abstract-logging@2.0.1` | MIT |
 | `ajv-formats@3.0.1` | MIT |
@@ -233,8 +233,8 @@ para a imagem nem para o instalador.
 
 | Pacote | Licença |
 | --- | --- |
-| `@sparta/core@0.1.0 (workspace)` | não declarada |
-| `@sparta/riot@0.1.0 (workspace)` | não declarada |
+| `@sparta/core@0.9.0 (workspace)` | não declarada |
+| `@sparta/riot@0.9.0 (workspace)` | não declarada |
 | `boolbase@1.0.0` | ISC |
 | `cheerio-select@2.1.0` | BSD-2-Clause |
 | `cheerio@1.0.0` | MIT |

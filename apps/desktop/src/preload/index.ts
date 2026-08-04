@@ -8,7 +8,7 @@ import type {
 import type { Role } from "@sparta/core";
 
 contextBridge.exposeInMainWorld("sparta", {
-  version: "0.1.0",
+  version: "0.9.0",
   realtimeAssistance: false,
   /**
    * Assina mudancas de fase do gameflow do cliente League (somente leitura).
