@@ -88,10 +88,26 @@ const electronVersion = exigir(
   "desktop.electronVersion"
 );
 
+/**
+ * O instalador do candidato e o que carrega **esta** versao no nome. Aceitar
+ * qualquer `Sparta-Setup-*.exe` faria o manifesto apontar para um artefato de
+ * outra versao que tivesse sobrevivido no diretorio — aconteceu de verdade na
+ * primeira execucao do pipeline, com o manifesto do 0.9.0 registrando o
+ * instalador do 0.1.0 e o SHA-256 dele.
+ */
 function acharInstalador() {
+  const doCandidato = new RegExp(`^Sparta-Setup-${VERSAO.replace(/\./g, "\\.")}-.*\\.exe$`, "i");
   for (const dir of [DEST, join(ROOT, "dist-installer")]) {
     if (!existsSync(dir)) continue;
-    const achado = readdirSync(dir).find((n) => /^Sparta-Setup-.*\.exe$/i.test(n));
+    const arquivos = readdirSync(dir).filter((n) => /^Sparta-Setup-.*\.exe$/i.test(n));
+    const outrasVersoes = arquivos.filter((n) => !doCandidato.test(n));
+    if (outrasVersoes.length > 0) {
+      problemas.push(
+        `desktop.installerFile: ${dir.slice(ROOT.length + 1)} contem instalador de outra versao ` +
+          `(${outrasVersoes.join(", ")}). Limpe o diretorio antes de congelar o candidato.`
+      );
+    }
+    const achado = arquivos.find((n) => doCandidato.test(n));
     if (achado) return join(dir, achado);
   }
   return null;

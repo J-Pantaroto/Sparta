@@ -29,7 +29,16 @@
 
 import { createHash } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  writeFileSync
+} from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -143,11 +152,19 @@ passo("5/9 imagem da API", () => {
 // ------------------------------------------------------------ 6. instalador
 
 passo("6/9 instalador Windows (sem publicação)", () => {
+  // `dist-installer/` e o destino são limpos antes: o electron-builder não
+  // remove artefato de versão anterior, e um `.exe` de outra versão sobrevivendo
+  // ali vira ambiguidade sobre qual arquivo é o candidato — foi exatamente o que
+  // aconteceu na primeira execução deste script, com o manifesto apontando para
+  // o instalador antigo.
+  rmSync(join(ROOT, "dist-installer"), { recursive: true, force: true });
+  rmSync(DEST, { recursive: true, force: true });
+
   pnpm(["--filter", "@sparta/desktop", "package:win"]);
   mkdirSync(DEST, { recursive: true });
   const origem = join(ROOT, "dist-installer");
   const copiados = readdirSync(origem)
-    .filter((n) => /^Sparta-Setup-.*\.(exe|blockmap)$/i.test(n))
+    .filter((n) => new RegExp(`^Sparta-Setup-${VERSAO.replace(/\./g, "\\.")}-.*\\.(exe|blockmap)$`, "i").test(n))
     .sort();
   if (copiados.length === 0) {
     console.error("   nenhum instalador produzido");
