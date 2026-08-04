@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
   REPLAY_BUNDLE_SCHEMA_VERSION,
+  buildBaselineConfiguration,
   validateReplayInputBundle,
   verifyReplayBundle,
   type DraftState,
@@ -46,12 +47,24 @@ const draft: DraftState = {
   enemyLaneChampionId: 64
 };
 
+/**
+ * Configuração efetiva do cenário (Etapa 27c): a captura passa a embutir a
+ * configuração inteira no bundle, então o contexto do teste precisa dela.
+ */
+const configuration = buildBaselineConfiguration(draft, { computeHash: sha256 });
+
 function context(overrides: Partial<EvaluationContext> = {}): EvaluationContext {
   return Object.freeze({
     evaluatedAt: "2026-07-31T12:00:00.000Z",
     riotAccountId: "account-1",
     role: "JUNGLE" as const,
     draft,
+    configuration,
+    configurationMeta: {
+      source: "BUILT_IN_BASELINE" as const,
+      cacheState: "MISS" as const,
+      fallbackUsed: false
+    },
     pool: [
       {
         championId: 234,

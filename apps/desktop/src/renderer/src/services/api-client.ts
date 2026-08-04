@@ -716,6 +716,18 @@ export interface SessionReplayCapability extends ReplayCapabilityReport {
   snapshotId: string | null;
 }
 
+/**
+ * Identidade da configuração do snapshot (Etapa 27c). Só o que identifica —
+ * a API não devolve pesos nem regras para esta superfície.
+ */
+export interface ReplayConfigurationIdentity {
+  source: "BUILT_IN_BASELINE" | "RELEASE";
+  releaseId: string | null;
+  version: string | null;
+  configHash: string | null;
+  embeddedInBundle: boolean;
+}
+
 export interface ReplayBundleSummary extends ReplayCapabilityReport {
   snapshotId: string;
   hasBundle: boolean;
@@ -723,6 +735,7 @@ export interface ReplayBundleSummary extends ReplayCapabilityReport {
   evaluatedAt?: string;
   createdAt?: string;
   lastVerification?: { status: string; verifiedAt: string } | null;
+  configuration?: ReplayConfigurationIdentity;
 }
 
 export interface ReplayVerificationResponse {
@@ -1195,7 +1208,13 @@ export function fetchRelease(token: string, releaseId: string) {
 export function validateRelease(token: string, releaseId: string) {
   return request<ReleaseRow>(`/calibration/releases/${encodeURIComponent(releaseId)}/validate`, {
     method: "POST",
-    headers: auth(token)
+    headers: auth(token),
+    // `request` sempre manda `Content-Type: application/json`, e o Fastify
+    // recusa POST sem corpo com esse content-type (`FST_ERR_CTP_EMPTY_JSON_BODY`,
+    // 400) **antes** de a rota rodar — mesmo defeito achado na Etapa 26b em
+    // `verifySnapshotReplay`. Introduzido por mim na 27b e só exposto agora,
+    // ao exercitar a validação pelo caminho real.
+    body: "{}"
   });
 }
 

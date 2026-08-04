@@ -12,9 +12,18 @@ import {
   describeSnapshotReplayCapability,
   replayEngines,
   replayRecommendationEngineV1,
+  resolveBundleConfiguration,
   verifyReplayBundle
 } from "./replay-verifier.js";
+import { buildBaselineConfiguration } from "../draft/recommendation-engine.js";
 import type { PersistedRecommendation } from "../draft/recommendation-snapshot.js";
+
+/** Roda o replay da fixture com a configuração que o próprio bundle carrega. */
+function replayOf(input: ReplayInputBundle) {
+  const resolved = resolveBundleConfiguration(input, fakeHash);
+  if (!resolved.ok) throw new Error(`configuração não resolvida: ${resolved.detail}`);
+  return replayRecommendationEngineV1(input, resolved.configuration);
+}
 
 /** Hash determinístico e local: o teste não precisa de `node:crypto`. */
 function fakeHash(canonical: string): string {
@@ -88,9 +97,29 @@ function champion(
   };
 }
 
+/**
+ * Baseline do cenário da fixture (blind pick, `pickOrder: 1`), expressa como
+ * configuração efetiva — é o que a captura v2 embute desde a Etapa 27c.
+ */
+function baselineConfiguration() {
+  return buildBaselineConfiguration(
+    {
+      playerRole: "JUNGLE",
+      playerRoleSource: "USER",
+      pickOrder: 1,
+      allies: [{ championId: 103, championName: "Ahri", team: "ally" }],
+      enemies: [{ championId: 64, championName: "Lee Sin", team: "enemy" }],
+      bannedChampionIds: [55, 91],
+      enemyLaneChampionId: 64
+    },
+    { computeHash: fakeHash }
+  );
+}
+
 function bundle(overrides: Partial<ReplayInputBundle> = {}): ReplayInputBundle {
   const base: Omit<ReplayInputBundle, "contentHash"> = {
     schemaVersion: REPLAY_BUNDLE_SCHEMA_VERSION,
+    effectiveRecommendationConfiguration: baselineConfiguration(),
     snapshotId: "snap-1",
     evaluatedAt: "2026-07-28T17:15:54.000Z",
     capturedAt: "2026-07-28T17:15:54.900Z",
@@ -383,7 +412,7 @@ describe("contrato", () => {
 describe("verifyReplayBundle", () => {
   /** Snapshot derivado do próprio bundle: é o que a 26b vai persistir junto. */
   function snapshotOf(input = bundle()): PersistedRecommendation[] {
-    return replayRecommendationEngineV1(input).map((entry) => ({
+    return replayOf(input).map((entry) => ({
       championId: entry.championId,
       championName: entry.championName,
       rank: entry.rank,
@@ -518,7 +547,7 @@ describe("describeSnapshotReplayCapability", () => {
     const current = bundle();
     const verification = verifyReplayBundle({
       bundle: current,
-      snapshot: replayRecommendationEngineV1(current).map((entry) => ({
+      snapshot: replayOf(current).map((entry) => ({
         championId: entry.championId,
         championName: entry.championName,
         rank: entry.rank,
@@ -595,7 +624,7 @@ describe("describeSnapshotReplayCapability", () => {
 
   it("divergência entre reconstruído e persistido também vira FULL_DERIVATION_REPLAY_INVALID", () => {
     const current = bundle();
-    const divergentSnapshot = replayRecommendationEngineV1(current).map((entry) => ({
+    const divergentSnapshot = replayOf(current).map((entry) => ({
       championId: entry.championId,
       championName: entry.championName,
       rank: entry.rank,

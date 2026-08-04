@@ -22,6 +22,21 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-08-04 01:20 — Etapa 27c: replay autossuficiente para configurações promovidas
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0032-replay-autossuficiente-configuracao.md`
+
+`replay-input-bundle/2.0.0` passa a preservar a configuração efetiva completa, e o tipo do registro
+de replay exige a configuração como parâmetro obrigatório — fechando no tipo o fallback silencioso
+para a baseline que reprovou a ativação da `release-etapa27b-v2`. Canonicalização versionada
+preserva o `contentHash` dos bundles v1 (sem backfill); v1 de baseline continua reproduzível e v1
+de release é classificado como `MISSING_EFFECTIVE_CONFIGURATION` em vez de gerar divergências
+enganosas. Validado em conta isolada: o cenário exato do rollback deu `EXACT_REPLAY` com 0
+divergências, inclusive com a release adulterada e depois deletada. Conta real segue na baseline,
+com `release-etapa27c-v1` apenas em `READY_FOR_ACTIVATION`. 24 testes novos (1052 no monorepo).
+
+---
+
 ## 2026-08-03 22:35 — Ativação de `release-etapa27b-v2`: revertida por falha de integridade do replay
 
 **Status:** BLOQUEADA · Prompt: `.ai/prompts/features/0031-ativacao-release-etapa27b-v2.md`

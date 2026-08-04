@@ -9,6 +9,12 @@ import type { ChampionCapabilityProfile } from "../types/champion-capability.js"
 import type { PlayerChampionPoolSource } from "../types/player-champion-pool.js";
 import type { DataProvenance } from "../types/provenance.js";
 import type { RecommendationMetricKey } from "../types/recommendation-metric.js";
+import {
+  canonicalConfigurationContent,
+  validateEffectiveConfigurationStructure,
+  type EffectiveRecommendationConfiguration
+} from "../release/effective-configuration.js";
+import { SUPPORTED_AGGREGATION_VERSIONS } from "./engine-candidate.js";
 
 /**
  * `ReplayInputBundle` — captura **prospectiva** dos inputs de derivação.
@@ -47,7 +53,31 @@ import type { RecommendationMetricKey } from "../types/recommendation-metric.js"
  * não carrega `puuid`.
  */
 
-export const REPLAY_BUNDLE_SCHEMA_VERSION = "replay-input-bundle/1.0.0";
+/**
+ * Schema atual. A v2 (Etapa 27c) acrescenta
+ * `effectiveRecommendationConfiguration`: sem ela, um bundle produzido sob
+ * uma release ativa era irreplayável, porque `algorithmVersions.
+ * recommendationConfiguration` guarda só o **hash** da configuração — um hash
+ * identifica, mas não reconstrói. Medido na ativação real da
+ * `release-etapa27b-v2`: replay do snapshot da release deu
+ * `REPLAY_INTEGRITY_FAILED` com 10 divergências, porque a verificação
+ * reconstruía com a baseline.
+ */
+export const REPLAY_BUNDLE_SCHEMA_VERSION = "replay-input-bundle/2.0.0";
+
+/**
+ * Schema anterior, ainda aceito para leitura. **Não há backfill**: bundle v1
+ * continua exatamente como foi gravado, e a canonicalização dele permanece
+ * byte a byte a mesma (ver `canonicalBundleContent`), senão o `contentHash`
+ * já persistido deixaria de bater.
+ */
+export const REPLAY_BUNDLE_SCHEMA_VERSION_V1 = "replay-input-bundle/1.0.0";
+
+/** Schemas que esta versão sabe ler. */
+export const SUPPORTED_REPLAY_BUNDLE_SCHEMAS: readonly string[] = [
+  REPLAY_BUNDLE_SCHEMA_VERSION,
+  REPLAY_BUNDLE_SCHEMA_VERSION_V1
+];
 
 /** Papel do campeão dentro da análise que consultou o perfil dele. */
 export type ReplayChampionRole = "CANDIDATE" | "ALLY" | "ENEMY" | "DIRECT_OPPONENT";
@@ -142,6 +172,21 @@ export interface ReplayInputBundle {
   activeParameters: ReplayActiveParameters;
   dependencyManifest: ReplayDependencyManifest[];
   provenance: DataProvenance;
+
+  /**
+   * Configuração efetiva **completa** que produziu esta avaliação (v2+).
+   *
+   * Opcional no tipo só porque bundle v1 legitimamente não a tem — nunca
+   * porque um bundle v2 possa omiti-la: a validação exige presença quando
+   * `schemaVersion` é v2, e o verificador devolve erro estruturado em vez de
+   * cair na baseline em silêncio.
+   *
+   * Guarda origem (`BUILT_IN_BASELINE`/`RELEASE` + `releaseId`), versão,
+   * `configHash`, pesos, métricas desligadas, regras pós-agregação e
+   * compatibilidade — tudo que o motor precisa, sem consultar release,
+   * provider, banco, cache, candidata ou experimento.
+   */
+  effectiveRecommendationConfiguration?: EffectiveRecommendationConfiguration;
 }
 
 export interface ReplayCandidateContext {
@@ -180,11 +225,41 @@ function byChampionId<T extends { championId: number }>(list: readonly T[]): T[]
  * recente pondera por índice, então ali a ordem é semântica.
  *
  * `capturedAt` e o próprio `contentHash` ficam de fora por definição.
+ *
+ * ## Por que a serialização é versionada
+ *
+ * A v2 acrescenta `effectiveRecommendationConfiguration` ao conteúdo
+ * hasheado. Acrescentá-la incondicionalmente mudaria o `contentHash` de todo
+ * bundle v1 **já persistido**, e eles passariam a falhar na verificação de
+ * integridade — um backfill silencioso pela porta dos fundos. Por isso o
+ * ramo v1 devolve exatamente a mesma string de antes desta etapa.
  */
 export function canonicalBundleContent(
   bundle: Omit<ReplayInputBundle, "contentHash">
 ): string {
+  const base = canonicalBundleBase(bundle);
+  if (bundle.schemaVersion === REPLAY_BUNDLE_SCHEMA_VERSION_V1) {
+    return JSON.stringify(base);
+  }
   return JSON.stringify({
+    ...base,
+    // A configuração entra pela canonicalização própria dela
+    // (`canonicalConfigurationContent`), a mesma que produz o `configHash` —
+    // uma segunda forma canônica para o mesmo dado seria uma fonte de
+    // divergência. `version` e `configHash` entram à parte porque aquela
+    // função os exclui de propósito.
+    effectiveRecommendationConfiguration: bundle.effectiveRecommendationConfiguration
+      ? [
+          bundle.effectiveRecommendationConfiguration.version,
+          bundle.effectiveRecommendationConfiguration.configHash,
+          canonicalConfigurationContent(bundle.effectiveRecommendationConfiguration)
+        ]
+      : null
+  });
+}
+
+function canonicalBundleBase(bundle: Omit<ReplayInputBundle, "contentHash">): object {
+  return {
     schemaVersion: bundle.schemaVersion,
     snapshotId: bundle.snapshotId,
     evaluatedAt: bundle.evaluatedAt,
@@ -262,7 +337,7 @@ export function canonicalBundleContent(
         entry.available,
         entry.unavailableReason ?? null
       ])
-  });
+  };
 }
 
 /**
@@ -300,7 +375,20 @@ export type BundleRejectionCode =
   | "NON_FINITE_PARAMETER"
   | "DUPLICATE_CHAMPION"
   | "DEPENDENCY_WITHOUT_INPUTS"
-  | "CONTENT_HASH_MISMATCH";
+  | "CONTENT_HASH_MISMATCH"
+  /* --- v2 (Etapa 27c) --- */
+  /** Bundle v2 sem a configuração efetiva embutida. */
+  | "MISSING_EFFECTIVE_CONFIGURATION"
+  /** O `configHash` declarado não corresponde ao conteúdo da configuração. */
+  | "CONFIGURATION_HASH_MISMATCH"
+  /** `configHash` do bundle e da configuração embutida discordam. */
+  | "CONFIGURATION_HASH_INCONSISTENT"
+  /** `RELEASE` sem `releaseId`, ou `BUILT_IN_BASELINE` com `releaseId`. */
+  | "CONFIGURATION_SOURCE_INCONSISTENT"
+  /** Peso ou regra pós-agregação não finita/fora de faixa. */
+  | "CONFIGURATION_PARAMETER_INVALID"
+  /** A configuração declara compatibilidade com um motor que não é este. */
+  | "INCOMPATIBLE_CONFIGURATION_VERSION";
 
 export interface BundleRejection {
   code: BundleRejectionCode;
@@ -335,13 +423,15 @@ export function validateReplayInputBundle(
 ): BundleValidationResult {
   const rejections: BundleRejection[] = [];
 
-  if (bundle.schemaVersion !== REPLAY_BUNDLE_SCHEMA_VERSION) {
+  if (!SUPPORTED_REPLAY_BUNDLE_SCHEMAS.includes(bundle.schemaVersion)) {
     rejections.push({
       code: "UNSUPPORTED_SCHEMA",
       detail: `Schema ${bundle.schemaVersion} não é reconhecido por ${REPLAY_BUNDLE_SCHEMA_VERSION}.`
     });
     return { valid: false, rejections };
   }
+
+  rejections.push(...validateEmbeddedConfiguration(bundle, options.computeHash));
 
   if (!bundle.evaluatedAt || Number.isNaN(Date.parse(bundle.evaluatedAt))) {
     rejections.push({
@@ -455,6 +545,94 @@ export function validateReplayInputBundle(
   }
 
   return { valid: rejections.length === 0, rejections };
+}
+
+/**
+ * Valida a configuração efetiva embutida (v2).
+ *
+ * Bundle v1 não tem o campo e **não é reprovado por isso** — ele nasceu antes
+ * do contrato existir. O que a ausência custa a ele é a capacidade de replay
+ * quando a avaliação usou release, e isso é decidido no verificador
+ * (`MISSING_EFFECTIVE_CONFIGURATION`), não aqui.
+ *
+ * Adulterar a configuração invalida o bundle **antes** de qualquer execução:
+ * o `configHash` é recalculado a partir do conteúdo e comparado.
+ */
+function validateEmbeddedConfiguration(
+  bundle: ReplayInputBundle,
+  computeHash?: (canonical: string) => string
+): BundleRejection[] {
+  const rejections: BundleRejection[] = [];
+  const configuration = bundle.effectiveRecommendationConfiguration;
+
+  if (bundle.schemaVersion === REPLAY_BUNDLE_SCHEMA_VERSION_V1) {
+    // v1 não declara configuração. Nada a validar — e nada a inventar.
+    return rejections;
+  }
+
+  if (!configuration) {
+    rejections.push({
+      code: "MISSING_EFFECTIVE_CONFIGURATION",
+      detail: `Bundle ${bundle.schemaVersion} precisa carregar a configuração efetiva completa.`
+    });
+    return rejections;
+  }
+
+  // Origem e releaseId têm que concordar: uma release sem id não é
+  // identificável, e uma baseline com id afirma uma origem que ela não tem.
+  const source = configuration.source;
+  if (source.type === "RELEASE" && !source.releaseId) {
+    rejections.push({
+      code: "CONFIGURATION_SOURCE_INCONSISTENT",
+      detail: "Configuração de origem RELEASE sem `releaseId`."
+    });
+  }
+  if (source.type === "BUILT_IN_BASELINE" && "releaseId" in source && source.releaseId) {
+    rejections.push({
+      code: "CONFIGURATION_SOURCE_INCONSISTENT",
+      detail: "Configuração de origem BUILT_IN_BASELINE não pode declarar `releaseId`."
+    });
+  }
+
+  const structural = validateEffectiveConfigurationStructure(configuration);
+  for (const problem of structural.problems) {
+    rejections.push({
+      code: "CONFIGURATION_PARAMETER_INVALID",
+      detail: `Parâmetro inválido na configuração embutida: ${JSON.stringify(problem)}.`
+    });
+  }
+
+  // A configuração declara com qual agregação ela é compatível. Uma versão
+  // que este domínio não reconhece não pode ser executada às cegas.
+  const aggregation = configuration.algorithmCompatibility?.aggregation;
+  if (aggregation && !SUPPORTED_AGGREGATION_VERSIONS.includes(aggregation)) {
+    rejections.push({
+      code: "INCOMPATIBLE_CONFIGURATION_VERSION",
+      detail: `Agregação ${aggregation} não é suportada por esta versão do motor.`
+    });
+  }
+
+  // O `configHash` ecoado em `algorithmVersions` e o da configuração embutida
+  // descrevem o mesmo fato; discordar significa que um dos dois foi mexido.
+  const echoed = bundle.algorithmVersions?.recommendationConfiguration;
+  if (echoed && echoed !== configuration.configHash) {
+    rejections.push({
+      code: "CONFIGURATION_HASH_INCONSISTENT",
+      detail: "`algorithmVersions.recommendationConfiguration` diverge do `configHash` da configuração embutida."
+    });
+  }
+
+  if (computeHash) {
+    const expected = computeHash(canonicalConfigurationContent(configuration));
+    if (expected !== configuration.configHash) {
+      rejections.push({
+        code: "CONFIGURATION_HASH_MISMATCH",
+        detail: `A configuração embutida não corresponde ao configHash declarado (esperado ${expected}).`
+      });
+    }
+  }
+
+  return rejections;
 }
 
 /**

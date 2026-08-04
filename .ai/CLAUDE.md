@@ -1,5 +1,62 @@
 # Sparta - Contexto para Continuidade
 
+## Etapa 27c: replay autossuficiente para configurações promovidas
+
+Corrige o achado bloqueante da ativação da `release-etapa27b-v2` (seção abaixo): o
+`ReplayInputBundle` passa a preservar a **configuração efetiva completa**, não só o `configHash`.
+
+**`replay-input-bundle/2.0.0`** ganha `effectiveRecommendationConfiguration`. Opcional no tipo só
+porque bundle v1 legitimamente não o tem; a validação exige presença quando o schema é v2.
+**A canonicalização é versionada**: acrescentar o campo incondicionalmente mudaria o `contentHash`
+de todo bundle v1 **já persistido**, que passaria a falhar integridade — backfill silencioso pela
+porta dos fundos. O ramo v1 devolve a mesma string de antes; só o v2 acrescenta a configuração,
+canonicalizada por `canonicalConfigurationContent` (a mesma que produz o `configHash`) mais
+`version`/`configHash` à parte.
+
+**A causa raiz era o tipo do registro.** `ReplayImplementation` agora exige a configuração como
+**segundo parâmetro obrigatório** — antes ela era opcional em `replayRecommendationEngineV1` e o
+tipo do registro a apagava, produzindo fallback silencioso para a baseline. Não existe mais como
+chamar o replay sem dizer com qual configuração; o compilador achou sozinho os pontos que o tipo
+antigo escondia.
+
+**`resolveBundleConfiguration` tira a configuração só do bundle**: v2 usa a embutida (inclusive a
+baseline embutida, **direta**, não recalculada das constantes atuais — senão um ajuste futuro
+delas mudaria em silêncio o replay de um snapshot antigo); v1 sem `configHash` é anterior à 27b,
+quando release não existia; v1 **com** `configHash` é desambiguado pelo próprio bundle,
+recalculando a baseline do cenário e comparando o hash. Bate → era baseline, replay exato. Não
+bate → era release. **Não** se busca o artefato pelo hash, o que reintroduziria fonte externa no
+caminho de verificação. Isso funciona porque a baseline varia por cenário: os dois bundles de
+baseline reais têm hashes distintos, e o de release tem outro.
+
+**`MISSING_EFFECTIVE_CONFIGURATION`** (status + capacidade
+`FULL_DERIVATION_REPLAY_MISSING_CONFIGURATION`) classifica honestamente o bundle v1 de release:
+distinto de `INVALID` (nada corrompeu) e de `UNAVAILABLE` (os inputs de derivação estão lá). O
+replay **não roda** — executar a baseline produziria as mesmas 10 divergências enganosas.
+`reweightAvailable` continua `true`. Seis rejeições novas cobrem hash da configuração, coerência
+origem/`releaseId`, parâmetros e compatibilidade; configuração adulterada invalida o bundle antes
+de qualquer execução.
+
+**Bug real corrigido no caminho**: `validateRelease` no cliente do desktop fazia `POST` sem corpo
+com `Content-Type: application/json` — 400 `FST_ERR_CTP_EMPTY_JSON_BODY` antes de a rota rodar,
+mesmo defeito da 26b. Introduzido por mim na 27b, só exposto ao exercitar a validação pelo caminho
+real; o botão "Validar" nunca teria funcionado. As duas ocorrências pendentes em
+`generateDraftComparison`/`revealDraftReviewResult` seguem fora de escopo.
+
+**Validado real**: em **conta isolada** (criada, exercitada e removida sem resíduo), o cenário
+exato que causou o rollback — recomendação sob release ativa — replayou com **`EXACT_REPLAY` e 0
+divergências**; com os pesos da release **adulterados no banco** e depois com a release
+**deletada**, o replay seguiu exato; ciclo ativação → rollback pela API com o replay do snapshot
+da release continuando exato **depois** do rollback. No universo real de 16 bundles: **13 pré-27b
+e 2 de baseline → `EXACT_REPLAY`**; o único de release → `MISSING_EFFECTIVE_CONFIGURATION` com **0
+divergências** (eram 10). Ranking da baseline **idêntico** ao anterior. Electron com 0 erro de
+console, 0 imagem quebrada, 0 `NaN`/`undefined`.
+
+**A conta real continua na baseline.** `release-etapa27c-v1` foi criada e validada até
+`READY_FOR_ACTIVATION` e **não** foi ativada; `release-etapa27b-v2` continua `ROLLED_BACK`
+(terminal). 24 testes novos (620 em `packages/core`; 1052 no monorepo). Sem migration — o bundle é
+JSONB. Ver `docs/replay-input-bundle.md` e
+`.ai/prompts/features/0032-replay-autossuficiente-configuracao.md`.
+
 ## Ativação real de `release-etapa27b-v2`: ativada, reprovada no replay, revertida
 
 Autorizada explicitamente pelo usuário depois da Etapa 27b. A ativação **funcionou como

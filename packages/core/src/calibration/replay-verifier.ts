@@ -1,10 +1,11 @@
-import { recommendFromPersonalPool } from "../draft/recommendation-engine.js";
+import { buildBaselineConfiguration, recommendFromPersonalPool } from "../draft/recommendation-engine.js";
 import type { PersistedRecommendation } from "../draft/recommendation-snapshot.js";
 import type { DraftPick, DraftState } from "../types/domain.js";
 import type { RecommendationMetricKey } from "../types/recommendation-metric.js";
 import type { EffectiveRecommendationConfiguration } from "../release/effective-configuration.js";
 import {
-  REPLAY_BUNDLE_SCHEMA_VERSION,
+  REPLAY_BUNDLE_SCHEMA_VERSION_V1,
+  SUPPORTED_REPLAY_BUNDLE_SCHEMAS,
   validateReplayInputBundle,
   type BundleRejection,
   type ReplayInputBundle
@@ -33,7 +34,15 @@ export type ReplayVerificationStatus =
   | "UNSUPPORTED_BUNDLE_SCHEMA"
   | "UNSUPPORTED_ALGORITHM_VERSION"
   | "INVALID_BUNDLE"
-  | "MISSING_DEPENDENCY";
+  | "MISSING_DEPENDENCY"
+  /**
+   * Bundle v1 cuja avaliação usou uma **release**: ele preservou o
+   * identificador da configuração (`configHash`), mas não os parâmetros
+   * efetivos, então não há como reconstruir o resultado. Distinto de
+   * `REPLAY_INTEGRITY_FAILED`: nada divergiu, o replay sequer é executável.
+   * Rodar a baseline aqui produziria divergências conhecidas e enganosas.
+   */
+  | "MISSING_EFFECTIVE_CONFIGURATION";
 
 export interface ReplayDivergence {
   championId?: number;
@@ -52,10 +61,31 @@ export interface ReplayVerificationResult {
   replayImplementation?: string;
 }
 
-/** Assinatura de uma implementação de replay registrada por versão. */
+export interface ReplayReconstructedCandidate {
+  championId: number;
+  championName: string;
+  totalScore: number;
+  dataCoverage: number;
+  rank: number;
+  group: "PRIMARY" | "ALTERNATIVE";
+  metricValues: Partial<Record<RecommendationMetricKey, number | null>>;
+}
+
+/**
+ * Assinatura de uma implementação de replay registrada por versão.
+ *
+ * `configuration` é **obrigatória** (Etapa 27c). Antes ela era um parâmetro
+ * opcional de `replayRecommendationEngineV1` que o tipo do registro apagava,
+ * e o resultado prático era um fallback silencioso para a baseline: a
+ * verificação de um snapshot produzido sob release reconstruía com
+ * `selectWeights(draft)` e reportava divergências que não eram divergências
+ * de verdade. Tornar o parâmetro obrigatório fecha esse caminho no tipo — não
+ * existe mais como chamar o replay sem dizer com qual configuração.
+ */
 export type ReplayImplementation = (
-  bundle: ReplayInputBundle
-) => { championId: number; championName: string; totalScore: number; dataCoverage: number; rank: number; group: "PRIMARY" | "ALTERNATIVE"; metricValues: Partial<Record<RecommendationMetricKey, number | null>> }[];
+  bundle: ReplayInputBundle,
+  configuration: EffectiveRecommendationConfiguration
+) => ReplayReconstructedCandidate[];
 
 /**
  * Reconstrói `DraftState` a partir do bundle.
@@ -102,16 +132,15 @@ export function draftStateFrom(bundle: ReplayInputBundle): DraftState {
  * operacional, alimentada só pelo bundle. `evaluatedAt` vem congelado — usar
  * `new Date()` aqui faria a recência do risco mudar a cada execução.
  *
- * `configuration` (Etapa 27a, opcional) permite rodar o mesmo bundle com uma
- * configuração de release em vez da baseline — usado por
- * `release/laboratory-equivalence.ts` para provar que o motor operacional,
- * alimentado por dado histórico real, reproduz o que o laboratório calculou
- * a partir de métricas congeladas. Omitido, o comportamento é exatamente o
- * de antes desta etapa.
+ * `configuration` é obrigatória (Etapa 27c) e vem **sempre** do bundle, nunca
+ * do estado operacional: para v2 é a configuração embutida; para v1 é a
+ * baseline do cenário histórico, derivada do próprio draft do bundle. Em
+ * nenhum dos dois casos esta função consulta release, provider, banco ou
+ * cache — ela não tem por onde.
  */
 export function replayRecommendationEngineV1(
   bundle: ReplayInputBundle,
-  configuration?: EffectiveRecommendationConfiguration
+  configuration: EffectiveRecommendationConfiguration
 ): ReturnType<ReplayImplementation> {
   const tags = bundle.referencedChampions
     .map((entry) => entry.championTag)
@@ -136,7 +165,7 @@ export function replayRecommendationEngineV1(
     compositionRules: bundle.activeParameters.compositionRules,
     patchMeta: null,
     evaluatedAt: bundle.evaluatedAt,
-    ...(configuration ? { configuration } : {})
+    configuration
   });
 
   const collect = (
@@ -159,6 +188,100 @@ export function replayRecommendationEngineV1(
     ...collect(response.primaryRecommendations, "PRIMARY"),
     ...collect(response.alternatives, "ALTERNATIVE")
   ];
+}
+
+/**
+ * Hash local e determinístico, usado **só** para materializar a baseline de
+ * um bundle v1 durante o replay. Esse `configHash` não é persistido, não é
+ * comparado com nada e não sai desta função — a baseline v1 é identificada
+ * pelo cenário do draft, não por hash. `packages/core` roda no renderer e não
+ * pode usar `node:crypto`, e injetar `computeHash` só para um valor
+ * descartável seria ruído na assinatura pública.
+ */
+function replayLocalHash(canonical: string): string {
+  let hash = 0;
+  for (let index = 0; index < canonical.length; index += 1) {
+    hash = (hash * 31 + canonical.charCodeAt(index)) | 0;
+  }
+  return `replay-local-${hash}`;
+}
+
+export type BundleConfigurationOrigin =
+  /** Configuração efetiva embutida no próprio bundle (v2). */
+  | "EMBEDDED"
+  /** Baseline do cenário histórico, derivada do draft do bundle (v1). */
+  | "DERIVED_BASELINE_V1";
+
+export type BundleConfigurationResolution =
+  | {
+      ok: true;
+      configuration: EffectiveRecommendationConfiguration;
+      origin: BundleConfigurationOrigin;
+    }
+  | { ok: false; reason: "MISSING_EFFECTIVE_CONFIGURATION"; detail: string };
+
+/**
+ * Resolve a configuração do replay **exclusivamente a partir do bundle**.
+ *
+ * - **v2**: usa a configuração embutida, seja ela de baseline ou de release.
+ *   A baseline embutida também é usada diretamente, em vez de recalculada a
+ *   partir das constantes atuais — senão um ajuste futuro dessas constantes
+ *   mudaria em silêncio o replay de um snapshot antigo.
+ * - **v1 sem `configHash` registrado**: anterior à Etapa 27b, quando release
+ *   operacional não existia. A baseline do cenário é, por construção, a
+ *   configuração que produziu aquele resultado.
+ * - **v1 com `configHash` registrado**: pode ter sido baseline ou release. A
+ *   distinção sai do próprio bundle, sem consultar nada: recalcula-se a
+ *   baseline do cenário e compara-se o `configHash`. Bate → era baseline.
+ *   Não bate → era release, e os parâmetros dela não foram preservados.
+ */
+export function resolveBundleConfiguration(
+  bundle: ReplayInputBundle,
+  computeHash?: (canonical: string) => string
+): BundleConfigurationResolution {
+  const embedded = bundle.effectiveRecommendationConfiguration;
+  if (embedded) {
+    return { ok: true, configuration: embedded, origin: "EMBEDDED" };
+  }
+
+  if (bundle.schemaVersion !== REPLAY_BUNDLE_SCHEMA_VERSION_V1) {
+    return {
+      ok: false,
+      reason: "MISSING_EFFECTIVE_CONFIGURATION",
+      detail: `Bundle ${bundle.schemaVersion} sem a configuração efetiva embutida.`
+    };
+  }
+
+  const recorded = bundle.algorithmVersions?.recommendationConfiguration;
+  const baseline = buildBaselineConfiguration(draftStateFrom(bundle), {
+    computeHash: computeHash ?? replayLocalHash
+  });
+
+  if (!recorded) {
+    // Bundle anterior à existência de release operacional: só a baseline
+    // podia tê-lo produzido.
+    return { ok: true, configuration: baseline, origin: "DERIVED_BASELINE_V1" };
+  }
+
+  if (!computeHash) {
+    return {
+      ok: false,
+      reason: "MISSING_EFFECTIVE_CONFIGURATION",
+      detail:
+        "Bundle v1 com identificador de configuração, mas sem função de hash para confirmar que era a baseline."
+    };
+  }
+
+  if (recorded === baseline.configHash) {
+    return { ok: true, configuration: baseline, origin: "DERIVED_BASELINE_V1" };
+  }
+
+  return {
+    ok: false,
+    reason: "MISSING_EFFECTIVE_CONFIGURATION",
+    detail:
+      "Esta versão preservou o identificador da configuração, mas não seus parâmetros efetivos."
+  };
 }
 
 /**
@@ -195,14 +318,14 @@ export function verifyReplayBundle(input: VerifyReplayInput): ReplayVerification
   const registry = input.registry ?? replayEngines;
   const empty = { divergences: [], rejections: [], missingDependencies: [] };
 
-  if (bundle.schemaVersion !== REPLAY_BUNDLE_SCHEMA_VERSION) {
+  if (!SUPPORTED_REPLAY_BUNDLE_SCHEMAS.includes(bundle.schemaVersion)) {
     return {
       ...empty,
       status: "UNSUPPORTED_BUNDLE_SCHEMA",
       rejections: [
         {
           code: "UNSUPPORTED_SCHEMA",
-          detail: `Schema ${bundle.schemaVersion} não é reconhecido por ${REPLAY_BUNDLE_SCHEMA_VERSION}.`
+          detail: `Schema ${bundle.schemaVersion} não está entre os suportados (${SUPPORTED_REPLAY_BUNDLE_SCHEMAS.join(", ")}).`
         }
       ]
     };
@@ -238,7 +361,22 @@ export function verifyReplayBundle(input: VerifyReplayInput): ReplayVerification
     };
   }
 
-  const reconstructed = implementation(bundle);
+  // A configuração vem SÓ do bundle. Sem ela, o replay não é executado —
+  // rodar a baseline no lugar produziria divergências que não descrevem
+  // divergência nenhuma, foi exatamente o que reprovou a ativação da
+  // `release-etapa27b-v2`.
+  const resolved = resolveBundleConfiguration(bundle, input.computeHash);
+  if (!resolved.ok) {
+    return {
+      ...empty,
+      status: "MISSING_EFFECTIVE_CONFIGURATION",
+      missingDependencies,
+      replayImplementation: key,
+      rejections: [{ code: "MISSING_EFFECTIVE_CONFIGURATION", detail: resolved.detail }]
+    };
+  }
+
+  const reconstructed = implementation(bundle, resolved.configuration);
   const byChampion = new Map(reconstructed.map((entry) => [entry.championId, entry]));
   const divergences: ReplayDivergence[] = [];
 
@@ -375,7 +513,15 @@ export type SnapshotReplayCapability =
   | "FULL_DERIVATION_REPLAY_AVAILABLE"
   | "FULL_DERIVATION_REPLAY_UNAVAILABLE"
   | "FULL_DERIVATION_REPLAY_INVALID"
-  | "FULL_DERIVATION_REPLAY_UNSUPPORTED_VERSION";
+  | "FULL_DERIVATION_REPLAY_UNSUPPORTED_VERSION"
+  /**
+   * Bundle de uma versão que preservou o **identificador** da configuração,
+   * mas não os parâmetros efetivos, e a avaliação usou release. Não é
+   * "inválido" (nada está corrompido) nem "indisponível por dependência"
+   * (os inputs de derivação estão todos lá): é especificamente a
+   * configuração que falta.
+   */
+  | "FULL_DERIVATION_REPLAY_MISSING_CONFIGURATION";
 
 export interface SnapshotReplayCapabilityReport {
   capability: SnapshotReplayCapability;
@@ -449,6 +595,16 @@ export function describeSnapshotReplayCapability(input: {
         status === "UNSUPPORTED_ALGORITHM_VERSION"
           ? "Versão histórica do motor não suportada."
           : "Schema do bundle não suportado por esta versão.",
+      verificationStatus: status
+    };
+  }
+
+  if (status === "MISSING_EFFECTIVE_CONFIGURATION") {
+    return {
+      ...common,
+      capability: "FULL_DERIVATION_REPLAY_MISSING_CONFIGURATION",
+      reason:
+        "Replay completo indisponível: esta versão preservou o identificador da configuração, mas não seus parâmetros efetivos.",
       verificationStatus: status
     };
   }

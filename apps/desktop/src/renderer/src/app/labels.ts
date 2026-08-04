@@ -123,5 +123,16 @@ export const replayCapabilityLabels: Record<string, string> = {
   REWEIGHT_ONLY: "Replay limitado à reponderação",
   FULL_DERIVATION_REPLAY_UNAVAILABLE: "Inputs históricos não preservados nesta versão",
   FULL_DERIVATION_REPLAY_INVALID: "Bundle inválido",
-  FULL_DERIVATION_REPLAY_UNSUPPORTED_VERSION: "Versão histórica não suportada"
+  FULL_DERIVATION_REPLAY_UNSUPPORTED_VERSION: "Versão histórica não suportada",
+  // Etapa 27c: nada corrompeu e nenhum input falta — o que falta são os
+  // parâmetros da configuração, preservados só como identificador naquela
+  // versão. Chamar isso de "inválido" acusaria o registro de um defeito que
+  // ele não tem.
+  FULL_DERIVATION_REPLAY_MISSING_CONFIGURATION: "Configuração efetiva não preservada nesta versão"
+};
+
+/** Origem da configuração que produziu um snapshot. */
+export const configurationSourceLabels: Record<string, string> = {
+  BUILT_IN_BASELINE: "Baseline",
+  RELEASE: "Release"
 };

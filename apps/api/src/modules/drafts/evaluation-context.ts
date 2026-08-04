@@ -351,6 +351,11 @@ export function buildReplayBundle(input: {
     evaluatedAt: context.evaluatedAt,
     capturedAt: input.capturedAt ?? new Date().toISOString(),
     algorithmVersions: { ...context.algorithmVersions },
+    // Etapa 27c: a MESMA instância já resolvida em `buildEvaluationContext`,
+    // que também alimentou o motor, o snapshot e a observabilidade. Nada é
+    // relido do banco nem reconstruído aqui — uma segunda cópia poderia
+    // divergir da que de fato produziu o resultado.
+    effectiveRecommendationConfiguration: context.configuration,
     draft: {
       role: context.role,
       roleSource: context.draft.playerRoleSource ?? "USER",

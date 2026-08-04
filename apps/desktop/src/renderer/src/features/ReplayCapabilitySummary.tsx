@@ -5,7 +5,7 @@ import {
   type ReplayBundleSummary
 } from "../services/api-client";
 import { useAsyncData } from "../hooks/use-async-data";
-import { replayCapabilityLabels } from "../app/labels";
+import { configurationSourceLabels, replayCapabilityLabels } from "../app/labels";
 import { Button, SignalChip } from "../ui";
 
 /**
@@ -43,6 +43,9 @@ export function ReplayCapabilitySummary({
     return null;
   }
 
+  // `MISSING_CONFIGURATION` fica em `info`, não em `negative`: o registro está
+  // íntegro e os inputs de derivação todos lá — o que falta é um campo que
+  // aquela versão do schema não tinha. Não é defeito do snapshot.
   const tone: "positive" | "negative" | "info" =
     data.capability === "FULL_DERIVATION_REPLAY_AVAILABLE"
       ? "positive"
@@ -71,6 +74,24 @@ export function ReplayCapabilitySummary({
           {data.lastVerification
             ? ` · Última verificação: ${new Date(data.lastVerification.verifiedAt).toLocaleString("pt-BR")}`
             : " · Ainda não verificado"}
+        </p>
+      )}
+
+      {data.configuration && (
+        <p style={secondaryTextStyle}>
+          Configuração: {configurationSourceLabels[data.configuration.source] ?? data.configuration.source}
+          {data.configuration.version ? ` ${data.configuration.version}` : ""}
+          {data.configuration.configHash
+            ? ` · hash ${data.configuration.configHash.slice(0, 12)}…`
+            : " · sem identificador (anterior ao registro de configuração)"}
+          {data.configuration.releaseId
+            ? ` · release ${data.configuration.releaseId.slice(0, 8)}…`
+            : ""}
+          {data.hasBundle
+            ? data.configuration.embeddedInBundle
+              ? " · parâmetros preservados no bundle"
+              : " · parâmetros não preservados no bundle"
+            : ""}
         </p>
       )}
 

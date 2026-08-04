@@ -113,6 +113,23 @@ export async function findSessionReplayCapability(
   return { sessionId, snapshotId: snapshot.id, ...describeCapability(snapshot) };
 }
 
+/**
+ * Identidade da configuração que produziu o snapshot (Etapa 27c).
+ *
+ * Deliberadamente **não** carrega pesos, métricas desligadas nem regras
+ * pós-agregação: a interface comum precisa saber *qual* configuração valia e
+ * se o replay é possível, não reproduzir a configuração inteira. Quem quer os
+ * parâmetros usa a tela de releases, que os lê do artefato.
+ */
+export interface ReplayConfigurationIdentity {
+  source: "BUILT_IN_BASELINE" | "RELEASE";
+  releaseId: string | null;
+  version: string | null;
+  configHash: string | null;
+  /** `true` quando o bundle carrega a configuração efetiva completa (v2+). */
+  embeddedInBundle: boolean;
+}
+
 export interface ReplayBundleSummaryResponse extends SnapshotReplayCapabilityReport {
   snapshotId: string;
   hasBundle: boolean;
@@ -120,6 +137,7 @@ export interface ReplayBundleSummaryResponse extends SnapshotReplayCapabilityRep
   evaluatedAt?: string;
   createdAt?: string;
   lastVerification?: unknown;
+  configuration?: ReplayConfigurationIdentity;
 }
 
 /**
@@ -127,6 +145,24 @@ export interface ReplayBundleSummaryResponse extends SnapshotReplayCapabilityRep
  * observabilidade precisam. O conteúdo funcional (draft, stats, tags,
  * capacidades) nunca sai desta função.
  */
+/**
+ * Identidade da configuração, lida do **snapshot** (o eco gravado pela 27b) e
+ * do bundle. Snapshot anterior à 27b não tem o eco e sai como baseline sem
+ * `configHash` — que é o fato: naquela versão não existia release nenhuma.
+ */
+function describeConfiguration(snapshot: OwnedSnapshot): ReplayConfigurationIdentity {
+  const bundle = snapshot.replayBundle
+    ? (snapshot.replayBundle.contentJson as unknown as ReplayInputBundle)
+    : null;
+  return {
+    source: (snapshot.configurationSource as "BUILT_IN_BASELINE" | "RELEASE") ?? "BUILT_IN_BASELINE",
+    releaseId: snapshot.configurationReleaseId,
+    version: snapshot.configurationVersion,
+    configHash: snapshot.configHash,
+    embeddedInBundle: bundle?.effectiveRecommendationConfiguration !== undefined
+  };
+}
+
 export async function findReplayBundleSummary(
   riotAccountId: string,
   snapshotId: string
@@ -141,6 +177,7 @@ export async function findReplayBundleSummary(
     snapshotId,
     hasBundle: bundleRow !== null,
     ...report,
+    configuration: describeConfiguration(snapshot),
     ...(bundleRow
       ? {
           contentBytes: bundleRow.contentBytes,
