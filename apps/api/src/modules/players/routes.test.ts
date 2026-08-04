@@ -476,7 +476,11 @@ describe("players routes", () => {
 
       expect(created.statusCode).toBe(201);
       expect(addUserProvidedPoolEntryMock).toHaveBeenCalledWith("acc-1", "puuid-1", 61, "MID");
-      expect(forged.statusCode).toBe(500);
+      // Origem forjada continua recusada; desde a Etapa 28a o status é 400
+      // (erro do cliente) em vez de 500 — o zod passou a ser tratado pelo
+      // handler global, que antes nunca chegava às rotas.
+      expect(forged.statusCode).toBe(400);
+      expect(forged.json().error).toBe("invalid_payload");
       expect(addUserProvidedPoolEntryMock).toHaveBeenCalledTimes(1);
       await app.close();
     });
@@ -553,7 +557,7 @@ describe("players routes", () => {
       await app.close();
     });
 
-    it("rejeita valores fora de [1,200] (zod.parse lanca, mesmo comportamento das outras rotas sem handler global de erro)", async () => {
+    it("rejeita valores fora de [1,200] com 400 sanitizado (handler global, Etapa 28a)", async () => {
       getAuthenticatedUserIdMock.mockResolvedValue("user-1");
       riotAccountFindFirstMock.mockResolvedValue({
         id: "acc-1",
@@ -568,7 +572,8 @@ describe("players routes", () => {
         payload: { matchAnalysisLimit: 500 }
       });
 
-      expect(response.statusCode).toBe(500);
+      expect(response.statusCode).toBe(400);
+      expect(response.json().error).toBe("invalid_payload");
       expect(setMatchAnalysisLimitMock).not.toHaveBeenCalled();
       await app.close();
     });

@@ -93,6 +93,16 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  // `Content-Type: application/json` só quando existe corpo de fato.
+  //
+  // Anunciar JSON sem enviar nada faz o Fastify recusar a requisição com
+  // `FST_ERR_CTP_EMPTY_JSON_BODY` (400) **antes** de a rota rodar — o
+  // content-type é uma descrição do corpo, e sem corpo não há o que
+  // descrever. Esse defeito já apareceu três vezes neste cliente
+  // (`verifySnapshotReplay` na Etapa 26b, `validateRelease` na 27c, e as
+  // duas ocorrências restantes corrigidas aqui); tratá-lo no ponto central
+  // elimina a classe inteira em vez de cada caso.
+  const hasBody = options.body !== undefined && options.body !== null;
   const response = await fetchWithPolicy(`${API_BASE_URL}${path}`, {
     integration: "SPARTA_API",
     timeoutMs: HTTP_TIMEOUTS.spartaApiMs,
@@ -101,7 +111,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     request: {
       ...options,
       headers: {
-        "Content-Type": "application/json",
+        ...(hasBody ? { "Content-Type": "application/json" } : {}),
         ...options.headers
       }
     }
@@ -777,11 +787,7 @@ export function verifySnapshotReplay(token: string, snapshotId: string) {
     `/recommendation-snapshots/${encodeURIComponent(snapshotId)}/verify-replay`,
     {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-      // `request()` sempre manda Content-Type: application/json; sem corpo o
-      // Fastify recusa com FST_ERR_CTP_EMPTY_JSON_BODY antes de a rota rodar
-      // (achado real na validação desta etapa, via UI real, não via curl).
-      body: "{}"
+      headers: { Authorization: `Bearer ${token}` }
     }
   );
 }
@@ -1208,13 +1214,7 @@ export function fetchRelease(token: string, releaseId: string) {
 export function validateRelease(token: string, releaseId: string) {
   return request<ReleaseRow>(`/calibration/releases/${encodeURIComponent(releaseId)}/validate`, {
     method: "POST",
-    headers: auth(token),
-    // `request` sempre manda `Content-Type: application/json`, e o Fastify
-    // recusa POST sem corpo com esse content-type (`FST_ERR_CTP_EMPTY_JSON_BODY`,
-    // 400) **antes** de a rota rodar — mesmo defeito achado na Etapa 26b em
-    // `verifySnapshotReplay`. Introduzido por mim na 27b e só exposto agora,
-    // ao exercitar a validação pelo caminho real.
-    body: "{}"
+    headers: auth(token)
   });
 }
 

@@ -36,6 +36,12 @@ services:
       ANALYZER_URL: http://analyzer:8000
     ports:
       - "3333:3333"
+    # Um container que morre por erro transitório (banco reiniciando, por
+    # exemplo) ficava parado até alguém perceber.
+    restart: unless-stopped
+    # `stop_grace_period` dá ao Fastify tempo de terminar as requisições em
+    # curso antes do SIGKILL, em vez de cortá-las no meio.
+    stop_grace_period: 15s
     depends_on:
       postgres:
         condition: service_healthy

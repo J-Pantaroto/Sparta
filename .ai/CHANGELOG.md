@@ -22,6 +22,22 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-08-04 12:40 — Etapa 28a: auditoria de segurança e prontidão para release
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0034-auditoria-seguranca-prontidao.md`
+
+Auditoria completa com a release ativa (relatório em `docs/security-audit.md`). Vulnerabilidades
+alcançáveis: 14 high → 4 high, só com patch/minor; as restantes são do Electron e exigem major,
+adiado com análise de alcance. Dois bugs reais achados na auditoria: `setErrorHandler` registrado
+depois dos `register` (nunca chegava às rotas — a correção anterior era ilusória) e
+`Content-Type: application/json` injetado em toda requisição, causa comum dos três
+`FST_ERR_CTP_EMPTY_JSON_BODY`. Corrigidos também: erro de schema virou 400 sanitizado, cabeçalhos
+de endurecimento, `/docs` opt-in, Electron com `sandbox`/`setWindowOpenHandler`/`will-navigate`, e
+container deixou de rodar como root com lockfile reprodutível, healthcheck e shutdown controlado.
+Release ativa produziu ranking idêntico antes e depois; replay segue `EXACT_REPLAY`. 1066 testes.
+
+---
+
 ## 2026-08-04 03:58 — Ativação controlada de `release-etapa27c-v1`: ativa e mantida
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0033-ativacao-release-etapa27c-v1.md`

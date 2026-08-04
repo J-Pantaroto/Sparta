@@ -79,7 +79,31 @@ function createWindow() {
     webPreferences: {
       preload: join(__dirname, "../preload/index.cjs"),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      // Explícito de propósito. O Electron já usa `true` por padrão nesta
+      // configuração — e é por causa dele que o preload precisa ser CommonJS
+      // (o loader do renderer sandboxed não entende ESM, bug real corrigido
+      // numa sessão anterior). Declarar deixa a dependência visível: quem
+      // mexer no formato do preload vê o motivo aqui.
+      sandbox: true
+    }
+  });
+
+  // Sparta não abre janela nenhuma a partir do renderer. Sem este handler, um
+  // `window.open` (ou conteúdo injetado que o provoque) criaria uma
+  // `BrowserWindow` nova com as preferências padrão, fora da CSP desta
+  // janela. Negar por padrão é o comportamento correto, e um link legítimo
+  // futuro deve passar por `shell.openExternal` com destino conferido.
+  window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+
+  // A janela do app não navega para fora dela mesma. Sem esta guarda, uma
+  // navegação induzida no renderer substituiria a aplicação inteira por
+  // conteúdo externo, mantendo o preload e o bridge no lugar.
+  window.webContents.on("will-navigate", (event, targetUrl) => {
+    const allowed = process.env.ELECTRON_RENDERER_URL;
+    const isDevServer = allowed !== undefined && targetUrl.startsWith(allowed);
+    if (!isDevServer && !targetUrl.startsWith("file://")) {
+      event.preventDefault();
     }
   });
 

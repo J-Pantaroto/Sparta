@@ -3,6 +3,7 @@ import rateLimit from "@fastify/rate-limit";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
 import Fastify from "fastify";
+import { ZodError } from "zod";
 import { ExternalServiceError } from "@sparta/riot";
 import { safeExternalErrorLog, sendExternalError } from "./http/external-error-response.js";
 import { authRoutes } from "./modules/auth/routes.js";
@@ -47,15 +48,86 @@ export async function buildApp() {
   // Limite global generoso; rotas sensiveis a forca bruta (login/registro)
   // tem limite proprio, mais restrito, definido em modules/auth/routes.ts.
   await app.register(rateLimit, { max: 100, timeWindow: "1 minute" });
-  await app.register(swagger, {
-    openapi: {
-      info: {
-        title: "Sparta API",
-        version: "0.1.0"
-      }
-    }
+  // Cabeçalhos de endurecimento aplicados a toda resposta. Escritos à mão em
+  // vez de trazer `@fastify/helmet`: a API só é consumida pelo renderer do
+  // Electron em localhost, e uma dependência nova é superfície nova. HSTS
+  // fica de fora de propósito — o serviço é HTTP em localhost, e anunciar
+  // HSTS ali só criaria um pin inútil no navegador do usuário.
+  app.addHook("onSend", async (_request, reply, payload) => {
+    reply.header("X-Content-Type-Options", "nosniff");
+    reply.header("X-Frame-Options", "DENY");
+    reply.header("Referrer-Policy", "no-referrer");
+    reply.header("Cross-Origin-Resource-Policy", "same-origin");
+    reply.header("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'");
+    reply.removeHeader("X-Powered-By");
+    return payload;
   });
-  await app.register(swaggerUi, { routePrefix: "/docs" });
+
+  // Swagger é ferramenta de desenvolvimento. Fora do desenvolvimento ele
+  // publicaria o inventário completo de rotas e schemas, e
+  // `@fastify/swagger-ui` arrasta `@fastify/static`, que acumula avisos de
+  // path traversal. Sem `/docs`, essa superfície deixa de existir em vez de
+  // depender da versão do transitivo estar em dia.
+  //
+  // A condição é **opt-in** (`=== "development"`), não `!== "production"`:
+  // um ambiente com `NODE_ENV` ausente, vazio ou "staging" não deve ganhar a
+  // documentação por omissão. Errar aqui para o lado fechado é barato — quem
+  // quer `/docs` declara que está em desenvolvimento.
+  if (process.env.NODE_ENV === "development") {
+    await app.register(swagger, {
+      openapi: {
+        info: {
+          title: "Sparta API",
+          version: "0.1.0"
+        }
+      }
+    });
+    await app.register(swaggerUi, { routePrefix: "/docs" });
+  }
+
+  // O error handler precisa ser instalado ANTES dos plugins de rota.
+  // No Fastify, cada contexto encapsulado herda o handler existente no
+  // momento em que e criado — registrado depois, ele nunca chegava as
+  // rotas, e a resposta de erro continuava sendo a serializacao padrao
+  // (500 com a mensagem crua). Achado real: os testes de seguranca desta
+  // etapa reprovaram exatamente por isso.
+  app.setErrorHandler((error, request, reply) => {
+    if (error instanceof ExternalServiceError) {
+      request.log.warn({ event: "external_request_failed", ...safeExternalErrorLog(error) });
+      return sendExternalError(reply, error);
+    }
+
+    // Payload inválido é erro do cliente, não do servidor. Antes, o `parse`
+    // do zod lançava e caía no caminho genérico abaixo: a resposta saía como
+    // **500** com o dump completo do erro do zod no `message` — status errado
+    // e descrição do schema interno de graça. Agora vira 400 com a lista de
+    // caminhos inválidos, sem a mensagem crua da biblioteca.
+    if (error instanceof ZodError) {
+      request.log.info({ event: "invalid_payload", issues: error.issues.length });
+      return reply.status(400).send({
+        error: "invalid_payload",
+        message: "Payload inválido.",
+        fields: error.issues.map((issue) => issue.path.join("."))
+      });
+    }
+
+    // Erro não classificado: registra o detalhe no log do servidor e devolve
+    // uma mensagem genérica. `error.message` pode carregar detalhe de
+    // infraestrutura (nome de tabela, coluna, string de conexão do Prisma) —
+    // isso pertence ao log, não à resposta.
+    const failure = error as { statusCode?: number; name?: string; message?: string };
+    const status = typeof failure.statusCode === "number" ? failure.statusCode : 500;
+    if (status >= 500) {
+      request.log.error({ event: "unhandled_error", name: failure.name, statusCode: status });
+      return reply.status(status).send({
+        error: "internal_error",
+        message: "Não foi possível concluir a operação."
+      });
+    }
+    return reply
+      .status(status)
+      .send({ error: failure.name ?? "request_error", message: failure.message ?? "Requisição inválida." });
+  });
 
   await app.register(healthRoutes);
   await app.register(authRoutes);
@@ -71,14 +143,6 @@ export async function buildApp() {
   await app.register(catalogRoutes);
   await app.register(patchesRoutes);
   await app.register(replaysRoutes);
-
-  app.setErrorHandler((error, request, reply) => {
-    if (error instanceof ExternalServiceError) {
-      request.log.warn({ event: "external_request_failed", ...safeExternalErrorLog(error) });
-      return sendExternalError(reply, error);
-    }
-    return reply.send(error);
-  });
 
   return app;
 }

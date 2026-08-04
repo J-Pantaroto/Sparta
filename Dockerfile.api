@@ -1,16 +1,36 @@
 FROM node:20-slim AS base
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
+# `NODE_ENV=production` não é só cosmético: é o que fecha `/docs` (Swagger UI)
+# na imagem. Ver `apps/api/src/app.ts`.
+ENV NODE_ENV=production
 RUN corepack enable
 WORKDIR /app
 
-COPY package.json pnpm-workspace.yaml tsconfig.base.json tsconfig.node.json eslint.config.js ./
+# O lockfile precisa entrar na imagem. Sem ele o build usava
+# `--frozen-lockfile=false` e resolvia as dependências do zero a cada vez —
+# a imagem podia divergir em silêncio do conjunto que foi auditado e testado,
+# e nenhum `pnpm audit` local descreveria o que de fato está rodando.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json tsconfig.node.json eslint.config.js ./
 COPY packages ./packages
 COPY apps/api ./apps/api
 COPY data ./data
-RUN pnpm install --frozen-lockfile=false
+RUN pnpm install --frozen-lockfile
 RUN pnpm --filter @sparta/api prisma:generate
 RUN pnpm --filter "@sparta/api..." build
 
+# O servidor não escreve nada em disco; rodar como root só dava ao processo
+# permissão de escrita sobre a própria imagem. `node` (uid 1000) já existe na
+# imagem base. O diretório de trabalho passa a pertencer a ele porque o pnpm
+# escreve metadados em `node_modules/.pnpm` ao iniciar via `--filter`.
+RUN chown -R node:node /app /pnpm
+USER node
+
 EXPOSE 3333
+
+# O compose espera o Postgres ficar saudável, mas nada verificava a própria
+# API: um container que subia e travava seguia marcado como no ar.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=25s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:3333/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+
 CMD ["pnpm", "--filter", "@sparta/api", "start"]

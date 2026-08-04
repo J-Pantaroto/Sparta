@@ -1,5 +1,49 @@
 # Sparta - Contexto para Continuidade
 
+## Etapa 28a: auditoria de segurança e prontidão para release
+
+Auditoria completa com a release ativa, corrigindo só o comprovado e de baixo risco. Relatório em
+`docs/security-audit.md` (inventário, severidade, evidência, correção, risco aceito, adiados).
+
+**Dependências**: 14 high → 4 high via `pnpm.overrides` só com patch/minor (`fast-uri`,
+`find-my-way`, `@fastify/static`, `brace-expansion`, `postcss`). As 4 restantes são **todas do
+Electron** e exigem major 37 → 39 — adiadas com análise de alcance: cada uma depende de uma API que
+o Sparta não chama ou de conteúdo web hostil, que a CSP e as novas guardas impedem.
+
+**Dois bugs reais achados na própria auditoria, ambos meus.** (1) `setErrorHandler` estava
+registrado **depois** dos `register`: no Fastify cada contexto encapsulado herda o handler
+existente quando é criado, então ele **nunca chegava às rotas** — a primeira versão da correção de
+sanitização era ilusória, e só apareceu porque escrevi o teste antes de dar o item por resolvido.
+(2) `request()` injetava `Content-Type: application/json` em **toda** requisição: era a causa comum
+das três ocorrências de `FST_ERR_CTP_EMPTY_JSON_BODY` (26b, 27c e as duas pendentes). Corrigido no
+ponto central, e os contornos `body: "{}"` foram removidos.
+
+**API**: erro de schema virou 400 sanitizado (era 500 com o dump do zod, expondo o schema interno);
+erro interno devolve mensagem genérica com o detalhe indo pro log; cabeçalhos de endurecimento em
+toda resposta; `/docs` publicado só com `NODE_ENV === "development"` — **opt-in**, para ambiente
+sem `NODE_ENV` não ganhar documentação por omissão.
+
+**Electron**: `sandbox: true` explícito, `setWindowOpenHandler` negando por padrão, guarda de
+`will-navigate`. Verificado como já seguro: bridge com allowlist de 9 métodos, sem `ipcRenderer`/
+`require`/`process` no renderer, e `download-skin` com https + allowlist de host + `basename()`.
+
+**Containers**: deixou de rodar como **root** (`USER node`); lockfile copiado com
+`--frozen-lockfile` (o build resolvia dependências do zero, e a imagem podia divergir em silêncio
+do conjunto auditado); `HEALTHCHECK`; `restart: unless-stopped`; encerramento controlado em
+`SIGTERM`/`SIGINT` (antes a transação em curso ficava para o timeout do Postgres).
+
+**A release ativa não mudou**: mesmo contexto controlado antes e depois deu ranking **idêntico**
+(Viego 58.7 / Udyr 58.5 / Vi 55.3 / Nocturne 53.3 / Graves 50.1), `artifactHash`/`configHash`
+inalterados, e replay `EXACT_REPLAY` com 0 divergências tanto no snapshot novo quanto no da linha
+de base. **Build empacotado exercitado** a partir de `out/`, sem dev server, em caminho com espaço
+e acento — 0 erro de console, 0 imagem quebrada, bridge com exatamente os 9 métodos.
+
+**Adiado**: Electron major, devDeps na imagem (que cresceu de 1,06 GB para 1,58 GB com o
+`--frozen-lockfile`; resolver exige multi-stage, que não é mudança de baixo risco), PUUID em log de
+acesso, FKs sem índice, migration revertida com arquivo presente, imagem-base sem digest,
+configuração de instalador. 1066 testes. Ver
+`.ai/prompts/features/0034-auditoria-seguranca-prontidao.md`.
+
 ## ESTADO OPERACIONAL ATUAL: `release-etapa27c-v1` está ATIVA
 
 **A configuração operacional do Sparta não é mais a baseline.** Autorizada explicitamente pelo
