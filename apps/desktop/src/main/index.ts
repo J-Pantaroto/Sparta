@@ -17,6 +17,21 @@ import {
 } from "@sparta/riot";
 import type { Role } from "@sparta/core";
 
+/**
+ * O Electron deriva `app.getName()` do campo `name` do `package.json`
+ * empacotado, que aqui e `@sparta/desktop` — nome de pacote do workspace, nao
+ * nome de produto. Sem esta chamada, `app.getPath("userData")` vira
+ * `%APPDATA%\@sparta\desktop`: a barra do escopo vira subpasta, e o usuario
+ * ganha um diretorio `@sparta` solto em AppData com o nome interno do
+ * monorepo. Achado ao validar a instalacao do candidato 0.9.0.
+ *
+ * Precisa vir **antes** de qualquer leitura de `userData` (o download de skin
+ * escreve la) e antes do `whenReady`. Trocar isso depois de publicado
+ * significaria abandonar os dados de quem ja tivesse instalado; como nada foi
+ * publicado ainda, a correcao nao exige migracao.
+ */
+app.setName("Sparta");
+
 const GAMEFLOW_POLL_INTERVAL_MS = 2500;
 
 /**
