@@ -2,6 +2,12 @@ node_modules/
 dist/
 build/
 out/
+# Recursos de empacotamento do Electron. `build/` acima e generico e casaria
+# com esta pasta, mas o icone e **fonte**, nao artefato: sem ele versionado,
+# `pnpm --filter @sparta/desktop package:win` num clone limpo produziria o
+# instalador com o icone padrao do Electron em vez do icone do Sparta.
+!apps/desktop/build/
+!apps/desktop/build/**
 coverage/
 .vite/
 .turbo/
@@ -28,3 +34,6 @@ __pycache__/
 /.claude
 /.codex
 /.agents
+
+# Candidato de release local (Etapa 28b). Nunca versionado.
+dist-installer/

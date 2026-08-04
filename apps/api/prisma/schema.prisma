@@ -167,6 +167,8 @@ model MatchParticipant {
   @@unique([matchId, puuid])
   @@index([puuid])
   @@index([championId])
+  // Etapa 28b: medido — o planner troca Seq Scan por Index Scan nesta FK.
+  @@index([riotAccountId])
 }
 
 model MatchTimeline {

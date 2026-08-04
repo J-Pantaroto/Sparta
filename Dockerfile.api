@@ -1,36 +1,117 @@
-FROM node:20-slim AS base
+# Imagem-base fixada por versão E digest.
+#
+# A tag sozinha é flutuante: `node:20-slim` aponta para builds diferentes ao
+# longo do tempo, e duas construções do mesmo commit podiam produzir imagens
+# distintas. O digest trava o conteúdo; a tag ao lado dele serve de rótulo
+# legível.
+#
+# Para atualizar (procedimento em docs/release-candidate.md):
+#   docker pull node:20-slim
+#   docker inspect --format '{{index .RepoDigests 0}}' node:20-slim
+# e substituir o digest nas TRÊS referências abaixo, num commit próprio.
+ARG NODE_IMAGE=node:20-slim@sha256:2cf067cfed83d5ea958367df9f966191a942351a2df77d6f0193e162b5febfc0
+
+# ---------------------------------------------------------------------------
+# Estágio 1: dependências. Isolado para o cache do Docker não ser invalidado
+# por qualquer mudança de código-fonte.
+# ---------------------------------------------------------------------------
+FROM ${NODE_IMAGE} AS deps
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
-# `NODE_ENV=production` não é só cosmético: é o que fecha `/docs` (Swagger UI)
-# na imagem. Ver `apps/api/src/app.ts`.
+RUN corepack enable
+WORKDIR /app
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY packages/core/package.json ./packages/core/
+COPY packages/riot/package.json ./packages/riot/
+COPY apps/api/package.json ./apps/api/
+# `--frozen-lockfile`: a imagem instala exatamente o conjunto auditado. Sem
+# isso o build resolvia do zero e podia divergir em silêncio.
+RUN pnpm install --frozen-lockfile --filter "@sparta/api..."
+
+# ---------------------------------------------------------------------------
+# Estágio 2: build. Compila TypeScript e gera o Prisma Client.
+# ---------------------------------------------------------------------------
+FROM ${NODE_IMAGE} AS build
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable
+WORKDIR /app
+
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/packages/core/node_modules ./packages/core/node_modules
+COPY --from=deps /app/packages/riot/node_modules ./packages/riot/node_modules
+COPY --from=deps /app/apps/api/node_modules ./apps/api/node_modules
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json tsconfig.node.json ./
+COPY packages ./packages
+COPY apps/api ./apps/api
+
+# O `tsc` depende dos tipos do Prisma Client, então este generate roda antes
+# do build. Ele é refeito depois do install de produção (abaixo), contra a
+# árvore final — os dois são necessários e servem a propósitos diferentes.
+RUN pnpm --filter @sparta/api prisma:generate
+RUN pnpm --filter "@sparta/api..." build
+
+# Reinstala do zero só com dependências de produção.
+#
+# `rm -rf` antes é necessário: um `install --prod` sobre a árvore existente
+# remove os *links*, mas as cópias físicas continuam no store virtual
+# (`node_modules/.pnpm`) — inalcançáveis por `require`, e ainda assim
+# ocupando espaço. Medido: eslint, vitest, typescript e prettier
+# sobreviviam ali. Recriar a árvore é o que de fato os tira da imagem.
+#
+# O Prisma Client é gerado DEPOIS deste passo, contra a árvore final: gerá-lo
+# antes o perderia junto com o `node_modules` antigo.
+RUN rm -rf node_modules packages/core/node_modules packages/riot/node_modules apps/api/node_modules \
+ && CI=true pnpm install --frozen-lockfile --filter "@sparta/api..." --prod \
+ && pnpm --filter @sparta/api prisma:generate
+
+# Um pacote sem NENHUMA dependência de produção fica sem `node_modules` (é o
+# caso de `packages/core`, domínio puro). O `COPY` do runtime falha em
+# caminho inexistente, então os diretórios são garantidos aqui — vazios
+# quando é o caso, o que é o correto.
+RUN mkdir -p packages/core/node_modules packages/riot/node_modules apps/api/node_modules
+
+# ---------------------------------------------------------------------------
+# Estágio 3: runtime. Só o necessário para executar a API.
+# ---------------------------------------------------------------------------
+FROM ${NODE_IMAGE} AS runtime
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+# Fecha `/docs` (Swagger UI) e liga a guarda de `AUTH_TOKEN_SECRET` em
+# `env.ts`. Ver apps/api/src/app.ts.
 ENV NODE_ENV=production
 RUN corepack enable
 WORKDIR /app
 
-# O lockfile precisa entrar na imagem. Sem ele o build usava
-# `--frozen-lockfile=false` e resolvia as dependências do zero a cada vez —
-# a imagem podia divergir em silêncio do conjunto que foi auditado e testado,
-# e nenhum `pnpm audit` local descreveria o que de fato está rodando.
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json tsconfig.node.json eslint.config.js ./
-COPY packages ./packages
-COPY apps/api ./apps/api
-COPY data ./data
-RUN pnpm install --frozen-lockfile
-RUN pnpm --filter @sparta/api prisma:generate
-RUN pnpm --filter "@sparta/api..." build
+# Compilados, dependências de produção e metadados mínimos de pacote.
+COPY --from=build --chown=node:node /app/node_modules ./node_modules
+COPY --from=build --chown=node:node /app/package.json /app/pnpm-workspace.yaml ./
+COPY --from=build --chown=node:node /app/packages/core/package.json ./packages/core/
+COPY --from=build --chown=node:node /app/packages/core/dist ./packages/core/dist
+COPY --from=build --chown=node:node /app/packages/core/node_modules ./packages/core/node_modules
+COPY --from=build --chown=node:node /app/packages/riot/package.json ./packages/riot/
+COPY --from=build --chown=node:node /app/packages/riot/dist ./packages/riot/dist
+COPY --from=build --chown=node:node /app/packages/riot/node_modules ./packages/riot/node_modules
+COPY --from=build --chown=node:node /app/apps/api/package.json ./apps/api/
+COPY --from=build --chown=node:node /app/apps/api/dist ./apps/api/dist
+COPY --from=build --chown=node:node /app/apps/api/node_modules ./apps/api/node_modules
 
-# O servidor não escreve nada em disco; rodar como root só dava ao processo
-# permissão de escrita sobre a própria imagem. `node` (uid 1000) já existe na
-# imagem base. O diretório de trabalho passa a pertencer a ele porque o pnpm
-# escreve metadados em `node_modules/.pnpm` ao iniciar via `--filter`.
-RUN chown -R node:node /app /pnpm
+# Prisma: schema e migrations são o caminho operacional de `migrate deploy`.
+COPY --from=build --chown=node:node /app/apps/api/prisma ./apps/api/prisma
+
+# `data/` é lido em RUNTIME por `champion-capability-repository.ts`, não é só
+# insumo de seed — por isso entra na imagem final.
+COPY --chown=node:node data ./data
+
 USER node
-
 EXPOSE 3333
 
-# O compose espera o Postgres ficar saudável, mas nada verificava a própria
-# API: um container que subia e travava seguia marcado como no ar.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=25s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:3333/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
-CMD ["pnpm", "--filter", "@sparta/api", "start"]
+# `node` direto em vez de `pnpm --filter`: um processo a menos entre o PID 1 e
+# o servidor, o que faz o SIGTERM chegar ao handler de encerramento controlado
+# sem depender de repasse de sinal do pnpm.
+WORKDIR /app/apps/api
+CMD ["node", "dist/server.js"]

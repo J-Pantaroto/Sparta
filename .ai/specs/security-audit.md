@@ -197,3 +197,127 @@ Os testes novos (`apps/api/src/app.security.test.ts`, 14 casos) cobrem cabeçalh
 erro interno sem vazamento, POST sem corpo, `/docs` fechado fora de desenvolvimento e exigência de
 autenticação nas rotas de release. Dois testes pré-existentes que **afirmavam** o comportamento
 defeituoso (zod → 500) foram atualizados para o comportamento correto.
+
+---
+
+# Hardening final e candidato de release (Etapa 28b)
+
+Esta parte fecha os riscos que a 28a deixou registrados como abertos. Cada linha da tabela de
+"Riscos restantes" acima é reendereçada abaixo com o resultado **medido**, não com a intenção.
+
+## 11. Situação de cada risco herdado da 28a
+
+| Item da 28a | Situação agora | Evidência |
+| --- | --- | --- |
+| Electron 37 → 39 (17 advisories) | **Corrigido** | Electron **39.8.10**; `pnpm audit` volta 0 em todas as severidades. App empacotado revalidado: `window.open` externo devolve `null`, `ipcRenderer`/`require`/`process`/`Buffer`/`global`/`module` todos `undefined`, CSP aplicada, 0 erro de console |
+| devDependencies na imagem (1,58 GB) | **Corrigido** | Dockerfile multi-stage: **1,58 GB → 513 MB**, boot **3444 ms → 836 ms** |
+| PUUID em log de acesso | **Corrigido** | `apps/api/src/http/log-redaction.ts`; medido no container: `"url":"/players/pid_3907b354893f/recent-matches?limit=3"` |
+| FKs sem índice | **Corrigido no caso com evidência** | Um índice criado (`MatchParticipant.riotAccountId`), com plano antes/depois. Os outros três **não** foram criados — ver §13 |
+| Migration revertida com arquivo presente | **O achado da 28a estava errado** | Há duas linhas: tentativa que nunca terminou (`applied_steps_count = 0`) **e** aplicação bem-sucedida 92 s depois (`= 1`). `ApiCacheEntry.collectedAt` existe. Schema consistente; nada a corrigir. Ver `docs/database-migrations.md` |
+| `node:20-slim` sem digest | **Corrigido** | `ARG NODE_IMAGE=node:20-slim@sha256:2cf067cf…` |
+| Sem configuração de instalador | **Corrigido** | `apps/desktop/electron-builder.yml`; instalador gerado e exercitado — ver §14 |
+
+## 12. Dependências — classificação final
+
+`pnpm audit` e `pnpm audit --prod`, com o Electron 39 e o `electron-builder` já no grafo:
+
+```txt
+{"info":0,"low":0,"moderate":0,"high":0,"critical":0}
+```
+
+Nenhum alerta remanescente. Os 29 advisories que a 28a encontrou ficam classificados assim:
+
+| Grupo | Classificação | Como |
+| --- | --- | --- |
+| `fast-uri`, `find-my-way`, `@fastify/static` (produção, via Fastify) | **corrigido** | `overrides` de faixa mínima, sem salto de major |
+| `brace-expansion`, `postcss` (só ferramenta de desenvolvimento) | **corrigido** | `overrides`; nunca alcançavam produção, corrigidos por higiene |
+| 17 advisories do Electron 37 | **corrigido** | Atualização para 39.8.10, com revalidação do empacotado |
+| `@noble/hashes` v2 exigido como CJS pelo `electron-builder` | **corrigido** | Override **escopado** (`app-builder-lib>@noble/hashes`): a incompatibilidade é de formato de módulo, não vulnerabilidade, e o escopo impede que o pin vaze para o resto do grafo |
+
+**Não coberto**: pacotes do sistema operacional dentro de `node:20-slim`. `pnpm audit` só enxerga o
+grafo npm. Fixar a imagem por digest torna a base **reproduzível e auditável**, não isenta — subir o
+digest continua sendo uma decisão manual, e este repositório não tem scanner de imagem.
+
+## 13. Índices — o que entrou e o que ficou de fora
+
+Regra aplicada: índice só entra com plano medido antes e depois. O `EXPLAIN ANALYZE` da consulta
+real (`MatchParticipant` filtrado por `riotAccountId`) mostrou `Seq Scan` com custo **14.75**;
+depois do índice, `Index Scan using "MatchParticipant_riotAccountId_idx"` com custo **9.53**.
+
+As outras três FKs sem índice **não** ganharam índice: nas cardinalidades reais desta base o
+planejador escolhe varredura sequencial de qualquer forma, então o índice custaria escrita e espaço
+sem mudar plano nenhum. Criá-los seria especulação, e a instrução era explícita contra isso.
+
+## 14. Instalador — o que existe e o que ele não é
+
+`pnpm --filter @sparta/desktop package:win` gera `Sparta-Setup-0.1.0-x64.exe` (NSIS, x64, por
+usuário). Exercitado de verdade: instalação silenciosa em `C:\…\Sparta Validação` — caminho **com
+acento e espaço** —, `ExitCode 0`, atalhos de área de trabalho e menu iniciar criados, entrada de
+desinstalação com `Publisher: J-Pantaroto`. O app instalado abriu a partir de `file://…/app.asar`,
+sem Vite, e passou as 10 telas com 0 imagem quebrada, 0 `NaN`/`undefined` e 0 erro de console.
+
+O conteúdo do `asar` foi verificado entrada a entrada: **0** arquivos `.ts`/`.tsx`, `.map`,
+`.test.*`, `tsconfig*`, `vitest.config`, `electron.vite.config`, `.env*` e **0** referências a
+`src/`. Só `out/` compilado, `package.json` e as dependências de produção.
+
+**O instalador é não assinado.** `Get-AuthenticodeSignature` devolve `NotSigned`. O log do
+electron-builder imprime "signing with signtool.exe" mesmo sem certificado — a linha é enganosa, e
+por isso a verificação foi feita contra o binário, não contra o log. Nada no empacotamento simula
+assinatura. O efeito no SmartScreen está descrito em `docs/release-candidate.md`.
+
+**Nada foi publicado**: sem bloco `publish` no `electron-builder.yml`, todos os comandos passam
+`--publish never`, e não há GitHub Release nem distribuição externa.
+
+## 15. Prova de não regressão
+
+Mesma recomendação controlada (JUNGLE, pick 3, Ahri aliada, Lee Sin inimigo, bans 55/91), contra a
+API **reconstruída do zero**, comparada com a captura feita antes de qualquer mudança desta etapa:
+
+| # | Campeão | Score | Cobertura | Resultado |
+| --- | --- | --- | --- | --- |
+| 1 | Viego | 58.7 | 0.9 | idêntico |
+| 2 | Udyr | 58.5 | 0.5 | idêntico |
+| 3 | Vi | 55.3 | 0.5 | idêntico |
+| 4 | Nocturne | 53.3 | 0.5 | idêntico |
+| 5 | Graves | 50.1 | 0.5 | idêntico |
+
+Idênticos também categoria, códigos de motivo e códigos de alerta em todos os cinco.
+
+A release ativa não foi tocada: `release-etapa27c-v1` continua `ACTIVE`, com `artifactHash`
+`8878a657…` e `configHash` `fa9dbde1…` **iguais** antes e depois. O snapshot novo saiu com
+`configurationSource = RELEASE`, bundle `replay-input-bundle/2.0.0` (121 387 bytes) com a
+configuração embutida, e `verify-replay` devolveu **`EXACT_REPLAY` com 0 divergências**.
+
+## 16. Comportamento sob falha, medido no container
+
+| Cenário | Resultado |
+| --- | --- |
+| Reinício da API | Release ativa continua resolvida corretamente; ponteiro preservado |
+| Duas resoluções dentro do TTL | `cacheState` `MISS` → `HIT` |
+| Postgres derrubado, rota de leitura | HTTP 500 com corpo genérico ("Não foi possível concluir a operação."); `PrismaClientKnownRequestError` fica **só no log**. Nenhum vazamento de `prisma`, `postgres`, `5432`, nome de tabela, `DATABASE_URL` ou stack |
+| Postgres derrubado, processo | API continua de pé (`/health` 200) |
+| `SIGTERM` | Encerramento gracioso em **864 ms**, `exit code 0` (não SIGKILL), com `shutdown_requested` registrado |
+
+Ressalva honesta: derrubar o Postgres inteiro exercita o **caminho de erro sanitizado**, não o
+fallback do provider — a rota `/recommendation-engine/active-release` lê o repositório direto e
+legitimamente não tem o que responder sem banco. O fallback do provider (`fallbackUsed: true`,
+`DB_READ_FAILED_NO_LAST_KNOWN` → baseline) está coberto por teste automatizado, onde a falha de
+leitura pode ser isolada do resto da avaliação.
+
+## 17. O que continua em aberto
+
+| Item | Por quê |
+| --- | --- |
+| Instalador sem assinatura de código | Exige certificado OV/EV de autoridade reconhecida — decisão de negócio, não técnica |
+| Sem scanner de imagem de container | `pnpm audit` não vê pacote de sistema operacional; adotar scanner é etapa própria |
+| Atualização do digest da imagem-base | Fixar por digest congela; subir exige processo manual deliberado |
+| Publicação e distribuição | Fora do escopo por instrução explícita |
+
+## 18. Verificação
+
+`typecheck`, `lint`, `test` e `build` aprovados nos quatro pacotes TypeScript: **core 620, riot 96,
+api 285, desktop 73** e 2 na raiz — **1076 testes**. Os 8 testes novos desta etapa cobrem a redação
+de log (`apps/api/src/http/log-redaction.test.ts`): substituição do PUUID por rótulo opaco,
+preservação de query string, caminhos aninhados, rotas sem identificador, estabilidade e distinção
+do rótulo, ausência de qualquer subsequência do identificador original, e o serializador não emitir
+headers.

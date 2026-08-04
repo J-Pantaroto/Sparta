@@ -6,6 +6,7 @@ import Fastify from "fastify";
 import { ZodError } from "zod";
 import { ExternalServiceError } from "@sparta/riot";
 import { safeExternalErrorLog, sendExternalError } from "./http/external-error-response.js";
+import { requestLogSerializer } from "./http/log-redaction.js";
 import { authRoutes } from "./modules/auth/routes.js";
 import { draftsRoutes } from "./modules/drafts/routes.js";
 import { replayBundleRoutes } from "./modules/drafts/replay-bundle-routes.js";
@@ -30,7 +31,22 @@ import { patchesRoutes } from "./modules/patches/routes.js";
 const ALLOWED_ORIGINS = new Set(["http://localhost:5173", "null"]);
 
 export async function buildApp() {
-  const app = Fastify({ logger: true });
+  const app = Fastify({
+    logger: {
+      // `redact` cobre o caso de algum caminho passar a emitir headers; o
+      // serializador abaixo já não os coleta, então as duas camadas se
+      // reforçam em vez de dependerem uma da outra.
+      redact: {
+        paths: [
+          "req.headers.authorization",
+          "req.headers.cookie",
+          "res.headers['set-cookie']"
+        ],
+        remove: true
+      },
+      serializers: { req: requestLogSerializer }
+    }
+  });
 
   await app.register(cors, {
     origin(origin, callback) {

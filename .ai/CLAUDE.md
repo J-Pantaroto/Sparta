@@ -1,5 +1,73 @@
 # Sparta - Contexto para Continuidade
 
+## Etapa 28b: hardening final e candidato de release local
+
+Fecha, com resultado **medido**, cada risco que a 28a tinha registrado como aberto. Relatório em
+`docs/security-audit.md` §11–18; inventário do candidato em `docs/release-candidate.md`; política de
+migrations em `docs/database-migrations.md`.
+
+**Electron 37 → 39.8.10**, feito isolado e antes de tudo. Zera os 17 advisories que a 28a marcou
+`ACCEPTED_RISK`, e a revalidação foi no **app empacotado**, não no dev server: `window.open` externo
+devolve `null`; `ipcRenderer`/`require`/`process`/`Buffer`/`global`/`module` todos `undefined`; CSP
+aplicada; 0 erro de console. Nenhum controle foi afrouxado para a atualização passar.
+
+**Dockerfile multi-stage: 1,58 GB → 513 MB, boot 3444 ms → 836 ms.** Três estágios sobre a mesma
+imagem-base fixada por digest (`node:20-slim@sha256:2cf067cf…`). O detalhe que faz a diferença é
+`rm -rf node_modules` **antes** do `pnpm install --prod` — sem isso a store virtual do pnpm sobrevive
+e as devDependencies continuam na imagem, com o `--prod` mudando só os links.
+
+**Redação de log** (`apps/api/src/http/log-redaction.ts`): o PUUID no caminho vira rótulo opaco com
+sal de processo (`pid_3907b354893f`), estável dentro da execução para correlacionar requisições e sem
+nenhuma subsequência do original. O serializador não coleta headers, e o `redact` do pino cobre
+`authorization`/`cookie`/`set-cookie` — as duas camadas se reforçam em vez de uma depender da outra.
+
+**Um índice criado, três recusados.** `MatchParticipant.riotAccountId` tem `EXPLAIN ANALYZE` antes e
+depois (`Seq Scan` 14.75 → `Index Scan` 9.53). As outras três FKs sem índice não ganharam: nas
+cardinalidades reais o planejador escolhe varredura sequencial de qualquer jeito.
+
+**O achado da 28a sobre a migration revertida estava errado.** `_prisma_migrations` tem **duas**
+linhas para `20260727234500_http_cache_states`: uma tentativa que nunca terminou
+(`applied_steps_count = 0`, marcada revertida) e a aplicação bem-sucedida 92 s depois (`= 1`). A
+coluna `ApiCacheEntry.collectedAt` existe. Schema consistente, nada a corrigir — a linha revertida é
+registro honesto e fica onde está.
+
+**Instalador Windows configurado e exercitado, não publicado.** `apps/desktop/electron-builder.yml`:
+NSIS x64 por usuário, `files` como allowlist mais exclusões explícitas, sem bloco `publish`. O `asar`
+foi conferido entrada a entrada — 0 `.ts`/`.tsx`/`.map`/`.test.*`/`tsconfig*`/`.env*`, 0 referência a
+`src/`. Instalação silenciosa em `C:\…\Sparta Validação` (acento e espaço), `ExitCode 0`, atalhos e
+entrada de desinstalação criados; o app instalado abriu de `file://…/app.asar` (sem Vite) e passou as
+**10 telas** com 0 imagem quebrada, 0 `NaN`/`undefined`, 0 erro de console/main/preload. **Não
+assinado**, confirmado no binário (`Get-AuthenticodeSignature` → `NotSigned`) — o log do
+electron-builder imprime "signing with signtool.exe" mesmo sem certificado, e a linha é enganosa.
+
+**Dois bugs reais no caminho**: (1) o `electron-builder` não subia — `app-builder-lib` faz
+`require()` de `@noble/hashes@2`, ESM-only (`ERR_REQUIRE_ESM`); resolvido com override **escopado**
+(`app-builder-lib>@noble/hashes`) para o pin não vazar; (2) o ícone do instalador estava sendo
+ignorado pelo git — a regra genérica `build/` casava com `apps/desktop/build/`, e num clone limpo o
+`package:win` produziria o instalador com o ícone padrão do Electron.
+
+**Inventário** (`scripts/release-inventory.mjs` → `docs/release-candidate.md`): commit, versão do
+app, Electron, digest da imagem-base e da construída, SHA-256 dos artefatos, as 21 migrations e SBOM
+de produção (API 140 pacotes, desktop 28, com licença). O gerador não lê `.env`, não lê variável de
+ambiente do projeto e não consulta o banco.
+
+**Não regressão**: mesma recomendação controlada contra a API reconstruída do zero →
+**5 candidatos idênticos** em score, cobertura, rank, categoria, motivos e alertas (Viego 58.7/0.9,
+Udyr 58.5/0.5, Vi 55.3/0.5, Nocturne 53.3/0.5, Graves 50.1/0.5). `release-etapa27c-v1` continua
+**`ACTIVE`** com `artifactHash` e `configHash` iguais; snapshot novo com bundle
+`replay-input-bundle/2.0.0` e `verify-replay` em **`EXACT_REPLAY`, 0 divergências**.
+
+**Sob falha, medido no container**: reinício preserva a release ativa; cache `MISS` → `HIT` dentro do
+TTL; Postgres derrubado dá 500 com corpo genérico e o `PrismaClientKnownRequestError` só no log (sem
+vazar `prisma`, `postgres`, `5432`, tabela, `DATABASE_URL` ou stack), com a API de pé; `SIGTERM`
+encerra em 864 ms com exit code 0. Ressalva: derrubar o Postgres inteiro exercita o caminho de erro
+sanitizado, **não** o fallback do provider — a rota de leitura consulta o repositório direto; o
+fallback está coberto por teste automatizado.
+
+`pnpm audit` volta **0** em dev e em produção. 8 testes novos; **1076** no monorepo (core 620, riot
+96, api 285, desktop 73, raiz 2). Nada publicado: sem GitHub Release, sem distribuição externa, sem
+publicação automática.
+
 ## Etapa 28a: auditoria de segurança e prontidão para release
 
 Auditoria completa com a release ativa, corrigindo só o comprovado e de baixo risco. Relatório em

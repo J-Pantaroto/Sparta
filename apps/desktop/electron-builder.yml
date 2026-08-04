@@ -1,0 +1,66 @@
+# Empacotamento Windows do Sparta (Etapa 28b).
+#
+# NÃO publica: todos os comandos passam `--publish never` e não há bloco
+# `publish` aqui. Gerar o candidato é local; distribuição é decisão separada.
+
+appId: com.sparta.desktop
+productName: Sparta
+copyright: Sparta
+
+directories:
+  output: ../../dist-installer
+  buildResources: build
+
+# `files` é uma allowlist: só o que o app precisa para executar entra no
+# asar. O padrão do electron-builder incluiria a árvore inteira do pacote —
+# aqui `out/` é o bundle já compilado (main, preload, renderer), e nada mais
+# do desktop é necessário em runtime.
+files:
+  - out/**/*
+  - package.json
+  # Exclusões explícitas. Redundantes com a allowlist acima em vários casos,
+  # mas declaradas para que uma mudança futura em `files` não reintroduza
+  # nenhuma delas em silêncio.
+  - "!src/**/*"
+  - "!**/*.ts"
+  - "!**/*.tsx"
+  - "!**/*.map"
+  - "!**/*.test.*"
+  - "!**/tsconfig*.json"
+  - "!**/vitest.config.*"
+  - "!**/electron.vite.config.*"
+  - "!**/.env*"
+  - "!**/*.log"
+  - "!**/.cache/**"
+  - "!**/node_modules/.cache/**"
+
+# O backend não é empacotado: a API roda em container e o desktop fala com
+# ela por HTTP. Nenhuma fonte de `apps/api` ou `packages/*` vai ao instalador
+# além do que já está compilado dentro de `out/renderer`.
+asar: true
+
+win:
+  icon: build/icon.png
+  target:
+    - target: nsis
+      arch:
+        - x64
+  # Sem `certificateFile`/`certificateSubjectName`: não existe certificado de
+  # assinatura de código neste projeto. O instalador sai **não assinado** —
+  # ver docs/release-candidate.md para o efeito prático no SmartScreen.
+  # Nada aqui simula assinatura.
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Sparta
+  # Desinstalação remove os atalhos e os arquivos instalados. Os dados do
+  # usuário em `%APPDATA%/Sparta` (tema baixado, token de sessão) ficam por
+  # decisão explícita: apagá-los sem perguntar destruiria estado que o
+  # usuário pode querer preservar entre reinstalações.
+  deleteAppDataOnUninstall: false
+  # Nome previsível do artefato, sem hash nem timestamp.
+  artifactName: Sparta-Setup-${version}-${arch}.${ext}

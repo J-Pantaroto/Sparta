@@ -1,0 +1,15 @@
+-- Indice na FK `MatchParticipant.riotAccountId` (Etapa 28b).
+--
+-- Justificado por medicao, nao por regra geral. Com 220 linhas reais, o
+-- planner troca de Seq Scan (custo 14.75, 12 buffers, 0.073 ms) para Index
+-- Scan (custo 9.53, 0.031 ms). E a unica das quatro FKs sem indice apontadas
+-- na auditoria da Etapa 28a em que isso acontece hoje: `RiotAccount.userId`
+-- (1 linha), `DraftPostGameComparisonRevision.riotAccountId` (0) e
+-- `RecommendationEngineRelease.candidateRevisionId` (3) sao pequenas demais,
+-- e o planner ignora o indice - criar la seria especulativo.
+--
+-- E tambem a unica tabela do grupo que cresce sem teto: ganha 10 linhas por
+-- partida sincronizada. O custo de escrita e um indice a mais num
+-- `createMany` de 10 linhas por partida, o que e desprezivel perto do ganho
+-- de leitura por conta.
+CREATE INDEX "MatchParticipant_riotAccountId_idx" ON "MatchParticipant"("riotAccountId");

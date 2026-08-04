@@ -31,14 +31,21 @@
     "vitest": "^3.2.4"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["@prisma/client", "@prisma/engines", "electron", "esbuild", "prisma"],
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "@prisma/engines",
+      "electron",
+      "esbuild",
+      "prisma"
+    ],
     "//overrides": "Correções de segurança em transitivos (Etapa 28a). Só patch/minor: nenhum salto de major, e cada faixa é a mínima que sai da versão vulnerável. fast-uri/find-my-way/@fastify/static chegam pela API (produção); brace-expansion e postcss só por ferramenta de desenvolvimento (eslint, typescript-eslint, vitest) e estão aqui por higiene, não por alcance em produção.",
     "overrides": {
       "fast-uri@>=3.0.0 <3.1.5": ">=3.1.5",
       "find-my-way@<=9.6.0": ">=9.7.0",
       "@fastify/static@<=10.1.1": ">=10.1.2",
       "brace-expansion": ">=5.0.9",
-      "postcss@<=8.5.22": ">=8.5.23"
+      "postcss@<=8.5.22": ">=8.5.23",
+      "app-builder-lib>@noble/hashes": "^1.8.0"
     }
   }
 }

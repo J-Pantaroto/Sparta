@@ -22,6 +22,24 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-08-04 16:55 — Etapa 28b: hardening final e candidato de release local
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0035-hardening-final-candidato-release.md`
+
+Fecha todos os riscos que a 28a deixou abertos, com resultado medido: Electron 39.8.10 (zera os 17
+advisories e revalidado no app **empacotado**), Dockerfile multi-stage 1,58 GB → 513 MB com boot
+3444 ms → 836 ms e imagem-base por digest, PUUID fora do log de acesso (rótulo opaco), um índice
+criado com `EXPLAIN` antes/depois e três recusados por serem especulativos, política de migrations
+documentada. `pnpm audit` volta 0 em dev e produção. Instalador Windows configurado e **exercitado**
+(instalação silenciosa em caminho com acento, app instalado passando as 10 telas), **não assinado** e
+**não publicado**. Inventário em `docs/release-candidate.md` (SBOM, checksums, versões) sem nenhum
+segredo. Dois bugs reais no caminho: `electron-builder` quebrado por `@noble/hashes` v2 ESM-only e o
+ícone do instalador sendo ignorado pelo `.gitignore`. O achado da 28a sobre a migration revertida
+estava errado — o schema está consistente. Não regressão: os 5 candidatos da recomendação controlada
+idênticos, release ativa intocada, replay `EXACT_REPLAY`. 1076 testes.
+
+---
+
 ## 2026-08-04 12:40 — Etapa 28a: auditoria de segurança e prontidão para release
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0034-auditoria-seguranca-prontidao.md`
