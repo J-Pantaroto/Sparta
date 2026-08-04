@@ -22,6 +22,21 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-08-04 03:58 — Ativação controlada de `release-etapa27c-v1`: ativa e mantida
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0033-ativacao-release-etapa27c-v1.md`
+
+Primeira release operacional do Sparta a ficar ativa de forma sustentada. As 11 validações
+passaram: uma release `ACTIVE` com ponteiro correto, hashes inalterados, cache invalidado, origem
+`RELEASE`, recomendação real persistida, 9 conferências cruzadas entre snapshot e bundle (incluindo
+a configuração efetiva idêntica nos dois), bundle em `replay-input-bundle/2.0.0` e replay offline
+em `EXACT_REPLAY` com 0 divergências — o mesmo cenário que deu 10 divergências na 27b.
+Independência de fontes externas provada por reinício da API, por o verificador recusar resolver
+configuração por hash mesmo com a release do hash existindo no banco, e estruturalmente. A baseline
+não está mais em uso operacional.
+
+---
+
 ## 2026-08-04 01:20 — Etapa 27c: replay autossuficiente para configurações promovidas
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0032-replay-autossuficiente-configuracao.md`

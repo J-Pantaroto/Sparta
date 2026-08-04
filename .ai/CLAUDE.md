@@ -1,5 +1,43 @@
 # Sparta - Contexto para Continuidade
 
+## ESTADO OPERACIONAL ATUAL: `release-etapa27c-v1` está ATIVA
+
+**A configuração operacional do Sparta não é mais a baseline.** Autorizada explicitamente pelo
+usuário depois da Etapa 27c, `release-etapa27c-v1` foi ativada e **mantida ativa** — a primeira
+release do projeto a ficar no ar de forma sustentada. As 11 validações pedidas passaram.
+
+Pré-ativação registrado: baseline em uso, `READY_FOR_ACTIVATION`, `artifactHash`
+`8878a657…`, `configHash` `fa9dbde1…`, `validatedArtifactHash == artifactHash`, validação
+`VALID`, equivalência `MATCH`, 0 releases ativas.
+
+Pós-ativação: 1 release `ACTIVE` com o ponteiro apontando pra ela; `artifactHash`/`configHash`
+**idênticos** aos de antes (inclusive os internos do `artifactJson`); cache invalidado
+(`cacheInvalidated: true`, depois `MISS` → `HIT`); `GET /recommendation-engine/active-release`
+devolvendo `RELEASE` **sem** as tabelas de baseline; recomendação real `SAVED`; **9 conferências
+cruzadas** entre snapshot e bundle todas `t`, incluindo a configuração efetiva byte a byte igual
+nos dois; bundle em `replay-input-bundle/2.0.0`; e o replay offline em **`EXACT_REPLAY` com 0
+divergências** — exatamente o cenário que deu 10 divergências na ativação da 27b.
+
+**Independência de fontes externas provada por três vias**: (1) a API foi reiniciada, zerando o
+cache em memória, e o replay seguiu exato; (2) o snapshot da 27b tem `configHash` `2cefcade…` e a
+release dona desse hash **ainda existe no banco** (`ROLLED_BACK`) — se o verificador resolvesse
+configuração por hash, ele a acharia, mas devolve `MISSING_EFFECTIVE_CONFIGURATION`; (3)
+estruturalmente, `verifySnapshotReplay` só consulta `recommendationSnapshot`, `draftSession` e
+`replayInputBundleRecord`.
+
+Zero fallback, zero `hash_mismatch`, zero erro, 10/10 HTTP 200, zero `NaN`/`Infinity`/`undefined`.
+Electron com "Release ativa" exibida, "Fallback para baseline em uso" **ausente**, 0 erro de
+console e 0 imagem quebrada.
+
+**Efeito operacional**: o ranking sob a release (Viego 58.7 / Udyr 58.5 / Vi 55.3 / Nocturne 53.3
+/ Graves 50.1) difere do da baseline (60.4 / 54.3 / 51 / 49.6 / 46.8) — os pesos calibrados
+valorizam mais `TEAM_COMPOSITION`. A diferença agora é **reproduzível**: o mesmo resultado sai do
+replay offline a partir só do bundle.
+
+Estado: `release-etapa27c-v1` `ACTIVE` (ponteiro confere), `release-etapa27b-v2` `ROLLED_BACK`,
+`release-etapa27b-validacao` `VALIDATION_FAILED`, candidata `APPROVED_FOR_FUTURE_RELEASE`. Ver
+`.ai/prompts/features/0033-ativacao-release-etapa27c-v1.md`.
+
 ## Etapa 27c: replay autossuficiente para configurações promovidas
 
 Corrige o achado bloqueante da ativação da `release-etapa27b-v2` (seção abaixo): o
@@ -51,10 +89,11 @@ e 2 de baseline → `EXACT_REPLAY`**; o único de release → `MISSING_EFFECTIVE
 divergências** (eram 10). Ranking da baseline **idêntico** ao anterior. Electron com 0 erro de
 console, 0 imagem quebrada, 0 `NaN`/`undefined`.
 
-**A conta real continua na baseline.** `release-etapa27c-v1` foi criada e validada até
-`READY_FOR_ACTIVATION` e **não** foi ativada; `release-etapa27b-v2` continua `ROLLED_BACK`
-(terminal). 24 testes novos (620 em `packages/core`; 1052 no monorepo). Sem migration — o bundle é
-JSONB. Ver `docs/replay-input-bundle.md` e
+Ao fim desta etapa a conta real seguia na baseline, com `release-etapa27c-v1` apenas em
+`READY_FOR_ACTIVATION` — mas ela **foi ativada depois**, sob autorização explícita do usuário, e
+**continua ativa**: ver a seção no topo deste arquivo. `release-etapa27b-v2` continua
+`ROLLED_BACK` (terminal). 24 testes novos (620 em `packages/core`; 1052 no monorepo). Sem
+migration — o bundle é JSONB. Ver `docs/replay-input-bundle.md` e
 `.ai/prompts/features/0032-replay-autossuficiente-configuracao.md`.
 
 ## Ativação real de `release-etapa27b-v2`: ativada, reprovada no replay, revertida
