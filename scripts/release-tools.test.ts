@@ -115,4 +115,9 @@ describe("descoberta estrita de artefatos", () => {
     ].join("\n");
     expect(caminhosSujosNaoGerados(status, "0.9.0")).toEqual(["packages/riot/package.json"]);
   });
+
+  it("aceita o primeiro registro porcelain depois de trim", () => {
+    const status = " M artifacts/releases/0.9.0/checksums.txt\n M docs/release-candidate.md".trim();
+    expect(caminhosSujosNaoGerados(status, "0.9.0")).toEqual([]);
+  });
 });

@@ -67,7 +67,11 @@ export function descobrirArtefatosDoCandidato(diretorio, versao, opcoes = {}) {
 }
 
 export function caminhoGitDeStatus(linha) {
-  const bruto = linha.slice(3).trim();
+  // `run()` normaliza a saída com `.trim()`, removendo o primeiro espaço do
+  // primeiro registro porcelain (`" M arquivo"` vira `"M arquivo"`). Aceitar
+  // os dois formatos evita cortar a primeira letra do caminho gerado.
+  const inicio = linha[2] === " " ? 3 : linha[1] === " " ? 2 : 0;
+  const bruto = linha.slice(inicio).trim();
   return (bruto.includes(" -> ") ? bruto.split(" -> ").at(-1) : bruto).replaceAll("\\", "/");
 }
 
