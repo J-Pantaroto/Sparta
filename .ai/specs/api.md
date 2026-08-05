@@ -31,7 +31,8 @@ Base local: `http://localhost:3333`.
 
 Endpoints:
 
-- `GET /health`
+- `GET /health` — liveness do processo, sem consultar dependências
+- `GET /ready` — readiness; consulta Postgres com timeout e responde `503` sem vazar detalhe
 - `POST /auth/register`, `POST /auth/login`, `GET /auth/me`
 - `GET /players/:riotName/:tagLine/profile` — real, le `RiotAccount`/`PlayerChampionStats` persistidos
 - `POST /players/link-riot-account` (autenticado) — real, chama Account-V1
@@ -48,7 +49,15 @@ Endpoints:
 - `POST /postgame/analyze`, `GET /postgame/:matchId` — mock
 - `POST /replays/import`, `GET /replays/:jobId` — nao implementado (fora do MVP)
 
-Swagger UI fica em `/docs`.
+Swagger UI fica em `/docs` somente quando `NODE_ENV=development` e
+`API_DOCS_ENABLED=true`; a validação recusa documentação habilitada em produção.
+
+A configuração pública sem valores reais está em `.env.production.example`. Em produção a API
+exige URL pública HTTPS, allowlist CORS explícita, segredo HMAC forte e PostgreSQL. O proxy é
+confiado por quantidade explícita de saltos; limites, timeouts, TTL do bearer token, log level e
+grace period de shutdown são configuráveis. Redis ainda não é consumido e não participa da
+readiness. O plano e os bloqueios de publicação estão em
+`docs/public-api-infrastructure-readiness.md`.
 
 O contrato e as regras de origem do pool estão em
 `docs/player-champion-pool.md`. `PATCH` está explicitamente liberado no CORS
@@ -85,7 +94,7 @@ token, payload ou stack.
 
 ## Integrações Riot em uso (backend)
 
-- **Account-V1** (`riot/account/v1/accounts/by-riot-id/{gameName}/{tagLine}`) — resolve Riot ID pra puuid real em `POST /players/link-riot-account`. Cacheado 24h (`ApiCacheEntry`).
+- **Account-V1** (`riot/account/v1/accounts/by-riot-id/{gameName}/{tagLine}`) — resolve Riot ID pra puuid real em `POST /players/link-riot-account`. Cacheado 24h (`ApiCacheEntry`). Esse lookup não prova propriedade da conta; RSO e autorização uniforme são bloqueadores antes da exposição pública.
 - **Match-V5** — `matches/by-puuid/{puuid}/ids`, `matches/{matchId}` e `matches/{matchId}/timeline`, usados pelo sync incremental (`apps/api/src/modules/sync/riot-sync-service.ts`). Sem cache adicional: a própria tabela `Match` (unicidade por `matchId`) já é o cache permanente.
 - **Data Dragon** — catálogo de campeões (`pnpm --filter @sparta/api catalog:sync`, cacheado 7 dias) e assets usados pelo desktop.
 - **LCU local read-only** — ver `docs/riot-compliance.md`.

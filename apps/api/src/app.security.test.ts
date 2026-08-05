@@ -148,35 +148,40 @@ describe("POST sem corpo", () => {
 });
 
 describe("superfície de documentação", () => {
-  // O gating é opt-in: só `development` publica `/docs`. Um ambiente com
-  // `NODE_ENV` ausente ou desconhecido não deve ganhar a documentação por
-  // omissão — errar para o lado fechado é o comportamento correto aqui.
-  it.each(["production", "staging", ""])(
-    "/docs não existe com NODE_ENV=%s",
-    async (valor) => {
-      const anterior = process.env.NODE_ENV;
-      process.env.NODE_ENV = valor;
-      try {
-        const app = await buildApp();
-        const response = await app.inject({ method: "GET", url: "/docs" });
-        expect(response.statusCode).toBe(404);
-        await app.close();
-      } finally {
-        process.env.NODE_ENV = anterior;
-      }
+  it("/docs não existe em test", async () => {
+    const app = await buildApp();
+    const response = await app.inject({ method: "GET", url: "/docs" });
+    expect(response.statusCode).toBe(404);
+    await app.close();
+  });
+
+  it("/docs não existe em desenvolvimento sem opt-in", async () => {
+    const anterior = process.env.NODE_ENV;
+    process.env.NODE_ENV = "development";
+    try {
+      const app = await buildApp();
+      const response = await app.inject({ method: "GET", url: "/docs" });
+      expect(response.statusCode).toBe(404);
+      await app.close();
+    } finally {
+      if (anterior === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = anterior;
     }
-  );
+  });
 
   it("/docs existe em desenvolvimento", async () => {
     const anterior = process.env.NODE_ENV;
     process.env.NODE_ENV = "development";
+    process.env.API_DOCS_ENABLED = "true";
     try {
       const app = await buildApp();
       const response = await app.inject({ method: "GET", url: "/docs" });
       expect(response.statusCode).not.toBe(404);
       await app.close();
     } finally {
-      process.env.NODE_ENV = anterior;
+      if (anterior === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = anterior;
+      delete process.env.API_DOCS_ENABLED;
     }
   });
 });
@@ -184,10 +189,7 @@ describe("superfície de documentação", () => {
 describe("autenticação e isolamento", () => {
   it("rotas de release exigem autenticação", async () => {
     const app = await buildApp();
-    for (const url of [
-      "/calibration/releases",
-      "/recommendation-engine/active-release"
-    ]) {
+    for (const url of ["/calibration/releases", "/recommendation-engine/active-release"]) {
       const response = await app.inject({ method: "GET", url });
       expect(response.statusCode).toBe(401);
     }

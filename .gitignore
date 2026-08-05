@@ -19,6 +19,7 @@ pnpm-debug.log*
 .env
 .env.*
 !.env.example
+!.env.production.example
 apps/api/prisma/generated/
 *.sqlite
 *.sqlite3

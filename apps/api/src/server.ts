@@ -14,9 +14,17 @@ const app = await buildApp();
 for (const signal of ["SIGTERM", "SIGINT"] as const) {
   process.once(signal, () => {
     app.log.info({ event: "shutdown_requested", signal });
+    const forcedExit = globalThis.setTimeout(() => {
+      app.log.error({ event: "shutdown_timeout", signal });
+      process.exit(1);
+    }, env.SHUTDOWN_GRACE_PERIOD_MS);
+    forcedExit.unref();
     void app
       .close()
-      .then(() => process.exit(0))
+      .then(() => {
+        globalThis.clearTimeout(forcedExit);
+        process.exit(0);
+      })
       .catch(() => process.exit(1));
   });
 }

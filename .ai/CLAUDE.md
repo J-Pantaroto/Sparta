@@ -1,5 +1,30 @@
 # Sparta - Contexto para Continuidade
 
+## Etapa 31B: infraestrutura pública preparada, não provisionada
+
+Parecer combinado: `READY_FOR_INFRASTRUCTURE_APPROVAL`, `BLOCKED_BY_RIOT_APPROVAL` e
+`BLOCKED_BY_OWNER_DECISIONS`. Relatório executável em
+`docs/public-api-infrastructure-readiness.md`; operações futuras em
+`docs/runbook-public-api-operations.md`. Nenhum recurso cloud, registry, domínio, gasto, migration
+externa, imagem ou deploy foi criado.
+
+Auditoria medida: API 120,8 MiB, Postgres 44,7 MiB, Redis 8,9 MiB, banco 18,7 MB e imagem 513 MB.
+Redis e analyzer não são consumidos pela API atual; `/health` continua liveness e o novo `/ready`
+testa Postgres, declarando Redis `not_used`. `.env.production.example` não contém valores reais; a
+validação exige HTTPS, CORS explícito, segredo forte, PostgreSQL, docs desligados e chave Riot
+definida. O tipo da chave não é inferível pelo formato: o gate operacional ainda precisa confirmar
+que é a Production Key aprovada.
+
+Development Key não sustenta produto público; Account-V1/Match-V5 e RSO exigem aprovação/Production
+Key. O vínculo atual por Riot ID não prova propriedade e há rotas pessoais sem ownership uniforme:
+staging público fica bloqueado até decisão e correção coordenada. GCP São Paulo gerenciado foi
+recomendado, com Lightsail como menor custo e ECS/Fargate como maior controle; nenhuma opção foi
+escolhida automaticamente.
+
+O desktop segue `WITHDRAWN_PENDING_PUBLIC_API`. `release-etapa27c-v1`, artifact/config hashes e
+replay `EXACT_REPLAY` permanecem intactos. A próxima etapa só pode ser 31C após autorização explícita
+e fechamento dos bloqueios; não iniciar 31D/31E/31F/32.
+
 ## Etapa 30B: desktop 0.9.0 publicado parcialmente — `PARTIALLY_PUBLISHED`
 
 Tag anotada `v0.9.0` publicada apontando exatamente para
@@ -629,8 +654,7 @@ dado pessoal de verdade. No Electron real (dev, CDP): 0 erros de console vindos 
 `NaN`/`Infinity`/`undefined`, ranking/scores/cobertura/grupos idênticos ao anterior.
 
 Testes por pacote, todos passando isoladamente: `packages/core` 526 (42 em
-`replay-input-bundle.test.ts`, +4 desta etapa), `packages/riot` 96, `apps/desktop` 73, `apps/api`
-241. A suíte agregada via `pnpm -r test` mostrou flakiness intermitente sob contenção de recursos
+`replay-input-bundle.test.ts`, +4 desta etapa), `packages/riot` 96, `apps/desktop` 73, `apps/api` 241. A suíte agregada via `pnpm -r test` mostrou flakiness intermitente sob contenção de recursos
 rodando os quatro pacotes em paralelo — não reproduzível isolando cada pacote, e não é regressão
 desta etapa. `typecheck`, `lint` e `build` completos nos quatro pacotes TypeScript. Ver
 `docs/replay-input-bundle.md`.
@@ -705,8 +729,8 @@ histórico real, sem tocar no motor. `packages/core/src/calibration/` (`calibrat
 não tem migration, rota, tela nem execução operacional — isso é a Etapa 25b.
 
 **A auditoria encontrou a restrição que define o desenho**: `PersistedRecommendation` congela as
-métricas *já calculadas*, os pesos efetivos e o score, mas **nada** preserva `PlayerChampionStats`,
-`ChampionTag`, capacidades ou agregados de matchup *como estavam no instante do draft* — essas
+métricas _já calculadas_, os pesos efetivos e o score, mas **nada** preserva `PlayerChampionStats`,
+`ChampionTag`, capacidades ou agregados de matchup _como estavam no instante do draft_ — essas
 tabelas são recalculadas a cada sync e sobrescritas. Reexecutar uma derivação com o dado de hoje
 leria um histórico maior do que o jogador tinha, e produziria uma comparação que parece válida e
 não é. Apresentado ao usuário, ele escolheu o **caminho A** (só replay historicamente honesto) e
@@ -718,8 +742,8 @@ Por isso a capacidade de reprodução é **declarada por parâmetro** e verifica
 `REQUIRES_HISTORICAL_DERIVATION_INPUT` (os onze parâmetros de derivação: formação/elegibilidade do
 pool, disponibilidade, desempenho pessoal, forma recente, familiaridade, risco, matchup, tags,
 capacidades, estratégia e proveniência) e `UNSUPPORTED` (meta global, resultado como rótulo).
-**Thresholds não são uma categoria só**: a curva de penalização é aplicada a um risco *já
-congelado* (pós-agregação), enquanto `maxFamiliarityRiskRelief` e `executionRiskDerivation` mudam
+**Thresholds não são uma categoria só**: a curva de penalização é aplicada a um risco _já
+congelado_ (pós-agregação), enquanto `maxFamiliarityRiskRelief` e `executionRiskDerivation` mudam
 como esse risco é produzido (exigem histórico ausente). Configuração com parâmetro não reproduzível
 é **rejeitada antes de executar**, com a dependência nomeada — não se roda um experimento inteiro
 pra marcar tudo como impossível. Configuração inválida também não é normalizada em silêncio.

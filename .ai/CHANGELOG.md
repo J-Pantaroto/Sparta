@@ -22,6 +22,18 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-08-05 20:52 — Etapa 31B: preparação da infraestrutura pública da API
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0042-preparacao-infraestrutura-publica-api.md`
+
+Requisitos reais, dependências Riot, três arquiteturas/custos, banco, imagem, ambientes,
+observabilidade, checklists e dez runbooks foram documentados sem provisionamento. Configuração de
+produção passou a validar HTTPS/CORS/secrets/timeouts/limites, e `/ready` verifica Postgres. Estado
+combinado: `READY_FOR_INFRASTRUCTURE_APPROVAL`, `BLOCKED_BY_RIOT_APPROVAL` e
+`BLOCKED_BY_OWNER_DECISIONS`; release interna/replay intactos e desktop ainda retirado.
+
+---
+
 ## 2026-08-05 18:40 — Etapa 31A: retirada controlada do desktop 0.9.0
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0041-retirada-controlada-desktop-0-9-0.md`
@@ -298,6 +310,7 @@ reconstruídos com diferença zero. Nada do motor operacional mudou; promoção 
 `APPROVED_FOR_FUTURE_RELEASE`. 51 testes novos (831 no total). Ver `docs/engine-calibration-lab.md`.
 
 ## 2026-07-30 16:40 — Revisão humana auditável do motor
+
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0024-revisao-humana-auditavel-do-motor.md`
 
 Fluxo de revisão manual em duas fases para drafts já registrados. A fase cega avalia seis
@@ -309,7 +322,6 @@ investigação, e agregado descritivo sempre com denominador — sem nota geral,
 ou versão vencedora. Vitória e derrota não rotulam nada. Nenhum peso, fórmula, threshold ou
 ranking foi alterado, e nenhum snapshot foi recalculado. 47 testes novos (780 no total).
 Ver `docs/draft-review.md`.
-
 
 ## 2026-07-28 18:39 — Avaliação longitudinal e observabilidade do motor
 

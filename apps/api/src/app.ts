@@ -21,27 +21,24 @@ import { replaysRoutes } from "./modules/replays/routes.js";
 import { matchesRoutes } from "./modules/matches/routes.js";
 import { catalogRoutes } from "./modules/catalog/routes.js";
 import { patchesRoutes } from "./modules/patches/routes.js";
+import { loadEnv, parseAllowedOrigins } from "./config/env.js";
 
-// Origens permitidas a chamar a API. O app empacotado carrega o renderer via
-// file:// e o Chromium envia Origin "null" nesse caso; localhost:5173 e o
-// servidor Vite em dev. Qualquer outra origem (ex.: um site malicioso tentando
-// usar o navegador da vitima para acessar a API que roda em localhost) e
-// rejeitada — CORS aberto (origin: true) numa API que fica de pe em
-// localhost:3333 permite esse tipo de ataque "drive-by localhost".
-const ALLOWED_ORIGINS = new Set(["http://localhost:5173", "null"]);
-
+// O app empacotado carrega o renderer via file:// e envia Origin "null";
+// localhost:5173 e o Vite em dev. A allowlist vem do ambiente para que uma
+// origem web futura seja explícita. CORS nunca substitui autenticação.
 export async function buildApp() {
+  const env = loadEnv();
+  const allowedOrigins = parseAllowedOrigins(env.CORS_ALLOWED_ORIGINS);
   const app = Fastify({
+    trustProxy: env.TRUST_PROXY_HOPS > 0 ? env.TRUST_PROXY_HOPS : false,
+    requestTimeout: env.REQUEST_TIMEOUT_MS,
     logger: {
+      level: env.LOG_LEVEL,
       // `redact` cobre o caso de algum caminho passar a emitir headers; o
       // serializador abaixo já não os coleta, então as duas camadas se
       // reforçam em vez de dependerem uma da outra.
       redact: {
-        paths: [
-          "req.headers.authorization",
-          "req.headers.cookie",
-          "res.headers['set-cookie']"
-        ],
+        paths: ["req.headers.authorization", "req.headers.cookie", "res.headers['set-cookie']"],
         remove: true
       },
       serializers: { req: requestLogSerializer }
@@ -50,7 +47,7 @@ export async function buildApp() {
 
   await app.register(cors, {
     origin(origin, callback) {
-      if (!origin || ALLOWED_ORIGINS.has(origin)) {
+      if (!origin || allowedOrigins.has(origin)) {
         callback(null, true);
         return;
       }
@@ -63,12 +60,11 @@ export async function buildApp() {
   });
   // Limite global generoso; rotas sensiveis a forca bruta (login/registro)
   // tem limite proprio, mais restrito, definido em modules/auth/routes.ts.
-  await app.register(rateLimit, { max: 100, timeWindow: "1 minute" });
+  await app.register(rateLimit, { max: env.GLOBAL_RATE_LIMIT_MAX, timeWindow: "1 minute" });
   // Cabeçalhos de endurecimento aplicados a toda resposta. Escritos à mão em
   // vez de trazer `@fastify/helmet`: a API só é consumida pelo renderer do
-  // Electron em localhost, e uma dependência nova é superfície nova. HSTS
-  // fica de fora de propósito — o serviço é HTTP em localhost, e anunciar
-  // HSTS ali só criaria um pin inútil no navegador do usuário.
+  // Electron e uma dependência nova é superfície nova. HSTS fica no edge que
+  // realmente termina HTTPS; anunciá-lo na API HTTP local seria incorreto.
   app.addHook("onSend", async (_request, reply, payload) => {
     reply.header("X-Content-Type-Options", "nosniff");
     reply.header("X-Frame-Options", "DENY");
@@ -85,11 +81,10 @@ export async function buildApp() {
   // path traversal. Sem `/docs`, essa superfície deixa de existir em vez de
   // depender da versão do transitivo estar em dia.
   //
-  // A condição é **opt-in** (`=== "development"`), não `!== "production"`:
-  // um ambiente com `NODE_ENV` ausente, vazio ou "staging" não deve ganhar a
-  // documentação por omissão. Errar aqui para o lado fechado é barato — quem
-  // quer `/docs` declara que está em desenvolvimento.
-  if (process.env.NODE_ENV === "development") {
+  // A condição tem dois opt-ins: ambiente `development` e flag explícita.
+  // Ambiente inválido é recusado pela validação antes do boot; test/produção
+  // e desenvolvimento sem a flag permanecem fechados.
+  if (env.NODE_ENV === "development" && env.API_DOCS_ENABLED) {
     await app.register(swagger, {
       openapi: {
         info: {
@@ -140,9 +135,10 @@ export async function buildApp() {
         message: "Não foi possível concluir a operação."
       });
     }
-    return reply
-      .status(status)
-      .send({ error: failure.name ?? "request_error", message: failure.message ?? "Requisição inválida." });
+    return reply.status(status).send({
+      error: failure.name ?? "request_error",
+      message: failure.message ?? "Requisição inválida."
+    });
   });
 
   await app.register(healthRoutes);
