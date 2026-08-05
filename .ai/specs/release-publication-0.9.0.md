@@ -2,9 +2,31 @@
 
 Espelho de `docs/release-publication-0.9.0.md`. A fonte de verdade é o arquivo em `docs/`.
 
-## Estado
+## Estado atual — Etapa 30A
 
-`BLOCKED` em 2026-08-05, antes de qualquer tag, GitHub Release, upload ou deploy externo.
+`READY_FOR_DESKTOP_PUBLICATION` em 2026-08-05. A correção eliminou fixtures, mocks, snapshots,
+testes, TypeScript e source maps do `app.asar` real; a inspeção aprovou 2.584 entradas. O inventário
+estrito foi regenerado apenas com os artefatos `0.9.0` do commit
+`18ea00544fcfdf8cffb884ad8d7524ffee04db2f`, cujo CI passou no run `31037753965`.
+
+Instalação, atualização no mesmo caminho com espaços e acento, execução por `file:` sem Vite e
+desinstalação passaram. A árvore instalada teve 75/75 arquivos sem excedentes. A validação
+operacional repetiu o mesmo input/sessão, preservou `sessionId`/`snapshotId` com `UNCHANGED`,
+manteve os cinco candidatos e produziu `EXACT_REPLAY` sem divergências.
+
+A API continua `BLOCKED_BY_MISSING_INFRASTRUCTURE`. Nada foi publicado: sem tag, GitHub Release,
+imagem remota, upload do instalador, deploy ou Etapa 31.
+
+Hashes canônicos: instalador
+`24105e665e4cb94e41638ff7f85aed479b0a87c9442443a5d965baa6a2b228f9`, blockmap
+`87854716b6e57edd22748528379af3f127ce2d6534f5e676348ee2a0fba2d83d`, imagem local da API
+`sha256:1268f2921b44c8abb085afb0e89527a4204c9bd66f66de4445ff10874a1badc4`.
+
+## Registro histórico — Etapa 30
+
+`BLOCKED` em 2026-08-05, antes de qualquer tag, GitHub Release, upload ou deploy externo. Os dois
+bloqueadores locais abaixo foram resolvidos pela Etapa 30A; a falta de infraestrutura da API
+permanece.
 
 ## Motivos
 

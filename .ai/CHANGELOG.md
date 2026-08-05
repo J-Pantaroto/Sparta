@@ -22,6 +22,20 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-08-05 16:19 — Etapa 30A: correção e recongelamento do candidato 0.9.0
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0038-correcao-recongelamento-candidato-0-9-0.md`
+
+Fixtures removidas pela origem do build, inspeção automática do `app.asar` real e inventário
+estrito com metadados internos. O candidato foi regenerado do zero e aprovado com 2.584 entradas
+no ASAR, 75/75 arquivos instalados, instalação/atualização/execução/desinstalação reais e zero erro
+do renderer. A mesma sessão operacional permaneceu `UNCHANGED`, com ranking idêntico e replay
+`EXACT_REPLAY`; release ativa e hashes ficaram intactos. Parecer
+`READY_FOR_DESKTOP_PUBLICATION`; API `BLOCKED_BY_MISSING_INFRASTRUCTURE`. Nada publicado e Etapa 31
+não iniciada.
+
+---
+
 ## 2026-08-05 15:27 — Etapa 30: publicação controlada bloqueada antes de mutações externas
 
 **Status:** BLOQUEADA · Prompt: `.ai/prompts/features/0037-publicacao-controlada-sparta-0-9-0.md`

@@ -11,13 +11,15 @@ GitHub Release, não há distribuição externa e o empacotamento roda sempre co
 
 | Campo | Valor |
 | --- | --- |
-| Commit | `f7c62d78ba4026ae2488326db5b8fa40906168f2` |
-| Versão do app | 0.1.0 |
-| Versão do monorepo | 0.1.0 |
+| Commit | `18ea00544fcfdf8cffb884ad8d7524ffee04db2f` |
+| Versão do app | 0.9.0 |
+| Versão do monorepo | 0.9.0 |
+| Versão interna do instalador | 0.9.0 |
+| Publisher | J-Pantaroto |
 | Electron | 39.8.10 |
 | Gerenciador de pacotes | pnpm@10.34.4 |
 | Imagem-base da API | `node:20-slim@sha256:2cf067cfed83d5ea958367df9f966191a942351a2df77d6f0193e162b5febfc0` |
-| Imagem da API construída | `sha256:2a4ab5c1ad76857888a49c357174466e547a3811e42a07ba5216f7dc2dfd2050` |
+| Imagem da API construída | `sha256:1268f2921b44c8abb085afb0e89527a4204c9bd66f66de4445ff10874a1badc4` |
 | Tamanho da imagem | 513 MB |
 
 ## Assinatura de código
@@ -41,12 +43,14 @@ reconhecida — decisão de negócio, fora do escopo técnico desta etapa.
 
 | Arquivo | Bytes | SHA-256 |
 | --- | --- | --- |
-| Sparta-Setup-0.1.0-x64.exe | 95702448 | `153ec4e5bf5aad3c9337e64b5f0000fbcabae5f6648e0622ba2a5fe9417fbc9f` |
-| Sparta-Setup-0.1.0-x64.exe.blockmap | 101671 | `8bc0793f8a7ade2f39617ed6d4b4fd315f0de391f6b659ccbe6704cb5fe2a319` |
+| Sparta-Setup-0.9.0-x64.exe | 95694968 | `24105e665e4cb94e41638ff7f85aed479b0a87c9442443a5d965baa6a2b228f9` |
+| Sparta-Setup-0.9.0-x64.exe.blockmap | 101623 | `87854716b6e57edd22748528379af3f127ce2d6534f5e676348ee2a0fba2d83d` |
 
-Os artefatos não são versionados (`dist-installer/` está no `.gitignore`).
-Os checksums acima identificam a build gerada a partir do commit registrado
-acima; reconstruir a partir de outro commit produz outros valores.
+O instalador e o blockmap não são versionados; o inventário lê o diretório
+canônico `artifacts/releases/0.9.0/` depois de ele ter sido limpo e
+regenerado. O gerador rejeita ausência, versão diferente, candidato ambíguo e
+metadados internos incompatíveis. Os checksums acima identificam esta build;
+reconstruir a partir de outro commit produz outros valores.
 
 ## Migrations
 
@@ -110,8 +114,8 @@ para a imagem nem para o instalador.
 | `@prisma/engines@6.19.3` | Apache-2.0 |
 | `@prisma/fetch-engine@6.19.3` | Apache-2.0 |
 | `@prisma/get-platform@6.19.3` | Apache-2.0 |
-| `@sparta/core@0.1.0 (workspace)` | não declarada |
-| `@sparta/riot@0.1.0 (workspace)` | não declarada |
+| `@sparta/core@0.9.0 (workspace)` | não declarada |
+| `@sparta/riot@0.9.0 (workspace)` | não declarada |
 | `@standard-schema/spec@1.1.0` | MIT |
 | `abstract-logging@2.0.1` | MIT |
 | `ajv-formats@3.0.1` | MIT |
@@ -233,8 +237,8 @@ para a imagem nem para o instalador.
 
 | Pacote | Licença |
 | --- | --- |
-| `@sparta/core@0.1.0 (workspace)` | não declarada |
-| `@sparta/riot@0.1.0 (workspace)` | não declarada |
+| `@sparta/core@0.9.0 (workspace)` | não declarada |
+| `@sparta/riot@0.9.0 (workspace)` | não declarada |
 | `boolbase@1.0.0` | ISC |
 | `cheerio-select@2.1.0` | BSD-2-Clause |
 | `cheerio@1.0.0` | MIT |

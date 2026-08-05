@@ -1,6 +1,65 @@
 # Publicação controlada — Sparta 0.9.0
 
-## Estado
+## Etapa 30A — estado atual
+
+> ## `READY_FOR_DESKTOP_PUBLICATION`
+
+O candidato local corrigido foi regenerado do zero e recongelado em 2026-08-05 a partir do commit
+`18ea00544fcfdf8cffb884ad8d7524ffee04db2f`. Os dois bloqueadores encontrados na Etapa 30 foram
+eliminados: o `app.asar` real não contém fixtures, mocks, snapshots, testes, fontes TypeScript,
+source maps, `.env` ou payload sintético da Riot, e o inventário agora aceita somente o conjunto
+canônico e não ambíguo da versão corrente.
+
+A API pública continua com o estado explícito **`BLOCKED_BY_MISSING_INFRASTRUCTURE`**: não existe
+registry, ambiente, servidor, domínio, backup ou rollback real configurado. Esse bloqueio não foi
+disfarçado com o Compose local e não invalida a prontidão do artefato desktop. Nenhuma tag, GitHub
+Release, imagem remota, publicação do instalador ou Etapa 31 foi criada/iniciada.
+
+### Candidato recongelado
+
+| Arquivo                               |      Bytes | SHA-256                                                            |
+| ------------------------------------- | ---------: | ------------------------------------------------------------------ |
+| `Sparta-Setup-0.9.0-x64.exe`          | 95.694.968 | `24105e665e4cb94e41638ff7f85aed479b0a87c9442443a5d965baa6a2b228f9` |
+| `Sparta-Setup-0.9.0-x64.exe.blockmap` |    101.623 | `87854716b6e57edd22748528379af3f127ce2d6534f5e676348ee2a0fba2d83d` |
+| `checksums.txt`                       |        359 | `f385666bc25f13d590f65ed68984f0bbf2252ea4c2153ed9a0233c888a8f8abb` |
+| `sbom-api.json`                       |     16.654 | `f8cf1af575d854b73aa0431dcbef0b293768afcd06b17f68ade59035a8bfa744` |
+| `sbom-desktop.json`                   |      3.559 | `40eacd9f64cb3ddc2fc3768015e258bef149ee50560abc507b9af8bfb18d2c14` |
+| `sparta-release-manifest.json`        |      3.625 | `cd121d14b23c2479051cd72538e4a57cdab80f229fa07d3a9bceada0b87ef336` |
+
+O instalador preserva produto `Sparta`, FileVersion/ProductVersion `0.9.0`, CompanyName
+`J-Pantaroto` e assinatura `NotSigned`. O manifesto registra a imagem local da API
+`sha256:1268f2921b44c8abb085afb0e89527a4204c9bd66f66de4445ff10874a1badc4`, 21 migrations,
+`release-etapa27c-v1` ativa, os hashes funcionais da release e replay
+`replay-input-bundle/2.0.0` em `EXACT_REPLAY`.
+
+### Evidências da correção e validação
+
+- O CI do commit-fonte concluiu com sucesso no run `31037753965`; a geração local repetiu
+  version check, typecheck, lint, build, 1.089 testes TypeScript e 1 teste Python.
+- A origem foi corrigida no build do `@sparta/riot` e nas exclusões gerais do electron-builder;
+  o verificador abriu o `app.asar` real com `@electron/asar` e aprovou 2.584 entradas, com zero
+  achados proibidos.
+- A descoberta de artefatos rejeita ausência, versão antiga, duplicidade, ambiguidade e metadados
+  internos divergentes. O inventário e seu espelho registram apenas `0.9.0`.
+- Instalação antiga e atualização pelo novo candidato foram exercitadas no mesmo caminho com
+  espaços e acento. O `app.asar` foi substituído pelo hash da build nova; a árvore instalada ficou
+  em 75/75 arquivos, sem excedentes, com um atalho em cada local e uma entrada de desinstalação.
+- O executável instalado carregou de `file:` sem Vite, com preload disponível, documento completo,
+  zero exceção de renderer, zero erro de console e nenhum `NaN`, `Infinity` ou `undefined` visível.
+  A desinstalação removeu pasta, atalhos e registro com exit code 0.
+- A API local foi recriada com a imagem nova. O mesmo input e a mesma sessão devolveram os mesmos
+  IDs e persistência `UNCHANGED`: Viego 58,7/0,9; Udyr 58,5/0,5; Vi 55,3/0,5; Nocturne 53,3/0,5;
+  Graves 50,1/0,5. O replay foi `EXACT_REPLAY`, com zero divergências e zero dependências ausentes.
+- O release ativo continuou com ID `0d8a2ce4-7e42-4cb1-9bdb-fd2b9ef2e0e9`, `artifactHash`
+  `8878a65782130a78f7fa47146d4e651158244ce05391a3e767d2e72fd8d9ce90` e `configHash`
+  `fa9dbde183efb4ae4d45bf006730ad7486ab1a80253642d33805f1ca4e34aa38`. Houve zero fallback
+  real, zero erro de hash e zero log de nível erro/fatal; token inválido permaneceu em 401.
+
+O parecer significa somente que o candidato desktop está apto para uma decisão posterior de
+publicação. Não autoriza inventar a infraestrutura da API nem transforma a validação local em
+deploy de produção.
+
+## Registro histórico — Etapa 30
 
 > ## `BLOCKED`
 
@@ -110,5 +169,5 @@ decisão precisa ser reavaliada se uma API pública real for configurada antes d
 - Replay: último bundle em `EXACT_REPLAY`.
 - Estado da Etapa 30: `BLOCKED`, não `PUBLISHED` nem `PARTIALLY_PUBLISHED`.
 
-A próxima ação válida é preparar e aprovar um novo candidato corrigido. A Etapa 31 não foi
-iniciada.
+Esse bloqueio histórico foi resolvido pelo candidato da Etapa 30A descrito no início do documento.
+A Etapa 31 não foi iniciada.

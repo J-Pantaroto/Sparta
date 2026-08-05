@@ -1,11 +1,28 @@
 # Parecer de prontidão — Sparta 0.9.0
 
-> **Atualização da Etapa 30 (2026-08-05):** este parecer é o registro histórico do congelamento da
-> Etapa 29. A auditoria independente de publicação encontrou fixtures de teste dentro do
-> `app.asar` e inventário divergente, por isso o candidato atual não foi publicado. Estado e
-> evidências em `docs/release-publication-0.9.0.md`.
+> **Atualização da Etapa 30A (2026-08-05):** fixtures e inventário divergente foram corrigidos na
+> origem, o candidato foi regenerado e revalidado. O estado atual é
+> **`READY_FOR_DESKTOP_PUBLICATION`**. A API permanece
+> **`BLOCKED_BY_MISSING_INFRASTRUCTURE`**; nada foi publicado. Evidências e hashes em
+> `docs/release-publication-0.9.0.md`.
 
-## Resultado
+## Resultado atual — Etapa 30A
+
+> ## `READY_FOR_DESKTOP_PUBLICATION`
+
+O `app.asar` real foi aprovado com 2.584 entradas e zero arquivo/conteúdo proibido; o inventário
+estrito contém somente artefatos `0.9.0`; instalação, atualização, execução sem Vite e
+desinstalação passaram; a mesma sessão operacional preservou o snapshot e devolveu persistência
+`UNCHANGED`; o replay permaneceu `EXACT_REPLAY`, e o release ativo e seus hashes não mudaram.
+
+O candidato vem do commit `18ea00544fcfdf8cffb884ad8d7524ffee04db2f`. O SHA-256 canônico do
+instalador é `24105e665e4cb94e41638ff7f85aed479b0a87c9442443a5d965baa6a2b228f9`.
+
+Nenhuma tag, GitHub Release, imagem remota ou distribuição foi criada. A ausência de
+infraestrutura real da API continua bloqueando somente a publicação funcional completa, sem ser
+convertida em bloqueio do candidato desktop.
+
+## Registro histórico — Etapa 29
 
 > ## `READY_FOR_PUBLICATION`
 

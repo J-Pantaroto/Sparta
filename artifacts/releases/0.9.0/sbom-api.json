@@ -2,7 +2,7 @@
   "format": "sparta-sbom/1.0.0",
   "component": "Sparta API (imagem de container)",
   "version": "0.9.0",
-  "commit": "6b43b512e7dcdf30844f482ea5c1731bade56008",
+  "commit": "18ea00544fcfdf8cffb884ad8d7524ffee04db2f",
   "scope": "production",
   "packageCount": 140,
   "packages": [

@@ -1,5 +1,36 @@
 # Sparta - Contexto para Continuidade
 
+## Etapa 30A: candidato 0.9.0 corrigido — `READY_FOR_DESKTOP_PUBLICATION`
+
+Correção feita na origem e candidato regenerado do zero a partir de
+`18ea00544fcfdf8cffb884ad8d7524ffee04db2f`. O build do `@sparta/riot` limpa `dist` e exclui
+testes/fixtures; o electron-builder exclui de forma geral fixtures, mocks, snapshots, testes,
+TypeScript, source maps, `.env`, logs e caches inclusive nas dependências do workspace. A inspeção
+automatizada abre o `app.asar` real com `@electron/asar`, procura caminhos e payloads proibidos e
+aprovou 2.584 entradas com zero achados.
+
+Descoberta de artefatos agora é estrita: exige exatamente o instalador e blockmap canônicos da
+versão corrente, rejeita antigos/ambíguos e valida FileVersion, ProductVersion, ProductName e
+CompanyName no binário. Treze testes novos protegem o ASAR e o inventário. Pipeline limpo passou
+typecheck, lint, build, 1.089 testes TypeScript e 1 teste Python; manifesto, SBOM, checksums e os
+dois inventários foram regenerados.
+
+Instalação antiga → atualização nova → execução → desinstalação foi exercitada no mesmo caminho
+com espaços e acento. O ASAR instalado foi substituído pelo novo, a árvore ficou 75/75 sem
+excedentes, atalhos não duplicaram, o app carregou por `file:` sem Vite e teve zero erro de
+renderer/preload/console. A desinstalação removeu pasta, atalhos e registro.
+
+Não regressão operacional: API local recriada com
+`sha256:1268f2921b44c8abb085afb0e89527a4204c9bd66f66de4445ff10874a1badc4`; o mesmo input e sessão
+preservaram `sessionId`/`snapshotId` com `UNCHANGED` e os cinco candidatos/scores/coberturas.
+Replay `EXACT_REPLAY`, zero divergências; `release-etapa27c-v1`, `artifactHash` e `configHash`
+inalterados; zero fallback real, erro de hash ou log de erro/fatal.
+
+Estado final do desktop: **`READY_FOR_DESKTOP_PUBLICATION`**. Estado da API:
+**`BLOCKED_BY_MISSING_INFRASTRUCTURE`** — não existe registry, ambiente, servidor, domínio, backup
+ou rollback real. Nada publicado: sem tag, GitHub Release, imagem remota, instalador remoto ou
+Etapa 31. Relatório: `docs/release-publication-0.9.0.md`.
+
 ## Etapa 30: publicação 0.9.0 bloqueada no checkpoint pré-publicação
 
 Auditoria completa em `docs/release-publication-0.9.0.md`, executada antes de qualquer mutação
