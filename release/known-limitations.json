@@ -58,6 +58,22 @@
       "resolution": "Production Key."
     },
     {
+      "id": "replay-capability-label-before-verification",
+      "classification": "KNOWN_LIMITATION",
+      "title": "Rótulo de replay diz \"inputs não preservados\" antes da primeira verificação",
+      "detail": "`FULL_DERIVATION_REPLAY_UNAVAILABLE` cobre dois estados distintos: \"não havia bundle nesta versão\" e \"o bundle existe, mas a integridade ainda não foi verificada\". O `reason` distingue os dois corretamente e aparece no tooltip, mas o rótulo visível é o do primeiro caso. Todo snapshot novo mostra isso até alguém clicar em \"Verificar replay\".",
+      "impact": "Cosmético e transitório: o dado está preservado e o replay funciona. O usuário pode achar, por um momento, que a análise não é reproduzível.",
+      "resolution": "Separar os dois estados em valores distintos de capacidade — mudança no core com teste e documentação. Deliberadamente fora do escopo de uma etapa de congelamento, e sem custo de migração para corrigir depois."
+    },
+    {
+      "id": "elevated-install-goes-per-machine",
+      "classification": "KNOWN_LIMITATION",
+      "title": "Instalação a partir de um terminal com privilégio de administrador vai para Program Files",
+      "detail": "O instalador declara `requestedExecutionLevel=\"asInvoker\"` e nunca pede elevação: um usuário comum instala em `%LOCALAPPDATA%\\Programs\\Sparta`, por usuário, medido. Se o instalador for iniciado a partir de um processo já elevado, ele herda o token de administrador e o NSIS passa a instalar para todos os usuários, em `C:\\Program Files\\Sparta`, com a entrada de desinstalação em HKLM.",
+      "impact": "Só afeta quem inicia o instalador de um terminal elevado. A instalação funciona nos dois casos; muda o alcance e o local.",
+      "resolution": "Forçar o modo por usuário exigiria `perMachine` fixo e uma página de escolha desabilitada no NSIS. Não alterado durante o congelamento."
+    },
+    {
       "id": "installer-nondeterministic-bytes",
       "classification": "KNOWN_LIMITATION",
       "title": "O instalador não é reproduzível byte a byte",

@@ -1,5 +1,68 @@
 # Sparta - Contexto para Continuidade
 
+## Etapa 29: release candidate 0.9.0 congelado — `READY_FOR_PUBLICATION`
+
+Parecer final em `docs/release-readiness.md`: **`READY_FOR_PUBLICATION`**, sem nenhum
+`PUBLICATION_BLOCKER`. **Nada foi publicado** — sem GitHub Release, sem registry, sem distribuição
+do instalador. Isso autoriza publicar; a publicação é decisão separada, por
+`docs/runbook-publication.md`.
+
+**Versão oficial 0.9.0, não 1.0.0.** O escopo local está completo, mas os dados globais (matchup,
+meta, builds, runas) dependem de Riot Production Key, o instalador não é assinado, e contratos
+públicos ainda se movem — o `ReplayInputBundle` foi 1.0.0 → 2.0.0 uma etapa atrás. 1.0.0
+comunicaria escopo fechado e estabilidade de contrato; nenhum dos dois é verdade.
+`scripts/sync-version.mjs` faz do `package.json` da raiz a **fonte de verdade única** e propaga para
+5 `package.json`, o `pyproject.toml` e **dois literais em código** (a versão do OpenAPI e a que o
+bridge do preload expõe ao renderer). `pnpm version:check` entrou no CI.
+
+**Manifesto só de fonte real** (`scripts/release-manifest.mjs` → `artifacts/releases/0.9.0/`):
+`git`, `docker image inspect`, o arquivo em disco e o Postgres. Campo sem fonte faz o gerador
+**falhar** — manifesto com valor inventado é pior que ausente, porque parece verificado. A
+assinatura é lida do **binário**, não do log do empacotador. Limitações vêm de
+`release/known-limitations.json`, versionado.
+
+**Reprodutibilidade medida, não alegada** (`docs/release-reproducibility.md`). Determinísticos:
+`app.asar`, `Sparta.exe`, os SBOM, a árvore de 2604 entradas do asar e **o conteúdo extraído do
+instalador** — 75 arquivos, byte a byte iguais em duas gerações. Não determinísticos: o `.exe` do
+NSIS e a imagem. Causa verificada, não suposta: no instalador o `TimeDateStamp` do PE é **idêntico**
+(é o stub pré-compilado) e o que muda em `0xDA18` é o tamanho do fluxo comprimido — entrada igual,
+saída diferente, logo é o compressor; na imagem, só as 6 camadas da base coincidem, porque cada
+`COPY`/`RUN` grava mtime. Daí as regras nos runbooks: publicar a imagem **por digest**, e verificar
+o instalador pelo **conteúdo extraído**, não pelo hash do `.exe`.
+
+**Documentação**: `docs/user-guide.md` e `docs/release-notes.md` (matchup/meta/builds/runas globais
+aparecem como **inexistentes** nesta versão, não como temporariamente indisponíveis; SmartScreen
+explicado sem eufemismo), `docs/runbook-publication.md` (API antes do instalador, publicação por
+digest, smoke tests com resultado esperado explícito) e `docs/runbook-rollback.md` (critérios
+objetivos de aborto em tabela, rollback por digest e não por reconstrução, migration aditiva vs
+destrutiva sem prometer reversão automática). Comandos exercitados localmente, nenhum contra
+infraestrutura externa.
+
+**Instalação exercitada como usuário real**, em processo **não elevado** (tarefa agendada com
+privilégio `LIMITED`): caminho padrão por usuário sem pedir administrador, caminho com espaço e
+acento, 1 atalho de cada, app abrindo de `file://…/app.asar` sem Vite. Atualização por cima
+preservou os dados locais, **removeu** um arquivo obsoleto plantado e não duplicou atalho.
+Desinstalação removeu pasta, atalhos e registro; preservou os dados do usuário por desenho e não
+tocou no League.
+
+**Smoke test com os artefatos congelados**: 5 candidatos idênticos à linha de base, `SAVED`, bundle
+`replay-input-bundle/2.0.0` com configuração embutida, `EXACT_REPLAY` com 0 divergências,
+`release-etapa27c-v1` `ACTIVE` conferindo com o manifesto em id/versão/`artifactHash`/`configHash`,
+0 fallback, `SIGTERM` em 1296 ms com exit 0, 10 telas com 0 erro de renderer/preload/main.
+
+**Dois defeitos reais corrigidos**: (1) os dados do usuário iam para `%APPDATA%\@sparta\desktop` —
+o Electron deriva `app.getName()` do `name` do package.json empacotado (`@sparta/desktop`) e a barra
+do escopo vira subpasta; `app.setName("Sparta")` antes do `whenReady`, e corrigir **agora** não
+custa nada, depois de publicado custaria abandonar o perfil de quem já instalou; (2) o
+`electron-builder` não limpa `dist-installer/`, e o instalador do 0.1.0 sobreviveu — o manifesto do
+0.9.0 registrou **ele** e o SHA-256 dele.
+
+**Duas limitações novas, descobertas pela validação e registradas em vez de silenciadas**: o rótulo
+de replay antes da primeira verificação (`FULL_DERIVATION_REPLAY_UNAVAILABLE` cobre dois estados; o
+`reason` distingue, o rótulo visível não) e a instalação a partir de terminal elevado indo para
+Program Files (o instalador declara `asInvoker` e nunca pede elevação — só herda token já elevado).
+Nenhuma reclassificada para baixo para permitir concluir a etapa.
+
 ## Etapa 28b: hardening final e candidato de release local
 
 Fecha, com resultado **medido**, cada risco que a 28a tinha registrado como aberto. Relatório em

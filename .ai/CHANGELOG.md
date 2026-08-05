@@ -22,6 +22,27 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-08-04 18:20 — Etapa 29: preparação e congelamento da release final (0.9.0)
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0036-preparacao-congelamento-release-final.md`
+
+Parecer final **`READY_FOR_PUBLICATION`** (`docs/release-readiness.md`), sem nenhum
+`PUBLICATION_BLOCKER`. Nada publicado. Versão oficial **0.9.0** e não 1.0.0: o escopo local está
+completo, mas os dados globais dependem de Production Key, o instalador não é assinado e contratos
+públicos ainda se movem. Fonte de verdade única da versão (`scripts/sync-version.mjs`, verificada no
+CI) cobrindo 8 lugares, dois deles literais em código. Manifesto do candidato gerado só de fontes
+reais — o gerador falha em vez de presumir. Reprodutibilidade **medida**: `app.asar`, `Sparta.exe`,
+SBOM e o conteúdo extraído do instalador são idênticos byte a byte; o `.exe` do NSIS e a imagem não
+são, com a causa de cada diferença verificada. Guia do usuário, release notes e runbooks de
+publicação e rollback, com comandos exercitados localmente. Instalação, atualização e desinstalação
+exercitadas **sem elevação**, incluindo caminho com espaço e acento. Smoke test com os artefatos
+congelados: 5 candidatos, `EXACT_REPLAY`, release ativa íntegra, 0 erro. Um defeito real corrigido —
+os dados do usuário iam para `%APPDATA%\@sparta\desktop` — e outro no próprio pipeline, que fazia o
+manifesto registrar o instalador da versão anterior. Duas limitações novas descobertas pela
+validação e registradas, nenhuma reclassificada para baixo.
+
+---
+
 ## 2026-08-04 16:55 — Etapa 28b: hardening final e candidato de release local
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0035-hardening-final-candidato-release.md`
