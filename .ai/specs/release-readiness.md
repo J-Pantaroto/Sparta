@@ -1,5 +1,10 @@
 # Parecer de prontidão — Sparta 0.9.0
 
+> **Atualização da Etapa 30 (2026-08-05):** este parecer é o registro histórico do congelamento da
+> Etapa 29. A auditoria independente de publicação encontrou fixtures de teste dentro do
+> `app.asar` e inventário divergente, por isso o candidato atual não foi publicado. Estado e
+> evidências em `docs/release-publication-0.9.0.md`.
+
 ## Resultado
 
 > ## `READY_FOR_PUBLICATION`

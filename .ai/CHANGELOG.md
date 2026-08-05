@@ -22,6 +22,20 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-08-05 15:27 — Etapa 30: publicação controlada bloqueada antes de mutações externas
+
+**Status:** BLOQUEADA · Prompt: `.ai/prompts/features/0037-publicacao-controlada-sparta-0-9-0.md`
+
+Checkpoint completo em `docs/release-publication-0.9.0.md`: Git/CI, hashes, assinatura, metadados,
+imagem local, migrations, release ativa e replay conferem, mas o `app.asar` congelado contém quatro
+cópias de fixtures sintéticas de teste do próprio `@sparta/riot`, e o inventário obrigatório ainda
+registra artefatos `0.1.0`. O deploy da API também ficou explicitamente bloqueado: não existe
+registry, ambiente, servidor, domínio, backup ou rollback real configurado. Nenhuma tag, GitHub
+Release, imagem remota ou distribuição foi criada. Corrigir o pacote exige novo candidato e nova
+validação; o binário congelado não foi alterado nem atribuído retroativamente a outro commit.
+
+---
+
 ## 2026-08-04 18:20 — Etapa 29: preparação e congelamento da release final (0.9.0)
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0036-preparacao-congelamento-release-final.md`

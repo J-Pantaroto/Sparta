@@ -1,5 +1,29 @@
 # Sparta - Contexto para Continuidade
 
+## Etapa 30: publicação 0.9.0 bloqueada no checkpoint pré-publicação
+
+Auditoria completa em `docs/release-publication-0.9.0.md`, executada antes de qualquer mutação
+externa. **Nada foi publicado**: sem tag `v0.9.0`, GitHub Release, upload de instalador, imagem
+remota ou deploy da API.
+
+Git e CI conferem em `c3b5c6f`; hashes do instalador/SBOM/blockmap conferem; instalador é 0.9.0,
+Publisher `J-Pantaroto`, `NotSigned`; imagem local bate com o manifesto; banco local tem 21
+migrations, `release-etapa27c-v1` como única ativa e bundle mais recente em `EXACT_REPLAY`.
+
+**Bloqueador do instalador:** o `app.asar` contém as fixtures sintéticas `match-detail.json` e
+`match-timeline.json` do próprio `@sparta/riot`, duplicadas em `src/mappers/__fixtures__` e
+`dist/mappers/__fixtures__`. Não há segredo nem dado real, mas são arquivos de teste indevidos e
+contradizem a allowlist/documentação. Corrigir exige novo empacotamento, novos hashes/manifesto,
+revalidação completa e aprovação de novo commit; não modificar o candidato congelado em silêncio.
+
+**Bloqueador documental:** `docs/release-candidate.md` ainda aponta artefatos 0.1.0 e o espelho em
+`.ai/specs/` está ainda mais antigo. Regenerar ambos apenas junto do candidato sucessor.
+
+**API bloqueada:** não existe registry, ambiente GitHub, deployment, secret/variável de deploy,
+servidor, domínio, backup ou rollback real. O Compose local usa `NODE_ENV=development` e não é
+produção. Não inventar infraestrutura. Se um candidato corrigido for aprovado sem API pública, a
+GitHub Release deve começar como prerelease, não latest.
+
 ## Etapa 29: release candidate 0.9.0 congelado — `READY_FOR_PUBLICATION`
 
 Parecer final em `docs/release-readiness.md`: **`READY_FOR_PUBLICATION`**, sem nenhum
