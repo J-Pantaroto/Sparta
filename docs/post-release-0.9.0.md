@@ -4,6 +4,19 @@
 - Release: [v0.9.0](https://github.com/J-Pantaroto/Sparta/releases/tag/v0.9.0)
 - Commit imutável da tag: `aa2366b3e5bb4b3e5227dcdec43eaf8c6977ba77`
 
+## Atualização — retirada controlada em 2026-08-05
+
+A recomendação desta etapa foi executada na Etapa 31A. O estado público atual é:
+
+```text
+WITHDRAWN_PENDING_PUBLIC_API
+```
+
+O título e o início das notas sinalizam a retirada. Somente
+`Sparta-Setup-0.9.0-x64.exe` foi removido; tag, release e os cinco documentos de auditoria foram
+preservados. O snapshot anterior e a verificação posterior estão em
+`docs/release-withdrawal-0.9.0.md`.
+
 ## Parecer
 
 ```text
@@ -17,8 +30,9 @@ padrão para `http://localhost:3333`. Autenticação, recomendações, históric
 dependem dessa API. Isso satisfaz o critério de retirada da própria Etapa 31: dependência de API
 inacessível que torna o fluxo principal indisponível.
 
-Este documento **não executa a retirada**. Tag, prerelease e anexos permanecem intactos até uma
-decisão explicitamente autorizada. Nenhum hotfix, 0.9.1, deploy de API ou Etapa 32 foi iniciado.
+Na conclusão original desta etapa, a retirada ainda não havia sido executada. A autorização veio
+na Etapa 31A e removeu somente o instalador, preservando a auditoria. Nenhum hotfix, 0.9.1, deploy
+de API ou Etapa 32 foi iniciado.
 
 ## Integridade remota
 
@@ -152,13 +166,14 @@ Achados desta execução:
    estabilidade.
 
 Um hotfix só pode ser aberto com autorização específica e novo ciclo de build, congelamento e
-publicação; anexos de `v0.9.0` não podem ser substituídos. Retirada também requer autorização e
-deve preservar tag, hashes, manifesto, SBOM, notas e este relatório como evidência histórica.
+publicação; anexos de `v0.9.0` não podem ser substituídos. A retirada posteriormente autorizada
+preservou tag, hashes, manifesto, SBOMs, notas e este relatório como evidência histórica.
 
 ## Estado final preservado
 
-- tag, prerelease, anexos e `latest`: **inalterados**;
+- tag e prerelease: preservadas; instalador retirado na Etapa 31A; cinco documentos preservados;
 - API pública: `BLOCKED_BY_MISSING_INFRASTRUCTURE`;
 - release operacional: `release-etapa27c-v1`, `ACTIVE`, inalterada;
 - replay: `EXACT_REPLAY`, zero divergência;
-- telemetria, recalibração, hotfix, retirada e Etapa 32: **não executados**.
+- telemetria, recalibração, hotfix e Etapa 32: **não executados**;
+- estado público atual: `WITHDRAWN_PENDING_PUBLIC_API`.

@@ -22,6 +22,17 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-08-05 18:40 — Etapa 31A: retirada controlada do desktop 0.9.0
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0041-retirada-controlada-desktop-0-9-0.md`
+
+Snapshot pré-retirada preservado e GitHub Release sinalizada como `WITHDRAWN`. Somente o
+instalador foi removido; tag, commit e cinco documentos de auditoria permanecem, com prerelease
+não latest. Release interna ativa e replay exato ficaram intactos. Estado final
+`WITHDRAWN_PENDING_PUBLIC_API`; sem 0.9.1, API, infraestrutura, dado global ou Etapa 32.
+
+---
+
 ## 2026-08-05 18:19 — Etapa 31: pós-release e monitoramento do desktop 0.9.0
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0040-pos-release-monitoramento-desktop-0-9-0.md`

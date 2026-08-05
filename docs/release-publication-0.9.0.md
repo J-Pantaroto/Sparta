@@ -1,5 +1,24 @@
 # Publicação controlada — Sparta 0.9.0
 
+## Etapa 31A — estado atual
+
+> ## `WITHDRAWN_PENDING_PUBLIC_API`
+
+Em 2026-08-05, a release ID `365792897` foi retirada de forma controlada porque a API pública
+continua inexistente e o desktop não oferece as funcionalidades principais a usuários externos.
+O título atual é `WITHDRAWN — Sparta Desktop 0.9.0`, e as notas começam com o aviso explícito de
+retirada.
+
+Somente `Sparta-Setup-0.9.0-x64.exe` foi removido. A tag `v0.9.0`, seu commit
+`aa2366b3e5bb4b3e5227dcdec43eaf8c6977ba77`, a GitHub Release e os cinco documentos de auditoria
+permanecem. A release continua prerelease, não draft e não latest. Nenhuma versão substituta ou
+API foi publicada.
+
+O inventário anterior à retirada, incluindo IDs, tamanhos, hashes e contadores brutos de download,
+e a verificação posterior estão em `docs/release-withdrawal-0.9.0.md`. Nova publicação exige API
+pública real, fluxo externo validado e um novo candidato/versionamento imutável; o instalador de
+`v0.9.0` não deve ser recolocado.
+
 ## Etapa 30B — estado atual
 
 > ## `PARTIALLY_PUBLISHED`
