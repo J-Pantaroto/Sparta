@@ -23,3 +23,5 @@ Leitura recomendada:
 - `match-observations.md` para itens, runas, feitiços e posições observados em cada partida.
 - `personal-loadout-evidence.md` para a agregação pessoal desses loadouts por campeão e posição.
 - `adr/0002-global-meta-source.md` para a decisão da fonte global, os contratos neutros de fornecedor e as condições de aprovação.
+- `support.md` para o canal público e as regras de diagnóstico sanitizado.
+- `post-release-0.9.0.md` para a verificação da prerelease e o parecer da Etapa 31.

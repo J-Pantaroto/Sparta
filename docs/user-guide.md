@@ -196,6 +196,11 @@ remover tudo.
 
 ## Problemas comuns
 
+Para relatar um problema, use o
+[GitHub Issues](https://github.com/J-Pantaroto/Sparta/issues) e consulte
+`docs/support.md`. O Desktop 0.9.0 não cria log persistente: não anexe
+`%APPDATA%\Sparta`, tokens, senhas, `.env`, dumps ou Local Storage.
+
 **"O Windows protegeu o computador" ao instalar.**
 Esperado: o instalador não é assinado. "Mais informações" → "Executar assim
 mesmo". Confira o SHA-256 antes, se quiser.

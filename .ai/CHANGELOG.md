@@ -22,6 +22,19 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-08-05 18:19 — Etapa 31: pós-release e monitoramento do desktop 0.9.0
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0040-pos-release-monitoramento-desktop-0-9-0.md`
+
+Integridade remota, instalador público, atualização, desinstalação, estados sem API,
+recomendação controlada e replay revalidados. Canal público e template sanitizado de suporte
+adicionados; ausência de log persistente registrada. Parecer `WITHDRAWAL_REQUIRED` junto de
+`MONITORING_LIMITED_BY_MISSING_PUBLIC_API`: o artefato é íntegro, mas a API pública inexistente
+bloqueia autenticação e o fluxo principal. Release/tag/anexos preservados; sem retirada, hotfix,
+telemetria, recalibração ou Etapa 32.
+
+---
+
 ## 2026-08-05 17:15 — Etapa 30B: publicação parcial do desktop 0.9.0
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0039-publicacao-parcial-desktop-0-9-0.md`

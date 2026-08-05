@@ -1,0 +1,71 @@
+name: Relatar problema no Sparta Desktop
+description: Informe um problema reproduzível sem incluir credenciais ou dados privados.
+title: "[Desktop 0.9.0] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Obrigado pelo relato. O canal público de suporte é o GitHub Issues deste repositório.
+        Nunca cole tokens, senhas, arquivos `.env`, dumps completos ou o conteúdo de `%APPDATA%\Sparta`.
+  - type: input
+    id: sparta-version
+    attributes:
+      label: Versão do Sparta
+      description: A versão aparece nas notas da release e nas propriedades do instalador.
+      placeholder: "0.9.0"
+    validations:
+      required: true
+  - type: input
+    id: windows-version
+    attributes:
+      label: Versão do Windows
+      placeholder: "Windows 11 23H2, 64 bits"
+    validations:
+      required: true
+  - type: dropdown
+    id: stage
+    attributes:
+      label: Em que etapa ocorreu?
+      options:
+        - Download ou verificação do instalador
+        - Instalação ou atualização
+        - Primeiro acesso ou autenticação
+        - Vinculação da conta Riot
+        - Champion Select ou recomendação
+        - Histórico de drafts ou do motor
+        - Laboratório do motor
+        - Desinstalação
+        - Outro
+    validations:
+      required: true
+  - type: textarea
+    id: visible-message
+    attributes:
+      label: Mensagem visível
+      description: Copie somente a mensagem que apareceu na tela ou anexe uma captura sem dados privados.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Passos para reproduzir
+      description: Liste o que fez, o que esperava e o que ocorreu.
+      placeholder: |
+        1. Baixei o instalador da release v0.9.0
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: sanitized-diagnostics
+    attributes:
+      label: Diagnóstico sanitizado, se houver
+      description: O Desktop 0.9.0 não grava log persistente. Operadores da API podem anexar somente trechos sanitizados, sem cabeçalhos, tokens, URLs com credenciais ou payloads pessoais.
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacidade
+      options:
+        - label: Confirmei que o relato não contém senha, token, `.env`, dump, dados de outro jogador nem a pasta completa de dados do aplicativo.
+          required: true

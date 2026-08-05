@@ -2599,6 +2599,15 @@ Não usar force push sem pedido explícito.
 
 ## Próximos passos recomendados
 
+### Estado pós-release 0.9.0 (Etapa 31)
+
+Em 2026-08-05, a prerelease e o instalador público permaneceram íntegros, e a release
+operacional `release-etapa27c-v1` continuou `ACTIVE` com replay `EXACT_REPLAY`. O parecer de
+pós-release é **`WITHDRAWAL_REQUIRED` + `MONITORING_LIMITED_BY_MISSING_PUBLIC_API`**: o desktop
+aponta por padrão para `http://localhost:3333`, mas não existe API pública; por isso um usuário
+externo não consegue autenticar nem usar recomendações, históricos ou laboratório. Não houve
+retirada, hotfix ou Etapa 32. Ver `docs/post-release-0.9.0.md` e `docs/support.md`.
+
 Fase 1 (Riot Sync), o refinamento visual do desktop, Fase 2 (Player Intelligence), Fase 3 (Draft Intelligence), Fase 4 (Post-Game Coach), Fase 5 (Growth Journey), a conexão do desktop às rotas reais, a Fase 6 inteira (Configurações + tema com skins + "quantas partidas analisar" + ordem de pick automática via LCU), a Fase 7 (auditoria e documentação dos algoritmos de scoring), a Fase 8 inteira (Sub-fase 8a: motor de build + seletor de time inimigo; Sub-fase 8b: polimento visual do desktop, validada com a conta real Zekerus#117), a Fase 9 inteira (Sub-fase 9a: `ScoreBadge`/`StatBar`/`SignalChip`, Dashboard, Champion Select; Sub-fase 9b: Perfil, Pós-game, Evolução), a Fase 10 (polimento de UX + `ChampionIcon.tsx` com fallback Data Dragon → Community Dragon → placeholder) , a Fase 11 (detecção de posição/lane via LCU + gating do Champion Select + correções de polimento) e a Fase 12 (módulo de temas: splash art com extensão errada + `file://` bloqueado no renderer, mais fallback via Community Dragon) estão completas em `main` — mais sete bugs reais corrigidos ao longo do caminho: card de skin sobreposto, cor errada do número do `ScoreBadge`, o preload nunca carregando de verdade em nenhuma sessão anterior, ícones de campeão quebrados por depender do `championName` cru da Riot, `draft.playerRole` hardcoded em MID (recomendações pro papel errado), splash art pedida como `.png` quando a CDN só serve `.jpg` (403 em tudo: prévia e download), e `localSplashPath` gravado como `file://`, que o renderer nunca conseguiu carregar. Próximo:
 
 1. **Validar a detecção automática de posição/ordem de pick dentro de uma sessão de champion select real** (precisa do cliente do League aberto e em champ select) — a Fase 11 implementou `derivePlayerRole` e o gating, e o download de skin já foi validado de verdade (não é mais pendência), mas a detecção de papel/pick order/troca de lane só pode ser confirmada de ponta a ponta com o League rodando, indisponível neste ambiente.
