@@ -23,10 +23,21 @@ jobs:
       # o que impede o conserto de um lugar só passar despercebido.
       - run: pnpm version:check
       - run: pnpm --filter @sparta/api prisma:generate
-      - run: pnpm lint
       - run: pnpm typecheck
-      - run: pnpm test
+      - run: pnpm lint
+      # `build` ANTES de `test`, e não depois. `packages/core` publica
+      # `main: dist/index.js`, então quem o importa por nome — os testes de
+      # `packages/riot` — só resolve o pacote depois que ele foi compilado.
+      # Num runner limpo `dist/` não existe, e a suíte falhava com
+      # "Failed to resolve entry for package @sparta/core". Localmente a falha
+      # ficava mascarada porque `dist/` sobrevivia de builds anteriores.
+      #
+      # A regra que isso preserva: teste não pode depender de artefato residual
+      # do workspace. Inverter a ordem é o que torna o CI uma verificação de
+      # ambiente limpo em vez de uma verificação da máquina de quem rodou por
+      # último.
       - run: pnpm build
+      - run: pnpm test
 
   analyzer:
     runs-on: ubuntu-latest
