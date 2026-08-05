@@ -38,12 +38,19 @@ __pycache__/
 # Candidato de release local (Etapa 28b). Nunca versionado.
 dist-installer/
 
-# Artefatos de release. O diretorio inteiro e gerado; so o manifesto, os SBOM e
-# os checksums sao versionados — eles descrevem o candidato e cabem num diff.
-# O instalador, a imagem exportada e qualquer intermediario ficam de fora.
-artifacts/
+# Artefatos de release. O diretorio e gerado; so o manifesto, os SBOM e os
+# checksums sao versionados — eles descrevem o candidato e cabem num diff. O
+# instalador, a imagem exportada e qualquer intermediario ficam de fora.
+#
+# A escada de `dir/*` + `!dir/` e obrigatoria: o git nao desce em diretorio
+# excluido, entao um `artifacts/` simples faria toda negacao abaixo dele ser
+# ignorada em silencio — e o manifesto nunca seria versionado. Foi o que
+# aconteceu na primeira versao desta regra.
+artifacts/*
 !artifacts/releases/
+artifacts/releases/*
 !artifacts/releases/*/
+artifacts/releases/*/*
 !artifacts/releases/*/sparta-release-manifest.json
 !artifacts/releases/*/sbom-*.json
 !artifacts/releases/*/checksums.txt

@@ -1,0 +1,4 @@
+78c77fad6e395f1adfe608fa04f3aea58273b72349e932cf8f60f9698a318411  Sparta-Setup-0.9.0-x64.exe
+50f9144964779c8a486f5e20a6c318dcb339b5a84d7589c54facfffbea6f4acc  Sparta-Setup-0.9.0-x64.exe.blockmap
+4bc3621aa6a8936b5598b688274fcebc8eeec86b6d9d136eb3b5eb531744599b  sbom-api.json
+7ac0b8838588cda8288a99e5ae64a98a8e1f55b25d350c1f203fb7eeab4528f4  sbom-desktop.json

@@ -1,0 +1,178 @@
+{
+  "format": "sparta-sbom/1.0.0",
+  "component": "Sparta Desktop (instalador Windows)",
+  "version": "0.9.0",
+  "commit": "6b43b512e7dcdf30844f482ea5c1731bade56008",
+  "scope": "production",
+  "packageCount": 28,
+  "packages": [
+    {
+      "name": "@sparta/core",
+      "version": "0.9.0",
+      "license": "não declarada",
+      "source": "workspace"
+    },
+    {
+      "name": "@sparta/riot",
+      "version": "0.9.0",
+      "license": "não declarada",
+      "source": "workspace"
+    },
+    {
+      "name": "boolbase",
+      "version": "1.0.0",
+      "license": "ISC",
+      "source": "npm"
+    },
+    {
+      "name": "cheerio-select",
+      "version": "2.1.0",
+      "license": "BSD-2-Clause",
+      "source": "npm"
+    },
+    {
+      "name": "cheerio",
+      "version": "1.0.0",
+      "license": "MIT",
+      "source": "npm"
+    },
+    {
+      "name": "css-select",
+      "version": "5.2.2",
+      "license": "BSD-2-Clause",
+      "source": "npm"
+    },
+    {
+      "name": "css-what",
+      "version": "6.2.2",
+      "license": "BSD-2-Clause",
+      "source": "npm"
+    },
+    {
+      "name": "dom-serializer",
+      "version": "2.0.0",
+      "license": "MIT",
+      "source": "npm"
+    },
+    {
+      "name": "domelementtype",
+      "version": "2.3.0",
+      "license": "BSD-2-Clause",
+      "source": "npm"
+    },
+    {
+      "name": "domhandler",
+      "version": "5.0.3",
+      "license": "BSD-2-Clause",
+      "source": "npm"
+    },
+    {
+      "name": "domutils",
+      "version": "3.2.2",
+      "license": "BSD-2-Clause",
+      "source": "npm"
+    },
+    {
+      "name": "encoding-sniffer",
+      "version": "0.2.1",
+      "license": "MIT",
+      "source": "npm"
+    },
+    {
+      "name": "entities",
+      "version": "4.5.0",
+      "license": "BSD-2-Clause",
+      "source": "npm"
+    },
+    {
+      "name": "entities",
+      "version": "6.0.1",
+      "license": "BSD-2-Clause",
+      "source": "npm"
+    },
+    {
+      "name": "htmlparser2",
+      "version": "9.1.0",
+      "license": "MIT",
+      "source": "npm"
+    },
+    {
+      "name": "iconv-lite",
+      "version": "0.6.3",
+      "license": "MIT",
+      "source": "npm"
+    },
+    {
+      "name": "lucide-react",
+      "version": "0.525.0",
+      "license": "ISC",
+      "source": "npm"
+    },
+    {
+      "name": "nth-check",
+      "version": "2.1.1",
+      "license": "BSD-2-Clause",
+      "source": "npm"
+    },
+    {
+      "name": "parse5-htmlparser2-tree-adapter",
+      "version": "7.1.0",
+      "license": "MIT",
+      "source": "npm"
+    },
+    {
+      "name": "parse5-parser-stream",
+      "version": "7.1.2",
+      "license": "MIT",
+      "source": "npm"
+    },
+    {
+      "name": "parse5",
+      "version": "7.3.0",
+      "license": "MIT",
+      "source": "npm"
+    },
+    {
+      "name": "react-dom",
+      "version": "19.2.7",
+      "license": "MIT",
+      "source": "npm"
+    },
+    {
+      "name": "react",
+      "version": "19.2.7",
+      "license": "MIT",
+      "source": "npm"
+    },
+    {
+      "name": "safer-buffer",
+      "version": "2.1.2",
+      "license": "MIT",
+      "source": "npm"
+    },
+    {
+      "name": "scheduler",
+      "version": "0.27.0",
+      "license": "MIT",
+      "source": "npm"
+    },
+    {
+      "name": "undici",
+      "version": "6.28.0",
+      "license": "MIT",
+      "source": "npm"
+    },
+    {
+      "name": "whatwg-encoding",
+      "version": "3.1.1",
+      "license": "MIT",
+      "source": "npm"
+    },
+    {
+      "name": "whatwg-mimetype",
+      "version": "4.0.0",
+      "license": "MIT",
+      "source": "npm"
+    }
+  ]
+}

@@ -1,0 +1,69 @@
+{
+  "version": "0.9.0",
+  "commit": "6b43b512e7dcdf30844f482ea5c1731bade56008",
+  "createdAt": "2026-08-05T02:56:46.442Z",
+  "desktop": {
+    "electronVersion": "39.8.10",
+    "installerFile": "artifacts/releases/0.9.0/Sparta-Setup-0.9.0-x64.exe",
+    "installerSha256": "78c77fad6e395f1adfe608fa04f3aea58273b72349e932cf8f60f9698a318411",
+    "signed": false
+  },
+  "api": {
+    "imageTag": "sparta-api:latest",
+    "imageDigest": "sha256:a701f6b2fa2faaddd04419d361e2c3d387ddc04f0ace6ab15e2933b3e2c5cae5",
+    "baseImageDigest": "node:20-slim@sha256:2cf067cfed83d5ea958367df9f966191a942351a2df77d6f0193e162b5febfc0",
+    "healthcheck": "node -e \"fetch('http://127.0.0.1:3333/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""
+  },
+  "database": {
+    "requiredMigrations": [
+      "20260715120000_init",
+      "20260716010000_nullable_participant_challenge_stats",
+      "20260721220000_matchparticipant_team_and_unique",
+      "20260722020000_postgame_report_unique",
+      "20260722180000_player_profile_match_analysis_limit",
+      "20260726120000_player_champion_stats_nullable_participation",
+      "20260726150000_match_participant_objective_absolutes",
+      "20260727220000_champion_tag_provenance",
+      "20260727234500_http_cache_states",
+      "20260728010000_match_observations",
+      "20260728020600_player_champion_pool",
+      "20260728033000_champion_execution_risk",
+      "20260728120000_draft_session_persistence",
+      "20260728163000_patch_intelligence",
+      "20260728190000_draft_match_reconciliation",
+      "20260728210000_draft_postgame_comparison",
+      "20260730100000_draft_review",
+      "20260731100000_calibration_lab",
+      "20260731160000_replay_input_bundle",
+      "20260803150000_recommendation_engine_releases",
+      "20260804130000_match_participant_account_index"
+    ],
+    "schemaVersion": "20260804130000_match_participant_account_index+sha256:88f1b3895f02"
+  },
+  "recommendationEngine": {
+    "activeReleaseId": "0d8a2ce4-7e42-4cb1-9bdb-fd2b9ef2e0e9",
+    "releaseVersion": "release-etapa27c-v1",
+    "artifactHash": "8878a65782130a78f7fa47146d4e651158244ce05391a3e767d2e72fd8d9ce90",
+    "configHash": "fa9dbde183efb4ae4d45bf006730ad7486ab1a80253642d33805f1ca4e34aa38"
+  },
+  "replay": {
+    "bundleSchemaVersion": "replay-input-bundle/2.0.0",
+    "verificationStatus": "EXACT_REPLAY"
+  },
+  "sbomFiles": [
+    "artifacts/releases/0.9.0/sbom-api.json",
+    "artifacts/releases/0.9.0/sbom-desktop.json"
+  ],
+  "knownLimitations": [
+    "ACCEPTED_RISK: Instalador Windows não assinado",
+    "KNOWN_LIMITATION: Sem matchup global, meta global, builds e runas globais",
+    "KNOWN_LIMITATION: Detecção dentro de um champion select real nunca validada ponta a ponta",
+    "FUTURE_FEATURE: Sem atualização automática",
+    "ACCEPTED_RISK: Auditoria de dependências não cobre pacotes do sistema operacional",
+    "KNOWN_LIMITATION: A API não é distribuída junto do instalador",
+    "KNOWN_LIMITATION: Chave de desenvolvimento da Riot expira em 24 h",
+    "KNOWN_LIMITATION: Rótulo de replay diz \"inputs não preservados\" antes da primeira verificação",
+    "KNOWN_LIMITATION: Instalação a partir de um terminal com privilégio de administrador vai para Program Files",
+    "KNOWN_LIMITATION: O instalador não é reproduzível byte a byte"
+  ]
+}
