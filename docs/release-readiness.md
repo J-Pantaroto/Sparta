@@ -1,12 +1,23 @@
 # Parecer de prontidão — Sparta 0.9.0
 
-> **Atualização da Etapa 30A (2026-08-05):** fixtures e inventário divergente foram corrigidos na
-> origem, o candidato foi regenerado e revalidado. O estado atual é
-> **`READY_FOR_DESKTOP_PUBLICATION`**. A API permanece
-> **`BLOCKED_BY_MISSING_INFRASTRUCTURE`**; nada foi publicado. Evidências e hashes em
-> `docs/release-publication-0.9.0.md`.
+> **Atualização da Etapa 30B (2026-08-05):** o desktop aprovado foi publicado como prerelease na
+> tag `v0.9.0`. O estado atual é **`PARTIALLY_PUBLISHED`**. A API permanece
+> **`BLOCKED_BY_MISSING_INFRASTRUCTURE`** e nenhuma imagem ou infraestrutura foi publicada.
+> Evidências, anexos e verificação pós-download em `docs/release-publication-0.9.0.md`.
 
-## Resultado atual — Etapa 30A
+## Resultado atual — Etapa 30B
+
+> ## `PARTIALLY_PUBLISHED`
+
+A tag anotada `v0.9.0` aponta exatamente para
+`aa2366b3e5bb4b3e5227dcdec43eaf8c6977ba77`. A GitHub Release está como prerelease, não latest, e
+contém somente instalador, checksums, manifesto, dois SBOMs e notas da versão. O instalador foi
+baixado da própria release e confirmou o SHA-256 aprovado, versão interna `0.9.0` e `NotSigned`.
+
+Release: <https://github.com/J-Pantaroto/Sparta/releases/tag/v0.9.0>. A API pública continua
+indisponível; release operacional e replay permaneceram `ACTIVE` e `EXACT_REPLAY`.
+
+## Registro histórico — Etapa 30A
 
 > ## `READY_FOR_DESKTOP_PUBLICATION`
 

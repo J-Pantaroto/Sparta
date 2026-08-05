@@ -2,7 +2,23 @@
 
 Espelho de `docs/release-publication-0.9.0.md`. A fonte de verdade é o arquivo em `docs/`.
 
-## Estado atual — Etapa 30A
+## Estado atual — Etapa 30B
+
+`PARTIALLY_PUBLISHED` em 2026-08-05. A tag anotada `v0.9.0` aponta para
+`aa2366b3e5bb4b3e5227dcdec43eaf8c6977ba77`, e a GitHub Release
+<https://github.com/J-Pantaroto/Sparta/releases/tag/v0.9.0> está publicada como prerelease, não
+draft e não latest.
+
+Foram anexados somente instalador, checksums, manifesto, dois SBOMs e notas da versão — seis
+arquivos. Todos foram baixados novamente e comparados com as fontes locais. O instalador remoto
+manteve SHA-256 `24105e665e4cb94e41638ff7f85aed479b0a87c9442443a5d965baa6a2b228f9`, versão
+interna `0.9.0` e `NotSigned`. Não foi encontrado segredo, e a cópia temporária foi removida.
+
+`API_PUBLICATION_STATUS=BLOCKED_BY_MISSING_INFRASTRUCTURE`. Nenhuma imagem, registry, Docker
+remoto, migration externa ou deploy foi criado. Release operacional e replay permaneceram
+`ACTIVE`/`EXACT_REPLAY`, e a Etapa 31 não foi iniciada.
+
+## Registro histórico — Etapa 30A
 
 `READY_FOR_DESKTOP_PUBLICATION` em 2026-08-05. A correção eliminou fixtures, mocks, snapshots,
 testes, TypeScript e source maps do `app.asar` real; a inspeção aprovou 2.584 entradas. O inventário

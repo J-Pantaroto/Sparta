@@ -1,6 +1,70 @@
 # Publicação controlada — Sparta 0.9.0
 
-## Etapa 30A — estado atual
+## Etapa 30B — estado atual
+
+> ## `PARTIALLY_PUBLISHED`
+
+O Sparta Desktop 0.9.0 foi publicado em 2026-08-05 20:14:40 UTC como **prerelease**:
+
+- Release: <https://github.com/J-Pantaroto/Sparta/releases/tag/v0.9.0>
+- tag anotada: `v0.9.0`;
+- commit da tag: `aa2366b3e5bb4b3e5227dcdec43eaf8c6977ba77`;
+- título: `Sparta Desktop 0.9.0`;
+- draft: não;
+- prerelease: sim;
+- latest: não — o endpoint de latest permanece sem release publicada.
+
+Antes da primeira mutação, `HEAD`, `origin/main` e a referência remota de `main` coincidiam com o
+commit aprovado; a árvore estava limpa; o CI `31039393695` estava verde; tag e release não
+existiam; checksum, versão interna, `NotSigned`, manifesto, inventário, ASAR e varredura de segredos
+passaram. A tag foi criada sem força e o objeto remoto “peeled” aponta exatamente para o commit
+aprovado.
+
+### Anexos publicados
+
+| Anexo                          |      Bytes | SHA-256                                                            |
+| ------------------------------ | ---------: | ------------------------------------------------------------------ |
+| `Sparta-Setup-0.9.0-x64.exe`   | 95.694.968 | `24105e665e4cb94e41638ff7f85aed479b0a87c9442443a5d965baa6a2b228f9` |
+| `checksums.txt`                |        359 | `f385666bc25f13d590f65ed68984f0bbf2252ea4c2153ed9a0233c888a8f8abb` |
+| `sparta-release-manifest.json` |      3.625 | `cd121d14b23c2479051cd72538e4a57cdab80f229fa07d3a9bceada0b87ef336` |
+| `sbom-api.json`                |     16.654 | `f8cf1af575d854b73aa0431dcbef0b293768afcd06b17f68ade59035a8bfa744` |
+| `sbom-desktop.json`            |      3.559 | `40eacd9f64cb3ddc2fc3768015e258bef149ee50560abc507b9af8bfb18d2c14` |
+| `release-notes.md`             |      5.272 | `490984ecfee3fad7a93dfa620a5fdb866f2254ca6878f308e6be63a3a67eec11` |
+
+Os dois SBOMs são documentos de transparência do candidato congelado; anexar o SBOM da API não
+publica a imagem nem declara o serviço disponível. O blockmap não foi anexado, conforme a decisão
+explícita desta etapa. Não há `.env`, log, dump, token, arquivo temporário, fonte, teste, artefato
+0.1.0, dado de usuário ou imagem Docker entre os seis anexos.
+
+### Verificação pós-upload
+
+Todos os seis anexos foram baixados da própria GitHub Release para uma pasta temporária e
+comparados byte a byte com as fontes aprovadas. O instalador baixado manteve:
+
+- SHA-256 `24105e665e4cb94e41638ff7f85aed479b0a87c9442443a5d965baa6a2b228f9`;
+- FileVersion/ProductVersion `0.9.0`;
+- assinatura `NotSigned`, sem certificado de signatário.
+
+A lista remota teve exatamente os seis nomes permitidos, todos os hashes coincidiram e a varredura
+de alto sinal não encontrou segredo nos documentos baixados. A cópia temporária foi removida após
+a validação.
+
+### Limite da publicação
+
+`API_PUBLICATION_STATUS=BLOCKED_BY_MISSING_INFRASTRUCTURE`
+
+Nenhuma imagem da API foi enviada, nenhum registry foi criado, nenhum Docker remoto foi alterado,
+nenhuma migration externa foi aplicada e nenhum deploy foi simulado. A release operacional local
+continua `release-etapa27c-v1` `ACTIVE`, com `artifactHash` e `configHash` inalterados; o replay
+continua `replay-input-bundle/2.0.0`, `EXACT_REPLAY`, com zero divergências e zero dependências
+ausentes.
+
+A prerelease deixa explícitos Windows/League como requisitos, instalador não assinado e possível
+SmartScreen, ausência de API pública e inexistência de matchup, meta, builds e runas globais. O
+resultado é parcial porque o desktop e sua documentação foram publicados, enquanto a API pública
+continua indisponível. A Etapa 31 não foi iniciada.
+
+## Registro histórico — Etapa 30A
 
 > ## `READY_FOR_DESKTOP_PUBLICATION`
 

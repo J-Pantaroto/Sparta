@@ -1,5 +1,26 @@
 # Sparta - Contexto para Continuidade
 
+## Etapa 30B: desktop 0.9.0 publicado parcialmente — `PARTIALLY_PUBLISHED`
+
+Tag anotada `v0.9.0` publicada apontando exatamente para
+`aa2366b3e5bb4b3e5227dcdec43eaf8c6977ba77`, sem força. GitHub Release:
+<https://github.com/J-Pantaroto/Sparta/releases/tag/v0.9.0>, título `Sparta Desktop 0.9.0`,
+prerelease, não draft e não latest. CI aprovado `31039393695`.
+
+Seis anexos, e somente eles: `Sparta-Setup-0.9.0-x64.exe`, `checksums.txt`,
+`sparta-release-manifest.json`, `sbom-api.json`, `sbom-desktop.json` e `release-notes.md`. O
+blockmap não foi publicado. Os SBOMs são documentos de transparência, não publicação da API.
+
+Todos os anexos foram baixados da própria release e comparados byte a byte. O instalador remoto
+confirmou SHA-256 `24105e665e4cb94e41638ff7f85aed479b0a87c9442443a5d965baa6a2b228f9`,
+FileVersion/ProductVersion `0.9.0` e `NotSigned`; a varredura remota não encontrou segredo e a
+cópia temporária foi removida.
+
+`API_PUBLICATION_STATUS=BLOCKED_BY_MISSING_INFRASTRUCTURE`. Nenhuma imagem, registry, Docker
+remoto, migration externa ou deploy foi criado. `release-etapa27c-v1` segue `ACTIVE`, hashes
+inalterados; replay `EXACT_REPLAY`, zero divergências/dependências. Etapa 31 não iniciada. Registro
+completo em `docs/release-publication-0.9.0.md`.
+
 ## Etapa 30A: candidato 0.9.0 corrigido — `READY_FOR_DESKTOP_PUBLICATION`
 
 Correção feita na origem e candidato regenerado do zero a partir de

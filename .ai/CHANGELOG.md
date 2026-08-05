@@ -22,6 +22,18 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-08-05 17:15 — Etapa 30B: publicação parcial do desktop 0.9.0
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0039-publicacao-parcial-desktop-0-9-0.md`
+
+Tag anotada `v0.9.0` e GitHub Release criadas no commit aprovado como prerelease, não latest. Seis
+anexos permitidos foram publicados e baixados novamente; todos coincidiram byte a byte, e o
+instalador confirmou SHA-256 aprovado, versão 0.9.0 e `NotSigned`. Nenhum segredo ou anexo indevido.
+Resultado `PARTIALLY_PUBLISHED`; API `BLOCKED_BY_MISSING_INFRASTRUCTURE`, release operacional e
+replay intactos, sem imagem/deploy e sem iniciar a Etapa 31.
+
+---
+
 ## 2026-08-05 16:19 — Etapa 30A: correção e recongelamento do candidato 0.9.0
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0038-correcao-recongelamento-candidato-0-9-0.md`
