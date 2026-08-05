@@ -28,6 +28,11 @@ import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { sbomDe as sbomLib } from "./lib/sbom.mjs";
+import {
+  caminhosSujosNaoGerados,
+  descobrirArtefatosDoCandidato,
+  nomeDoArquivo
+} from "./lib/release-artifacts.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const SAIDA = join(ROOT, "docs", "release-candidate.md");
@@ -63,20 +68,6 @@ function sha256(caminho) {
   return createHash("sha256").update(readFileSync(caminho)).digest("hex");
 }
 
-function artefatos() {
-  const dir = join(ROOT, "dist-installer");
-  if (!existsSync(dir)) return [];
-  // `builder-debug.yml` fica de fora: é dump interno do electron-builder, com
-  // caminhos absolutos da máquina de build, e não é artefato distribuível.
-  return readdirSync(dir)
-    .filter((nome) => /\.(exe|blockmap|zip|msi)$/i.test(nome))
-    .sort()
-    .map((nome) => {
-      const caminho = join(dir, nome);
-      return { nome, bytes: statSync(caminho).size, sha256: sha256(caminho) };
-    });
-}
-
 function imagemBaseDoDockerfile() {
   const texto = readFileSync(join(ROOT, "Dockerfile.api"), "utf-8");
   const m = texto.match(/^ARG NODE_IMAGE=(\S+)/m);
@@ -98,19 +89,32 @@ const desktopPkg = lerJson(join(ROOT, "apps", "desktop", "package.json"));
 const rootPkg = lerJson(join(ROOT, "package.json"));
 const commit = run("git", ["rev-parse", "HEAD"]) ?? "desconhecido";
 const commitCurto = commit.slice(0, 7);
-const sujo = (run("git", ["status", "--porcelain"]) ?? "").length > 0;
+const caminhosSujos = caminhosSujosNaoGerados(
+  run("git", ["status", "--porcelain"]) ?? "",
+  rootPkg.version
+);
+const sujo = caminhosSujos.length > 0;
 const electron = (desktopPkg.devDependencies?.electron ?? "").replace(/^[\^~]/, "");
 const electronResolvido =
   run("node", ["-p", "require('electron/package.json').version"], {
     cwd: join(ROOT, "apps", "desktop")
   }) ?? electron;
 const imagemDigest =
-  run("docker", ["image", "inspect", "sparta-api", "--format", "{{index .Id}}"]) ?? "imagem não construída";
+  run("docker", ["image", "inspect", "sparta-api", "--format", "{{index .Id}}"]) ??
+  "imagem não construída";
 const imagemTamanho = run("docker", ["image", "inspect", "sparta-api", "--format", "{{.Size}}"]);
 
 const sbomApi = sbomDe("@sparta/api");
 const sbomDesktop = sbomDe("@sparta/desktop");
-const listaArtefatos = artefatos();
+const diretorioCandidato = join(ROOT, "artifacts", "releases", rootPkg.version);
+const artefatosCandidato = descobrirArtefatosDoCandidato(diretorioCandidato, rootPkg.version);
+const listaArtefatos = [artefatosCandidato.instalador, artefatosCandidato.blockmap].map(
+  (caminho) => ({
+    nome: nomeDoArquivo(caminho),
+    bytes: statSync(caminho).size,
+    sha256: sha256(caminho)
+  })
+);
 const listaMigrations = migrations();
 
 const conteudo = `# Candidato de release — inventário
@@ -127,14 +131,22 @@ GitHub Release, não há distribuição externa e o empacotamento roda sempre co
 ${tabela([
   ["Campo", "Valor"],
   ["---", "---"],
-  ["Commit", `\`${commit}\`${sujo ? " (árvore com alterações não commitadas no momento da geração)" : ""}`],
+  [
+    "Commit",
+    `\`${commit}\`${sujo ? " (árvore com alterações não commitadas no momento da geração)" : ""}`
+  ],
   ["Versão do app", desktopPkg.version],
   ["Versão do monorepo", rootPkg.version],
+  ["Versão interna do instalador", artefatosCandidato.metadados.ProductVersion],
+  ["Publisher", artefatosCandidato.metadados.CompanyName],
   ["Electron", electronResolvido],
   ["Gerenciador de pacotes", rootPkg.packageManager],
   ["Imagem-base da API", `\`${imagemBaseDoDockerfile()}\``],
   ["Imagem da API construída", `\`${imagemDigest}\``],
-  ["Tamanho da imagem", imagemTamanho ? `${(Number(imagemTamanho) / 1e6).toFixed(0)} MB` : "não medido"]
+  [
+    "Tamanho da imagem",
+    imagemTamanho ? `${(Number(imagemTamanho) / 1e6).toFixed(0)} MB` : "não medido"
+  ]
 ])}
 
 ## Assinatura de código
@@ -166,9 +178,11 @@ ${
       ])
 }
 
-Os artefatos não são versionados (\`dist-installer/\` está no \`.gitignore\`).
-Os checksums acima identificam a build gerada a partir do commit registrado
-acima; reconstruir a partir de outro commit produz outros valores.
+O instalador e o blockmap não são versionados; o inventário lê o diretório
+canônico \`artifacts/releases/${rootPkg.version}/\` depois de ele ter sido limpo e
+regenerado. O gerador rejeita ausência, versão diferente, candidato ambíguo e
+metadados internos incompatíveis. Os checksums acima identificam esta build;
+reconstruir a partir de outro commit produz outros valores.
 
 ## Migrations
 
@@ -223,7 +237,9 @@ artefatos em disco.
 if (CHECAR) {
   const atual = existsSync(SAIDA) ? readFileSync(SAIDA, "utf-8") : "";
   if (atual !== conteudo) {
-    console.error("docs/release-candidate.md está desatualizado. Rode: node scripts/release-inventory.mjs");
+    console.error(
+      "docs/release-candidate.md está desatualizado. Rode: node scripts/release-inventory.mjs"
+    );
     process.exit(1);
   }
   console.log("docs/release-candidate.md está atualizado.");

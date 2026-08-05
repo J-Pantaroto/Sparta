@@ -11,9 +11,10 @@
  *   4. typecheck, lint, testes e builds;
  *   5. imagem da API;
  *   6. instalador Windows;
- *   7. SBOM;
- *   8. checksums;
- *   9. manifesto.
+ *   7. inspeção do app.asar real;
+ *   8. SBOM;
+ *   9. checksums;
+ *  10. manifesto e inventário.
  *
  * **Não publica nada.** Não envia imagem para registry, não cria release, não
  * configura publicação. O empacotamento passa `--publish never`.
@@ -41,6 +42,7 @@ import {
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { descobrirArtefatosDoCandidato } from "./lib/release-artifacts.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
@@ -83,7 +85,11 @@ function exec(cmd, argv, opcoes = {}) {
 const pnpm = (argv) => exec(process.execPath, [NPX, "--yes", PM, ...argv]);
 const capturar = (cmd, argv) => {
   try {
-    return execFileSync(cmd, argv, { cwd: ROOT, encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+    return execFileSync(cmd, argv, {
+      cwd: ROOT,
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "ignore"]
+    }).trim();
   } catch {
     return null;
   }
@@ -94,7 +100,7 @@ console.log(`destino: ${DEST.slice(ROOT.length + 1)}`);
 
 // ---------------------------------------------------------------- 1. árvore
 
-passo("1/9 árvore e versão", () => {
+passo("1/10 árvore e versão", () => {
   const sujo = (capturar("git", ["status", "--porcelain"]) ?? "").length > 0;
   if (sujo && !PERMITE_SUJO) {
     console.error("\nÁrvore de trabalho suja. Os artefatos precisam corresponder a um commit.");
@@ -103,24 +109,26 @@ passo("1/9 árvore e versão", () => {
   }
   if (sujo) console.log("   AVISO: árvore suja (--allow-dirty)");
   exec(process.execPath, [join(ROOT, "scripts", "sync-version.mjs"), "--check"]);
-  console.log(`   commit ${(capturar("git", ["rev-parse", "HEAD"]) ?? "?").slice(0, 7)}, versão ${VERSAO} consistente`);
+  console.log(
+    `   commit ${(capturar("git", ["rev-parse", "HEAD"]) ?? "?").slice(0, 7)}, versão ${VERSAO} consistente`
+  );
 });
 
 // ------------------------------------------------------- 2-3. deps e Prisma
 
-passo("2/9 dependências (lockfile congelado)", () => {
+passo("2/10 dependências (lockfile congelado)", () => {
   pnpm(["install", "--frozen-lockfile"]);
   console.log("   instalado sem alterar o lockfile");
 });
 
-passo("3/9 Prisma Client", () => {
+passo("3/10 Prisma Client", () => {
   pnpm(["--filter", "@sparta/api", "prisma:generate"]);
   console.log("   gerado");
 });
 
 // -------------------------------------------------------------- 4. verificação
 
-passo("4/9 typecheck, lint, testes e build", () => {
+passo("4/10 typecheck, lint, build e testes", () => {
   if (PULA_VERIFICACAO) {
     console.log("   pulado (--skip-verify); build ainda roda, é insumo do empacotamento");
     pnpm(["build"]);
@@ -130,28 +138,32 @@ passo("4/9 typecheck, lint, testes e build", () => {
   console.log("   typecheck ok");
   pnpm(["lint"]);
   console.log("   lint ok");
+  // O CI usa a mesma ordem. `@sparta/core` publica `dist/index.js`, então os
+  // testes que resolvem o workspace por nome precisam do build limpo antes.
+  pnpm(["build"]);
+  console.log("   build ok");
   const saida = pnpm(["test"]);
   const total = [...saida.matchAll(/Tests\s+?\[?[\d;]*m?\s*(\d+) passed/g)].reduce(
     (a, m) => a + Number(m[1]),
     0
   );
   console.log(`   testes ok${total ? ` (${total} aprovados)` : ""}`);
-  pnpm(["build"]);
-  console.log("   build ok");
 });
 
 // ------------------------------------------------------------- 5. imagem API
 
-passo("5/9 imagem da API", () => {
+passo("5/10 imagem da API", () => {
   exec("docker", ["compose", "build", "api"]);
   const digest = capturar("docker", ["image", "inspect", "sparta-api", "--format", "{{.Id}}"]);
   const tamanho = capturar("docker", ["image", "inspect", "sparta-api", "--format", "{{.Size}}"]);
-  console.log(`   ${digest?.slice(0, 26)}…  ${tamanho ? (Number(tamanho) / 1e6).toFixed(0) + " MB" : "?"}`);
+  console.log(
+    `   ${digest?.slice(0, 26)}…  ${tamanho ? (Number(tamanho) / 1e6).toFixed(0) + " MB" : "?"}`
+  );
 });
 
 // ------------------------------------------------------------ 6. instalador
 
-passo("6/9 instalador Windows (sem publicação)", () => {
+passo("6/10 instalador Windows (sem publicação)", () => {
   // `dist-installer/` e o destino são limpos antes: o electron-builder não
   // remove artefato de versão anterior, e um `.exe` de outra versão sobrevivendo
   // ali vira ambiguidade sobre qual arquivo é o candidato — foi exatamente o que
@@ -163,22 +175,26 @@ passo("6/9 instalador Windows (sem publicação)", () => {
   pnpm(["--filter", "@sparta/desktop", "package:win"]);
   mkdirSync(DEST, { recursive: true });
   const origem = join(ROOT, "dist-installer");
-  const copiados = readdirSync(origem)
-    .filter((n) => new RegExp(`^Sparta-Setup-${VERSAO.replace(/\./g, "\\.")}-.*\\.(exe|blockmap)$`, "i").test(n))
-    .sort();
-  if (copiados.length === 0) {
-    console.error("   nenhum instalador produzido");
-    process.exit(1);
-  }
-  for (const n of copiados) {
+  const candidato = descobrirArtefatosDoCandidato(origem, VERSAO);
+  for (const n of candidato.nomes) {
     copyFileSync(join(origem, n), join(DEST, n));
     console.log(`   ${n} (${(statSync(join(DEST, n)).size / 1e6).toFixed(1)} MB)`);
   }
+  console.log(
+    `   metadados ${candidato.metadados.ProductName} ${candidato.metadados.ProductVersion}, Publisher ${candidato.metadados.CompanyName}`
+  );
 });
 
-// ------------------------------------------------------------------ 7. SBOM
+// ----------------------------------------------------- 7. inspeção do pacote
 
-passo("7/9 SBOM", () => {
+passo("7/10 inspeção do app.asar real", () => {
+  exec(process.execPath, [join(ROOT, "scripts", "verify-release-package.mjs")]);
+  console.log("   pacote sem fixture, mock, teste, fonte, map, .env ou segredo detectável");
+});
+
+// ------------------------------------------------------------------ 8. SBOM
+
+passo("8/10 SBOM", () => {
   const script = join(ROOT, "scripts", "generate-sbom.mjs");
   // O SBOM sempre vai para o diretório canônico da versão; com --suffix a
   // segunda geração copia de lá, já que o grafo de dependências é o mesmo
@@ -192,20 +208,25 @@ passo("7/9 SBOM", () => {
   }
 });
 
-// ------------------------------------------------------------- 8. checksums
+// ------------------------------------------------------------- 9. checksums
 
-passo("8/9 checksums", () => {
+passo("9/10 checksums", () => {
   const linhas = readdirSync(DEST)
     .filter((n) => n !== "checksums.txt" && n !== "sparta-release-manifest.json")
     .sort()
-    .map((n) => `${createHash("sha256").update(readFileSync(join(DEST, n))).digest("hex")}  ${n}`);
+    .map(
+      (n) =>
+        `${createHash("sha256")
+          .update(readFileSync(join(DEST, n)))
+          .digest("hex")}  ${n}`
+    );
   writeFileSync(join(DEST, "checksums.txt"), `${linhas.join("\n")}\n`, "utf-8");
   for (const l of linhas) console.log(`   ${l}`);
 });
 
-// ------------------------------------------------------------- 9. manifesto
+// ----------------------------------------------- 10. manifesto e inventário
 
-passo("9/9 manifesto", () => {
+passo("10/10 manifesto e inventário", () => {
   if (SUFIXO) {
     // O manifesto identifica **o** candidato. Uma geração de comparação não
     // produz um candidato novo — produz uma segunda amostra do mesmo. Escrever
@@ -214,8 +235,11 @@ passo("9/9 manifesto", () => {
     console.log("   pulado: geração de comparação (--suffix) não congela candidato");
     return;
   }
-  const script = join(ROOT, "scripts", "release-manifest.mjs");
-  const r = spawnSync(process.execPath, PERMITE_SUJO ? [script, "--allow-dirty"] : [script], {
+  const manifesto = join(ROOT, "scripts", "release-manifest.mjs");
+  const argumentosManifesto = PERMITE_SUJO
+    ? [manifesto, "--allow-dirty"]
+    : [manifesto, "--allow-generated-dirty"];
+  const r = spawnSync(process.execPath, argumentosManifesto, {
     cwd: ROOT,
     stdio: "inherit",
     env: process.env
@@ -224,6 +248,13 @@ passo("9/9 manifesto", () => {
     console.error("\nO manifesto não ficou completo — ver os problemas acima.");
     process.exit(1);
   }
+
+  exec(process.execPath, [join(ROOT, "scripts", "release-inventory.mjs")]);
+  copyFileSync(
+    join(ROOT, "docs", "release-candidate.md"),
+    join(ROOT, ".ai", "specs", "release-candidate.md")
+  );
+  console.log("   inventário gerado e espelho .ai sincronizado");
 });
 
 console.log(`\nArtefatos em ${DEST.slice(ROOT.length + 1)}`);

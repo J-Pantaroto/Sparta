@@ -2,6 +2,10 @@
   "name": "@sparta/riot",
   "version": "0.9.0",
   "private": true,
+  "files": [
+    "dist",
+    "package.json"
+  ],
   "type": "module",
   "main": "dist/index.js",
   "module": "src/index.ts",
@@ -17,7 +21,7 @@
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint src --ext .ts",
     "test": "vitest run --passWithNoTests"

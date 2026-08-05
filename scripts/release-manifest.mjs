@@ -28,9 +28,14 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  caminhosSujosNaoGerados,
+  descobrirArtefatosDoCandidato
+} from "./lib/release-artifacts.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const PERMITE_SUJO = process.argv.includes("--allow-dirty");
+const PERMITE_GERADOS = process.argv.includes("--allow-generated-dirty");
 
 const problemas = [];
 
@@ -54,7 +59,19 @@ function lerJson(caminho) {
 
 /** Consulta o Postgres do compose. Devolve `null` se o banco não responder. */
 function psql(sql) {
-  return run("docker", ["compose", "exec", "-T", "postgres", "psql", "-U", "sparta", "-d", "sparta", "-tAc", sql]);
+  return run("docker", [
+    "compose",
+    "exec",
+    "-T",
+    "postgres",
+    "psql",
+    "-U",
+    "sparta",
+    "-d",
+    "sparta",
+    "-tAc",
+    sql
+  ]);
 }
 
 function exigir(valor, campo) {
@@ -70,7 +87,11 @@ function exigir(valor, campo) {
 const rootPkg = lerJson(join(ROOT, "package.json"));
 const VERSAO = rootPkg.version;
 const commit = exigir(run("git", ["rev-parse", "HEAD"]), "commit");
-const sujo = (run("git", ["status", "--porcelain"]) ?? "").length > 0;
+const statusGit = run("git", ["status", "--porcelain"]) ?? "";
+const caminhosSujos = PERMITE_GERADOS
+  ? caminhosSujosNaoGerados(statusGit, VERSAO)
+  : statusGit.split(/\r?\n/).filter(Boolean);
+const sujo = caminhosSujos.length > 0;
 
 if (sujo && !PERMITE_SUJO) {
   problemas.push(
@@ -84,37 +105,36 @@ if (sujo && !PERMITE_SUJO) {
 const DEST = join(ROOT, "artifacts", "releases", VERSAO);
 
 const electronVersion = exigir(
-  run("node", ["-p", "require('electron/package.json').version"], { cwd: join(ROOT, "apps", "desktop") }),
+  run("node", ["-p", "require('electron/package.json').version"], {
+    cwd: join(ROOT, "apps", "desktop")
+  }),
   "desktop.electronVersion"
 );
 
 /**
- * O instalador do candidato e o que carrega **esta** versao no nome. Aceitar
- * qualquer `Sparta-Setup-*.exe` faria o manifesto apontar para um artefato de
- * outra versao que tivesse sobrevivido no diretorio — aconteceu de verdade na
- * primeira execucao do pipeline, com o manifesto do 0.9.0 registrando o
- * instalador do 0.1.0 e o SHA-256 dele.
+ * Descoberta estrita compartilhada com o inventário: exige um único instalador
+ * e seu blockmap no diretório canônico, rejeita qualquer versão concorrente e
+ * confere FileVersion, ProductVersion, ProductName e CompanyName no binário.
  */
-function acharInstalador() {
-  const doCandidato = new RegExp(`^Sparta-Setup-${VERSAO.replace(/\./g, "\\.")}-.*\\.exe$`, "i");
-  for (const dir of [DEST, join(ROOT, "dist-installer")]) {
-    if (!existsSync(dir)) continue;
-    const arquivos = readdirSync(dir).filter((n) => /^Sparta-Setup-.*\.exe$/i.test(n));
-    const outrasVersoes = arquivos.filter((n) => !doCandidato.test(n));
-    if (outrasVersoes.length > 0) {
-      problemas.push(
-        `desktop.installerFile: ${dir.slice(ROOT.length + 1)} contem instalador de outra versao ` +
-          `(${outrasVersoes.join(", ")}). Limpe o diretorio antes de congelar o candidato.`
-      );
-    }
-    const achado = arquivos.find((n) => doCandidato.test(n));
-    if (achado) return join(dir, achado);
+function carregarArtefatos() {
+  try {
+    const congelados = descobrirArtefatosDoCandidato(DEST, VERSAO);
+    const saida = descobrirArtefatosDoCandidato(join(ROOT, "dist-installer"), VERSAO);
+    const hashCongelado = createHash("sha256")
+      .update(readFileSync(congelados.instalador))
+      .digest("hex");
+    const hashSaida = createHash("sha256").update(readFileSync(saida.instalador)).digest("hex");
+    if (hashCongelado !== hashSaida)
+      problemas.push("desktop.installerFile: saída e candidato congelado divergem");
+    return congelados;
+  } catch (erro) {
+    problemas.push(`desktop.installerFile: ${erro instanceof Error ? erro.message : String(erro)}`);
+    return null;
   }
-  return null;
 }
 
-const instalador = acharInstalador();
-if (!instalador) problemas.push("desktop.installerFile: nenhum instalador encontrado");
+const artefatosDesktop = carregarArtefatos();
+const instalador = artefatosDesktop?.instalador ?? null;
 
 const installerSha256 = instalador
   ? createHash("sha256").update(readFileSync(instalador)).digest("hex")
@@ -153,14 +173,22 @@ const baseImageDigest = (() => {
   return exigir(m ? m[1] : null, "api.baseImageDigest");
 })();
 const healthcheck = (() => {
-  const bruto = run("docker", ["image", "inspect", imageTag, "--format", "{{json .Config.Healthcheck.Test}}"]);
+  const bruto = run("docker", [
+    "image",
+    "inspect",
+    imageTag,
+    "--format",
+    "{{json .Config.Healthcheck.Test}}"
+  ]);
   if (!bruto) {
     problemas.push("api.healthcheck: imagem sem HEALTHCHECK declarado");
     return null;
   }
   try {
     const partes = JSON.parse(bruto);
-    return Array.isArray(partes) ? partes.filter((p) => p !== "CMD-SHELL" && p !== "CMD").join(" ") : String(bruto);
+    return Array.isArray(partes)
+      ? partes.filter((p) => p !== "CMD-SHELL" && p !== "CMD").join(" ")
+      : String(bruto);
   } catch {
     return String(bruto);
   }
@@ -202,10 +230,14 @@ const linhaRelease = psql(
    from "RecommendationEngineActivePointer" p
    join "RecommendationEngineRelease" r on r.id = p."releaseId";`
 );
-if (linhaRelease === null) problemas.push("recommendationEngine: Postgres de referência indisponível");
-if (linhaRelease === "") problemas.push("recommendationEngine: nenhuma release apontada como ativa");
+if (linhaRelease === null)
+  problemas.push("recommendationEngine: Postgres de referência indisponível");
+if (linhaRelease === "")
+  problemas.push("recommendationEngine: nenhuma release apontada como ativa");
 
-const [activeReleaseId, releaseVersion, artifactHash, configHash] = (linhaRelease ?? "|||").split("|");
+const [activeReleaseId, releaseVersion, artifactHash, configHash] = (linhaRelease ?? "|||").split(
+  "|"
+);
 
 // ---------------------------------------------------------------------- replay
 
@@ -229,7 +261,8 @@ const sbomFiles = existsSync(DEST)
       .filter((n) => /^sbom-.*\.json$/.test(n))
       .sort()
   : [];
-if (sbomFiles.length === 0) problemas.push("sbomFiles: nenhum SBOM encontrado no diretório do candidato");
+if (sbomFiles.length === 0)
+  problemas.push("sbomFiles: nenhum SBOM encontrado no diretório do candidato");
 
 // ----------------------------------------------------------------- limitações
 
@@ -247,6 +280,16 @@ const manifesto = {
     electronVersion,
     installerFile: instalador ? instalador.slice(ROOT.length + 1).replace(/\\/g, "/") : null,
     installerSha256,
+    blockmapFile: artefatosDesktop
+      ? artefatosDesktop.blockmap.slice(ROOT.length + 1).replace(/\\/g, "/")
+      : null,
+    blockmapSha256: artefatosDesktop
+      ? createHash("sha256").update(readFileSync(artefatosDesktop.blockmap)).digest("hex")
+      : null,
+    fileVersion: artefatosDesktop?.metadados.FileVersion ?? null,
+    productVersion: artefatosDesktop?.metadados.ProductVersion ?? null,
+    productName: artefatosDesktop?.metadados.ProductName ?? null,
+    publisher: artefatosDesktop?.metadados.CompanyName ?? null,
     signed
   },
 
@@ -286,8 +329,12 @@ console.log(`Manifesto escrito em ${caminho.slice(ROOT.length + 1)}`);
 console.log(`  versão=${VERSAO} commit=${(commit ?? "?").slice(0, 7)} electron=${electronVersion}`);
 console.log(`  instalador=${manifesto.desktop.installerFile ?? "ausente"} assinado=${signed}`);
 console.log(`  imagem=${imageDigest ? imageDigest.slice(0, 19) + "…" : "ausente"}`);
-console.log(`  release do motor=${releaseVersion || "ausente"} replay=${verificationStatus || "ausente"}`);
-console.log(`  migrations=${requiredMigrations.length} sbom=${sbomFiles.length} limitações=${limitacoes.length}`);
+console.log(
+  `  release do motor=${releaseVersion || "ausente"} replay=${verificationStatus || "ausente"}`
+);
+console.log(
+  `  migrations=${requiredMigrations.length} sbom=${sbomFiles.length} limitações=${limitacoes.length}`
+);
 
 if (bloqueadores.length > 0) {
   console.log("");

@@ -24,9 +24,19 @@ files:
   - "!src/**/*"
   - "!**/*.ts"
   - "!**/*.tsx"
+  - "!**/*.mts"
+  - "!**/*.cts"
   - "!**/*.map"
   - "!**/*.test.*"
+  - "!**/*.spec.*"
+  - "!**/__fixtures__/**/*"
+  - "!**/fixtures/**/*"
+  - "!**/__mocks__/**/*"
+  - "!**/mocks/**/*"
+  - "!**/__snapshots__/**/*"
+  - "!**/snapshots/**/*"
   - "!**/tsconfig*.json"
+  - "!**/{jest,vitest,playwright,cypress,mocha}.config.*"
   - "!**/vitest.config.*"
   - "!**/electron.vite.config.*"
   - "!**/.env*"
@@ -36,7 +46,10 @@ files:
 
 # O backend não é empacotado: a API roda em container e o desktop fala com
 # ela por HTTP. Nenhuma fonte de `apps/api` ou `packages/*` vai ao instalador
-# além do que já está compilado dentro de `out/renderer`.
+# além dos módulos JavaScript de produção resolvidos pelo electron-builder.
+# Dependências de workspace podem ser seguidas até a pasta fonte pelo pnpm;
+# por isso as exclusões acima também cobrem dependências, e a inspeção do
+# `app.asar` real no pipeline é a garantia final.
 asar: true
 
 win:
