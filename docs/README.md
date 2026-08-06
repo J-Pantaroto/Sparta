@@ -26,3 +26,13 @@ Leitura recomendada:
 - `support.md` para o canal público e as regras de diagnóstico sanitizado.
 - `post-release-0.9.0.md` para a verificação da prerelease e o parecer da Etapa 31.
 - `release-withdrawal-0.9.0.md` para o snapshot e a retirada controlada da Etapa 31A.
+- `identity-authorization-riot-readiness.md` para estados de vínculo, gates RSO e bloqueadores.
+- `route-authorization-audit.md` para a classificação rota a rota e ownership.
+- `riot-production-application-package.md` para o pacote preliminar ainda não enviado.
+- `privacy-policy-draft.md`, `terms-of-use-draft.md`, `account-deletion-draft.md` e
+  `support-and-non-endorsement-draft.md` para rascunhos ainda dependentes do titular.
+- `identity-authorization-riot-readiness.md` para estados de vínculo, gates RSO e bloqueadores.
+- `route-authorization-audit.md` para a classificação rota a rota e ownership.
+- `riot-production-application-package.md` para o pacote preliminar ainda não enviado.
+- `privacy-policy-draft.md`, `terms-of-use-draft.md`, `account-deletion-draft.md` e
+  `support-and-non-endorsement-draft.md` para rascunhos ainda dependentes do titular.

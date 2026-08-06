@@ -1,5 +1,19 @@
 # API
 
+## Identidade e autorização (Etapa 31C)
+
+A matriz fail-closed está em `apps/api/src/modules/auth/authorization-policy.ts`; o boot recusa
+rota registrada sem classificação. Inventário: `docs/route-authorization-audit.md`. Produção
+exige `IDENTITY_MODE=RSO_REQUIRED`, e dados pessoais exigem `VERIFIED_BY_RSO`. O provider real
+permanece desabilitado até aprovação/onboarding da Riot.
+
+## Identidade e autorização (Etapa 31C)
+
+A matriz fail-closed está em `apps/api/src/modules/auth/authorization-policy.ts`; o boot recusa
+rota registrada sem classificação. Inventário: `docs/route-authorization-audit.md`. Produção
+exige `IDENTITY_MODE=RSO_REQUIRED`, e dados pessoais exigem `VERIFIED_BY_RSO`. O provider real
+permanece desabilitado até aprovação/onboarding da Riot.
+
 Etapa 23:
 
 - `GET /players/:playerId/recommendation-observability` expõe o relatório

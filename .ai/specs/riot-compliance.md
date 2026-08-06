@@ -1,5 +1,10 @@
 # Riot Compliance
 
+## Identidade verificável e aprovação (Etapa 31C)
+
+Legado é `UNVERIFIED_LEGACY`; produção exige `VERIFIED_BY_RSO`. RSO está apenas contratado/gated,
+sem adapter, credenciais ou solicitação. Pacote: `docs/riot-production-application-package.md`.
+
 Cada leitura LCU tem timeout de 1,5 s e status explícito. O LCU nunca usa stale: qualquer perda
 de observação limpa o draft, e credenciais/headers nunca entram em logs ou erros públicos.
 

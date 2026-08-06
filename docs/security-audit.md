@@ -1,5 +1,19 @@
 # Auditoria de segurança e prontidão para release (Etapa 28a)
 
+## Etapa 31C — identidade e ownership
+
+Autorização central por rota, fail-closed, ownership derivado do token e 404 contra enumeração.
+Produção recusa legado e fecha laboratório/administração. RSO usa `state` one-time com hash/TTL;
+code e tokens Riot não são persistidos, logados nem enviados ao renderer/replay. Detalhes:
+`docs/identity-authorization-riot-readiness.md`.
+
+## Etapa 31C — identidade e ownership
+
+Autorização central por rota, fail-closed, ownership derivado do token e 404 contra enumeração.
+Produção recusa legado e fecha laboratório/administração. RSO usa `state` one-time com hash/TTL;
+code e tokens Riot não são persistidos, logados nem enviados ao renderer/replay. Detalhes:
+`docs/identity-authorization-riot-readiness.md`.
+
 Auditoria executada com a `release-etapa27c-v1` **operacionalmente ativa**. Nenhum peso, artefato,
 configuração ou release foi alterado; a comparação funcional antes/depois está no fim do
 documento.

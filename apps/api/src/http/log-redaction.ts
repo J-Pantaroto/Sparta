@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { URLSearchParams } from "node:url";
 
 /**
  * Redação de identificadores no log de acesso (Etapa 28b).
@@ -55,9 +56,19 @@ const SEGMENTS_WITH_PLAYER_ID = new Set(["players", "postgame"]);
  *
  * `/players/<puuid>/recent-matches` → `/players/pid_ab12cd34ef56/recent-matches`
  *
- * A query string é preservada: hoje ela só carrega `limit`/`offset`. Se algum
- * dia carregar identificador, esta função é o ponto único a mudar.
+ * Chaves sensíveis de query são removidas. O callback RSO carrega `code` e
+ * `state` na URL, portanto preservar toda query vazaria credencial transitória
+ * antes mesmo do handler poder protegê-la.
  */
+const SENSITIVE_QUERY_KEYS = new Set([
+  "code",
+  "state",
+  "token",
+  "access_token",
+  "refresh_token",
+  "id_token"
+]);
+
 export function redactRequestUrl(url: string): string {
   const [path, query] = url.split("?", 2);
   const segments = path.split("/");
@@ -67,7 +78,12 @@ export function redactRequestUrl(url: string): string {
     }
   }
   const redacted = segments.join("/");
-  return query === undefined ? redacted : `${redacted}?${query}`;
+  if (query === undefined) return redacted;
+  const search = new URLSearchParams(query);
+  for (const key of SENSITIVE_QUERY_KEYS) {
+    if (search.has(key)) search.set(key, "REDACTED");
+  }
+  return `${redacted}?${search.toString()}`;
 }
 
 /**

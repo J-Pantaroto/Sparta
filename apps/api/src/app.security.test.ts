@@ -176,7 +176,7 @@ describe("superfície de documentação", () => {
     try {
       const app = await buildApp();
       const response = await app.inject({ method: "GET", url: "/docs" });
-      expect(response.statusCode).not.toBe(404);
+      expect(response.statusCode).toBeLessThan(400);
       await app.close();
     } finally {
       if (anterior === undefined) delete process.env.NODE_ENV;
@@ -187,6 +187,47 @@ describe("superfície de documentação", () => {
 });
 
 describe("autenticação e isolamento", () => {
+  it("a matriz central protege rotas pessoais antes do handler", async () => {
+    const app = await buildApp({ enforceCentralAuthorization: true });
+    const response = await app.inject({
+      method: "GET",
+      url: "/players/qualquer/champions/61/role-evidence?role=MID"
+    });
+    expect(response.statusCode).toBe(401);
+    await app.close();
+  });
+
+  it("a matriz central oculta identificador de outra conta com 404", async () => {
+    getAuthenticatedUserIdMock.mockResolvedValue("user-1");
+    riotAccountFindFirstMock.mockResolvedValue({
+      id: "account-1", userId: "user-1", puuid: "own-puuid",
+      gameName: "Sparta", tagLine: "BR1", linkStatus: "UNVERIFIED_LEGACY",
+      createdAt: new Date()
+    });
+    const app = await buildApp({ enforceCentralAuthorization: true });
+    const response = await app.inject({
+      method: "GET",
+      url: "/players/other-puuid/champions/61/role-evidence?role=MID"
+    });
+    expect(response.statusCode).toBe(404);
+    expect(response.json().code).toBe("RESOURCE_NOT_FOUND");
+    await app.close();
+  });
+
+  it("a matriz central bloqueia vinculo revogado ate no modo controlado", async () => {
+    getAuthenticatedUserIdMock.mockResolvedValue("user-1");
+    riotAccountFindFirstMock.mockResolvedValue({
+      id: "account-1", userId: "user-1", puuid: "own-puuid",
+      gameName: "Sparta", tagLine: "BR1", linkStatus: "REVOKED",
+      createdAt: new Date()
+    });
+    const app = await buildApp({ enforceCentralAuthorization: true });
+    const response = await app.inject({ method: "GET", url: "/players/pool" });
+    expect(response.statusCode).toBe(403);
+    expect(response.json().code).toBe("RIOT_ACCOUNT_REVOKED");
+    await app.close();
+  });
+
   it("rotas de release exigem autenticação", async () => {
     const app = await buildApp();
     for (const url of ["/calibration/releases", "/recommendation-engine/active-release"]) {

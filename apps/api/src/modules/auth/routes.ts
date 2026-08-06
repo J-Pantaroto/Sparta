@@ -105,7 +105,9 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
         gameName: account.gameName,
         tagLine: account.tagLine,
         platformRegion: account.platformRegion,
-        regionalRouting: account.regionalRouting
+        regionalRouting: account.regionalRouting,
+        linkStatus: account.linkStatus,
+        verifiedAt: account.verifiedAt?.toISOString() ?? null
       }))
     };
   });

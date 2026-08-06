@@ -8,6 +8,9 @@ import { ExternalServiceError } from "@sparta/riot";
 import { safeExternalErrorLog, sendExternalError } from "./http/external-error-response.js";
 import { requestLogSerializer } from "./http/log-redaction.js";
 import { authRoutes } from "./modules/auth/routes.js";
+import { createRiotIdentityRoutes } from "./modules/auth/riot-identity-routes.js";
+import { enforceRouteAuthorization, hasAuthorizationPolicy } from "./modules/auth/authorization-policy.js";
+import type { RiotIdentityProvider } from "./modules/auth/riot-identity.js";
 import { draftsRoutes } from "./modules/drafts/routes.js";
 import { replayBundleRoutes } from "./modules/drafts/replay-bundle-routes.js";
 import { healthRoutes } from "./modules/health/routes.js";
@@ -26,7 +29,12 @@ import { loadEnv, parseAllowedOrigins } from "./config/env.js";
 // O app empacotado carrega o renderer via file:// e envia Origin "null";
 // localhost:5173 e o Vite em dev. A allowlist vem do ambiente para que uma
 // origem web futura seja explícita. CORS nunca substitui autenticação.
-export async function buildApp() {
+export async function buildApp(
+  options: {
+    riotIdentityProvider?: RiotIdentityProvider;
+    enforceCentralAuthorization?: boolean;
+  } = {}
+) {
   const env = loadEnv();
   const allowedOrigins = parseAllowedOrigins(env.CORS_ALLOWED_ORIGINS);
   const app = Fastify({
@@ -141,8 +149,25 @@ export async function buildApp() {
     });
   });
 
+  // Matriz fail-closed: toda rota registrada precisa declarar uma classe de
+  // acesso. O hook roda antes do handler e centraliza identidade, estado do
+  // vinculo e compatibilidade dos identificadores legados.
+  if (options.enforceCentralAuthorization ?? env.IDENTITY_MODE !== "TEST") {
+    app.addHook("preHandler", enforceRouteAuthorization);
+  }
+  const applicationRoutes: Array<{ method: string; path: string }> = [];
+  app.addHook("onRoute", (route) => {
+    const methods = Array.isArray(route.method) ? route.method : [route.method];
+    for (const method of methods) {
+      if (method !== "HEAD" && method !== "OPTIONS") {
+        applicationRoutes.push({ method, path: route.url });
+      }
+    }
+  });
+
   await app.register(healthRoutes);
   await app.register(authRoutes);
+  await app.register(createRiotIdentityRoutes(options.riotIdentityProvider));
   await app.register(playersRoutes);
   await app.register(draftsRoutes);
   await app.register(replayBundleRoutes);
@@ -155,6 +180,15 @@ export async function buildApp() {
   await app.register(catalogRoutes);
   await app.register(patchesRoutes);
   await app.register(replaysRoutes);
+
+  const uncovered = applicationRoutes.filter(
+    (route) => !hasAuthorizationPolicy(route.method, route.path)
+  );
+  if (uncovered.length > 0) {
+    throw new Error(
+      `Rotas sem politica de autorizacao: ${uncovered.map((route) => `${route.method} ${route.path}`).join(", ")}`
+    );
+  }
 
   return app;
 }

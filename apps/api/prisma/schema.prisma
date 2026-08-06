@@ -14,16 +14,26 @@ model User {
   displayName  String?
   createdAt    DateTime      @default(now())
   accounts     RiotAccount[]
+  rsoAuthorizationTransactions RsoAuthorizationTransaction[]
 }
 
 model RiotAccount {
   id                  String                            @id @default(uuid())
-  userId              String?
+  userId              String?                           @unique
   puuid               String                            @unique
   gameName            String
   tagLine             String
   platformRegion      String
   regionalRouting     String
+  /// UNVERIFIED_LEGACY | PENDING_VERIFICATION | VERIFIED_BY_RSO | REVOKED |
+  /// REQUIRES_REAUTHENTICATION. A migration adiciona o default legado a
+  /// contas existentes, sem promover nenhuma delas retroativamente.
+  linkStatus          String                            @default("UNVERIFIED_LEGACY")
+  verifiedAt          DateTime?
+  verificationMethod  String?
+  verificationEvidenceHash String?
+  revokedAt           DateTime?
+  reauthenticationRequiredAt DateTime?
   createdAt           DateTime                          @default(now())
   updatedAt           DateTime                          @updatedAt
   user                User?                             @relation(fields: [userId], references: [id])
@@ -34,6 +44,26 @@ model RiotAccount {
   postgameComparisons DraftPostGameComparisonRevision[]
 
   @@index([puuid])
+}
+
+/// Transacao efemera que vincula o callback RSO ao usuario Sparta que iniciou
+/// o fluxo. Somente o hash de `state` e persistido; authorization code e
+/// tokens Riot nunca sao gravados aqui.
+model RsoAuthorizationTransaction {
+  id          String   @id @default(uuid())
+  userId      String
+  stateHash   String   @unique
+  status      String   @default("PENDING")
+  redirectUri String
+  riotAccountId String?
+  previousLinkStatus String?
+  expiresAt   DateTime
+  consumedAt  DateTime?
+  failureCode String?
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status, expiresAt])
 }
 
 model PlayerProfile {

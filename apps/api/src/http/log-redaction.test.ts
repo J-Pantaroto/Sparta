@@ -19,6 +19,17 @@ describe("redação de identificador no caminho", () => {
     expect(url).not.toContain(PUUID);
   });
 
+  it("remove code, state e tokens do callback RSO", () => {
+    const url = redactRequestUrl(
+      "/auth/riot/rso/callback?code=secret-code&state=secret-state&limit=10"
+    );
+    expect(url).not.toContain("secret-code");
+    expect(url).not.toContain("secret-state");
+    expect(url).toContain("code=REDACTED");
+    expect(url).toContain("state=REDACTED");
+    expect(url).toContain("limit=10");
+  });
+
   it("cobre caminhos aninhados sob o identificador", () => {
     const url = redactRequestUrl(`/players/${PUUID}/champions/103/roles/MID/loadout-evidence`);
 

@@ -1,5 +1,8 @@
 # Política de migrations
 
+`20260805210000_riot_identity_authorization` migra para `UNVERIFIED_LEGACY`, nunca para verificado,
+e adiciona unicidade/estado RSO sem armazenar code/token. Não toca artefatos ou replay.
+
 Como o schema do Postgres evolui no Sparta, o que é permitido fazer com uma
 migration já aplicada, e como a base é levada a um ambiente novo.
 

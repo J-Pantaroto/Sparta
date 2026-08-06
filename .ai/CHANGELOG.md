@@ -22,6 +22,17 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-08-06 10:46 — Etapa 31C: identidade, autorização e prontidão Riot
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0043-identidade-autorizacao-prontidao-riot.md`
+
+Vínculos legados passaram a estado não verificado, produção exige RSO, e uma matriz fail-closed
+protege ownership em todas as rotas. Contratos/callback/revogação RSO e o pacote preliminar para a
+Riot foram preparados sem credenciais, envio ou infraestrutura. Estados:
+`AUTHORIZATION_HARDENED`, `BLOCKED_BY_RIOT_APPROVAL`, `BLOCKED_BY_OWNER_DECISIONS`.
+
+---
+
 ## 2026-08-05 20:52 — Etapa 31B: preparação da infraestrutura pública da API
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0042-preparacao-infraestrutura-publica-api.md`

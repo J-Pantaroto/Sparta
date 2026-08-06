@@ -1,5 +1,12 @@
 # Riot Compliance
 
+## Identidade verificável e aprovação (Etapa 31C)
+
+O vínculo antigo por Riot ID é somente `UNVERIFIED_LEGACY` e funciona apenas no modo local
+controlado. Produção exige RSO e Account-V1 `/accounts/me`; adapter, credenciais e solicitação
+continuam ausentes até aprovação. Pacote não enviado:
+`docs/riot-production-application-package.md`.
+
 Cada leitura LCU tem timeout de 1,5 s e motivo explícito para indisponibilidade. Não há cache
 stale: cliente fechado, lockfile inválido, conexão recusada, timeout, endpoint indisponível,
 saída do champion select ou payload inválido limpam imediatamente o draft. A senha do lockfile

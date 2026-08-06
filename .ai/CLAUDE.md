@@ -1,5 +1,26 @@
 # Sparta - Contexto para Continuidade
 
+## Etapa 31C: identidade/autorização endurecidas; RSO bloqueado
+
+Estados combinados: `AUTHORIZATION_HARDENED`, `BLOCKED_BY_RIOT_APPROVAL` e
+`BLOCKED_BY_OWNER_DECISIONS`. Toda rota possui classificação executável e o boot falha se surgir
+rota sem política. Recursos pessoais derivam o proprietário do token e identificadores cruzados
+recebem 404; laboratório/administração ficam invisíveis em produção.
+
+Vínculos existentes migram exclusivamente para `UNVERIFIED_LEGACY`. Produção aceita apenas
+`VERIFIED_BY_RSO`; local/teste preservam operação controlada sem declarar verificação. Foram
+preparados provider desacoplado, transação `state` one-time, callback, associação, revogação e
+reauth, mas nenhum adapter/segredo/credencial real foi criado. O pacote Riot e políticas públicas
+são rascunhos não enviados, com domínio, responsável, contato, retenção e exclusão marcados como
+decisões pendentes. Não provisionar/publicar/submeter/restaurar desktop na próxima etapa sem ordem
+explícita.
+
+Referências: `docs/identity-authorization-riot-readiness.md`,
+`docs/route-authorization-audit.md` e `docs/riot-production-application-package.md`.
+
+Migration local aplicada: vínculo anterior em `UNVERIFIED_LEGACY`, nenhuma associação duplicada,
+release `release-etapa27c-v1`/hashes intactos e cinco verificações recentes em `EXACT_REPLAY`.
+
 ## Etapa 31B: infraestrutura pública preparada, não provisionada
 
 Parecer combinado: `READY_FOR_INFRASTRUCTURE_APPROVAL`, `BLOCKED_BY_RIOT_APPROVAL` e

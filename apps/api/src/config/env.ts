@@ -16,6 +16,10 @@ export const envSchema = z.object({
   DATABASE_URL: z.string().default("postgresql://sparta:sparta@localhost:5432/sparta"),
   REDIS_URL: z.string().default("redis://localhost:6379"),
   RIOT_API_KEY: z.string().optional(),
+  IDENTITY_MODE: z.enum(["LOCAL_CONTROLLED", "TEST", "RSO_REQUIRED"]).optional(),
+  RSO_ENABLED: booleanFromString.default(false),
+  RSO_CLIENT_ID: z.string().optional(),
+  RSO_REDIRECT_URI: z.string().url().optional(),
   RIOT_PLATFORM_REGION: z.string().default("br1"),
   RIOT_REGIONAL_ROUTING: z.string().default("americas"),
   DATA_DRAGON_LOCALE: z.string().default("pt_BR"),
@@ -41,10 +45,37 @@ export const envSchema = z.object({
 });
 
 export type Env = z.infer<typeof envSchema>;
+export type ResolvedEnv = Omit<Env, "IDENTITY_MODE"> & {
+  IDENTITY_MODE: "LOCAL_CONTROLLED" | "TEST" | "RSO_REQUIRED";
+};
 
-export function loadEnv(input = process.env): Env {
-  const env = envSchema.parse(input);
+export function loadEnv(input = process.env): ResolvedEnv {
+  const parsed = envSchema.parse(input);
+  const env = {
+    ...parsed,
+    IDENTITY_MODE:
+      parsed.IDENTITY_MODE ??
+      (parsed.NODE_ENV === "production"
+        ? "RSO_REQUIRED"
+        : parsed.NODE_ENV === "test"
+          ? "TEST"
+          : "LOCAL_CONTROLLED")
+  } as ResolvedEnv;
   if (env.NODE_ENV === "production") {
+    if (env.IDENTITY_MODE !== "RSO_REQUIRED") {
+      throw new Error("IDENTITY_MODE deve ser RSO_REQUIRED em producao.");
+    }
+    if (
+      !env.RSO_ENABLED ||
+      !env.RSO_CLIENT_ID ||
+      /[<>]/.test(env.RSO_CLIENT_ID) ||
+      !env.RSO_REDIRECT_URI?.startsWith("https://") ||
+      /[<>]/.test(env.RSO_REDIRECT_URI)
+    ) {
+      throw new Error(
+        "RSO_ENABLED, RSO_CLIENT_ID e RSO_REDIRECT_URI HTTPS sao obrigatorios em producao."
+      );
+    }
     if (
       env.AUTH_TOKEN_SECRET === DEV_AUTH_TOKEN_SECRET ||
       env.AUTH_TOKEN_SECRET === "change_me" ||

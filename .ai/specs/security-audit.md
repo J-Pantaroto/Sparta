@@ -1,5 +1,8 @@
 # Auditoria de segurança e prontidão para release (Etapa 28a)
 
+Etapa 31C: matriz executável por rota, ownership server-side, 404 cruzado, callback RSO one-time e
+bloqueio de legado em produção. Ver `docs/route-authorization-audit.md`.
+
 Auditoria executada com a `release-etapa27c-v1` **operacionalmente ativa**. Nenhum peso, artefato,
 configuração ou release foi alterado; a comparação funcional antes/depois está no fim do
 documento.

@@ -36,6 +36,7 @@ Snapshot gerado em: 2026-07-25 (atualizado em 2026-07-27).
 - `adr/0002-global-meta-source.md` — decisão da fonte global, contratos e condições para integração.
 - `replay-analysis.md` — análise de replay (experimental).
 - `riot-compliance.md` — limites de produto e compliance com a Riot.
+- `identity-authorization-riot-readiness.md` — contrato de identidade, autorização e gates RSO.
 - `scoring-model.md` — modelo de scoring de desempenho.
 - `setup.md` — setup do ambiente local.
 - `adr/` — Architecture Decision Records.

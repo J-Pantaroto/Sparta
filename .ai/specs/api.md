@@ -1,5 +1,10 @@
 # API
 
+## Identidade e autorização (Etapa 31C)
+
+Toda rota consta na matriz fail-closed. Produção requer RSO; PUUID/Riot ID recebido apenas confere
+a conta derivada do token. Auditoria: `docs/route-authorization-audit.md`.
+
 Etapa 23:
 
 - `GET /players/:playerId/recommendation-observability`;

@@ -1,5 +1,12 @@
 # Política de migrations
 
+## 20260805210000_riot_identity_authorization
+
+Migration aditiva: vínculos existentes recebem `UNVERIFIED_LEGACY`; adiciona estados/evidência
+RSO, unicidade de `RiotAccount.userId` e transações com hash de `state`. Não promove vínculo nem
+altera snapshots, bundles, releases ou relatórios. Duplicidade inesperada faz a migration falhar,
+sem escolher silenciosamente um proprietário.
+
 Como o schema do Postgres evolui no Sparta, o que é permitido fazer com uma
 migration já aplicada, e como a base é levada a um ambiente novo.
 

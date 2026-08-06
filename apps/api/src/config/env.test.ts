@@ -8,7 +8,11 @@ const validProduction = {
   CORS_ALLOWED_ORIGINS: "null,https://app.example.com",
   TRUST_PROXY_HOPS: "1",
   AUTH_TOKEN_SECRET: "a-production-secret-with-32-characters-minimum",
-  RIOT_API_KEY: "test-production-key"
+  RIOT_API_KEY: "test-production-key",
+  IDENTITY_MODE: "RSO_REQUIRED",
+  RSO_ENABLED: "true",
+  RSO_CLIENT_ID: "approved-client-id",
+  RSO_REDIRECT_URI: "https://api.example.com/auth/riot/rso/callback"
 };
 
 describe("configuração de produção", () => {
@@ -48,6 +52,13 @@ describe("configuração de produção", () => {
       Object.entries(validProduction).filter(([key]) => key !== "TRUST_PROXY_HOPS")
     );
     expect(() => loadEnv(withoutTrustProxy)).toThrow(/TRUST_PROXY_HOPS/);
+  });
+
+  it("impede producao com identidade local ou sem configuracao RSO", () => {
+    expect(() => loadEnv({ ...validProduction, IDENTITY_MODE: "LOCAL_CONTROLLED" })).toThrow(
+      /IDENTITY_MODE/
+    );
+    expect(() => loadEnv({ ...validProduction, RSO_ENABLED: "false" })).toThrow(/RSO_/);
   });
 
   it("normaliza a allowlist CORS sem abrir origem curinga", () => {

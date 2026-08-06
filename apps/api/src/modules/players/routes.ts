@@ -9,7 +9,9 @@ import {
   type Role
 } from "@sparta/core";
 import { prisma } from "../../db/prisma.js";
+import { loadEnv } from "../../config/env.js";
 import { safeExternalErrorLog } from "../../http/external-error-response.js";
+import { opaqueIdentifier } from "../../http/log-redaction.js";
 import { getAuthenticatedUserId } from "../auth/routes.js";
 import { findParticipationHistory } from "../matches/match-repository.js";
 import { findPostgameReportsByPuuid } from "../postgame/postgame-repository.js";
@@ -319,7 +321,7 @@ export const playersRoutes: FastifyPluginAsync = async (app) => {
       request.log.warn({
         event: "riot_sync_participant_skipped",
         matchId: skipped.matchId,
-        puuid: skipped.puuid,
+        playerRef: opaqueIdentifier(skipped.puuid),
         reason: "Campeao ainda nao esta no catalogo (catalog:sync desatualizado)."
       });
     }
@@ -468,28 +470,64 @@ export const playersRoutes: FastifyPluginAsync = async (app) => {
       return { error: "Nao autenticado." };
     }
 
+    const env = loadEnv();
+    if (env.IDENTITY_MODE === "RSO_REQUIRED") {
+      reply.code(env.RSO_ENABLED ? 409 : 503);
+      return {
+        code: env.RSO_ENABLED ? "RSO_VERIFICATION_REQUIRED" : "RSO_NOT_CONFIGURED",
+        message: "O vinculo por Riot ID nao verifica propriedade. Use o fluxo RSO oficial."
+      };
+    }
+
     const payload = linkRiotAccountSchema.parse(request.body);
 
     const riotAccountInfo = await lookupRiotAccount(payload.gameName, payload.tagLine);
 
-    const account = await prisma.riotAccount.upsert({
-      where: { puuid: riotAccountInfo.puuid },
-      create: {
+    const [targetAccount, ownAccount] = await Promise.all([
+      prisma.riotAccount.findUnique({ where: { puuid: riotAccountInfo.puuid } }),
+      prisma.riotAccount.findUnique({ where: { userId } })
+    ]);
+    if (targetAccount?.userId && targetAccount.userId !== userId) {
+      reply.code(409);
+      return {
+        code: "RIOT_IDENTITY_ALREADY_ASSOCIATED",
+        message: "Esta identidade Riot nao pode ser vinculada a esta conta."
+      };
+    }
+    if (targetAccount && ownAccount && targetAccount.id !== ownAccount.id) {
+      reply.code(409);
+      return {
+        code: "RIOT_ACCOUNT_LINK_CONFLICT",
+        message: "A conta ja possui outro vinculo Riot controlado."
+      };
+    }
+
+    const common = {
+      gameName: riotAccountInfo.gameName,
+      tagLine: riotAccountInfo.tagLine,
+      platformRegion: payload.platformRegion,
+      regionalRouting: payload.regionalRouting,
+      userId,
+      linkStatus: "UNVERIFIED_LEGACY" as const,
+      verifiedAt: null,
+      verificationMethod: null,
+      verificationEvidenceHash: null,
+      revokedAt: null,
+      reauthenticationRequiredAt: null
+    };
+    const account = targetAccount
+      ? await prisma.riotAccount.update({ where: { id: targetAccount.id }, data: common })
+      : ownAccount
+        ? await prisma.riotAccount.update({
+            where: { id: ownAccount.id },
+            data: { ...common, puuid: riotAccountInfo.puuid }
+          })
+        : await prisma.riotAccount.create({
+            data: {
         puuid: riotAccountInfo.puuid,
-        gameName: riotAccountInfo.gameName,
-        tagLine: riotAccountInfo.tagLine,
-        platformRegion: payload.platformRegion,
-        regionalRouting: payload.regionalRouting,
-        userId
-      },
-      update: {
-        gameName: riotAccountInfo.gameName,
-        tagLine: riotAccountInfo.tagLine,
-        platformRegion: payload.platformRegion,
-        regionalRouting: payload.regionalRouting,
-        userId
-      }
-    });
+              ...common
+            }
+          });
 
     reply.code(201);
     return {
@@ -499,7 +537,9 @@ export const playersRoutes: FastifyPluginAsync = async (app) => {
         tagLine: account.tagLine,
         platformRegion: account.platformRegion,
         regionalRouting: account.regionalRouting
-      }
+      },
+      linkStatus: account.linkStatus,
+      verification: "NOT_VERIFIED"
     };
   });
 };
