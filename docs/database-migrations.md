@@ -1,5 +1,19 @@
 # Política de migrations
 
+## 20260806162500_email_verification_onboarding
+
+Aplicada por `migrate deploy`. É estritamente aditiva e não confirma retroativamente usuários
+legados. A medição após o deploy encontrou três usuários e zero `emailVerifiedAt`. A consulta por
+`userId`, ordenada por `createdAt`, usou
+`Bitmap Index Scan on EmailVerificationToken_userId_createdAt_idx`; o índice sustenta cooldown e
+limite de reenvio sem varrer todos os tokens.
+
+## 20260806170000_case_insensitive_user_email
+
+Índice funcional único em `LOWER(User.email)`, após confirmar zero duplicatas normalizadas. Ele
+protege a integridade entre contas novas normalizadas e emails legados com caixa diferente. Em três
+linhas, `EXPLAIN` escolheu `Seq Scan`; não se atribui ganho de leitura ao índice nessa cardinalidade.
+
 ## 20260805210000_riot_identity_authorization
 
 Migration aditiva: vínculos existentes recebem `UNVERIFIED_LEGACY`; adiciona estados/evidência
@@ -69,10 +83,10 @@ achado informativo na auditoria da Etapa 28a com a suspeita de que a migration
 estivesse pela metade. **A suspeita estava errada**, e a verificação direta é
 esta:
 
-| Início | Fim | Rollback | Passos |
-| --- | --- | --- | --- |
-| `2026-07-28 00:12:31` | — | `2026-07-28 00:13:56` | 0 |
-| `2026-07-28 00:14:03` | `2026-07-28 00:14:03` | — | 1 |
+| Início                | Fim                   | Rollback              | Passos |
+| --------------------- | --------------------- | --------------------- | ------ |
+| `2026-07-28 00:12:31` | —                     | `2026-07-28 00:13:56` | 0      |
+| `2026-07-28 00:14:03` | `2026-07-28 00:14:03` | —                     | 1      |
 
 A primeira linha é uma tentativa que **nunca terminou** (`applied_steps_count =
 0`, sem `finished_at`) e foi corretamente marcada como revertida. A segunda é a

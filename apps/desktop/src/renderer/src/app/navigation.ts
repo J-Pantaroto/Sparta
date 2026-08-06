@@ -21,6 +21,7 @@ export type Page =
   | "growth"
   | "motor"
   | "calibration"
+  | "account"
   | "settings";
 
 interface NavEntry {

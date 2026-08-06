@@ -12,7 +12,10 @@ const validProduction = {
   IDENTITY_MODE: "RSO_REQUIRED",
   RSO_ENABLED: "true",
   RSO_CLIENT_ID: "approved-client-id",
-  RSO_REDIRECT_URI: "https://api.example.com/auth/riot/rso/callback"
+  RSO_REDIRECT_URI: "https://api.example.com/auth/riot/rso/callback",
+  EMAIL_PROVIDER_MODE: "EXTERNAL",
+  EMAIL_VERIFICATION_FROM: "access@example.com",
+  EMAIL_VERIFICATION_URL_BASE: "https://app.example.com/verify-email"
 };
 
 describe("configuração de produção", () => {
@@ -54,11 +57,26 @@ describe("configuração de produção", () => {
     expect(() => loadEnv(withoutTrustProxy)).toThrow(/TRUST_PROXY_HOPS/);
   });
 
-  it("impede producao com identidade local ou sem configuracao RSO", () => {
+  it("impede producao com identidade local", () => {
     expect(() => loadEnv({ ...validProduction, IDENTITY_MODE: "LOCAL_CONTROLLED" })).toThrow(
       /IDENTITY_MODE/
     );
-    expect(() => loadEnv({ ...validProduction, RSO_ENABLED: "false" })).toThrow(/RSO_/);
+  });
+
+  it("permite RSO ainda indisponivel sem habilitar fallback local", () => {
+    const env = loadEnv({ ...validProduction, RSO_ENABLED: "false" });
+    expect(env.RSO_ENABLED).toBe(false);
+    expect(env.IDENTITY_MODE).toBe("RSO_REQUIRED");
+    expect(env.LOCAL_RIOT_LINK_ENABLED).toBe(false);
+  });
+
+  it("exige provider transacional real e bloqueia previews locais", () => {
+    expect(() => loadEnv({ ...validProduction, EMAIL_PROVIDER_MODE: "IN_MEMORY" })).toThrow(
+      /Provider/
+    );
+    expect(() => loadEnv({ ...validProduction, LOCAL_EMAIL_PREVIEW_ENABLED: "true" })).toThrow(
+      /Modos locais/
+    );
   });
 
   it("normaliza a allowlist CORS sem abrir origem curinga", () => {
@@ -66,5 +84,16 @@ describe("configuração de produção", () => {
       "null",
       "https://app.example.com"
     ]);
+  });
+});
+
+describe("configuração local de email", () => {
+  it("aceita remetente vazio quando o provider e somente em memoria", () => {
+    const env = loadEnv({
+      NODE_ENV: "development",
+      EMAIL_PROVIDER_MODE: "IN_MEMORY",
+      EMAIL_VERIFICATION_FROM: ""
+    });
+    expect(env.EMAIL_VERIFICATION_FROM).toBeUndefined();
   });
 });

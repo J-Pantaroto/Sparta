@@ -4,6 +4,7 @@ Esta pasta reúne as decisões técnicas do MVP. A fonte principal do produto é
 
 Leitura recomendada:
 
+- `account-access-onboarding.md` para acesso obrigatório, confirmação de email, gate Riot e sessão protegida.
 - `architecture.md` para visão geral.
 - `setup.md` para ambiente local.
 - `riot-compliance.md` para limites de integração.

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { LogOut, Settings, UserRound } from "lucide-react";
 import "./AppShell.css";
 
 export function AppShell({ sidebar, children }: { sidebar: ReactNode; children: ReactNode }) {
@@ -58,7 +59,14 @@ interface SidebarNavItemProps {
   badge?: ReactNode;
 }
 
-export function SidebarNavItem({ label, icon, active, onClick, live = false, badge }: SidebarNavItemProps) {
+export function SidebarNavItem({
+  label,
+  icon,
+  active,
+  onClick,
+  live = false,
+  badge
+}: SidebarNavItemProps) {
   return (
     <button
       type="button"
@@ -81,23 +89,64 @@ interface PlayerSummaryProps {
   meta: string;
   /** Splash do tema atual, recortada como retrato. */
   artUrl?: string;
+  onAccount: () => void;
+  onSettings: () => void;
+  onLogout: () => void;
 }
 
-export function PlayerSummary({ name, meta, artUrl }: PlayerSummaryProps) {
+export function PlayerSummary({
+  name,
+  meta,
+  artUrl,
+  onAccount,
+  onSettings,
+  onLogout
+}: PlayerSummaryProps) {
   return (
-    <div className="sp-player">
-      <div
-        className="sp-player__art"
-        aria-hidden="true"
-        style={artUrl ? { backgroundImage: `url(${artUrl})` } : undefined}
-      />
-      <div className="sp-player__text">
-        <strong className="sp-player__name" title={name}>
-          {name}
-        </strong>
-        <span className="sp-player__meta" title={meta}>
-          {meta}
+    <div className="sp-player-menu">
+      <button type="button" className="sp-player" onClick={onAccount} aria-label="Abrir sua conta">
+        <span
+          className="sp-player__art"
+          aria-hidden="true"
+          style={artUrl ? { backgroundImage: `url(${artUrl})` } : undefined}
+        />
+        <span className="sp-player__text">
+          <strong className="sp-player__name" title={name}>
+            {name}
+          </strong>
+          <span className="sp-player__meta" title={meta}>
+            {meta}
+          </span>
         </span>
+      </button>
+      <div className="sp-player-menu__actions" aria-label="Ações da conta">
+        <button
+          type="button"
+          className="sp-player-menu__action"
+          onClick={onAccount}
+          aria-label="Conta"
+          title="Conta"
+        >
+          <UserRound size={15} />
+        </button>
+        <button
+          type="button"
+          className="sp-player-menu__action"
+          onClick={onSettings}
+          aria-label="Configurações"
+          title="Configurações"
+        >
+          <Settings size={15} />
+        </button>
+        <button
+          type="button"
+          className="sp-player-menu__action"
+          onClick={onLogout}
+          aria-label="Sair"
+          title="Sair"
+        >
+          <LogOut size={15} />
+        </button>
       </div>
     </div>
   );

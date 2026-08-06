@@ -1,5 +1,10 @@
 # Política de migrations
 
+Etapa 31D: migration aditiva aplicada por deploy, três usuários legados e zero confirmação
+retroativa. A consulta de reenvio usa o índice `(userId, createdAt)` medido por `EXPLAIN`.
+Uma segunda migration cria unicidade em `LOWER(email)` para preservar caixa legada sem permitir
+identidades equivalentes; não havia duplicatas.
+
 `20260805210000_riot_identity_authorization` migra para `UNVERIFIED_LEGACY`, nunca para verificado,
 e adiciona unicidade/estado RSO sem armazenar code/token. Não toca artefatos ou replay.
 
@@ -65,10 +70,10 @@ achado informativo na auditoria da Etapa 28a com a suspeita de que a migration
 estivesse pela metade. **A suspeita estava errada**, e a verificação direta é
 esta:
 
-| Início | Fim | Rollback | Passos |
-| --- | --- | --- | --- |
-| `2026-07-28 00:12:31` | — | `2026-07-28 00:13:56` | 0 |
-| `2026-07-28 00:14:03` | `2026-07-28 00:14:03` | — | 1 |
+| Início                | Fim                   | Rollback              | Passos |
+| --------------------- | --------------------- | --------------------- | ------ |
+| `2026-07-28 00:12:31` | —                     | `2026-07-28 00:13:56` | 0      |
+| `2026-07-28 00:14:03` | `2026-07-28 00:14:03` | —                     | 1      |
 
 A primeira linha é uma tentativa que **nunca terminou** (`applied_steps_count =
 0`, sem `finished_at`) e foi corretamente marcada como revertida. A segunda é a

@@ -3,9 +3,11 @@ import type { DraftState, PlayerChampionStats } from "@sparta/core";
 import {
   ensureChampionStatsCoverage,
   fetchDraftRecommendations,
+  fetchSession,
   fetchPersonalLoadoutEvidence,
   fetchRecommendationObservability,
-  PlayerRoleUnavailableError
+  PlayerRoleUnavailableError,
+  SESSION_EXPIRED_EVENT
 } from "./api-client";
 
 /**
@@ -29,6 +31,27 @@ const legado = {
   objectiveParticipation: 0,
   recentMatches: []
 } as unknown as PlayerChampionStats;
+
+describe("sessao expirada", () => {
+  it("emite o evento central sem expor o bearer", async () => {
+    const dispatch = vi.fn();
+    vi.stubGlobal("dispatchEvent", dispatch);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ code: "UNAUTHENTICATED", message: "Nao autenticado." }), {
+          status: 401,
+          headers: { "Content-Type": "application/json" }
+        })
+      )
+    );
+    await expect(fetchSession("private-token")).rejects.toThrow();
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    expect(dispatch.mock.calls[0]?.[0]).toMatchObject({ type: SESSION_EXPIRED_EVENT });
+    expect(JSON.stringify(dispatch.mock.calls)).not.toContain("private-token");
+    vi.unstubAllGlobals();
+  });
+});
 
 describe("compatibilidade do contrato de recomendacoes (Etapa 12)", () => {
   const draft: DraftState = {

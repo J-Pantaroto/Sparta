@@ -5,12 +5,16 @@ import { AuthForm, AuthLayout, Button, Field, SignalChip, TextField } from "../u
 interface AuthScreenProps {
   splashUrl: string;
   onAuthenticated: (token: string) => void;
-  onSkip: () => void;
+  onRegistrationRequested: (email: string, localPreviewToken?: string) => void;
 }
 
 type Mode = "login" | "register";
 
-export function AuthScreen({ splashUrl, onAuthenticated, onSkip }: AuthScreenProps) {
+export function AuthScreen({
+  splashUrl,
+  onAuthenticated,
+  onRegistrationRequested
+}: AuthScreenProps) {
   const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -24,13 +28,21 @@ export function AuthScreen({ splashUrl, onAuthenticated, onSkip }: AuthScreenPro
     setError(null);
     setLoading(true);
     try {
-      const result =
-        mode === "login"
-          ? await login({ email, password })
-          : await register({ email, password, displayName: displayName || undefined });
-      onAuthenticated(result.token);
+      if (mode === "login") {
+        const result = await login({ email, password });
+        onAuthenticated(result.token);
+      } else {
+        const result = await register({
+          email,
+          password,
+          displayName: displayName || undefined
+        });
+        onRegistrationRequested(email, result.localPreviewToken);
+      }
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "Não foi possível conectar à API.");
+      setError(
+        submitError instanceof Error ? submitError.message : "Não foi possível conectar à API."
+      );
     } finally {
       setLoading(false);
     }
@@ -39,11 +51,12 @@ export function AuthScreen({ splashUrl, onAuthenticated, onSkip }: AuthScreenPro
   return (
     <AuthLayout
       splashUrl={splashUrl}
+      progressStep={1}
       title={mode === "login" ? "Entrar" : "Criar conta"}
       subtitle={
         mode === "login"
-          ? "Acesse sua conta pra continuar."
-          : "Crie sua conta pra vincular seu perfil da Riot."
+          ? "Entre para acessar seus dados pessoais do Sparta."
+          : "Crie a conta e confirme seu email antes de vincular a Riot."
       }
       footer={
         mode === "login" ? (
@@ -61,11 +74,6 @@ export function AuthScreen({ splashUrl, onAuthenticated, onSkip }: AuthScreenPro
             </button>
           </>
         )
-      }
-      skip={
-        <button type="button" onClick={onSkip}>
-          Continuar sem conta (modo local)
-        </button>
       }
     >
       <AuthForm onSubmit={handleSubmit}>
@@ -91,21 +99,23 @@ export function AuthScreen({ splashUrl, onAuthenticated, onSkip }: AuthScreenPro
             autoComplete="email"
           />
         </Field>
-        <Field label="Senha" htmlFor={ids.password} hint={mode === "register" ? "Mínimo de 8 caracteres." : undefined}>
+        <Field
+          label="Senha"
+          htmlFor={ids.password}
+          hint={mode === "register" ? "Mínimo de 8 caracteres." : undefined}
+        >
           <TextField
             id={ids.password}
             type="password"
             required
-            minLength={8}
+            minLength={mode === "register" ? 8 : undefined}
             value={password}
             onChange={setPassword}
             placeholder="••••••••"
             autoComplete={mode === "login" ? "current-password" : "new-password"}
           />
         </Field>
-
         {error && <SignalChip tone="negative">{error}</SignalChip>}
-
         <Button type="submit" variant="primary" size="lg" block loading={loading}>
           {mode === "login" ? "Entrar" : "Criar conta"}
         </Button>

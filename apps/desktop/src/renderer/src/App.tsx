@@ -3,6 +3,7 @@ import type {
   DraftPick,
   DraftRecommendationResponse,
   DraftState,
+  AccountOnboardingStatus,
   Role
 } from "@sparta/core";
 import type {
@@ -13,12 +14,14 @@ import type {
 } from "@sparta/riot";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { navGroups, type Page } from "./app/navigation";
+import { accessRouteForOnboarding } from "./app/session-routing";
 import { useAsyncData } from "./hooks/use-async-data";
 import {
   fetchDraftRecommendations,
   fetchSession,
+  logout,
   observeDraftSessionGame,
-  SESSION_TOKEN_KEY,
+  SESSION_EXPIRED_EVENT,
   transitionDraftSessionStatus,
   type DraftPersistenceInfo,
   type DraftSessionIdentity,
@@ -33,6 +36,7 @@ import {
   type DataDragonChampionSummary
 } from "./services/datadragon";
 import { AuthScreen } from "./features/AuthScreen";
+import { AccountScreen } from "./features/AccountScreen";
 import { ChampionSelectScreen } from "./features/ChampionSelectScreen";
 import { DashboardScreen } from "./features/DashboardScreen";
 import { DraftHistoryScreen } from "./features/DraftHistoryScreen";
@@ -40,6 +44,8 @@ import { CalibrationLabScreen } from "./features/CalibrationLabScreen";
 import { GrowthJourneyScreen } from "./features/GrowthJourneyScreen";
 import { MotorHistoryScreen } from "./features/MotorHistoryScreen";
 import { LinkRiotAccountScreen } from "./features/LinkRiotAccountScreen";
+import { EmailVerificationScreen } from "./features/EmailVerificationScreen";
+import { OnboardingCompleteScreen } from "./features/OnboardingCompleteScreen";
 import { PostGameScreen } from "./features/PostGameScreen";
 import { PreGameScreen } from "./features/PreGameScreen";
 import { ProfileScreen } from "./features/ProfileScreen";
@@ -55,7 +61,8 @@ import {
   SidebarNavItem
 } from "./ui";
 
-type SessionStatus = "checking" | "auth" | "link-account" | "ready";
+type SessionStatus =
+  "checking" | "auth" | "email-verification" | "link-account" | "complete" | "ready";
 
 /**
  * Chave técnica opaca da sessão de draft. Aleatória de propósito: qualquer
@@ -103,7 +110,10 @@ function SpartaApp() {
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>("checking");
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
+  const [onboarding, setOnboarding] = useState<AccountOnboardingStatus | null>(null);
   const [riotAccounts, setRiotAccounts] = useState<RiotAccountSummary[]>([]);
+  const [verificationEmail, setVerificationEmail] = useState("");
+  const [localPreviewToken, setLocalPreviewToken] = useState<string | undefined>();
   const [poolRevision, setPoolRevision] = useState(0);
   const [postgameInitialMatchId, setPostgameInitialMatchId] = useState<string | null>(null);
   /**
@@ -167,24 +177,52 @@ function SpartaApp() {
     return () => globalThis.removeEventListener(DATA_DRAGON_CACHE_EVENT, updateCacheState);
   }, []);
 
-  // Restaura sessao salva localmente, se existir.
-  useEffect(() => {
-    const storedToken = localStorage.getItem(SESSION_TOKEN_KEY);
-    if (!storedToken) {
-      setSessionStatus("auth");
-      return;
+  function applySession(result: Awaited<ReturnType<typeof fetchSession>>, showCompletion = false) {
+    setSessionUser(result.user);
+    setOnboarding(result.onboarding);
+    setRiotAccounts(result.riotAccounts);
+    const route = accessRouteForOnboarding(result.onboarding.state);
+    if (route === "email-verification") {
+      setVerificationEmail(result.user.email ?? "seu email");
+      setSessionStatus("email-verification");
+    } else if (route === "link-account") {
+      setSessionStatus("link-account");
+    } else {
+      setSessionStatus(showCompletion ? "complete" : "ready");
     }
-    fetchSession(storedToken)
-      .then((result) => {
-        setSessionToken(storedToken);
-        setSessionUser(result.user);
-        setRiotAccounts(result.riotAccounts);
-        setSessionStatus(result.riotAccounts.length > 0 ? "ready" : "link-account");
-      })
-      .catch(() => {
-        localStorage.removeItem(SESSION_TOKEN_KEY);
+  }
+
+  // Restaura somente o bearer cifrado pelo processo main. A chave antiga do
+  // localStorage e removida sem ser lida para eliminar o legado inseguro.
+  useEffect(() => {
+    localStorage.removeItem("sparta:token");
+    void window.sparta.session.get().then(async (storedToken) => {
+      if (!storedToken) {
         setSessionStatus("auth");
-      });
+        return;
+      }
+      try {
+        const result = await fetchSession(storedToken);
+        setSessionToken(storedToken);
+        applySession(result);
+      } catch {
+        await window.sparta.session.clear();
+        setSessionStatus("auth");
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    const expire = () => {
+      void window.sparta.session.clear();
+      setSessionToken(null);
+      setSessionUser(null);
+      setOnboarding(null);
+      setRiotAccounts([]);
+      setSessionStatus("auth");
+    };
+    globalThis.addEventListener(SESSION_EXPIRED_EVENT, expire);
+    return () => globalThis.removeEventListener(SESSION_EXPIRED_EVENT, expire);
   }, []);
 
   // Deteccao automatica de champion select via LCU (somente leitura).
@@ -414,21 +452,33 @@ function SpartaApp() {
     });
   }, [autoDraft, championNames]);
 
-  function handleAuthenticated(token: string) {
-    localStorage.setItem(SESSION_TOKEN_KEY, token);
+  async function handleAuthenticated(token: string) {
+    await window.sparta.session.set(token);
     setSessionToken(token);
-    fetchSession(token)
-      .then((result) => {
-        setSessionUser(result.user);
-        setRiotAccounts(result.riotAccounts);
-        setSessionStatus(result.riotAccounts.length > 0 ? "ready" : "link-account");
-      })
-      .catch(() => setSessionStatus("link-account"));
+    try {
+      applySession(await fetchSession(token));
+    } catch {
+      await window.sparta.session.clear();
+      setSessionToken(null);
+      setSessionStatus("auth");
+    }
   }
 
-  function handleLinked(account: RiotAccountSummary) {
-    setRiotAccounts((current) => [...current, account]);
-    setSessionStatus("ready");
+  async function refreshOnboarding(showCompletion = false) {
+    if (!sessionToken) return;
+    applySession(await fetchSession(sessionToken), showCompletion);
+  }
+
+  async function handleLogout() {
+    if (sessionToken) await logout(sessionToken).catch(() => undefined);
+    await window.sparta.session.clear();
+    setSessionToken(null);
+    setSessionUser(null);
+    setOnboarding(null);
+    setRiotAccounts([]);
+    setVerificationEmail("");
+    setLocalPreviewToken(undefined);
+    setSessionStatus("auth");
   }
 
   if (sessionStatus === "checking") {
@@ -448,18 +498,50 @@ function SpartaApp() {
       <AuthScreen
         splashUrl={splashUrl}
         onAuthenticated={handleAuthenticated}
-        onSkip={() => setSessionStatus("ready")}
+        onRegistrationRequested={(email, previewToken) => {
+          setVerificationEmail(email);
+          setLocalPreviewToken(previewToken);
+          setSessionStatus("email-verification");
+        }}
       />
     );
   }
 
-  if (sessionStatus === "link-account" && sessionToken) {
+  if (sessionStatus === "email-verification") {
+    return (
+      <EmailVerificationScreen
+        splashUrl={splashUrl}
+        email={verificationEmail || sessionUser?.email || "seu email"}
+        initialLocalPreviewToken={localPreviewToken}
+        onConfirmed={() => {
+          setLocalPreviewToken(undefined);
+          if (sessionToken) void refreshOnboarding();
+          else setSessionStatus("auth");
+        }}
+        onReturnToLogin={() => void handleLogout()}
+      />
+    );
+  }
+
+  if (sessionStatus === "link-account" && sessionToken && onboarding) {
     return (
       <LinkRiotAccountScreen
         token={sessionToken}
         splashUrl={splashUrl}
-        onLinked={handleLinked}
-        onSkip={() => setSessionStatus("ready")}
+        onboarding={onboarding}
+        onRefresh={() => void refreshOnboarding(true)}
+        onLogout={() => void handleLogout()}
+      />
+    );
+  }
+
+  if (sessionStatus === "complete" && onboarding) {
+    return (
+      <OnboardingCompleteScreen
+        splashUrl={splashUrl}
+        riotId={onboarding.riot.riotId}
+        localControlledMode={onboarding.riot.localControlledMode}
+        onContinue={() => setSessionStatus("ready")}
       />
     );
   }
@@ -498,9 +580,14 @@ function SpartaApp() {
               name={
                 account
                   ? `${account.gameName}#${account.tagLine}`
-                  : (sessionUser?.displayName ?? "Convidado")
+                  : (sessionUser?.displayName ?? "Conta Sparta")
               }
-              meta={account ? account.platformRegion.toUpperCase() : "Sem conta Riot vinculada"}
+              meta={
+                onboarding?.riot.acceptedForCurrentEnvironment ? "Acesso pronto" : "Acesso restrito"
+              }
+              onAccount={() => setPage("account")}
+              onSettings={() => setPage("settings")}
+              onLogout={() => void handleLogout()}
             />
           }
         >
@@ -602,11 +689,25 @@ function SpartaApp() {
       {page === "motor" && (
         <MotorHistoryScreen riotAccounts={riotAccounts} sessionToken={sessionToken} />
       )}
-      {page === "calibration" && sessionToken && (
-        <CalibrationLabScreen token={sessionToken} />
-      )}
+      {page === "calibration" && sessionToken && <CalibrationLabScreen token={sessionToken} />}
       {page === "settings" && (
         <SettingsScreen ddragonVersion={ddragonVersion} sessionToken={sessionToken} />
+      )}
+      {page === "account" && sessionToken && sessionUser && onboarding && (
+        <AccountScreen
+          token={sessionToken}
+          user={sessionUser}
+          onboarding={onboarding}
+          onSessionRotated={(token, email, previewToken) => {
+            void window.sparta.session.set(token);
+            setSessionToken(token);
+            setVerificationEmail(email);
+            setLocalPreviewToken(previewToken);
+            setSessionStatus("email-verification");
+          }}
+          onOnboardingChanged={() => void refreshOnboarding()}
+          onLogout={() => void handleLogout()}
+        />
       )}
     </AppShell>
   );

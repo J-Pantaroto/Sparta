@@ -1,5 +1,5 @@
-import { app, BrowserWindow, ipcMain } from "electron";
-import { mkdir, writeFile } from "node:fs/promises";
+import { app, BrowserWindow, ipcMain, safeStorage, shell } from "electron";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { URL } from "node:url";
 import {
@@ -33,6 +33,45 @@ import type { Role } from "@sparta/core";
 app.setName("Sparta");
 
 const GAMEFLOW_POLL_INTERVAL_MS = 2500;
+
+/**
+ * O bearer de sessao nunca e persistido pelo renderer. No Windows, o
+ * `safeStorage` usa DPAPI e vincula o ciphertext ao usuario do sistema. Se a
+ * criptografia nao estiver disponivel, o app mantem apenas a sessao em
+ * memoria em vez de gravar texto puro.
+ */
+function registerProtectedSessionStore() {
+  const sessionPath = join(app.getPath("userData"), "session-token.bin");
+  ipcMain.handle("sparta:session:get", async () => {
+    if (!safeStorage.isEncryptionAvailable()) return null;
+    try {
+      return safeStorage.decryptString(await readFile(sessionPath));
+    } catch {
+      return null;
+    }
+  });
+  ipcMain.handle("sparta:session:set", async (_event, token: string) => {
+    if (!safeStorage.isEncryptionAvailable() || typeof token !== "string" || token.length > 8_192) {
+      return false;
+    }
+    await mkdir(app.getPath("userData"), { recursive: true });
+    await writeFile(sessionPath, safeStorage.encryptString(token));
+    return true;
+  });
+  ipcMain.handle("sparta:session:clear", async () => {
+    await rm(sessionPath, { force: true });
+  });
+}
+
+function registerRiotAuthorizationHandler() {
+  ipcMain.handle("sparta:riot-auth:open", async (_event, target: string) => {
+    const url = new URL(target);
+    if (url.protocol !== "https:" || url.hostname !== "auth.riotgames.com") {
+      throw new Error("Destino de autorizacao Riot nao permitido.");
+    }
+    await shell.openExternal(url.toString());
+  });
+}
 
 /**
  * Baixa a splash art de uma skin pro disco (userData/skins), pra aplicar o
@@ -291,6 +330,8 @@ function startGameflowWatcher() {
 }
 
 void app.whenReady().then(() => {
+  registerProtectedSessionStore();
+  registerRiotAuthorizationHandler();
   createWindow();
   registerLcuStateHandler();
   startGameflowWatcher();

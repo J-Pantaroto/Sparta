@@ -8,8 +8,16 @@ import { ExternalServiceError } from "@sparta/riot";
 import { safeExternalErrorLog, sendExternalError } from "./http/external-error-response.js";
 import { requestLogSerializer } from "./http/log-redaction.js";
 import { authRoutes } from "./modules/auth/routes.js";
+import {
+  assertProductionEmailProvider,
+  defaultEmailProviderForEnvironment,
+  type TransactionalEmailProvider
+} from "./modules/auth/email-provider.js";
 import { createRiotIdentityRoutes } from "./modules/auth/riot-identity-routes.js";
-import { enforceRouteAuthorization, hasAuthorizationPolicy } from "./modules/auth/authorization-policy.js";
+import {
+  enforceRouteAuthorization,
+  hasAuthorizationPolicy
+} from "./modules/auth/authorization-policy.js";
 import type { RiotIdentityProvider } from "./modules/auth/riot-identity.js";
 import { draftsRoutes } from "./modules/drafts/routes.js";
 import { replayBundleRoutes } from "./modules/drafts/replay-bundle-routes.js";
@@ -32,10 +40,14 @@ import { loadEnv, parseAllowedOrigins } from "./config/env.js";
 export async function buildApp(
   options: {
     riotIdentityProvider?: RiotIdentityProvider;
+    transactionalEmailProvider?: TransactionalEmailProvider;
     enforceCentralAuthorization?: boolean;
   } = {}
 ) {
   const env = loadEnv();
+  const transactionalEmailProvider =
+    options.transactionalEmailProvider ?? defaultEmailProviderForEnvironment(env);
+  assertProductionEmailProvider(env, transactionalEmailProvider);
   const allowedOrigins = parseAllowedOrigins(env.CORS_ALLOWED_ORIGINS);
   const app = Fastify({
     trustProxy: env.TRUST_PROXY_HOPS > 0 ? env.TRUST_PROXY_HOPS : false,
@@ -166,7 +178,7 @@ export async function buildApp(
   });
 
   await app.register(healthRoutes);
-  await app.register(authRoutes);
+  await app.register(authRoutes, { emailProvider: transactionalEmailProvider });
   await app.register(createRiotIdentityRoutes(options.riotIdentityProvider));
   await app.register(playersRoutes);
   await app.register(draftsRoutes);

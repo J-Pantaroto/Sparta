@@ -28,6 +28,7 @@ export * from "./types/champion-difficulty.js";
 export * from "./types/champion-capability.js";
 export * from "./types/provenance.js";
 export * from "./types/cache.js";
+export * from "./types/account-onboarding.js";
 export * from "./types/stat-coverage.js";
 export * from "./aggregation/objective-participation.js";
 export * from "./aggregation/personal-loadout-evidence.js";

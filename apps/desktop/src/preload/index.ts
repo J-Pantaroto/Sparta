@@ -10,6 +10,20 @@ import type { Role } from "@sparta/core";
 contextBridge.exposeInMainWorld("sparta", {
   version: "0.9.0",
   realtimeAssistance: false,
+  session: {
+    get(): Promise<string | null> {
+      return ipcRenderer.invoke("sparta:session:get");
+    },
+    set(token: string): Promise<boolean> {
+      return ipcRenderer.invoke("sparta:session:set", token);
+    },
+    clear(): Promise<void> {
+      return ipcRenderer.invoke("sparta:session:clear");
+    }
+  },
+  openRiotAuthorization(url: string): Promise<void> {
+    return ipcRenderer.invoke("sparta:riot-auth:open", url);
+  },
   /**
    * Assina mudancas de fase do gameflow do cliente League (somente leitura).
    * Retorna uma funcao para cancelar a assinatura.

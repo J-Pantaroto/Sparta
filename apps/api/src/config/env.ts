@@ -9,6 +9,11 @@ const booleanFromString = z.preprocess((value) => {
   return value;
 }, z.boolean());
 
+const optionalEmail = z.preprocess(
+  (value) => (value === "" ? undefined : value),
+  z.string().email().optional()
+);
+
 export const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   API_PORT: z.coerce.number().int().min(1).max(65535).default(3333),
@@ -20,6 +25,19 @@ export const envSchema = z.object({
   RSO_ENABLED: booleanFromString.default(false),
   RSO_CLIENT_ID: z.string().optional(),
   RSO_REDIRECT_URI: z.string().url().optional(),
+  LOCAL_RIOT_LINK_ENABLED: booleanFromString.default(false),
+  EMAIL_PROVIDER_MODE: z.enum(["UNCONFIGURED", "IN_MEMORY", "EXTERNAL"]).optional(),
+  EMAIL_VERIFICATION_FROM: optionalEmail,
+  EMAIL_VERIFICATION_URL_BASE: z.string().url().default("http://localhost:5173/verify-email"),
+  EMAIL_VERIFICATION_TOKEN_TTL_MINUTES: z.coerce.number().int().min(5).max(1_440).default(30),
+  EMAIL_VERIFICATION_RESEND_COOLDOWN_SECONDS: z.coerce
+    .number()
+    .int()
+    .min(30)
+    .max(3_600)
+    .default(60),
+  EMAIL_VERIFICATION_MAX_PER_HOUR: z.coerce.number().int().min(1).max(20).default(5),
+  LOCAL_EMAIL_PREVIEW_ENABLED: booleanFromString.default(false),
   RIOT_PLATFORM_REGION: z.string().default("br1"),
   RIOT_REGIONAL_ROUTING: z.string().default("americas"),
   DATA_DRAGON_LOCALE: z.string().default("pt_BR"),
@@ -45,8 +63,9 @@ export const envSchema = z.object({
 });
 
 export type Env = z.infer<typeof envSchema>;
-export type ResolvedEnv = Omit<Env, "IDENTITY_MODE"> & {
+export type ResolvedEnv = Omit<Env, "IDENTITY_MODE" | "EMAIL_PROVIDER_MODE"> & {
   IDENTITY_MODE: "LOCAL_CONTROLLED" | "TEST" | "RSO_REQUIRED";
+  EMAIL_PROVIDER_MODE: "UNCONFIGURED" | "IN_MEMORY" | "EXTERNAL";
 };
 
 export function loadEnv(input = process.env): ResolvedEnv {
@@ -59,21 +78,39 @@ export function loadEnv(input = process.env): ResolvedEnv {
         ? "RSO_REQUIRED"
         : parsed.NODE_ENV === "test"
           ? "TEST"
-          : "LOCAL_CONTROLLED")
+          : "LOCAL_CONTROLLED"),
+    EMAIL_PROVIDER_MODE:
+      parsed.EMAIL_PROVIDER_MODE ?? (parsed.NODE_ENV === "test" ? "IN_MEMORY" : "UNCONFIGURED")
   } as ResolvedEnv;
   if (env.NODE_ENV === "production") {
     if (env.IDENTITY_MODE !== "RSO_REQUIRED") {
       throw new Error("IDENTITY_MODE deve ser RSO_REQUIRED em producao.");
     }
     if (
-      !env.RSO_ENABLED ||
-      !env.RSO_CLIENT_ID ||
-      /[<>]/.test(env.RSO_CLIENT_ID) ||
-      !env.RSO_REDIRECT_URI?.startsWith("https://") ||
-      /[<>]/.test(env.RSO_REDIRECT_URI)
+      env.RSO_ENABLED &&
+      (!env.RSO_CLIENT_ID ||
+        /[<>]/.test(env.RSO_CLIENT_ID) ||
+        !env.RSO_REDIRECT_URI?.startsWith("https://") ||
+        /[<>]/.test(env.RSO_REDIRECT_URI))
     ) {
       throw new Error(
-        "RSO_ENABLED, RSO_CLIENT_ID e RSO_REDIRECT_URI HTTPS sao obrigatorios em producao."
+        "RSO_CLIENT_ID e RSO_REDIRECT_URI HTTPS sao obrigatorios quando RSO esta habilitado."
+      );
+    }
+    if (env.LOCAL_RIOT_LINK_ENABLED || env.LOCAL_EMAIL_PREVIEW_ENABLED) {
+      throw new Error("Modos locais de identidade e email nao podem ser habilitados em producao.");
+    }
+    if (
+      !Object.prototype.hasOwnProperty.call(input, "EMAIL_PROVIDER_MODE") ||
+      env.EMAIL_PROVIDER_MODE !== "EXTERNAL" ||
+      !env.EMAIL_VERIFICATION_FROM ||
+      /[<>]/.test(env.EMAIL_VERIFICATION_FROM) ||
+      !Object.prototype.hasOwnProperty.call(input, "EMAIL_VERIFICATION_URL_BASE") ||
+      !env.EMAIL_VERIFICATION_URL_BASE.startsWith("https://") ||
+      /[<>]/.test(env.EMAIL_VERIFICATION_URL_BASE)
+    ) {
+      throw new Error(
+        "Provider, remetente e URL HTTPS de verificacao de email sao obrigatorios em producao."
       );
     }
     if (

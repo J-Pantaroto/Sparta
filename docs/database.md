@@ -1,5 +1,12 @@
 # Database
 
+## Acesso e confirmação de email (Etapa 31D)
+
+`User` possui `emailVerifiedAt`, `isActive`, `sessionVersion` e `updatedAt`.
+`EmailVerificationToken` guarda somente `tokenHash`, `emailSnapshot`, validade, consumo, revogação e
+datas, com índice `(userId, createdAt)`. Usuários legados não receberam backfill de confirmação.
+Detalhes e plano medido: `docs/account-access-onboarding.md` e `docs/database-migrations.md`.
+
 A Etapa 23 não adiciona tabela. Os agregados longitudinais são reconstruídos
 sob demanda a partir de `DraftSession`, do `RecommendationSnapshot` vigente
 no lock-in, de `PersistedRecommendation`, `MatchParticipant`,

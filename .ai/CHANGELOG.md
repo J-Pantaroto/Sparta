@@ -22,6 +22,18 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-08-06 17:09 — Etapa 31D: acesso, email e onboarding Riot obrigatórios
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0044-acesso-email-onboarding-riot.md`
+
+Convidado e bypass foram removidos; confirmação de email one-time, sessões revogáveis, onboarding
+calculado no backend e gate Conta → Email → Riot → Pronto passaram a proteger API e desktop. A
+migration preservou contas legadas sem confirmação retroativa; recomendação controlada e
+`EXACT_REPLAY` permaneceram exatos. Produção segue `BLOCKED_BY_EMAIL_PROVIDER_CONFIGURATION` e
+`BLOCKED_BY_RIOT_APPROVAL`, sem serviço, credencial ou infraestrutura inventada.
+
+---
+
 ## 2026-08-06 10:46 — Etapa 31C: identidade, autorização e prontidão Riot
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0043-identidade-autorizacao-prontidao-riot.md`

@@ -1,5 +1,12 @@
 # Auditoria de autorização das rotas — Etapa 31C
 
+Atualização 31D (2026-08-06): além da classe, toda rota pessoal exige onboarding `READY`.
+`AUTHENTICATED` só ignora esse gate nas rotas necessárias para concluir ou encerrar o próprio
+acesso. Conta inativa ou versão de sessão revogada responde 401; email ou Riot pendente responde
+`403 ONBOARDING_INCOMPLETE` com a etapa necessária. Novas rotas: cadastro e login públicos;
+reenvio/confirmacão de email públicos; `me`, `onboarding-status`, `logout` e mudança de email
+autenticados; início/revogação Riot acessíveis somente depois da confirmação do email.
+
 Data da auditoria: 2026-08-05. Fonte executável: `ROUTE_AUTHORIZATION_POLICIES` em
 `apps/api/src/modules/auth/authorization-policy.ts`. O boot falha se uma rota registrada não
 tiver política. `PUBLIC` não usa identidade; `AUTHENTICATED` usa o `sub` do token Sparta;

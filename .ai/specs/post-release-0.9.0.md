@@ -1,5 +1,8 @@
 # Etapa 31 — pós-release do Sparta Desktop 0.9.0
 
+> Atualização 31D: convidado/bypass pertencem apenas ao artefato histórico retirado. O código atual
+> exige Conta → Email → Riot → Pronto. A tag/release não foi alterada.
+
 Fonte de verdade: `docs/post-release-0.9.0.md`.
 
 Resultado em 2026-08-05:

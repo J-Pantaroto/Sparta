@@ -1,5 +1,8 @@
 # Database
 
+Etapa 31D: `User` ganhou confirmação/atividade/versão de sessão; `EmailVerificationToken` persiste
+somente hash e ciclo de vida. Não houve backfill de usuários legados.
+
 A Etapa 23 não cria tabela nem cache. A observabilidade é reconstruída sob
 demanda sobre `DraftSession`, o snapshot vigente no lock-in, a recomendação
 escolhida, a partida e a revisão pós-game mais recente. Novos vínculos entram

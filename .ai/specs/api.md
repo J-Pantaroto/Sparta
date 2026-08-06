@@ -1,5 +1,12 @@
 # API
 
+## Acesso e onboarding (Etapa 31D)
+
+O backend calcula o estado e bloqueia rotas pessoais até `READY`. Cadastro/reenvio são neutros;
+confirmação usa token one-time; logout revoga a versão da sessão; mudança de email exige senha e
+reinicia o gate. Produção aceita Riot apenas por RSO e falha sem provider real. Fonte:
+`docs/account-access-onboarding.md`.
+
 ## Identidade e autorização (Etapa 31C)
 
 Toda rota consta na matriz fail-closed. Produção requer RSO; PUUID/Riot ID recebido apenas confere

@@ -10,10 +10,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * nesses pontos quebre aqui, não em produção.
  */
 
-const { getAuthenticatedUserIdMock, riotAccountFindFirstMock } = vi.hoisted(() => ({
-  getAuthenticatedUserIdMock: vi.fn(),
-  riotAccountFindFirstMock: vi.fn()
-}));
+const { getAuthenticatedUserIdMock, riotAccountFindFirstMock, userFindUniqueMock } = vi.hoisted(
+  () => ({
+    getAuthenticatedUserIdMock: vi.fn(),
+    riotAccountFindFirstMock: vi.fn(),
+    userFindUniqueMock: vi.fn()
+  })
+);
 
 vi.mock("./modules/auth/routes.js", () => ({
   getAuthenticatedUserId: getAuthenticatedUserIdMock,
@@ -21,7 +24,10 @@ vi.mock("./modules/auth/routes.js", () => ({
 }));
 
 vi.mock("./db/prisma.js", () => ({
-  prisma: { riotAccount: { findFirst: riotAccountFindFirstMock } }
+  prisma: {
+    user: { findUnique: userFindUniqueMock },
+    riotAccount: { findFirst: riotAccountFindFirstMock }
+  }
 }));
 
 import { buildApp } from "./app.js";
@@ -30,6 +36,11 @@ beforeEach(() => {
   vi.clearAllMocks();
   getAuthenticatedUserIdMock.mockResolvedValue(null);
   riotAccountFindFirstMock.mockResolvedValue(null);
+  userFindUniqueMock.mockResolvedValue({
+    email: "player@example.com",
+    emailVerifiedAt: new Date("2026-08-06T00:00:00.000Z"),
+    isActive: true
+  });
 });
 
 describe("cabeçalhos de endurecimento", () => {
@@ -197,11 +208,33 @@ describe("autenticação e isolamento", () => {
     await app.close();
   });
 
+  it("bloqueia toda rota pessoal enquanto o email nao foi confirmado", async () => {
+    getAuthenticatedUserIdMock.mockResolvedValue("user-1");
+    userFindUniqueMock.mockResolvedValue({
+      email: "player@example.com",
+      emailVerifiedAt: null,
+      isActive: true
+    });
+    const app = await buildApp({ enforceCentralAuthorization: true });
+    const response = await app.inject({ method: "GET", url: "/players/pool" });
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toMatchObject({
+      code: "ONBOARDING_INCOMPLETE",
+      requiredStep: "EMAIL_VERIFICATION"
+    });
+    expect(riotAccountFindFirstMock).not.toHaveBeenCalled();
+    await app.close();
+  });
+
   it("a matriz central oculta identificador de outra conta com 404", async () => {
     getAuthenticatedUserIdMock.mockResolvedValue("user-1");
     riotAccountFindFirstMock.mockResolvedValue({
-      id: "account-1", userId: "user-1", puuid: "own-puuid",
-      gameName: "Sparta", tagLine: "BR1", linkStatus: "UNVERIFIED_LEGACY",
+      id: "account-1",
+      userId: "user-1",
+      puuid: "own-puuid",
+      gameName: "Sparta",
+      tagLine: "BR1",
+      linkStatus: "UNVERIFIED_LEGACY",
       createdAt: new Date()
     });
     const app = await buildApp({ enforceCentralAuthorization: true });
@@ -217,14 +250,21 @@ describe("autenticação e isolamento", () => {
   it("a matriz central bloqueia vinculo revogado ate no modo controlado", async () => {
     getAuthenticatedUserIdMock.mockResolvedValue("user-1");
     riotAccountFindFirstMock.mockResolvedValue({
-      id: "account-1", userId: "user-1", puuid: "own-puuid",
-      gameName: "Sparta", tagLine: "BR1", linkStatus: "REVOKED",
+      id: "account-1",
+      userId: "user-1",
+      puuid: "own-puuid",
+      gameName: "Sparta",
+      tagLine: "BR1",
+      linkStatus: "REVOKED",
       createdAt: new Date()
     });
     const app = await buildApp({ enforceCentralAuthorization: true });
     const response = await app.inject({ method: "GET", url: "/players/pool" });
     expect(response.statusCode).toBe(403);
-    expect(response.json().code).toBe("RIOT_ACCOUNT_REVOKED");
+    expect(response.json()).toMatchObject({
+      code: "ONBOARDING_INCOMPLETE",
+      requiredStep: "RIOT_LINK"
+    });
     await app.close();
   });
 

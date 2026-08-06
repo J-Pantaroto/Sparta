@@ -471,11 +471,15 @@ export const playersRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const env = loadEnv();
-    if (env.IDENTITY_MODE === "RSO_REQUIRED") {
-      reply.code(env.RSO_ENABLED ? 409 : 503);
+    if (env.IDENTITY_MODE === "RSO_REQUIRED" || !env.LOCAL_RIOT_LINK_ENABLED) {
+      reply.code(env.IDENTITY_MODE === "RSO_REQUIRED" && !env.RSO_ENABLED ? 503 : 409);
       return {
-        code: env.RSO_ENABLED ? "RSO_VERIFICATION_REQUIRED" : "RSO_NOT_CONFIGURED",
-        message: "O vinculo por Riot ID nao verifica propriedade. Use o fluxo RSO oficial."
+        code:
+          env.IDENTITY_MODE === "RSO_REQUIRED" && !env.RSO_ENABLED
+            ? "RSO_NOT_CONFIGURED"
+            : "LOCAL_RIOT_LINK_DISABLED",
+        message:
+          "O vinculo local por Riot ID nao verifica propriedade e nao esta habilitado neste ambiente."
       };
     }
 
@@ -524,7 +528,7 @@ export const playersRoutes: FastifyPluginAsync = async (app) => {
           })
         : await prisma.riotAccount.create({
             data: {
-        puuid: riotAccountInfo.puuid,
+              puuid: riotAccountInfo.puuid,
               ...common
             }
           });
@@ -536,7 +540,9 @@ export const playersRoutes: FastifyPluginAsync = async (app) => {
         gameName: account.gameName,
         tagLine: account.tagLine,
         platformRegion: account.platformRegion,
-        regionalRouting: account.regionalRouting
+        regionalRouting: account.regionalRouting,
+        linkStatus: account.linkStatus,
+        verifiedAt: account.verifiedAt?.toISOString() ?? null
       },
       linkStatus: account.linkStatus,
       verification: "NOT_VERIFIED"

@@ -1,5 +1,15 @@
 # API
 
+## Acesso e onboarding (Etapa 31D)
+
+O backend calcula o estado de onboarding e bloqueia toda rota pessoal até `READY`. Endpoints de
+acesso: `POST /auth/register`, `POST /auth/login`, `POST /auth/logout`,
+`POST /auth/email-verification/resend`, `POST /auth/email-verification/confirm`,
+`GET /auth/onboarding-status`, `GET /auth/me` e `PATCH /auth/account/email`. O erro uniforme é
+`403 ONBOARDING_INCOMPLETE` com `requiredStep`. Produção aceita somente vínculo Riot
+`VERIFIED_BY_RSO` e falha no boot sem provider transacional de email realmente configurado. Ver
+`docs/account-access-onboarding.md`.
+
 ## Identidade e autorização (Etapa 31C)
 
 A matriz fail-closed está em `apps/api/src/modules/auth/authorization-policy.ts`; o boot recusa

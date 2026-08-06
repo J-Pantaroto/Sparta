@@ -13,6 +13,12 @@ declare global {
     sparta: {
       version: string;
       realtimeAssistance: boolean;
+      session: {
+        get: () => Promise<string | null>;
+        set: (token: string) => Promise<boolean>;
+        clear: () => Promise<void>;
+      };
+      openRiotAuthorization: (url: string) => Promise<void>;
       onGameflowPhase: (callback: (phase: LcuGameflowPhase | null) => void) => () => void;
       /** Baixa a imagem pro disco e devolve um data URL carregavel pelo renderer. */
       downloadSkin: (url: string, fileName: string) => Promise<string>;

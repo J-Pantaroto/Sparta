@@ -1,5 +1,13 @@
 # Sparta — guia do usuário
 
+## Primeiro acesso
+
+O acesso segue quatro passos obrigatórios: **Conta, Email, Riot e Pronto**. Depois de criar a conta,
+confirme o link recebido por email; depois autorize sua própria identidade Riot. Não existe modo
+convidado. Se a sessão expirar, o Sparta volta ao login sem exibir conteúdo pessoal. Produção sem
+provider de email ou sem RSO aprovado mostra o bloqueio real e não simula a conclusão. O menu no
+rodapé abre Conta, Configurações e Sair. Ver `docs/account-access-onboarding.md`.
+
 Versão 0.9.0.
 
 ## O que é o Sparta
@@ -34,13 +42,13 @@ Tudo que ele mostra sobre você vem das **suas** partidas.
 
 ## Requisitos
 
-| Item | Requisito |
-| --- | --- |
-| Sistema | Windows 10 ou 11, 64 bits |
-| Espaço | ~400 MB para o aplicativo |
-| League of Legends | Instalado, para a detecção automática do champion select |
-| Servidor Sparta | Uma instância da API acessível (padrão `http://localhost:3333`) |
-| Conta | Uma conta Sparta e um Riot ID vinculado |
+| Item              | Requisito                                                       |
+| ----------------- | --------------------------------------------------------------- |
+| Sistema           | Windows 10 ou 11, 64 bits                                       |
+| Espaço            | ~400 MB para o aplicativo                                       |
+| League of Legends | Instalado, para a detecção automática do champion select        |
+| Servidor Sparta   | Uma instância da API acessível (padrão `http://localhost:3333`) |
+| Conta             | Uma conta Sparta e um Riot ID vinculado                         |
 
 O League não precisa estar aberto para consultar perfil, histórico ou análises
 já gravadas. Ele é necessário para o Sparta detectar sozinho que você entrou no

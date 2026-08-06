@@ -12,6 +12,7 @@ import {
 } from "@sparta/riot/http";
 import type {
   ChampionPerformanceScore,
+  AccountOnboardingStatus,
   DraftState,
   DraftRecommendationResponse,
   DraftPostGameComparison,
@@ -38,7 +39,7 @@ import type {
   TheoreticalPatchImpactCollection
 } from "@sparta/core";
 
-export const SESSION_TOKEN_KEY = "sparta:token";
+export const SESSION_EXPIRED_EVENT = "sparta:session-expired";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3333";
 
@@ -46,6 +47,8 @@ export interface SessionUser {
   id: string;
   email: string | null;
   displayName: string | null;
+  emailVerifiedAt: string | null;
+  isActive: boolean;
 }
 
 export interface PlayerProfileResponse {
@@ -78,6 +81,8 @@ export interface RiotAccountSummary {
   tagLine: string;
   platformRegion: string;
   regionalRouting: string;
+  linkStatus: string;
+  verifiedAt: string | null;
 }
 
 export class ApiError extends Error {
@@ -118,7 +123,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   });
   let body: unknown;
   try {
-    body = await response.json();
+    body = response.status === 204 ? undefined : await response.json();
   } catch (cause) {
     throw new ExternalServiceError({
       code: "UPSTREAM_INVALID_RESPONSE",
@@ -132,6 +137,9 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   }
 
   if (!response.ok) {
+    if (response.status === 401 && new globalThis.Headers(options.headers).has("Authorization")) {
+      globalThis.dispatchEvent(new globalThis.Event(SESSION_EXPIRED_EVENT));
+    }
     const message =
       body && typeof body === "object" && "error" in body
         ? String(body.error)
@@ -152,7 +160,13 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 
 export function register(input: { email: string; password: string; displayName?: string }) {
-  return request<{ token: string; user: SessionUser }>("/auth/register", {
+  return request<{
+    status: "VERIFICATION_REQUIRED";
+    message: string;
+    nextAllowedAt: string;
+    localPreviewToken?: string;
+    localPreviewOnly?: true;
+  }>("/auth/register", {
     method: "POST",
     body: JSON.stringify(input)
   });
@@ -166,8 +180,76 @@ export function login(input: { email: string; password: string }) {
 }
 
 export function fetchSession(token: string) {
-  return request<{ user: SessionUser; riotAccounts: RiotAccountSummary[] }>("/auth/me", {
+  return request<{
+    user: SessionUser;
+    onboarding: AccountOnboardingStatus;
+    riotAccounts: RiotAccountSummary[];
+  }>("/auth/me", {
     headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
+export function resendEmailVerification(email: string) {
+  return request<{
+    status: "VERIFICATION_REQUIRED";
+    message: string;
+    nextAllowedAt: string;
+    localPreviewToken?: string;
+    localPreviewOnly?: true;
+  }>("/auth/email-verification/resend", {
+    method: "POST",
+    body: JSON.stringify({ email })
+  });
+}
+
+export function confirmEmailVerification(token: string) {
+  return request<{ status: "EMAIL_VERIFIED" }>("/auth/email-verification/confirm", {
+    method: "POST",
+    body: JSON.stringify({ token })
+  });
+}
+
+export function fetchOnboardingStatus(token: string) {
+  return request<AccountOnboardingStatus>("/auth/onboarding-status", {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
+export function logout(token: string) {
+  return request<void>("/auth/logout", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
+export function startRiotRsoLink(token: string) {
+  return request<{ status: string; authorizationUrl: string; expiresInSeconds: number }>(
+    "/auth/riot/rso/start",
+    { method: "POST", headers: { Authorization: `Bearer ${token}` } }
+  );
+}
+
+export function revokeRiotLink(token: string) {
+  return request<{ status: "REVOKED" }>("/auth/riot/revoke", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
+export function changeAccountEmail(
+  token: string,
+  input: { email: string; currentPassword: string }
+) {
+  return request<{
+    token: string;
+    user: SessionUser;
+    onboarding: AccountOnboardingStatus;
+    localPreviewToken?: string;
+    localPreviewOnly?: true;
+  }>("/auth/account/email", {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(input)
   });
 }
 
@@ -832,7 +914,8 @@ export function transitionDraftSessionStatus(
 
 /* ── Revisão humana do motor (Etapa 24) ───────────────────────────────── */
 
-export type ReviewRatingValue = "STRONG" | "ADEQUATE" | "WEAK" | "INSUFFICIENT_DATA" | "NOT_APPLICABLE";
+export type ReviewRatingValue =
+  "STRONG" | "ADEQUATE" | "WEAK" | "INSUFFICIENT_DATA" | "NOT_APPLICABLE";
 
 export interface DraftReviewSummaryResponse {
   reviewsConsidered: number;
@@ -874,7 +957,12 @@ export interface BlindReviewContextResponse {
   lockedInAt: string | null;
   selectedChampionId: number | null;
   knownDraft: unknown;
-  snapshot: { id: string; createdAt: string; dataCoverage: number; recommendations: unknown[] } | null;
+  snapshot: {
+    id: string;
+    createdAt: string;
+    dataCoverage: number;
+    recommendations: unknown[];
+  } | null;
   algorithmVersions: Record<string, string>;
   hasLinkedMatch: boolean;
 }
@@ -917,7 +1005,11 @@ export function submitPreMatchReview(
 ) {
   return request<{ review: DraftReviewRecord }>(
     `/draft-reviews/${encodeURIComponent(reviewId)}/pre-match`,
-    { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify(assessment) }
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify(assessment)
+    }
   );
 }
 
@@ -940,7 +1032,11 @@ export function submitPostMatchReview(
 ) {
   return request<{ review: DraftReviewRecord }>(
     `/draft-reviews/${encodeURIComponent(reviewId)}/post-match`,
-    { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify(assessment) }
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify(assessment)
+    }
   );
 }
 
@@ -1089,10 +1185,9 @@ export function runCalibrationExperiment(
 
 export function listCalibrationExperiments(token: string, candidateId?: string) {
   const query = candidateId ? `?candidateId=${encodeURIComponent(candidateId)}` : "";
-  return request<{ experiments: CalibrationExperimentRow[] }>(
-    `/calibration/experiments${query}`,
-    { headers: auth(token) }
-  );
+  return request<{ experiments: CalibrationExperimentRow[] }>(`/calibration/experiments${query}`, {
+    headers: auth(token)
+  });
 }
 
 export function fetchCalibrationExperimentCases(
@@ -1166,7 +1261,11 @@ export interface ReleaseRow {
     | "REJECTED";
   artifact: {
     configuration: EffectiveConfigurationView;
-    experimentEvidence: { knownLimitations: string[]; sampleSize: number; exactReplayCases: number };
+    experimentEvidence: {
+      knownLimitations: string[];
+      sampleSize: number;
+      exactReplayCases: number;
+    };
   };
   artifactHash: string;
   configHash: string;
@@ -1193,11 +1292,14 @@ export interface ActiveReleaseResponse {
 }
 
 export function createRelease(token: string, candidateId: string, releaseVersion: string) {
-  return request<ReleaseRow>(`/calibration/candidates/${encodeURIComponent(candidateId)}/releases`, {
-    method: "POST",
-    headers: auth(token),
-    body: JSON.stringify({ releaseVersion })
-  });
+  return request<ReleaseRow>(
+    `/calibration/candidates/${encodeURIComponent(candidateId)}/releases`,
+    {
+      method: "POST",
+      headers: auth(token),
+      body: JSON.stringify({ releaseVersion })
+    }
+  );
 }
 
 export function listReleases(token: string) {
@@ -1235,5 +1337,7 @@ export function rollbackRelease(token: string, releaseId: string, reason?: strin
 }
 
 export function fetchActiveRelease(token: string) {
-  return request<ActiveReleaseResponse>("/recommendation-engine/active-release", { headers: auth(token) });
+  return request<ActiveReleaseResponse>("/recommendation-engine/active-release", {
+    headers: auth(token)
+  });
 }

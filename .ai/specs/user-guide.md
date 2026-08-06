@@ -1,5 +1,9 @@
 # Sparta — guia do usuário
 
+Etapa 31D: primeiro acesso obrigatório em Conta → Email → Riot → Pronto, sem convidado ou skip.
+Sessão expirada volta ao login antes de conteúdo pessoal. O menu oferece Conta, Configurações e
+Sair. Fonte: `docs/account-access-onboarding.md`.
+
 Versão 0.9.0.
 
 ## O que é o Sparta
@@ -34,13 +38,13 @@ Tudo que ele mostra sobre você vem das **suas** partidas.
 
 ## Requisitos
 
-| Item | Requisito |
-| --- | --- |
-| Sistema | Windows 10 ou 11, 64 bits |
-| Espaço | ~400 MB para o aplicativo |
-| League of Legends | Instalado, para a detecção automática do champion select |
-| Servidor Sparta | Uma instância da API acessível (padrão `http://localhost:3333`) |
-| Conta | Uma conta Sparta e um Riot ID vinculado |
+| Item              | Requisito                                                       |
+| ----------------- | --------------------------------------------------------------- |
+| Sistema           | Windows 10 ou 11, 64 bits                                       |
+| Espaço            | ~400 MB para o aplicativo                                       |
+| League of Legends | Instalado, para a detecção automática do champion select        |
+| Servidor Sparta   | Uma instância da API acessível (padrão `http://localhost:3333`) |
+| Conta             | Uma conta Sparta e um Riot ID vinculado                         |
 
 O League não precisa estar aberto para consultar perfil, histórico ou análises
 já gravadas. Ele é necessário para o Sparta detectar sozinho que você entrou no

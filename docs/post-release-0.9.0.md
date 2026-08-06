@@ -1,5 +1,9 @@
 # Etapa 31 — pós-release do Sparta Desktop 0.9.0
 
+> Atualização 31D (2026-08-06): as menções históricas a acesso convidado descrevem o artefato
+> retirado da Etapa 31. O código atual removeu integralmente convidado e bypass; consulte
+> `docs/account-access-onboarding.md`. A tag/release retirada não foi alterada.
+
 - Data da verificação: **2026-08-05**
 - Release: [v0.9.0](https://github.com/J-Pantaroto/Sparta/releases/tag/v0.9.0)
 - Commit imutável da tag: `aa2366b3e5bb4b3e5227dcdec43eaf8c6977ba77`

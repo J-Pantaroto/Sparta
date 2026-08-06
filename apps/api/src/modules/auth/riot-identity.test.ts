@@ -23,6 +23,12 @@ describe("Riot identity boundary", () => {
     }
   });
 
+  it("keeps a pending link outside READY in every mode", () => {
+    for (const mode of ["LOCAL_CONTROLLED", "TEST", "RSO_REQUIRED"] as const) {
+      expect(isRiotAccountAccessAllowed("PENDING_VERIFICATION", mode)).toBe(false);
+    }
+  });
+
   it("persists only a one-way state hash and emits the documented RSO request", () => {
     const state = createAuthorizationState();
     expect(state.length).toBeGreaterThanOrEqual(32);

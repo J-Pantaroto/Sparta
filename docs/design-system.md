@@ -1,5 +1,9 @@
 # Design System
 
+Na Etapa 31D, `AuthLayout` passou a sustentar o fluxo Conta → Email → Riot → Pronto com progresso
+semântico, foco visível, regiões `aria-live` e nenhuma saída anônima. O shell recebeu ações de
+Conta, Configurações e Sair; a modernização ficou limitada a acesso e onboarding.
+
 O design system do Sparta vive em `apps/desktop/src/renderer/src/ui/` — componentes e CSS
 colocados lado a lado, com `ui/index.ts` como único ponto de import.
 
@@ -9,12 +13,12 @@ componentes lá separaria o CSS do TSX e dividiria a fonte de verdade em vez de 
 
 ## Camadas
 
-| Arquivo | Responsabilidade |
-|---|---|
-| `ui/tokens.css` | Todos os tokens, organizados por função |
-| `ui/base.css` | Reset, tipografia do documento, foco por teclado, `prefers-reduced-motion`, scrollbar |
-| `ui/<Componente>.tsx` + `.css` | Um componente, um CSS colocado |
-| `styles/global.css` | Só o que ainda não migrou (telas de autenticação e restos de tela) |
+| Arquivo                        | Responsabilidade                                                                      |
+| ------------------------------ | ------------------------------------------------------------------------------------- |
+| `ui/tokens.css`                | Todos os tokens, organizados por função                                               |
+| `ui/base.css`                  | Reset, tipografia do documento, foco por teclado, `prefers-reduced-motion`, scrollbar |
+| `ui/<Componente>.tsx` + `.css` | Um componente, um CSS colocado                                                        |
+| `styles/global.css`            | Só o que ainda não migrou (telas de autenticação e restos de tela)                    |
 
 ## Regras
 

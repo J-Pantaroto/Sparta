@@ -168,6 +168,7 @@
 /* ─── Resumo do jogador (rodape da sidebar) ─────────────────────────── */
 
 .sp-player {
+  width: 100%;
   display: flex;
   align-items: center;
   gap: var(--space-3);
@@ -176,6 +177,43 @@
   border-radius: var(--radius-md);
   background: var(--surface-2);
   min-width: 0;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: var(--transition-colors);
+}
+
+.sp-player:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-3);
+}
+
+.sp-player-menu {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.sp-player-menu__actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2);
+}
+
+.sp-player-menu__action {
+  display: grid;
+  min-height: var(--space-7);
+  place-items: center;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: var(--transition-colors);
+}
+
+.sp-player-menu__action:hover {
+  border-color: var(--border-strong);
+  color: var(--text-primary);
 }
 
 .sp-player__art {

@@ -11,6 +11,20 @@ export const RIOT_ACCOUNT_LINK_STATUSES = [
 
 export type RiotAccountLinkStatus = (typeof RIOT_ACCOUNT_LINK_STATUSES)[number];
 
+export function isRiotAccountAccessAllowed(
+  linkStatus: string | undefined,
+  identityMode: "LOCAL_CONTROLLED" | "TEST" | "RSO_REQUIRED"
+): boolean {
+  return (
+    linkStatus === "VERIFIED_BY_RSO" ||
+    (identityMode !== "RSO_REQUIRED" &&
+      (linkStatus === "UNVERIFIED_LEGACY" ||
+        // Compatibilidade exclusiva de testes com fixtures anteriores a
+        // migration. Em producao a coluna NOT NULL impede este estado.
+        linkStatus === undefined))
+  );
+}
+
 export type RiotIdentityClaim = {
   puuid: string;
   gameName: string;

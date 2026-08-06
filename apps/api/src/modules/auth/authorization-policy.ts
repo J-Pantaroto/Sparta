@@ -2,6 +2,9 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 import { loadEnv } from "../../config/env.js";
 import { prisma } from "../../db/prisma.js";
 import { getAuthenticatedUserId } from "./routes.js";
+import { isRiotAccountAccessAllowed } from "./riot-identity.js";
+
+export { isRiotAccountAccessAllowed } from "./riot-identity.js";
 
 export type RouteAccessClass =
   "PUBLIC" | "AUTHENTICATED" | "OWN_RESOURCE" | "ADMINISTRATIVE" | "INTERNAL_ONLY";
@@ -32,7 +35,12 @@ export const ROUTE_AUTHORIZATION_POLICIES: readonly RouteAuthorizationPolicy[] =
   publicGet("/ready"),
   { method: "POST", path: "/auth/register", access: "PUBLIC" },
   { method: "POST", path: "/auth/login", access: "PUBLIC" },
+  { method: "POST", path: "/auth/email-verification/resend", access: "PUBLIC" },
+  { method: "POST", path: "/auth/email-verification/confirm", access: "PUBLIC" },
   { method: "GET", path: "/auth/me", access: "AUTHENTICATED" },
+  { method: "GET", path: "/auth/onboarding-status", access: "AUTHENTICATED" },
+  { method: "POST", path: "/auth/logout", access: "AUTHENTICATED" },
+  { method: "PATCH", path: "/auth/account/email", access: "AUTHENTICATED" },
   { method: "POST", path: "/auth/riot/rso/start", access: "AUTHENTICATED" },
   { method: "GET", path: "/auth/riot/rso/callback", access: "PUBLIC" },
   { method: "POST", path: "/auth/riot/revoke", access: "AUTHENTICATED" },
@@ -133,21 +141,6 @@ function sameRiotId(left: string, right: string): boolean {
   return left.trim().toLocaleLowerCase("en-US") === right.trim().toLocaleLowerCase("en-US");
 }
 
-export function isRiotAccountAccessAllowed(
-  linkStatus: string | undefined,
-  identityMode: "LOCAL_CONTROLLED" | "TEST" | "RSO_REQUIRED"
-): boolean {
-  return (
-    linkStatus === "VERIFIED_BY_RSO" ||
-    (identityMode !== "RSO_REQUIRED" &&
-      (linkStatus === "UNVERIFIED_LEGACY" ||
-        linkStatus === "PENDING_VERIFICATION" ||
-        // Compatibilidade exclusiva de testes com fixtures anteriores a
-        // migration. Em producao a coluna NOT NULL impede este estado.
-        linkStatus === undefined))
-  );
-}
-
 export function hasAuthorizationPolicy(method: string, path: string): boolean {
   return ROUTE_AUTHORIZATION_POLICIES.some(
     (entry) => entry.method === method && entry.path === path
@@ -185,9 +178,39 @@ export async function enforceRouteAuthorization(
     await reply.status(401).send({ code: "UNAUTHENTICATED", message: "Nao autenticado." });
     return;
   }
-  if (policy.access === "AUTHENTICATED") return;
-
   const env = loadEnv();
+  const onboardingExempt = new Set([
+    "/auth/me",
+    "/auth/onboarding-status",
+    "/auth/logout",
+    "/auth/account/email"
+  ]);
+  if (policy.access === "AUTHENTICATED" && onboardingExempt.has(routePath)) return;
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { email: true, emailVerifiedAt: true, isActive: true }
+  });
+  if (!user?.isActive) {
+    await reply.status(401).send({ code: "UNAUTHENTICATED", message: "Nao autenticado." });
+    return;
+  }
+  if (!user.emailVerifiedAt) {
+    await reply.status(403).send({
+      code: "ONBOARDING_INCOMPLETE",
+      requiredStep: "EMAIL_VERIFICATION",
+      message: "Confirme seu email para continuar."
+    });
+    return;
+  }
+
+  const riotOnboardingPaths = new Set([
+    "/auth/riot/rso/start",
+    "/auth/riot/revoke",
+    "/players/link-riot-account"
+  ]);
+  if (policy.access === "AUTHENTICATED" && riotOnboardingPaths.has(routePath)) return;
+
   if (
     (policy.access === "INTERNAL_ONLY" || policy.access === "ADMINISTRATIVE") &&
     env.IDENTITY_MODE === "RSO_REQUIRED"
@@ -203,22 +226,24 @@ export async function enforceRouteAuthorization(
     orderBy: [{ linkStatus: "desc" }, { createdAt: "asc" }]
   });
   if (!account) {
-    await reply
-      .status(404)
-      .send({ code: "RIOT_ACCOUNT_NOT_LINKED", message: "Conta Riot nao vinculada." });
+    await reply.status(403).send({
+      code: "ONBOARDING_INCOMPLETE",
+      requiredStep: "RIOT_LINK",
+      message: "Vincule e confirme sua conta Riot para continuar."
+    });
     return;
   }
   const allowedStatus = isRiotAccountAccessAllowed(account.linkStatus, env.IDENTITY_MODE);
   if (!allowedStatus) {
     await reply.status(403).send({
-      code:
-        account.linkStatus === "REVOKED"
-          ? "RIOT_ACCOUNT_REVOKED"
-          : "RIOT_ACCOUNT_VERIFICATION_REQUIRED",
-      message: "A conta Riot precisa de verificacao oficial para acessar dados pessoais."
+      code: "ONBOARDING_INCOMPLETE",
+      requiredStep: "RIOT_LINK",
+      message: "A conta Riot precisa de verificacao aceita neste ambiente para continuar."
     });
     return;
   }
+
+  if (policy.access === "AUTHENTICATED") return;
 
   const params = (request.params ?? {}) as Record<string, unknown>;
   const supplied = policy.identityParameter ? params[policy.identityParameter] : undefined;
