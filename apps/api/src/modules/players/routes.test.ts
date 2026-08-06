@@ -15,7 +15,8 @@ const {
   findPersonalLoadoutObservationsMock,
   findPlayerPoolMock,
   addUserProvidedPoolEntryMock,
-  disableUserProvidedPoolEntryMock
+  disableUserProvidedPoolEntryMock,
+  findPlayerProfileOverviewByUserIdMock
 } = vi.hoisted(() => ({
   findRiotAccountByRiotIdMock: vi.fn(),
   findChampionStatsByPuuidMock: vi.fn(),
@@ -31,7 +32,8 @@ const {
   findPersonalLoadoutObservationsMock: vi.fn(),
   findPlayerPoolMock: vi.fn(),
   addUserProvidedPoolEntryMock: vi.fn(),
-  disableUserProvidedPoolEntryMock: vi.fn()
+  disableUserProvidedPoolEntryMock: vi.fn(),
+  findPlayerProfileOverviewByUserIdMock: vi.fn()
 }));
 
 vi.mock("./player-stats-repository.js", () => ({
@@ -83,6 +85,10 @@ vi.mock("./player-pool-repository.js", () => ({
   disableUserProvidedPoolEntry: disableUserProvidedPoolEntryMock
 }));
 
+vi.mock("./player-profile-overview-repository.js", () => ({
+  findPlayerProfileOverviewByUserId: findPlayerProfileOverviewByUserIdMock
+}));
+
 import { buildApp } from "../../app.js";
 
 describe("players routes", () => {
@@ -91,6 +97,52 @@ describe("players routes", () => {
     findMatchAnalysisLimitByPuuidMock.mockResolvedValue(50);
     findPlayerPoolMock.mockResolvedValue({ entries: [], roleSummaries: [] });
     findPersonalLoadoutObservationsMock.mockResolvedValue([]);
+  });
+
+  describe("GET /me/player-profile", () => {
+    it("deriva o proprietário da sessão autenticada", async () => {
+      getAuthenticatedUserIdMock.mockResolvedValue("user-1");
+      findPlayerProfileOverviewByUserIdMock.mockResolvedValue({
+        status: "PARTIAL",
+        identity: { riotId: "Sparta#BR1" }
+      });
+      const app = await buildApp();
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/me/player-profile",
+        headers: { authorization: "Bearer session" }
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().identity.riotId).toBe("Sparta#BR1");
+      expect(findPlayerProfileOverviewByUserIdMock).toHaveBeenCalledWith("user-1");
+      await app.close();
+    });
+
+    it("recusa uma sessão ausente", async () => {
+      getAuthenticatedUserIdMock.mockResolvedValue(null);
+      const app = await buildApp();
+
+      const response = await app.inject({ method: "GET", url: "/me/player-profile" });
+
+      expect(response.statusCode).toBe(401);
+      expect(findPlayerProfileOverviewByUserIdMock).not.toHaveBeenCalled();
+      await app.close();
+    });
+
+    it("não consulta nem revela outra conta quando o proprietário não possui vínculo", async () => {
+      getAuthenticatedUserIdMock.mockResolvedValue("user-2");
+      findPlayerProfileOverviewByUserIdMock.mockResolvedValue(null);
+      const app = await buildApp();
+
+      const response = await app.inject({ method: "GET", url: "/me/player-profile" });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json().code).toBe("RIOT_ACCOUNT_NOT_LINKED");
+      expect(findPlayerProfileOverviewByUserIdMock).toHaveBeenCalledWith("user-2");
+      await app.close();
+    });
   });
 
   it("retorna 404 no perfil quando a conta Riot nao foi vinculada no Sparta", async () => {

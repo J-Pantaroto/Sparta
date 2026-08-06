@@ -1,445 +1,285 @@
-import {
-  MIN_GAMES_FOR_RANKING,
-  calculateKda,
-  roleBaselines,
-  scoreChampionPerformance,
-  type PlayerChampionStats,
-  type StatCoverage,
-  type Role
-} from "@sparta/core";
-import { MousePointerClick, UserPlus } from "lucide-react";
+import type { PlayerProfileOverview, ProfileCoverage } from "@sparta/core";
+import { AlertTriangle, BarChart3, Database, Gamepad2, RefreshCw, Trophy } from "lucide-react";
 import { useMemo, useState } from "react";
-import { ROLES, componentLabels, confidenceLabels, roleLabels } from "../app/labels";
 import { useAsyncData } from "../hooks/use-async-data";
-import { fetchPlayerProfile, type PlayerProfileResponse, type RiotAccountSummary } from "../services/api-client";
-import { ThemedPageHero } from "../theme/ThemedPageHero";
+import { fetchMyPlayerProfile } from "../services/api-client";
 import {
-  Badge,
   Card,
-  ChampionAvatar,
-  Columns,
-  DataRow,
-  DataTable,
+  ChampionPerformanceCard,
+  CoverageBadge,
   EmptyState,
   ErrorState,
-  IdentityCell,
-  InlineStat,
-  InlineStats,
-  Loading,
-  NumCell,
+  InsightCard,
+  MetricCard,
   PageLayout,
-  ScoreBadge,
-  ScoreBlock,
-  SearchInput,
+  PageSection,
+  ProfileDataNotice,
+  ProfileHero,
+  RecentMatchRow,
   SectionHeader,
   SegmentedControl,
-  Select,
-  SignalChip,
-  SignalChipList,
+  Skeleton,
   SkeletonRows,
-  StatBar,
-  Toolbar,
-  ToolbarSpacer
+  TrendChart
 } from "../ui";
 
-type RoleFilter = Role | "ALL";
-type SortKey = "score" | "games" | "winrate" | "name";
+type TrendPeriod = "7" | "14" | "30";
 
-const sortOptions: { value: SortKey; label: string }[] = [
-  { value: "score", label: "Maior desempenho" },
-  { value: "games", label: "Mais partidas" },
-  { value: "winrate", label: "Maior winrate" },
-  { value: "name", label: "Nome (A-Z)" }
-];
-
-const COLUMNS = "minmax(0, 1.4fr) 84px 76px 64px";
-
-function championKey(champion: { championId: number; role: Role }): string {
-  return `${champion.championId}-${champion.role}`;
-}
+const coverageLabels: Record<keyof ProfileCoverage, string> = {
+  identity: "Identidade Riot",
+  ranked: "Ranque League-V4",
+  roles: "Posições observadas",
+  recentPerformance: "Desempenho recente",
+  trend: "Tendência temporal",
+  champions: "Campeões utilizados",
+  matches: "Partidas recentes",
+  objectives: "Participação em objetivos",
+  loadout: "Itens, runas e feitiços"
+};
 
 export function ProfileScreen({
-  riotAccounts,
-  ddragonVersion
+  sessionToken,
+  ddragonVersion,
+  onOpenMatch
 }: {
-  riotAccounts: RiotAccountSummary[];
+  sessionToken: string;
   ddragonVersion: string;
+  onOpenMatch: (matchId: string) => void;
 }) {
-  const account = riotAccounts[0];
-  const profile = useAsyncData<PlayerProfileResponse>(
-    () => (account ? fetchPlayerProfile(account.gameName, account.tagLine) : undefined),
-    [account?.gameName, account?.tagLine]
+  const profile = useAsyncData<PlayerProfileOverview>(
+    () => fetchMyPlayerProfile(sessionToken),
+    [sessionToken]
   );
+  const [period, setPeriod] = useState<TrendPeriod>("14");
 
-  const [roleFilter, setRoleFilter] = useState<RoleFilter>("ALL");
-  const [search, setSearch] = useState("");
-  const [sortKey, setSortKey] = useState<SortKey>("score");
-  const [selectedKey, setSelectedKey] = useState<string | null>(null);
-
-  const stats = useMemo(() => profile.data?.championStats ?? [], [profile.data]);
-
-  const roleCounts = useMemo(() => {
-    const counts: Partial<Record<Role, number>> = {};
-    stats.forEach((champion) => {
-      counts[champion.role] = (counts[champion.role] ?? 0) + 1;
+  const trend = useMemo(() => {
+    if (!profile.data) return [];
+    const reference = new Date(profile.data.generatedAt).getTime();
+    const cutoff = reference - Number(period) * 24 * 60 * 60 * 1000;
+    return profile.data.performanceTrend.filter((point) => {
+      const timestamp = new Date(point.observedAt).getTime();
+      return Number.isFinite(timestamp) && timestamp >= cutoff && timestamp <= reference;
     });
-    return counts;
-  }, [stats]);
+  }, [period, profile.data]);
 
-  const visible = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    const filtered = stats.filter(
-      (champion) =>
-        (roleFilter === "ALL" || champion.role === roleFilter) && champion.championName.toLowerCase().includes(term)
-    );
-    return [...filtered].sort((a, b) => {
-      if (sortKey === "name") return a.championName.localeCompare(b.championName);
-      if (sortKey === "games") return b.games - a.games;
-      if (sortKey === "winrate") return b.wins / b.games - a.wins / a.games;
-      return scoreChampionPerformance(b).score - scoreChampionPerformance(a).score;
-    });
-  }, [stats, roleFilter, search, sortKey]);
+  if (profile.status === "loading" || profile.status === "idle") {
+    return <ProfileLoading />;
+  }
 
-  const selected = visible.find((champion) => championKey(champion) === selectedKey) ?? visible[0];
-
-  const totalGames = stats.reduce((sum, champion) => sum + champion.games, 0);
-  const totalWins = stats.reduce((sum, champion) => sum + champion.wins, 0);
-
-  if (!account) {
+  if (profile.status === "error" || !profile.data) {
     return (
       <PageLayout>
-        <ThemedPageHero eyebrow="Perfil" title="Perfil do jogador" />
         <Card>
-          <EmptyState
-            icon={<UserPlus size={22} />}
-            title="Nenhuma conta Riot vinculada"
-            description="Vincule sua conta pra ver seu desempenho real por campeão."
+          <ErrorState
+            title="Perfil indisponível"
+            description={profile.error ?? "A API não retornou o perfil desta sessão."}
           />
         </Card>
       </PageLayout>
     );
   }
 
+  const data = profile.data;
+  const noMatches = data.recentPerformance.sampleSize === 0;
+
   return (
     <PageLayout>
-      <ThemedPageHero
-        eyebrow="Perfil do jogador"
-        title={`${account.gameName}#${account.tagLine}`}
-        aside={profile.data && <ScoreBlock score={profile.data.recentForm.last10Score} label="Forma (10)" size="md" />}
-        meta={
-          profile.data && (
-            <InlineStats>
-              <InlineStat label="Partidas" value={totalGames} />
-              <InlineStat
-                label="Vitórias"
-                value={totalGames > 0 ? `${Math.round((totalWins / totalGames) * 100)}%` : "—"}
-              />
-              <InlineStat label="Campeões" value={stats.length} />
-              <InlineStat
-                label="Posições preferidas"
-                value={
-                  profile.data.preferredRoles.length > 0
-                    ? profile.data.preferredRoles.map((role) => roleLabels[role]).join(", ")
-                    : "—"
-                }
-                muted={profile.data.preferredRoles.length === 0}
-              />
-            </InlineStats>
-          )
-        }
-      />
+      <ProfileHero profile={data} ddragonVersion={ddragonVersion} />
 
-      {profile.status === "loading" && (
-        <Card>
-          <Loading block />
-        </Card>
+      {data.status === "STALE" && (
+        <ProfileDataNotice>
+          <AlertTriangle size={16} aria-hidden="true" />
+          Os dados observados estão desatualizados. Os valores permanecem históricos até uma nova
+          sincronização legítima.
+        </ProfileDataNotice>
       )}
-      {profile.status === "error" && (
-        <Card>
-          <ErrorState inline description={profile.error ?? undefined} />
-        </Card>
+      {data.status === "PARTIAL" && (
+        <ProfileDataNotice>
+          <Database size={16} aria-hidden="true" />
+          Perfil parcial: cada seção informa sua própria cobertura. Cobertura não é nota nem
+          confiança.
+        </ProfileDataNotice>
       )}
 
-      {profile.data && (
-        <>
-          <Card pad="sm">
-            <Toolbar>
-              <SegmentedControl<RoleFilter>
-                ariaLabel="Filtrar por posição"
-                value={roleFilter}
-                onChange={setRoleFilter}
-                options={[
-                  { value: "ALL", label: "Todas", count: stats.length },
-                  ...ROLES.map((role) => ({
-                    value: role as RoleFilter,
-                    label: roleLabels[role],
-                    count: roleCounts[role] ?? 0,
-                    disabled: (roleCounts[role] ?? 0) === 0
-                  }))
-                ]}
-              />
-              <ToolbarSpacer />
-              <div style={{ width: 220 }}>
-                <SearchInput value={search} onChange={setSearch} placeholder="Buscar campeão..." />
-              </div>
-              <div style={{ width: 190 }}>
-                <Select<SortKey> value={sortKey} onChange={setSortKey} options={sortOptions} ariaLabel="Ordenar por" />
-              </div>
-            </Toolbar>
+      <PageSection>
+        <SectionHeader
+          eyebrow="Índices do Sparta"
+          title="Resumo de desempenho"
+          description="Índices determinísticos sobre as partidas pessoais observadas; não são notas oficiais da Riot nem comparação global."
+        />
+        <div className="sp-profile-metrics">
+          {data.recentPerformance.metrics.map((metric) => (
+            <MetricCard key={metric.key} metric={metric} />
+          ))}
+        </div>
+      </PageSection>
+
+      <PageSection>
+        <SectionHeader
+          eyebrow="Histórico pessoal"
+          title="Tendência recente"
+          description="Escala fixa de 0 a 100 e intervalos sem partidas não conectados."
+          actions={
+            <SegmentedControl<TrendPeriod>
+              ariaLabel="Período da tendência"
+              value={period}
+              onChange={setPeriod}
+              options={[
+                { value: "7", label: "7 dias" },
+                { value: "14", label: "14 dias" },
+                { value: "30", label: "30 dias" }
+              ]}
+            />
+          }
+        />
+        <TrendChart points={trend} periodDays={Number(period)} />
+      </PageSection>
+
+      <PageSection>
+        <SectionHeader
+          eyebrow="Experiência observada"
+          title="Campeões mais utilizados"
+          description="Ordenados por volume pessoal observado; sem meta ou estatística global."
+        />
+        {data.topChampions.length === 0 ? (
+          <Card>
+            <EmptyState
+              inline
+              icon={<Trophy size={21} />}
+              title="Nenhum campeão observado"
+              description={
+                noMatches
+                  ? "Sincronize partidas para formar o histórico pessoal."
+                  : "As partidas disponíveis não possuem campeão e posição utilizáveis."
+              }
+            />
           </Card>
+        ) : (
+          <div className="sp-profile-champions">
+            {data.topChampions.slice(0, 6).map((champion) => (
+              <ChampionPerformanceCard
+                key={`${champion.championId}-${champion.role}`}
+                champion={champion}
+                ddragonVersion={ddragonVersion}
+              />
+            ))}
+          </div>
+        )}
+      </PageSection>
 
-          <Columns
-            asideWidth="380px"
-            stickyAside
-            main={
-              visible.length === 0 ? (
-                <Card>
-                  <EmptyState
-                    inline
-                    title="Nenhum campeão nesse filtro"
-                    description="Troque a posição ou limpe a busca."
-                  />
-                </Card>
-              ) : (
-                <DataTable
-                  columns={COLUMNS}
-                  head={
-                    <>
-                      <span>Campeão</span>
-                      <span>Partidas</span>
-                      <span>Vitórias</span>
-                      <span>Score</span>
-                    </>
-                  }
-                >
-                  {visible.map((champion) => {
-                    const performance = scoreChampionPerformance(champion);
-                    const key = championKey(champion);
-                    return (
-                      <DataRow
-                        key={key}
-                        onClick={() => setSelectedKey(key)}
-                        selected={selected ? championKey(selected) === key : false}
-                        label={`Ver detalhes de ${champion.championName}`}
-                      >
-                        <IdentityCell
-                          avatar={
-                            <ChampionAvatar
-                              championId={champion.championId}
-                              ddragonVersion={ddragonVersion}
-                              alt={champion.championName}
-                            />
-                          }
-                          name={champion.championName}
-                          meta={roleLabels[champion.role]}
-                        />
-                        <NumCell>{champion.games}</NumCell>
-                        <NumCell strong>{Math.round((champion.wins / champion.games) * 100)}%</NumCell>
-                        {performance.eligible ? (
-                          <ScoreBadge score={performance.score} size="xs" />
-                        ) : (
-                          <NumCell>—</NumCell>
-                        )}
-                      </DataRow>
-                    );
-                  })}
-                </DataTable>
-              )
-            }
-            aside={
-              <div style={{ display: "grid", gap: "var(--space-4)" }}>
-                {selected ? (
-                  <ChampionDetail champion={selected} ddragonVersion={ddragonVersion} />
-                ) : (
-                  <Card>
-                    <EmptyState
-                      inline
-                      icon={<MousePointerClick size={20} />}
-                      title="Selecione um campeão"
-                      description="Clique numa linha pra ver o detalhamento completo."
-                    />
-                  </Card>
-                )}
+      <PageSection>
+        <SectionHeader
+          eyebrow="Match-V5"
+          title="Partidas recentes"
+          description="Fatos observados, loadout normalizado e atalhos para o detalhe já existente."
+        />
+        {data.recentMatches.length === 0 ? (
+          <Card>
+            <EmptyState
+              inline
+              icon={<Gamepad2 size={21} />}
+              title="Nenhuma partida sincronizada"
+              description="O perfil não preenche a ausência com partidas de exemplo."
+            />
+          </Card>
+        ) : (
+          <div className="sp-profile-matches">
+            {data.recentMatches.map((match) => (
+              <RecentMatchRow
+                key={match.matchId}
+                match={match}
+                ddragonVersion={ddragonVersion}
+                onOpen={onOpenMatch}
+              />
+            ))}
+          </div>
+        )}
+      </PageSection>
 
-                <Card>
-                  <SectionHeader title="Pontos fortes e fracos" />
-                  {profile.data.strengths.length === 0 && profile.data.weaknesses.length === 0 ? (
-                    <EmptyState
-                      inline
-                      title="Sem histórico suficiente"
-                      description="O Sparta precisa de mais partidas sincronizadas pra apontar sinais com segurança."
-                    />
-                  ) : (
-                    <SignalChipList stacked>
-                      {profile.data.strengths.map((strength) => (
-                        <SignalChip key={strength.code} tone="positive">
-                          {strength.detail}
-                        </SignalChip>
-                      ))}
-                      {profile.data.weaknesses.map((weakness) => (
-                        <SignalChip key={weakness.code} tone="negative">
-                          {weakness.detail}
-                        </SignalChip>
-                      ))}
-                    </SignalChipList>
-                  )}
-                </Card>
-              </div>
-            }
-          />
-        </>
-      )}
+      <PageSection>
+        <SectionHeader
+          eyebrow="Evidência"
+          title="Pontos fortes e áreas de evolução"
+          description="Sinais descritivos com amostra, período, cobertura e versão da regra."
+        />
+        {data.strengths.length === 0 && data.improvementAreas.length === 0 ? (
+          <Card>
+            <EmptyState
+              inline
+              icon={<BarChart3 size={21} />}
+              title="Amostra ainda insuficiente para insights"
+              description="Nenhum julgamento é produzido sem sinais reais elegíveis."
+            />
+          </Card>
+        ) : (
+          <div className="sp-profile-insights">
+            {data.strengths.map((insight) => (
+              <InsightCard key={`strength-${insight.code}`} insight={insight} tone="positive" />
+            ))}
+            {data.improvementAreas.map((insight) => (
+              <InsightCard key={`improvement-${insight.code}`} insight={insight} tone="attention" />
+            ))}
+          </div>
+        )}
+      </PageSection>
 
-      {profile.status === "loading" && <SkeletonRows count={4} />}
+      <PageSection>
+        <SectionHeader
+          eyebrow="Transparência"
+          title="Cobertura e proveniência"
+          description={`Contrato ${data.algorithmVersion}. Zero observado permanece diferente de ausência.`}
+        />
+        <div className="sp-profile-coverage">
+          {(
+            Object.entries(data.coverage) as [
+              keyof ProfileCoverage,
+              ProfileCoverage[keyof ProfileCoverage]
+            ][]
+          ).map(([key, item]) => (
+            <article className="sp-profile-coverage__item" key={key}>
+              <strong>{coverageLabels[key]}</strong>
+              <CoverageBadge status={item.status} coverage={item.coverage} reason={item.reason} />
+              <span>
+                {item.availableSampleSize ?? 0} de {item.sampleSize} · atualização{" "}
+                {item.updatedAt ? new Date(item.updatedAt).toLocaleString("pt-BR") : "indisponível"}
+              </span>
+              {item.reason && <span>{item.reason}</span>}
+            </article>
+          ))}
+        </div>
+        <ProfileDataNotice>
+          <RefreshCw size={16} aria-hidden="true" />
+          Fontes:{" "}
+          {data.provenance
+            .map((source) => `${source.sourceId ?? source.sourceType} (${source.status})`)
+            .join(" · ")}
+        </ProfileDataNotice>
+      </PageSection>
     </PageLayout>
   );
 }
 
-interface RawStat {
-  label: string;
-  value: string;
-  hint: string;
-  /** Sem dado: renderiza o texto de ausência, nunca um número. */
-  unavailable?: boolean;
-  /** Tem valor, mas calculado sobre parte da amostra. */
-  partial?: boolean;
-}
-
-/**
- * Detalhamento progressivo: a tabela mostra o resumo, este painel abre o
- * que ja vinha da API e nunca era exibido (KP, participacao em objetivos,
- * ouro e visao por minuto, e os 10 componentes do score).
- */
-export function ChampionDetail({ champion, ddragonVersion }: { champion: PlayerChampionStats; ddragonVersion: string }) {
-  const performance = scoreChampionPerformance(champion);
-  const baseline = roleBaselines[champion.role];
-  const kda = calculateKda(champion.kills, champion.deaths, champion.assists);
-  const games = champion.games;
-
-  /**
-   * Percentual que pode simplesmente não existir. `0%` continua sendo `0%`
-   * (participação zero medida); ausência vira "Indisponível" com o motivo -
-   * antes da Etapa 4 os dois casos apareciam como `0%`.
-   */
-  function participationStat(
-    label: string,
-    value: number | null,
-    coverage: StatCoverage | undefined,
-    baselineValue: number
-  ): RawStat {
-    if (value === null || value === undefined) {
-      return { label, value: "Indisponível", hint: coverage?.reason ?? "Sem dado para este campeão", unavailable: true };
-    }
-    const partial = coverage?.status === "PARTIAL";
-    return {
-      label,
-      value: `${Math.round(value * 100)}%`,
-      hint: partial
-        ? `ref. ${Math.round(baselineValue * 100)}% · ${coverage?.availableSampleSize} de ${coverage?.sampleSize} partidas`
-        : `ref. ${Math.round(baselineValue * 100)}%`,
-      partial
-    };
-  }
-
-  const rawStats: RawStat[] = [
-    { label: "KDA", value: kda.toFixed(2), hint: `ref. ${baseline.kda}` },
-    { label: "CS/min", value: champion.csPerMinute.toFixed(1), hint: `ref. ${baseline.cs}` },
-    { label: "Dano/min", value: Math.round(champion.damagePerMinute).toString(), hint: `ref. ${baseline.damage}` },
-    { label: "Ouro/min", value: Math.round(champion.goldPerMinute).toString(), hint: `ref. ${baseline.gold}` },
-    { label: "Visão/min", value: champion.visionScorePerMinute.toFixed(2), hint: `ref. ${baseline.vision}` },
-    participationStat("Part. abates", champion.killParticipation, champion.coverage?.killParticipation, baseline.kp),
-    participationStat(
-      "Part. objetivos",
-      champion.objectiveParticipation,
-      champion.coverage?.objectiveParticipation,
-      baseline.objective
-    ),
-    { label: "Mortes/jogo", value: (champion.deaths / Math.max(1, games)).toFixed(1), hint: "menor é melhor" }
-  ];
-
-  // A ordem de `componentLabels` define a ordem de exibicao; componentes que
-  // o role nao usa mesmo assim aparecem, pra o painel nao mudar de forma ao
-  // trocar de campeao.
-  const components = Object.keys(componentLabels).filter((key) => performance.components[key] !== undefined);
-
+function ProfileLoading() {
   return (
-    <Card>
-      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-4)", marginBottom: "var(--space-5)" }}>
-        <ChampionAvatar
-          championId={champion.championId}
-          ddragonVersion={ddragonVersion}
-          size="lg"
-          alt={champion.championName}
-          ring
-        />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <strong style={{ display: "block", fontSize: "var(--text-xl)", fontWeight: "var(--weight-black)" }}>
-            {champion.championName}
-          </strong>
-          <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-2)", flexWrap: "wrap" }}>
-            <Badge tone="neutral" square>
-              {roleLabels[champion.role]}
-            </Badge>
-            <Badge tone={performance.eligible ? "accent" : "neutral"}>
-              {games} {games === 1 ? "partida" : "partidas"}
-            </Badge>
-            <Badge tone="neutral">confiança {confidenceLabels[performance.confidence]}</Badge>
-          </div>
+    <PageLayout>
+      <Card tone="feature" pad="lg">
+        <div
+          role="status"
+          aria-label="Carregando perfil"
+          style={{ display: "grid", gap: "var(--space-5)" }}
+        >
+          <Skeleton width="42%" height={34} />
+          <Skeleton width="68%" height={16} />
+          <Skeleton height={84} radius="var(--radius-lg)" />
         </div>
-        {performance.eligible && <ScoreBadge score={performance.score} size="md" />}
+      </Card>
+      <div className="sp-profile-metrics">
+        <SkeletonRows count={4} />
+        <SkeletonRows count={4} />
       </div>
-
-      {!performance.eligible && (
-        <div style={{ marginBottom: "var(--space-4)" }}>
-          <SignalChip tone="info">
-            Score indisponível: são necessárias {MIN_GAMES_FOR_RANKING} partidas pra comparar com segurança. As médias
-            abaixo continuam reais.
-          </SignalChip>
-        </div>
-      )}
-
-      <SectionHeader title="Médias reais" description="Comparadas com a referência do papel." />
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "var(--space-3)" }}>
-        {rawStats.map((stat) => (
-          <div key={stat.label}>
-            <span style={{ display: "block", color: "var(--text-muted)", fontSize: "var(--text-xs)" }}>
-              {stat.label}
-            </span>
-            <strong
-              style={{
-                fontSize: stat.unavailable ? "var(--text-sm)" : "var(--text-lg)",
-                fontVariantNumeric: "tabular-nums",
-                color: stat.unavailable ? "var(--text-muted)" : undefined,
-                fontWeight: stat.unavailable ? "var(--weight-medium)" : undefined
-              }}
-            >
-              {stat.value}
-              {stat.partial && (
-                <span style={{ marginLeft: "var(--space-2)", fontSize: "var(--text-2xs)", color: "var(--text-muted)" }}>
-                  parcial
-                </span>
-              )}
-            </strong>
-            <span style={{ display: "block", color: "var(--text-muted)", fontSize: "var(--text-2xs)" }}>
-              {stat.hint}
-            </span>
-          </div>
-        ))}
-      </div>
-
-      <div style={{ marginTop: "var(--space-6)" }}>
-        <SectionHeader title="Componentes do score" description="Cada dimensão normalizada de 0 a 100." />
-        <div style={{ display: "grid", gap: "var(--space-3)" }}>
-          {components.map((key) => (
-            <StatBar
-              key={key}
-              label={componentLabels[key]}
-              value={performance.components[key]}
-              value_label={Math.round(performance.components[key]).toString()}
-            />
-          ))}
-        </div>
-      </div>
-    </Card>
+      <Card>
+        <Skeleton height={280} radius="var(--radius-lg)" />
+      </Card>
+    </PageLayout>
   );
 }

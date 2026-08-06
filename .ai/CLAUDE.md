@@ -1,5 +1,27 @@
 # Sparta - Contexto para Continuidade
 
+## Etapa 31E: perfil analítico pessoal e fundação visual
+
+O Perfil agora é uma superfície analítica real, alimentada exclusivamente pelo proprietário da
+sessão em `GET /me/player-profile`. O contrato `PlayerProfileOverview` separa identidade, rank,
+oito métricas versionadas, evidência por posição, tendência, campeões, partidas/loadouts, insights,
+cobertura, atualização e proveniência. Zero observado é preservado; ausência, parcialidade,
+amostra pequena e desatualização têm estados distintos. Rank, ícone e nível permanecem
+indisponíveis enquanto League-V4/perfil correspondente não estiver integrado.
+
+A fundação reutilizável inclui hero, cartões de índice, badges de cobertura, gráfico SVG nativo,
+cartões de campeão, partidas recentes e insights. O gráfico usa escala fixa 0–100, não inventa
+pontos, interrompe linhas em lacunas e tem equivalente textual. Não há comparação global,
+nacionalidade inferida, dependência visual nova nem alteração em autenticação/onboarding,
+histórico, pesos, ranking, recomendação, release ou replay.
+
+Validação local: 1.155 testes TypeScript e o teste do analyzer aprovados, além de typecheck, lint,
+build e API reconstruída/saudável. A recomendação controlada retornou cinco escolhas principais e
+uma alternativa sem persistência histórica; `release-etapa27c-v1` manteve os mesmos hashes; o
+replay real permaneceu `EXACT_REPLAY`, com zero divergências. Referências:
+`docs/player-profile-overview.md`, `docs/design-system.md` e
+`.ai/specs/player-profile-overview.md`.
+
 ## Etapa 31C: identidade/autorização endurecidas; RSO bloqueado
 
 Estados combinados: `AUTHORIZATION_HARDENED`, `BLOCKED_BY_RIOT_APPROVAL` e

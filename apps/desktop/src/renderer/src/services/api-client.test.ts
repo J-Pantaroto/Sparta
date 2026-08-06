@@ -3,6 +3,7 @@ import type { DraftState, PlayerChampionStats } from "@sparta/core";
 import {
   ensureChampionStatsCoverage,
   fetchDraftRecommendations,
+  fetchMyPlayerProfile,
   fetchSession,
   fetchPersonalLoadoutEvidence,
   fetchRecommendationObservability,
@@ -294,6 +295,28 @@ describe("observabilidade longitudinal (Etapa 23)", () => {
     expect(url).toContain("patch=26.14");
     expect(url).toContain("group=PRIMARY");
     expect(url).not.toMatch(/wins|scoreBands|sampleSize/);
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("perfil analítico autenticado (Etapa 31E)", () => {
+  it("consulta somente /me/player-profile e envia a sessão no header", async () => {
+    const fetchSpy = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ status: "PARTIAL", identity: { riotId: "Sparta#BR1" } }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      })
+    );
+    vi.stubGlobal("fetch", fetchSpy);
+
+    await fetchMyPlayerProfile("private-profile-session");
+
+    expect(String(fetchSpy.mock.calls[0]?.[0])).toContain("/me/player-profile");
+    expect(String(fetchSpy.mock.calls[0]?.[0])).not.toMatch(/puuid|riotId|playerId/);
+    const request = fetchSpy.mock.calls[0]?.[1] as RequestInit;
+    expect(new globalThis.Headers(request.headers).get("Authorization")).toBe(
+      "Bearer private-profile-session"
+    );
     vi.unstubAllGlobals();
   });
 });

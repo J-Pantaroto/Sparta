@@ -638,8 +638,15 @@ function SpartaApp() {
           onNavigate={setPage}
         />
       )}
-      {page === "profile" && (
-        <ProfileScreen riotAccounts={riotAccounts} ddragonVersion={ddragonVersion} />
+      {page === "profile" && sessionToken && (
+        <ProfileScreen
+          sessionToken={sessionToken}
+          ddragonVersion={ddragonVersion}
+          onOpenMatch={(matchId) => {
+            setPostgameInitialMatchId(matchId);
+            setPage("postgame");
+          }}
+        />
       )}
       {page === "select" && (
         <ChampionSelectScreen

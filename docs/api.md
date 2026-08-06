@@ -1,5 +1,13 @@
 # API
 
+## Perfil analítico (Etapa 31E)
+
+`GET /me/player-profile` agrega identidade, posições, índices pessoais, tendência, campeões,
+partidas, loadouts, insights, cobertura e proveniência. O proprietário vem exclusivamente do
+bearer Sparta; a rota não aceita PUUID, Riot ID ou `playerId` arbitrário e passa pelos gates de
+email, vínculo Riot, onboarding e ownership. Ícone, nível e League-V4 permanecem explicitamente
+indisponíveis enquanto não houver fonte persistida. Ver `docs/player-profile-overview.md`.
+
 ## Acesso e onboarding (Etapa 31D)
 
 O backend calcula o estado de onboarding e bloqueia toda rota pessoal até `READY`. Endpoints de
@@ -50,6 +58,7 @@ Endpoints:
 - `GET /ready` — readiness; consulta Postgres com timeout e responde `503` sem vazar detalhe
 - `POST /auth/register`, `POST /auth/login`, `GET /auth/me`
 - `GET /players/:riotName/:tagLine/profile` — real, le `RiotAccount`/`PlayerChampionStats` persistidos
+- `GET /me/player-profile` (autenticado) — visão agregada do proprietário da sessão, com cobertura e proveniência por grupo
 - `POST /players/link-riot-account` (autenticado) — real, chama Account-V1
 - `POST /players/sync` (autenticado) — real, sincroniza partidas novas via Match-V5
 - `GET /players/:puuid/recent-matches?limit=10` — real

@@ -34,6 +34,7 @@ import {
   findPlayerPool
 } from "./player-pool-repository.js";
 import { findPersonalLoadoutObservations } from "./personal-loadout-repository.js";
+import { findPlayerProfileOverviewByUserId } from "./player-profile-overview-repository.js";
 
 export const linkRiotAccountSchema = z.object({
   gameName: z.string().min(3, "Informe o nome do invocador"),
@@ -66,6 +67,25 @@ const commaSeparatedNumbers = z
   });
 
 export const playersRoutes: FastifyPluginAsync = async (app) => {
+  app.get("/me/player-profile", async (request, reply) => {
+    const userId = await getAuthenticatedUserId(request);
+    if (!userId) {
+      reply.code(401);
+      return { code: "UNAUTHENTICATED", message: "Não autenticado." };
+    }
+
+    const profile = await findPlayerProfileOverviewByUserId(userId);
+    if (!profile) {
+      reply.code(404);
+      return {
+        code: "RIOT_ACCOUNT_NOT_LINKED",
+        message: "Nenhuma conta Riot vinculada foi encontrada para esta sessão."
+      };
+    }
+
+    return profile;
+  });
+
   app.get("/players/:riotName/:tagLine/profile", async (request, reply) => {
     const params = z.object({ riotName: z.string(), tagLine: z.string() }).parse(request.params);
     const account = await findRiotAccountByRiotId(params.riotName, params.tagLine);

@@ -45,3 +45,13 @@ export { MetricRow } from "./MetricRow";
 export { EmptyState, ErrorState, Loading, Skeleton, SkeletonGrid, SkeletonRows } from "./States";
 export { StatBar } from "./StatBar";
 export { InfoHint, Tooltip } from "./Tooltip";
+export {
+  ChampionPerformanceCard,
+  CoverageBadge,
+  InsightCard,
+  MetricCard,
+  ProfileDataNotice,
+  ProfileHero,
+  RecentMatchRow,
+  TrendChart
+} from "./ProfileAnalytics";

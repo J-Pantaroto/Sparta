@@ -1,5 +1,13 @@
 # Design System
 
+Na Etapa 31E, `ProfileAnalytics.tsx/.css` adicionou a fundação analítica reutilizável:
+`ProfileHero`, `MetricCard`, `TrendChart`, `ChampionPerformanceCard`, `RecentMatchRow`,
+`InsightCard` e `CoverageBadge`, reutilizando os estados e cabeçalhos existentes. O gráfico é SVG
+nativo (zero dependências e licenças adicionais), tem escala fixa, pontos focalizáveis, valores
+textuais equivalentes, séries separadas por lacunas e redução de movimento. Tokens `--chart-*`
+centralizam grid, série, vitória e derrota. Grades respondem em 1280/1080 px sem alterar a largura
+mínima suportada de 1000 px. Ver `docs/player-profile-overview.md`.
+
 Na Etapa 31D, `AuthLayout` passou a sustentar o fluxo Conta → Email → Riot → Pronto com progresso
 semântico, foco visível, regiões `aria-live` e nenhuma saída anônima. O shell recebeu ações de
 Conta, Configurações e Sair; a modernização ficou limitada a acesso e onboarding.

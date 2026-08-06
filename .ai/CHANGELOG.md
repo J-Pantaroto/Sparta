@@ -22,6 +22,17 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-08-06 18:27 — Etapa 31E: perfil analítico e fundação visual
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0045-perfil-analitico-fundacao-visual.md`
+
+O Perfil passou a consumir um agregado pessoal rastreável por `GET /me/player-profile`, com oito
+índices versionados, tendência, campeões, partidas, loadouts e insights estritamente derivados de
+evidência própria. A nova fundação visual diferencia zero, ausência, parcialidade, amostra pequena
+e dado desatualizado; release, recomendação e replay permaneceram intactos.
+
+---
+
 ## 2026-08-06 17:09 — Etapa 31D: acesso, email e onboarding Riot obrigatórios
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0044-acesso-email-onboarding-riot.md`

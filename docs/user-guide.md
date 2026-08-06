@@ -88,6 +88,20 @@ Em **Configurações → Análise** você escolhe quantas das suas últimas part
 entram nas análises (20, 50, 100, ou um valor até 200). O valor passa a valer a
 partir da próxima sincronização.
 
+## Perfil
+
+**Perfil** reúne seu Riot ID, servidor, posições observadas, partidas recentes, campeões mais
+utilizados e evolução pessoal. Os oito cards são **índices do Sparta**, calculados somente sobre
+suas partidas; não são notas oficiais nem comparação com jogadores do mesmo elo. O seletor do
+gráfico alterna entre 7, 14 e 30 dias e não desenha partidas nos dias em que você não jogou.
+
+Cada seção informa cobertura. “Indisponível” significa que o dado não existe na fonte atual;
+“Parcial” significa que ele existe apenas em parte da amostra; “Desatualizado” preserva o último
+histórico sem fingir que é atual. Um valor `0` é uma observação real e aparece como zero. Elo,
+ícone e nível ficam indisponíveis enquanto League-V4/Summoner não estiverem integradas. Região do
+servidor nunca é mostrada como bandeira ou nacionalidade. Clique — ou use Tab e Enter — numa
+partida recente para abrir o pós-game existente.
+
 ## Conexão com o cliente do League
 
 Com o League aberto, o Sparta lê o cliente **somente para leitura**: fase do

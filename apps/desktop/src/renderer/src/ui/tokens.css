@@ -62,6 +62,14 @@
   --color-red-dim: rgba(240, 85, 91, 0.14);
   --color-error: #f0555b;
 
+  /* Gráficos: semântica fixa e contraste sobre as superfícies analíticas. */
+  --chart-primary: #ef7378;
+  --chart-secondary: #9b8afb;
+  --chart-grid: rgba(165, 165, 176, 0.16);
+  --chart-glow: rgba(240, 85, 91, 0.34);
+  --chart-win: #4ade80;
+  --chart-loss: #f0555b;
+
   /* ─── Sombras ──────────────────────────────────────────────────────── */
   /* Baixas e largas: profundidade sem o "card flutuando" de sombra forte. */
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
@@ -92,7 +100,8 @@
   --space-10: 64px;
 
   /* ─── Tipografia ───────────────────────────────────────────────────── */
-  --font-sans: "Manrope", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-sans:
+    "Manrope", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-numeric: "Manrope", ui-monospace, monospace;
   --text-2xs: 10px;
   --text-xs: 11px;
@@ -120,8 +129,10 @@
   --duration-fast: 120ms;
   --duration-base: 180ms;
   --duration-slow: 240ms;
-  --transition-colors: color var(--duration-fast) var(--ease-out),
-    background-color var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);
+  --transition-colors:
+    color var(--duration-fast) var(--ease-out),
+    background-color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out);
   --transition-transform: transform var(--duration-fast) var(--ease-out);
 
   /* ─── z-index ──────────────────────────────────────────────────────── */
@@ -134,5 +145,4 @@
   /* ─── Layout ───────────────────────────────────────────────────────── */
   --sidebar-width: 232px;
   --content-max: 1560px;
-
 }

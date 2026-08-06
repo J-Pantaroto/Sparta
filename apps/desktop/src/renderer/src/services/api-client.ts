@@ -25,6 +25,7 @@ import type {
   PatchReleaseSummary,
   PersonalLoadoutEvidence,
   PickRecommendation,
+  PlayerProfileOverview,
   PlayerChampionPoolEntry,
   PlayerChampionPoolRoleSummary,
   PlayerChampionRoleEvidence,
@@ -313,6 +314,13 @@ export async function fetchPlayerProfile(gameName: string, tagLine: string) {
     ...profile,
     championStats: (profile.championStats ?? []).map(ensureChampionStatsCoverage)
   };
+}
+
+/** Perfil analítico do proprietário da sessão; não aceita identidade arbitrária. */
+export function fetchMyPlayerProfile(token: string) {
+  return request<PlayerProfileOverview>("/me/player-profile", {
+    headers: { Authorization: `Bearer ${token}` }
+  });
 }
 
 export function fetchChampionPerformance(puuid: string) {

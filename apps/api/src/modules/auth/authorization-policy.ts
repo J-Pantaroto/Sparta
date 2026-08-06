@@ -54,6 +54,7 @@ export const ROUTE_AUTHORIZATION_POLICIES: readonly RouteAuthorizationPolicy[] =
   publicGet("/patches/:patch"),
   publicGet("/draft-reviews/form"),
 
+  ownGet("/me/player-profile"),
   ownGet("/players/:riotName/:tagLine/profile", "riotId"),
   ownGet("/players/:puuid/champions/:championId/role-evidence", "puuid"),
   ownGet("/players/:playerId/champions/:championId/roles/:role/loadout-evidence", "playerId"),
