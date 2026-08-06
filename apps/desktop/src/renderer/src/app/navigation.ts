@@ -5,9 +5,11 @@ import {
   Gauge,
   History,
   FlaskConical,
+  ListChecks,
   Settings,
   Shield,
   TrendingUp,
+  UserRound,
   type LucideIcon
 } from "lucide-react";
 
@@ -24,10 +26,12 @@ export type Page =
   | "account"
   | "settings";
 
-interface NavEntry {
+export interface NavEntry {
   page: Page;
   label: string;
   icon: LucideIcon;
+  description: string;
+  developmentOnly?: boolean;
 }
 
 /**
@@ -38,26 +42,96 @@ interface NavEntry {
  */
 export const navGroups: { label: string; items: NavEntry[] }[] = [
   {
+    label: "Visão geral",
+    items: [
+      {
+        page: "dashboard",
+        label: "Dashboard",
+        icon: Gauge,
+        description: "Resumo do jogador, dados e ações principais"
+      },
+      {
+        page: "profile",
+        label: "Perfil",
+        icon: Activity,
+        description: "Índices, tendências e histórico pessoal"
+      }
+    ]
+  },
+  {
     label: "Análise",
     items: [
-      { page: "dashboard", label: "Dashboard", icon: Gauge },
-      { page: "profile", label: "Perfil", icon: Activity },
-      { page: "motor", label: "Histórico do motor", icon: History },
-      { page: "growth", label: "Evolução", icon: TrendingUp },
-      { page: "calibration", label: "Laboratório do motor", icon: FlaskConical }
+      {
+        page: "select",
+        label: "Champion Select",
+        icon: Crosshair,
+        description: "Recomendações durante a seleção"
+      },
+      {
+        page: "drafts",
+        label: "Histórico de drafts",
+        icon: History,
+        description: "Decisões e snapshots preservados"
+      },
+      {
+        page: "pregame",
+        label: "Pré-game",
+        icon: Shield,
+        description: "Leitura estratégica do draft atual"
+      },
+      {
+        page: "postgame",
+        label: "Partidas e pós-game",
+        icon: BarChart3,
+        description: "Partidas recentes e comparações disponíveis"
+      }
     ]
   },
   {
-    label: "Partida",
+    label: "Evolução",
     items: [
-      { page: "select", label: "Champion Select", icon: Crosshair },
-      { page: "pregame", label: "Pré-game", icon: Shield },
-      { page: "postgame", label: "Pós-game", icon: BarChart3 },
-      { page: "drafts", label: "Histórico de drafts", icon: History }
+      {
+        page: "growth",
+        label: "Evolução pessoal",
+        icon: TrendingUp,
+        description: "Mudanças observadas no próprio histórico"
+      },
+      {
+        page: "motor",
+        label: "Histórico do motor",
+        icon: ListChecks,
+        description: "Relatórios longitudinais do motor"
+      },
+      {
+        page: "calibration",
+        label: "Laboratório",
+        icon: FlaskConical,
+        description: "Ambiente controlado de calibração",
+        developmentOnly: true
+      }
     ]
   },
   {
-    label: "App",
-    items: [{ page: "settings", label: "Configurações", icon: Settings }]
+    label: "Conta",
+    items: [
+      {
+        page: "settings",
+        label: "Configurações",
+        icon: Settings,
+        description: "Tema, densidade e análise"
+      },
+      {
+        page: "account",
+        label: "Conta e segurança",
+        icon: UserRound,
+        description: "Email, vínculo Riot e sessões"
+      }
+    ]
   }
 ];
+
+export const pageContext: Record<Page, { title: string; description: string }> = Object.fromEntries(
+  navGroups.flatMap((group) =>
+    group.items.map((item) => [item.page, { title: item.label, description: item.description }])
+  )
+) as Record<Page, { title: string; description: string }>;

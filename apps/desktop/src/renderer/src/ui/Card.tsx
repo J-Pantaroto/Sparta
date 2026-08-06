@@ -11,6 +11,7 @@ interface CardBaseProps {
   children: ReactNode;
   style?: CSSProperties;
   id?: string;
+  className?: string;
 }
 
 function cardClass(tone: CardTone, pad: CardPad, selected: boolean, interactive: boolean): string {
@@ -30,9 +31,21 @@ function cardClass(tone: CardTone, pad: CardPad, selected: boolean, interactive:
  * `.panel` antigo dava exatamente o mesmo peso visual a todo bloco da tela,
  * o que deixava tudo parecendo uma pilha de caixas iguais.
  */
-export function Card({ tone = "default", pad = "md", selected = false, children, style, id }: CardBaseProps) {
+export function Card({
+  tone = "default",
+  pad = "md",
+  selected = false,
+  children,
+  style,
+  id,
+  className
+}: CardBaseProps) {
   return (
-    <section className={cardClass(tone, pad, selected, false)} style={style} id={id}>
+    <section
+      className={`${cardClass(tone, pad, selected, false)}${className ? ` ${className}` : ""}`}
+      style={style}
+      id={id}
+    >
       {children}
     </section>
   );
@@ -54,15 +67,16 @@ export function InteractiveCard({
   ariaCurrent,
   label,
   children,
-  style
+  style,
+  className
 }: InteractiveCardProps) {
   return (
     <button
       type="button"
       onClick={onClick}
-      aria-current={ariaCurrent ?? selected ? "true" : undefined}
+      aria-current={(ariaCurrent ?? selected) ? "true" : undefined}
       aria-label={label}
-      className={cardClass(tone, pad, selected, true)}
+      className={`${cardClass(tone, pad, selected, true)}${className ? ` ${className}` : ""}`}
       style={style}
     >
       {children}

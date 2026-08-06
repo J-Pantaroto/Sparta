@@ -18,7 +18,7 @@
  *   a cada tema.
  */
 
-export { AppShell, Sidebar, SidebarGroup, SidebarNavItem, PlayerSummary } from "./AppShell";
+export { AppShell, Sidebar, SidebarGroup, SidebarNavItem, PlayerSummary, Topbar } from "./AppShell";
 export { AuthForm, AuthLayout } from "./AuthLayout";
 export { Badge, StatusBadge, type BadgeTone } from "./Badge";
 export { Button, IconButton } from "./Button";
@@ -42,7 +42,15 @@ export { ScoreBadge, ScoreBlock, scoreColor } from "./ScoreBadge";
 export { SegmentedControl, Tabs, type SegmentOption } from "./SegmentedControl";
 export { SignalChip, SignalChipList } from "./SignalChip";
 export { MetricRow } from "./MetricRow";
-export { EmptyState, ErrorState, Loading, Skeleton, SkeletonGrid, SkeletonRows } from "./States";
+export {
+  EmptyState,
+  ErrorState,
+  GlobalNotice,
+  Loading,
+  Skeleton,
+  SkeletonGrid,
+  SkeletonRows
+} from "./States";
 export { StatBar } from "./StatBar";
 export { InfoHint, Tooltip } from "./Tooltip";
 export {
@@ -55,3 +63,4 @@ export {
   RecentMatchRow,
   TrendChart
 } from "./ProfileAnalytics";
+export type { TrendChartMetric } from "./ProfileAnalytics";

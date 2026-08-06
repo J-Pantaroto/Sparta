@@ -10,6 +10,18 @@ rodapé abre Conta, Configurações e Sair. Ver `docs/account-access-onboarding.
 
 Versão 0.9.0.
 
+## Navegação e aparência
+
+Depois do acesso, a barra lateral organiza o produto em Visão geral, Análise, Evolução e Conta. Ela
+pode ser recolhida pelo botão junto ao logo; a escolha fica salva neste computador e os ícones
+continuam identificados por tooltip e leitor de tela. A barra superior mostra o contexto da tela,
+última sincronização, disponibilidade da API e do League, refresh e menu da conta.
+
+Em **Configurações → Aparência**, escolha entre os temas Espartano, Obsidian e Adaptativo, densidade
+confortável ou compacta e intensidade visual completa ou reduzida. Isso muda somente apresentação,
+nunca o significado de sucesso/atenção/erro nem cálculos. O Adaptativo pode usar a cor de um campeão
+relacionado ao contexto; a opção reduzida remove arte ambiente.
+
 ## O que é o Sparta
 
 Um aplicativo de desktop que analisa **o seu** histórico de League of Legends e
@@ -101,6 +113,18 @@ histórico sem fingir que é atual. Um valor `0` é uma observação real e apar
 ícone e nível ficam indisponíveis enquanto League-V4/Summoner não estiverem integradas. Região do
 servidor nunca é mostrada como bandeira ou nacionalidade. Clique — ou use Tab e Enter — numa
 partida recente para abrir o pós-game existente.
+
+## Dashboard
+
+O Dashboard resume o mesmo perfil pessoal, sem recalcular uma fonte concorrente. O topo mostra
+identidade Riot, servidor, posição observada, tamanho da amostra e atualização. Elo, ícone e nível
+aparecem somente quando a fonte real os fornece. Os seis índices mostram amostra e cobertura e não
+são comparação global nem previsão.
+
+Na tendência, alterne 7, 14 ou 30 dias e escolha desempenho, KDA, objetivos, visão ou farm. Dias sem
+partida não são inventados e lacunas permanecem visíveis. Ações rápidas abrem as telas existentes;
+se o League estiver fechado, a detecção automática fica indisponível, mas a análise manual continua
+acessível. **Sincronizar** solicita novos dados à API e preserva o histórico anterior se houver erro.
 
 ## Conexão com o cliente do League
 

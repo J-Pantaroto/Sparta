@@ -15,11 +15,18 @@ import {
   ChampionGrid,
   EmptyState,
   ErrorState,
+  SegmentedControl,
   SectionHeader,
   SignalChip,
   SkeletonGrid
 } from "../ui";
-import { useFeaturedChampion } from "./featured-champion-context";
+import {
+  VISUAL_THEMES,
+  useFeaturedChampion,
+  type InterfaceDensity,
+  type VisualIntensity,
+  type VisualThemeId
+} from "./featured-champion-context";
 import { SkinSplash } from "./SkinSplash";
 import "./ThemeGallery.css";
 
@@ -33,7 +40,17 @@ import "./ThemeGallery.css";
  * data URL, que é o que faz o tema continuar funcionando offline.
  */
 export function ThemeGallery({ ddragonVersion }: { ddragonVersion: string }) {
-  const { featuredChampion, setFeaturedChampion, splashUrl } = useFeaturedChampion();
+  const {
+    featuredChampion,
+    setFeaturedChampion,
+    splashUrl,
+    visualTheme,
+    setVisualTheme,
+    density,
+    setDensity,
+    visualIntensity,
+    setVisualIntensity
+  } = useFeaturedChampion();
   const [selectedChampion, setSelectedChampion] = useState<DataDragonChampionSummary | null>(null);
   const [focusedSkin, setFocusedSkin] = useState<DataDragonSkin | null>(null);
   const [downloading, setDownloading] = useState(false);
@@ -61,7 +78,12 @@ export function ThemeGallery({ ddragonVersion }: { ddragonVersion: string }) {
   function applySkin(champion: DataDragonChampionSummary, skin: DataDragonSkin) {
     // Aplicar sem baixar volta pra CDN (localSplashPath undefined): o tema
     // funciona online; "Baixar" é o que garante funcionar offline depois.
-    setFeaturedChampion({ key: champion.key, name: champion.name, skinIndex: skin.num, skinName: skin.name });
+    setFeaturedChampion({
+      key: champion.key,
+      name: champion.name,
+      skinIndex: skin.num,
+      skinName: skin.name
+    });
   }
 
   async function downloadSkin(champion: DataDragonChampionSummary, skin: DataDragonSkin) {
@@ -75,7 +97,10 @@ export function ThemeGallery({ ddragonVersion }: { ddragonVersion: string }) {
     try {
       let localUrl: string;
       try {
-        localUrl = await window.sparta.downloadSkin(championSplashUrl(champion.key, skin.num), fileName);
+        localUrl = await window.sparta.downloadSkin(
+          championSplashUrl(champion.key, skin.num),
+          fileName
+        );
       } catch (primaryError) {
         // Data Dragon não tem essa arte (ou caiu) - tenta a Community
         // Dragon antes de reportar erro pro usuário.
@@ -105,9 +130,9 @@ export function ThemeGallery({ ddragonVersion }: { ddragonVersion: string }) {
     <div style={{ display: "grid", gap: "var(--space-4)" }}>
       <Card>
         <SectionHeader
-          eyebrow="Tema atual"
-          title={featuredChampion.skinName}
-          description="A arte escolhida aparece nos cabeçalhos, e a cor dominante dela vira a cor de destaque do app inteiro — bordas ativas, botões principais, o item selecionado na navegação e o brilho de fundo."
+          eyebrow="Sistema visual v2"
+          title={VISUAL_THEMES.find((theme) => theme.id === visualTheme)?.name ?? "Espartano"}
+          description="O tema controla superfícies, bordas, elevação, foco, seleção, gráficos e brilho. Cores semânticas de vitória, derrota e disponibilidade não mudam."
           actions={
             offlineReady ? (
               <Badge tone="positive" icon={<Check size={11} />}>
@@ -120,7 +145,52 @@ export function ThemeGallery({ ddragonVersion }: { ddragonVersion: string }) {
             )
           }
         />
-        <div style={{ display: "flex", gap: "var(--space-5)", alignItems: "center", flexWrap: "wrap" }}>
+        <div className="sp-theme-controls">
+          <div className="sp-theme-control">
+            <span>Tema visual</span>
+            <SegmentedControl<VisualThemeId>
+              ariaLabel="Tema visual do aplicativo"
+              value={visualTheme}
+              onChange={setVisualTheme}
+              options={VISUAL_THEMES.map((theme) => ({
+                value: theme.id,
+                label: theme.name
+              }))}
+            />
+            <small>{VISUAL_THEMES.find((theme) => theme.id === visualTheme)?.description}</small>
+          </div>
+          <div className="sp-theme-control">
+            <span>Densidade</span>
+            <SegmentedControl<InterfaceDensity>
+              ariaLabel="Densidade da interface"
+              value={density}
+              onChange={setDensity}
+              options={[
+                { value: "comfortable", label: "Confortável" },
+                { value: "compact", label: "Compacta" }
+              ]}
+            />
+            <small>Preferência local desta instalação; não altera nenhuma análise.</small>
+          </div>
+          <div className="sp-theme-control">
+            <span>Arte contextual</span>
+            <SegmentedControl<VisualIntensity>
+              ariaLabel="Intensidade visual"
+              value={visualIntensity}
+              onChange={setVisualIntensity}
+              options={[
+                { value: "full", label: "Exibir" },
+                { value: "reduced", label: "Reduzir" }
+              ]}
+            />
+            <small>
+              No modo reduzido, imagens de fundo desaparecem e o conteúdo permanece íntegro.
+            </small>
+          </div>
+        </div>
+        <div
+          style={{ display: "flex", gap: "var(--space-5)", alignItems: "center", flexWrap: "wrap" }}
+        >
           <img
             src={splashUrl}
             alt={featuredChampion.skinName}
@@ -134,21 +204,43 @@ export function ThemeGallery({ ddragonVersion }: { ddragonVersion: string }) {
             }}
           />
           <div>
-            <span style={{ display: "block", color: "var(--text-muted)", fontSize: "var(--text-xs)" }}>
+            <span
+              style={{ display: "block", color: "var(--text-muted)", fontSize: "var(--text-xs)" }}
+            >
               Cor extraída desta skin
             </span>
             <div className="sp-swatches" style={{ marginTop: "var(--space-2)" }}>
-              <span className="sp-swatch" style={{ background: "var(--color-accent)" }} title="Destaque" />
-              <span className="sp-swatch" style={{ background: "var(--color-accent-soft)" }} title="Destaque suave" />
-              <span className="sp-swatch" style={{ background: "var(--color-accent-glow)" }} title="Brilho ambiente" />
+              <span
+                className="sp-swatch"
+                style={{ background: "var(--color-accent)" }}
+                title="Destaque"
+              />
+              <span
+                className="sp-swatch"
+                style={{ background: "var(--color-accent-soft)" }}
+                title="Destaque suave"
+              />
+              <span
+                className="sp-swatch"
+                style={{ background: "var(--color-accent-glow)" }}
+                title="Brilho ambiente"
+              />
             </div>
           </div>
         </div>
         {!offlineReady && (
           <div style={{ marginTop: "var(--space-4)" }}>
             <SignalChip tone="info">
-              Baixe a arte pra o tema continuar aparecendo mesmo sem internet. As cores já ficam salvas de qualquer
-              forma.
+              Baixe a arte pra o tema continuar aparecendo mesmo sem internet. As cores já ficam
+              salvas de qualquer forma.
+            </SignalChip>
+          </div>
+        )}
+        {visualTheme !== "adaptive" && (
+          <div style={{ marginTop: "var(--space-4)" }}>
+            <SignalChip tone="info">
+              A cor extraída da arte só é aplicada no tema Adaptativo. Nos demais temas, a arte é
+              opcional e a paleta permanece estável.
             </SignalChip>
           </div>
         )}
@@ -199,7 +291,9 @@ export function ThemeGallery({ ddragonVersion }: { ddragonVersion: string }) {
                 description="A CDN da Riot pode estar indisponível. O tema atual continua aplicado."
               />
             )}
-            {skins.data && skins.data.length === 0 && <EmptyState inline title="Nenhuma skin encontrada" />}
+            {skins.data && skins.data.length === 0 && (
+              <EmptyState inline title="Nenhuma skin encontrada" />
+            )}
 
             {focusedSkin && selectedChampion && (
               <div className="sp-theme">
@@ -248,7 +342,8 @@ export function ThemeGallery({ ddragonVersion }: { ddragonVersion: string }) {
                 <div className="sp-theme__grid">
                   {(skins.data ?? []).map((skin) => {
                     const applied =
-                      featuredChampion.key === selectedChampion.key && featuredChampion.skinIndex === skin.num;
+                      featuredChampion.key === selectedChampion.key &&
+                      featuredChampion.skinIndex === skin.num;
                     const focused = focusedSkin.num === skin.num;
                     return (
                       <button

@@ -22,6 +22,17 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-08-06 19:14 — Etapa 31F: shell, dashboard e sistema visual v2
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0046-redesign-shell-dashboard-sistema-visual.md`
+
+O desktop autenticado recebeu navegação hierárquica, sidebar recolhível, topbar contextual e um
+dashboard baseado somente em `PlayerProfileOverview`. Temas Espartano/Obsidian/Adaptativo,
+densidade, arte reduzida e estados globais foram adicionados sem dependência ou alteração no motor;
+Electron empacotado, release ativa e replay exato foram revalidados.
+
+---
+
 ## 2026-08-06 18:27 — Etapa 31E: perfil analítico e fundação visual
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0045-perfil-analitico-fundacao-visual.md`

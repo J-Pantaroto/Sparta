@@ -4,6 +4,7 @@ Esta pasta reúne as decisões técnicas do MVP. A fonte principal do produto é
 
 Leitura recomendada:
 
+- `shell-dashboard-visual-system.md` para shell, navegação, dashboard, temas, densidade e validação visual da Etapa 31F.
 - `player-profile-overview.md` para fontes, contrato, índices e fundação visual do perfil analítico.
 - `account-access-onboarding.md` para acesso obrigatório, confirmação de email, gate Riot e sessão protegida.
 - `architecture.md` para visão geral.

@@ -1,5 +1,21 @@
 # Sparta - Contexto para Continuidade
 
+## Etapa 31F: shell, dashboard e sistema visual v2
+
+O shell autenticado agora possui sidebar hierárquica/recolhível, topbar contextual, status compactos
+de API/League e menu de conta sem duplicação. O dashboard deixou as três consultas legadas e usa
+exclusivamente `GET /me/player-profile`, com hero factual, seis índices, tendência por período e
+métrica, partidas, campeões, ações e estados operacionais. Sincronização usa `POST /players/sync`
+sem identidade ou conclusão enviada pelo renderer.
+
+O sistema visual oferece Espartano, Obsidian e Adaptativo, densidade confortável/compacta e arte
+completa/reduzida; semântica de cores permanece fixa e accent de campeão só atua no Adaptativo.
+Validação: 1.171 testes TypeScript e 1 do analyzer, typecheck/lint/build, pacote Electron inspecionado em
+1000/1280/1600 px e Obsidian compacto/reduzido. Sem dependência nova. Recomendação controlada gerou
+cinco principais e uma alternativa; `release-etapa27c-v1`/hashes permaneceram intactos; replay real
+`EXACT_REPLAY`, zero divergências/dependências. Referências:
+`docs/shell-dashboard-visual-system.md` e `.ai/specs/shell-dashboard-visual-system.md`.
+
 ## Etapa 31E: perfil analítico pessoal e fundação visual
 
 O Perfil agora é uma superfície analítica real, alimentada exclusivamente pelo proprietário da

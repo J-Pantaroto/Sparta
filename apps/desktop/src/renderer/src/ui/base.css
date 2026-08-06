@@ -36,6 +36,16 @@ body {
   background-color: var(--bg-base);
 }
 
+html[data-visual-intensity="reduced"] body {
+  background: var(--bg-base);
+}
+
+html[data-visual-intensity="reduced"] .sp-hero,
+html[data-visual-intensity="reduced"] .sp-auth,
+html[data-visual-intensity="reduced"] .sp-dashboard-hero {
+  background-image: none !important;
+}
+
 h1,
 h2,
 h3,

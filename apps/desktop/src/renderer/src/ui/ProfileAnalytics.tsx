@@ -193,26 +193,55 @@ export function MetricCard({ metric }: { metric: ProfileMetric }) {
   );
 }
 
-function splitRuns(points: PerformanceTrendPoint[]): PerformanceTrendPoint[][] {
-  const runs: PerformanceTrendPoint[][] = [];
-  for (const point of points) {
-    const current = runs.at(-1);
-    const previous = current?.at(-1);
-    const gap = previous
-      ? new Date(point.observedAt).getTime() - new Date(previous.observedAt).getTime()
-      : 0;
-    if (!current || gap > 48 * 60 * 60 * 1000) runs.push([point]);
-    else current.push(point);
+export type TrendChartMetric = "performance" | "kda" | "objectives" | "vision" | "farm";
+
+const trendMetricConfig: Record<
+  TrendChartMetric,
+  {
+    label: string;
+    value: (point: PerformanceTrendPoint) => number | null;
+    minimumMax: number;
+    suffix: string;
   }
-  return runs;
-}
+> = {
+  performance: {
+    label: "Índice de desempenho pessoal",
+    value: (point) => point.performanceIndex,
+    minimumMax: 100,
+    suffix: ""
+  },
+  kda: { label: "KDA observado", value: (point) => point.kda, minimumMax: 10, suffix: "" },
+  objectives: {
+    label: "Participação em objetivos",
+    value: (point) =>
+      point.objectiveParticipation === null ? null : point.objectiveParticipation * 100,
+    minimumMax: 100,
+    suffix: "%"
+  },
+  vision: {
+    label: "Visão por minuto",
+    value: (point) => point.visionScorePerMinute,
+    minimumMax: 3,
+    suffix: ""
+  },
+  farm: {
+    label: "Farm por minuto",
+    value: (point) => point.csPerMinute,
+    minimumMax: 12,
+    suffix: ""
+  }
+};
 
 export function TrendChart({
   points,
-  periodDays
+  periodDays,
+  metric = "performance",
+  compact = false
 }: {
   points: PerformanceTrendPoint[];
   periodDays: number;
+  metric?: TrendChartMetric;
+  compact?: boolean;
 }) {
   const ordered = [...points].sort((left, right) =>
     left.observedAt.localeCompare(right.observedAt)
@@ -227,18 +256,59 @@ export function TrendChart({
     );
   }
 
+  const config = trendMetricConfig[metric];
+  const available = ordered.flatMap((point, pointIndex) => {
+    const value = config.value(point);
+    return value === null || !Number.isFinite(value) ? [] : [{ point, pointIndex, value }];
+  });
+  if (available.length === 0) {
+    return (
+      <div className="sp-trend-empty" role="status">
+        <Activity size={22} aria-hidden="true" />
+        <strong>{config.label} indisponível no período</strong>
+        <span>Existem partidas, mas essa métrica não foi observada nelas.</span>
+      </div>
+    );
+  }
+
   const width = 760;
   const height = 220;
   const x = (index: number) => 28 + (index * (width - 56)) / Math.max(1, ordered.length - 1);
+  const observedMax = Math.max(...available.map((entry) => entry.value));
+  const axisMax =
+    metric === "performance" || metric === "objectives"
+      ? 100
+      : Math.max(config.minimumMax, Math.ceil(observedMax / 2) * 2);
   const y = (value: number) =>
-    18 + ((100 - Math.max(0, Math.min(100, value))) * (height - 44)) / 100;
-  const index = new Map(ordered.map((point, pointIndex) => [point.matchId, pointIndex]));
-  const runs = splitRuns(ordered);
+    18 + ((axisMax - Math.max(0, Math.min(axisMax, value))) * (height - 44)) / axisMax;
+  const runs: (typeof available)[] = [];
+  for (const entry of available) {
+    const current = runs.at(-1);
+    const previous = current?.at(-1);
+    const gap = previous
+      ? new Date(entry.point.observedAt).getTime() - new Date(previous.point.observedAt).getTime()
+      : 0;
+    if (
+      !current ||
+      !previous ||
+      entry.pointIndex !== previous.pointIndex + 1 ||
+      gap > 48 * 60 * 60 * 1000
+    ) {
+      runs.push([entry]);
+    } else {
+      current.push(entry);
+    }
+  }
+  const figureId = `profile-trend-${metric}`;
+  const ticks = [0, 0.25, 0.5, 0.75, 1].map((ratio) => axisMax * ratio);
 
   return (
-    <figure className="sp-trend-chart" aria-labelledby="profile-trend-title">
-      <figcaption id="profile-trend-title">
-        Índice de desempenho pessoal · últimos {periodDays} dias
+    <figure
+      className={`sp-trend-chart${compact ? " sp-trend-chart--compact" : ""}`}
+      aria-labelledby={`${figureId}-title`}
+    >
+      <figcaption id={`${figureId}-title`}>
+        {config.label} · últimos {periodDays} dias
       </figcaption>
       <div className="sp-trend-chart__legend" aria-label="Legenda do resultado observado">
         <span>
@@ -259,13 +329,13 @@ export function TrendChart({
       <svg
         viewBox={`0 0 ${width} ${height}`}
         role="img"
-        aria-describedby="profile-trend-description"
+        aria-describedby={`${figureId}-description`}
       >
-        <desc id="profile-trend-description">
-          Escala fixa de zero a cem. Intervalos superiores a 48 horas sem partida não são
-          conectados.
+        <desc id={`${figureId}-description`}>
+          Escala iniciada em zero e terminada em {axisMax}. Intervalos superiores a 48 horas sem
+          partida e métricas ausentes não são conectados.
         </desc>
-        {[0, 25, 50, 75, 100].map((tick) => (
+        {ticks.map((tick) => (
           <g key={tick}>
             <line
               className="sp-trend-chart__grid"
@@ -275,36 +345,43 @@ export function TrendChart({
               y2={y(tick)}
             />
             <text className="sp-trend-chart__label" x="2" y={y(tick) + 4}>
-              {tick}
+              {Number.isInteger(tick) ? tick : tick.toFixed(1)}
             </text>
           </g>
         ))}
         {runs.map((run) => {
           const coordinates = run
-            .map((point) => `${x(index.get(point.matchId) ?? 0)},${y(point.performanceIndex)}`)
+            .map((entry) => `${x(entry.pointIndex)},${y(entry.value)}`)
             .join(" ");
           return run.length > 1 ? (
-            <polyline key={run[0]?.matchId} className="sp-trend-chart__line" points={coordinates} />
+            <polyline
+              key={run[0]?.point.matchId}
+              className="sp-trend-chart__line"
+              points={coordinates}
+            />
           ) : null;
         })}
-        {ordered.map((point, pointIndex) => (
+        {available.map(({ point, pointIndex, value }) => (
           <circle
             key={point.matchId}
             className={`sp-trend-chart__point sp-trend-chart__point--${point.won ? "win" : "loss"}`}
             cx={x(pointIndex)}
-            cy={y(point.performanceIndex)}
+            cy={y(value)}
             r="5"
             tabIndex={0}
           >
-            <title>{`${dateLabel(point.observedAt)} · índice ${point.performanceIndex} · KDA ${point.kda} · ${point.won ? "vitória" : "derrota"}`}</title>
+            <title>{`${dateLabel(point.observedAt)} · ${config.label.toLocaleLowerCase()} ${safeNumber(value, 2)}${config.suffix} · ${point.won ? "vitória" : "derrota"}`}</title>
           </circle>
         ))}
       </svg>
       <ul className="sp-trend-chart__text-values" aria-label="Valores do gráfico">
-        {ordered.map((point) => (
+        {available.map(({ point, value }) => (
           <li key={point.matchId}>
             <time dateTime={point.observedAt}>{dateLabel(point.observedAt)}</time>
-            <span>Índice {point.performanceIndex}</span>
+            <span>
+              {config.label} {safeNumber(value, 2)}
+              {config.suffix}
+            </span>
             <span>KDA {point.kda}</span>
             <span>{point.won ? "Vitória" : "Derrota"}</span>
           </li>

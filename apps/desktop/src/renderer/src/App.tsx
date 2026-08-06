@@ -12,8 +12,8 @@ import type {
   LcuGameflowPhase,
   LcuObservedGame
 } from "@sparta/riot";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { navGroups, type Page } from "./app/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { navGroups, pageContext, type Page } from "./app/navigation";
 import { accessRouteForOnboarding } from "./app/session-routing";
 import { useAsyncData } from "./hooks/use-async-data";
 import {
@@ -54,11 +54,13 @@ import { FeaturedChampionProvider, useFeaturedChampion } from "./theme/featured-
 import {
   AppShell,
   AuthLayout,
+  GlobalNotice,
   Loading,
   PlayerSummary,
   Sidebar,
   SidebarGroup,
-  SidebarNavItem
+  SidebarNavItem,
+  Topbar
 } from "./ui";
 
 type SessionStatus =
@@ -90,6 +92,14 @@ export function App() {
 function SpartaApp() {
   const { splashUrl } = useFeaturedChampion();
   const [page, setPage] = useState<Page>("dashboard");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    () => localStorage.getItem("sparta:sidebar-collapsed") === "true"
+  );
+  const [leagueConnected, setLeagueConnected] = useState(false);
+  const [dashboardRefreshRequest, setDashboardRefreshRequest] = useState(0);
+  const [dashboardLoading, setDashboardLoading] = useState(false);
+  const [apiAvailable, setApiAvailable] = useState(true);
+  const [lastProfileSync, setLastProfileSync] = useState<string | null>(null);
   const [draft, setDraft] = useState<DraftState>({
     // Sem posição. Nada de `playerRole: "MID"`: até o LCU informar (ou o
     // usuário escolher no modo manual), o Sparta não sabe a posição, e
@@ -231,6 +241,7 @@ function SpartaApp() {
   useEffect(() => {
     if (sessionStatus !== "ready" || !window.sparta?.onGameflowPhase) return;
     const unsubscribe = window.sparta.onGameflowPhase((phase) => {
+      setLeagueConnected(phase !== null);
       const previous = lastGameflowPhaseRef.current;
       lastGameflowPhaseRef.current = phase;
       const active = phase === "ChampSelect";
@@ -383,6 +394,7 @@ function SpartaApp() {
     let cancelled = false;
     void window.sparta.getLcuState().then((state) => {
       if (cancelled) return;
+      setLeagueConnected(!["CLIENT_CLOSED", "LOCKFILE_MISSING"].includes(state.status));
       if (state.phase === "ChampSelect") {
         setChampSelectActive(true);
         setPage("select");
@@ -481,6 +493,19 @@ function SpartaApp() {
     setSessionStatus("auth");
   }
 
+  useEffect(() => {
+    localStorage.setItem("sparta:sidebar-collapsed", String(sidebarCollapsed));
+  }, [sidebarCollapsed]);
+
+  const handleDashboardProfileState = useCallback(
+    (state: { loading: boolean; apiAvailable: boolean; updatedAt: string | null }) => {
+      setDashboardLoading(state.loading);
+      setApiAvailable(state.apiAvailable);
+      if (state.updatedAt) setLastProfileSync(state.updatedAt);
+    },
+    []
+  );
+
   if (sessionStatus === "checking") {
     // Mesma casca das telas de login, pra a transição pro app (ou pro
     // formulário) não trocar o fundo debaixo do usuário.
@@ -569,36 +594,62 @@ function SpartaApp() {
   }
 
   const account = riotAccounts[0];
+  const currentPage = pageContext[page];
+  const visibleNavGroups = navGroups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => !item.developmentOnly || import.meta.env.DEV)
+    }))
+    .filter((group) => group.items.length > 0);
+  const accountName = account
+    ? `${account.gameName}#${account.tagLine}`
+    : (sessionUser?.displayName ?? "Conta Sparta");
 
   return (
     <AppShell
+      collapsed={sidebarCollapsed}
+      topbar={
+        <Topbar
+          title={currentPage.title}
+          context={currentPage.description}
+          accountName={accountName}
+          apiAvailable={apiAvailable}
+          leagueConnected={leagueConnected}
+          lastSync={lastProfileSync}
+          canRefresh={page === "dashboard"}
+          refreshing={dashboardLoading}
+          onRefresh={() => setDashboardRefreshRequest((current) => current + 1)}
+          onAccount={() => setPage("account")}
+          onSettings={() => setPage("settings")}
+          onLogout={() => void handleLogout()}
+        />
+      }
       sidebar={
         <Sidebar
+          collapsed={sidebarCollapsed}
+          onToggle={() => setSidebarCollapsed((current) => !current)}
+          leagueConnected={leagueConnected}
+          version={window.sparta.version}
           footer={
             <PlayerSummary
-              artUrl={splashUrl}
-              name={
-                account
-                  ? `${account.gameName}#${account.tagLine}`
-                  : (sessionUser?.displayName ?? "Conta Sparta")
-              }
+              collapsed={sidebarCollapsed}
+              name={accountName}
               meta={
                 onboarding?.riot.acceptedForCurrentEnvironment ? "Acesso pronto" : "Acesso restrito"
               }
-              onAccount={() => setPage("account")}
-              onSettings={() => setPage("settings")}
-              onLogout={() => void handleLogout()}
             />
           }
         >
-          {navGroups.map((group) => (
+          {visibleNavGroups.map((group) => (
             <SidebarGroup key={group.label} label={group.label}>
-              {group.items.map(({ page: item, label, icon: Icon }) => (
+              {group.items.map(({ page: item, label, description, icon: Icon }) => (
                 <SidebarNavItem
                   key={item}
                   label={label}
+                  description={description}
                   icon={<Icon size={16} />}
                   active={page === item}
+                  collapsed={sidebarCollapsed}
                   live={item === "select" && champSelectActive}
                   onClick={() => setPage(item)}
                 />
@@ -609,33 +660,38 @@ function SpartaApp() {
       }
     >
       {ddragonCache.state === "STALE" && (
-        <div
-          role="status"
-          style={{
-            margin: "var(--space-4)",
-            padding: "var(--space-3)",
-            border: "1px solid var(--color-warning)",
-            borderRadius: "var(--radius-md)"
-          }}
-        >
-          Data Dragon indisponível: usando catálogo local desatualizado, coletado em{" "}
-          {ddragonCache.collectedAt
-            ? new Date(ddragonCache.collectedAt).toLocaleString("pt-BR")
-            : "data desconhecida"}
-          .
-        </div>
+        <GlobalNotice
+          tone="attention"
+          title="Catálogo oficial desatualizado"
+          description={`A Data Dragon está indisponível. O Sparta preservou o catálogo local coletado em ${
+            ddragonCache.collectedAt
+              ? new Date(ddragonCache.collectedAt).toLocaleString("pt-BR")
+              : "data desconhecida"
+          }.`}
+        />
       )}
       {championCatalog.status === "error" && (
-        <div role="alert" style={{ margin: "var(--space-4)", color: "var(--color-danger)" }}>
-          O catálogo de campeões está indisponível: {championCatalog.error}
-        </div>
+        <GlobalNotice
+          tone="error"
+          title="Catálogo de campeões indisponível"
+          description="Tente novamente quando a conexão estiver disponível."
+        />
       )}
       {page === "dashboard" && (
         <DashboardScreen
           riotAccounts={riotAccounts}
+          sessionToken={sessionToken!}
           ddragonVersion={ddragonVersion}
           champSelectActive={champSelectActive}
+          leagueConnected={leagueConnected}
+          emailVerified={Boolean(sessionUser?.emailVerifiedAt)}
+          refreshRequest={dashboardRefreshRequest}
           onNavigate={setPage}
+          onOpenMatch={(matchId) => {
+            setPostgameInitialMatchId(matchId);
+            setPage("postgame");
+          }}
+          onProfileState={handleDashboardProfileState}
         />
       )}
       {page === "profile" && sessionToken && (

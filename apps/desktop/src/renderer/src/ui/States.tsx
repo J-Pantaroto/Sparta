@@ -1,4 +1,4 @@
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Info, TriangleAlert } from "lucide-react";
 import type { CSSProperties, ReactNode } from "react";
 import "./States.css";
 
@@ -81,7 +81,12 @@ export function EmptyState({ icon, title, description, actions, inline = false }
   );
 }
 
-export function ErrorState({ title = "Algo deu errado", description, actions, inline = false }: Partial<StateProps>) {
+export function ErrorState({
+  title = "Algo deu errado",
+  description,
+  actions,
+  inline = false
+}: Partial<StateProps>) {
   return (
     <div className={`sp-state sp-state--error${inline ? " sp-state--inline" : ""}`} role="alert">
       <div className="sp-state__icon">
@@ -90,6 +95,33 @@ export function ErrorState({ title = "Algo deu errado", description, actions, in
       <p className="sp-state__title">{title}</p>
       {description && <p className="sp-state__description">{description}</p>}
       {actions && <div className="sp-state__actions">{actions}</div>}
+    </div>
+  );
+}
+
+export function GlobalNotice({
+  tone = "info",
+  title,
+  description,
+  actions
+}: {
+  tone?: "info" | "attention" | "error" | "success";
+  title: ReactNode;
+  description: ReactNode;
+  actions?: ReactNode;
+}) {
+  const Icon = tone === "error" ? AlertCircle : tone === "attention" ? TriangleAlert : Info;
+  return (
+    <div
+      className={`sp-global-notice sp-global-notice--${tone}`}
+      role={tone === "error" ? "alert" : "status"}
+    >
+      <Icon size={17} aria-hidden="true" />
+      <div>
+        <strong>{title}</strong>
+        <span>{description}</span>
+      </div>
+      {actions && <div className="sp-global-notice__actions">{actions}</div>}
     </div>
   );
 }

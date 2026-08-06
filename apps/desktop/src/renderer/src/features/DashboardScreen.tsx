@@ -1,334 +1,806 @@
-import { rankChampionPool, type GrowthJourney, type RecentChampionMatch } from "@sparta/core";
-import { ArrowRight, Crosshair, Minus, TrendingDown, TrendingUp, UserPlus } from "lucide-react";
-import type { Page } from "../app/navigation";
-import { confidenceLabels, formTrendLabels, roleLabels, severityLabels } from "../app/labels";
-import { useAsyncData } from "../hooks/use-async-data";
+import type {
+  PerformanceTrendPoint,
+  PlayerProfileOverview,
+  ProfileMetric,
+  ProfileMetricKey
+} from "@sparta/core";
 import {
-  fetchGrowthJourney,
-  fetchPlayerProfile,
-  fetchRecentMatches,
-  type PlayerProfileResponse,
+  Activity,
+  ArrowRight,
+  CheckCircle2,
+  Clock3,
+  CloudOff,
+  Crosshair,
+  Database,
+  History,
+  RefreshCw,
+  ShieldCheck,
+  Sparkles,
+  UserRound,
+  Wifi,
+  WifiOff
+} from "lucide-react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode
+} from "react";
+import type { Page } from "../app/navigation";
+import { roleLabels } from "../app/labels";
+import {
+  fetchMyPlayerProfile,
+  syncMyPlayerData,
+  type PlayerSyncResult,
   type RiotAccountSummary
 } from "../services/api-client";
-import { ThemedPageHero } from "../theme/ThemedPageHero";
-import { useFeaturedChampion } from "../theme/featured-champion-context";
 import {
   Badge,
   Button,
   Card,
   ChampionAvatar,
-  Columns,
+  CoverageBadge,
   EmptyState,
   ErrorState,
-  InlineStat,
-  InlineStats,
-  Loading,
-  PageLayout,
-  ScoreBadge,
-  ScoreBlock,
+  RecentMatchRow,
   SectionHeader,
-  SignalChip,
+  SegmentedControl,
+  Skeleton,
   SkeletonRows,
-  StatusBadge
+  TrendChart
 } from "../ui";
 import "./DashboardScreen.css";
 
+type TrendMetric = "performance" | "kda" | "objectives" | "vision" | "farm";
+type SyncState = "idle" | "syncing" | "success" | "error";
+
 interface DashboardScreenProps {
   riotAccounts: RiotAccountSummary[];
+  sessionToken: string;
   ddragonVersion: string;
   champSelectActive: boolean;
+  leagueConnected: boolean;
+  emailVerified: boolean;
+  refreshRequest?: number;
   onNavigate: (page: Page) => void;
+  onOpenMatch: (matchId: string) => void;
+  onProfileState?: (state: {
+    loading: boolean;
+    apiAvailable: boolean;
+    updatedAt: string | null;
+  }) => void;
 }
 
-export function DashboardScreen({ riotAccounts, ddragonVersion, champSelectActive, onNavigate }: DashboardScreenProps) {
+export function DashboardScreen({
+  riotAccounts,
+  sessionToken,
+  ddragonVersion,
+  champSelectActive,
+  leagueConnected,
+  emailVerified,
+  refreshRequest = 0,
+  onNavigate,
+  onOpenMatch,
+  onProfileState
+}: DashboardScreenProps) {
   const account = riotAccounts[0];
-  const { featuredChampion } = useFeaturedChampion();
+  const [profile, setProfile] = useState<PlayerProfileOverview | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [periodDays, setPeriodDays] = useState<7 | 14 | 30>(14);
+  const [trendMetric, setTrendMetric] = useState<TrendMetric>("performance");
+  const [syncState, setSyncState] = useState<SyncState>("idle");
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const requestSequence = useRef(0);
 
-  const profile = useAsyncData<PlayerProfileResponse>(
-    () => (account ? fetchPlayerProfile(account.gameName, account.tagLine) : undefined),
-    [account?.gameName, account?.tagLine]
-  );
-  const matches = useAsyncData<{ puuid: string; matches: RecentChampionMatch[] }>(
-    () => (account ? fetchRecentMatches(account.puuid, 10) : undefined),
-    [account?.puuid]
-  );
-  const journey = useAsyncData<{ puuid: string } & GrowthJourney>(
-    () => (account ? fetchGrowthJourney(account.puuid) : undefined),
-    [account?.puuid]
-  );
+  const loadProfile = useCallback(async () => {
+    const sequence = ++requestSequence.current;
+    setLoading(true);
+    setError(null);
+    onProfileState?.({ loading: true, apiAvailable: true, updatedAt: null });
+    try {
+      const data = await fetchMyPlayerProfile(sessionToken);
+      if (sequence !== requestSequence.current) return;
+      setProfile(data);
+      setLoading(false);
+      onProfileState?.({
+        loading: false,
+        apiAvailable: true,
+        updatedAt: data.identity.updatedAt
+      });
+    } catch (cause) {
+      if (sequence !== requestSequence.current) return;
+      const message =
+        cause instanceof Error ? cause.message : "Não foi possível carregar o perfil.";
+      setError(message);
+      setLoading(false);
+      onProfileState?.({ loading: false, apiAvailable: false, updatedAt: null });
+    }
+  }, [sessionToken, onProfileState]);
 
-  const stats = profile.data?.championStats ?? [];
-  const ranked = profile.data ? rankChampionPool(stats) : [];
-  const recentForm = profile.data?.recentForm;
-  const strength = profile.data?.strengths[0];
-  const weakness = profile.data?.weaknesses[0];
+  useEffect(() => {
+    void loadProfile();
+  }, [loadProfile, refreshRequest]);
 
-  // Totais do pool inteiro (nao so dos campeoes elegiveis pro ranking) -
-  // "quantas partidas o Sparta analisou" tem que bater com o historico real.
-  const totalGames = stats.reduce((sum, champion) => sum + champion.games, 0);
-  const totalWins = stats.reduce((sum, champion) => sum + champion.wins, 0);
-  const winrate = totalGames > 0 ? Math.round((totalWins / totalGames) * 100) : null;
+  const filteredTrend = useMemo(() => {
+    if (!profile) return [];
+    const anchor = new Date(profile.generatedAt).getTime();
+    const cutoff = anchor - periodDays * 24 * 60 * 60 * 1000;
+    return profile.performanceTrend.filter(
+      (point) => new Date(point.observedAt).getTime() >= cutoff
+    );
+  }, [profile, periodDays]);
+
+  async function synchronize() {
+    setSyncState("syncing");
+    setSyncMessage(null);
+    try {
+      const result = await syncMyPlayerData(sessionToken);
+      setSyncState("success");
+      setSyncMessage(syncResultMessage(result));
+      await loadProfile();
+    } catch {
+      setSyncState("error");
+      setSyncMessage("A sincronização não foi concluída. Verifique a API e tente novamente.");
+    }
+  }
 
   if (!account) {
     return (
-      <PageLayout>
-        <ThemedPageHero variant="feature" eyebrow="Bem-vindo" title="Sparta" subtitle="Escolhas melhores antes da partida, revisões melhores depois." />
-        <Card>
-          <EmptyState
-            icon={<UserPlus size={22} />}
-            title="Vincule sua conta Riot pra começar"
-            description="Com a conta vinculada o Sparta sincroniza seu histórico real e passa a analisar desempenho, recomendar picks e revisar suas partidas."
-          />
-        </Card>
-      </PageLayout>
+      <Card>
+        <EmptyState
+          icon={<UserRound size={22} />}
+          title="Vínculo Riot necessário"
+          description="Conclua o vínculo da sua conta para carregar o dashboard pessoal."
+        />
+      </Card>
     );
   }
 
-  return (
-    <PageLayout>
-      <ThemedPageHero
-        variant="feature"
-        eyebrow={
-          champSelectActive ? (
-            <StatusBadge state="live">Seleção de campeões em andamento</StatusBadge>
-          ) : (
-            `Tema: ${featuredChampion.skinName}`
-          )
-        }
-        title={`${account.gameName}#${account.tagLine}`}
-        meta={
-          <InlineStats>
-            <InlineStat label="Partidas analisadas" value={totalGames || "—"} />
-            <InlineStat label="Vitórias" value={winrate !== null ? `${winrate}%` : "—"} />
-            <InlineStat label="Campeões no pool" value={stats.length || "—"} />
-            <InlineStat
-              label="Tendência"
-              value={recentForm ? (formTrendLabels[recentForm.trend] ?? recentForm.trend) : "—"}
-              muted={!recentForm}
-            />
-          </InlineStats>
-        }
-        aside={
-          <>
-            {recentForm && <ScoreBlock score={recentForm.last10Score} label="Forma (10 jogos)" size="lg" />}
-            {champSelectActive && (
-              <Button variant="primary" icon={<Crosshair size={15} />} onClick={() => onNavigate("select")}>
-                Abrir Champion Select
-              </Button>
-            )}
-          </>
-        }
-      />
+  if (loading && !profile) return <DashboardSkeleton />;
 
-      {profile.status === "loading" && (
-        <Card>
-          <Loading block label="Carregando seu perfil..." />
-        </Card>
-      )}
-      {profile.status === "error" && (
-        <Card>
-          <ErrorState inline description={profile.error ?? undefined} />
-        </Card>
-      )}
-
-      {profile.data && (
-        <Columns
-          asideWidth="340px"
-          main={
-            <div style={{ display: "grid", gap: "var(--space-4)" }}>
-              <Card>
-                <SectionHeader
-                  title="Forma recente"
-                  description="Score ponderado por recência: quanto mais recente a partida, mais peso ela tem no número."
-                  actions={recentForm && <Badge tone="neutral">confiança {confidenceLabels[recentForm.confidence]}</Badge>}
-                />
-                {recentForm ? (
-                  <InlineStats>
-                    <ScoreBlock score={recentForm.last10Score} label="Últimas 10" size="md" />
-                    <ScoreBlock score={recentForm.last20Score} label="Últimas 20" />
-                    <ScoreBlock score={recentForm.last50Score} label="Últimas 50" />
-                  </InlineStats>
-                ) : (
-                  <EmptyState inline title="Sem forma calculada ainda" />
-                )}
-
-                {matches.status === "loading" && <SkeletonRows count={1} height={32} />}
-                {matches.data && matches.data.matches.length > 0 && (
-                  <div style={{ marginTop: "var(--space-5)" }}>
-                    <MatchStreak matches={matches.data.matches} ddragonVersion={ddragonVersion} />
-                  </div>
-                )}
-              </Card>
-
-              <Card>
-                <SectionHeader
-                  title="Seus melhores campeões"
-                  description={`Só campeões com amostra suficiente pra ranquear entram aqui (${stats.length - ranked.length} fora do corte).`}
-                  actions={
-                    <Button variant="ghost" size="sm" icon={<ArrowRight size={14} />} onClick={() => onNavigate("profile")}>
-                      Ver perfil completo
-                    </Button>
-                  }
-                />
-                {ranked.length === 0 ? (
-                  <EmptyState
-                    inline
-                    title="Nenhum campeão ranqueado ainda"
-                    description="O Sparta precisa de mais partidas com o mesmo campeão pra comparar desempenho com segurança."
-                  />
-                ) : (
-                  <div className="sp-pool">
-                    {ranked.slice(0, 5).map((champion, index) => {
-                      const raw = stats.find(
-                        (item) => item.championId === champion.championId && item.role === champion.role
-                      );
-                      const championWinrate = raw ? Math.round((raw.wins / raw.games) * 100) : null;
-                      return (
-                        <div className="sp-pool__row" key={`${champion.championId}-${champion.role}`}>
-                          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", minWidth: 0 }}>
-                            <span className="sp-pool__rank">{index + 1}</span>
-                            <ChampionAvatar
-                              championId={champion.championId}
-                              ddragonVersion={ddragonVersion}
-                              size="sm"
-                              alt={champion.championName}
-                            />
-                            <div style={{ minWidth: 0 }}>
-                              <strong className="sp-truncate" style={{ display: "block" }}>
-                                {champion.championName}
-                              </strong>
-                              <span style={{ color: "var(--text-muted)", fontSize: "var(--text-xs)" }}>
-                                {roleLabels[champion.role]}
-                              </span>
-                            </div>
-                          </div>
-                          <span style={{ color: "var(--text-secondary)", fontSize: "var(--text-sm)" }}>
-                            {champion.games} jogos
-                          </span>
-                          <span style={{ fontWeight: "var(--weight-bold)", fontVariantNumeric: "tabular-nums" }}>
-                            {championWinrate !== null ? `${championWinrate}%` : "—"}
-                          </span>
-                          <ScoreBadge score={champion.score} size="xs" />
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </Card>
-            </div>
-          }
-          aside={
-            <div style={{ display: "grid", gap: "var(--space-4)" }}>
-              <Card tone="feature">
-                <span className="sp-insight__label">Ponto forte</span>
-                {strength ? (
-                  <>
-                    <strong className="sp-insight__headline">{strength.label}</strong>
-                    <span className="sp-insight__detail">{strength.detail}</span>
-                    <div style={{ marginTop: "var(--space-3)" }}>
-                      <Badge tone="positive">confiança {confidenceLabels[strength.confidence]}</Badge>
-                    </div>
-                  </>
-                ) : (
-                  <EmptyState inline title="Sem dado suficiente" />
-                )}
-              </Card>
-
-              <Card>
-                <span className="sp-insight__label">Risco atual</span>
-                {weakness ? (
-                  <>
-                    <strong className="sp-insight__headline">{weakness.label}</strong>
-                    <span className="sp-insight__detail">{weakness.detail}</span>
-                    <div style={{ marginTop: "var(--space-3)" }}>
-                      <Badge tone="negative">severidade {severityLabels[weakness.severity]}</Badge>
-                    </div>
-                  </>
-                ) : (
-                  <EmptyState inline title="Sem dado suficiente" />
-                )}
-              </Card>
-
-              <Card>
-                <SectionHeader
-                  title="Evolução"
-                  actions={
-                    <Button variant="ghost" size="sm" icon={<ArrowRight size={14} />} onClick={() => onNavigate("growth")}>
-                      Abrir
-                    </Button>
-                  }
-                />
-                {journey.status === "loading" && <SkeletonRows count={2} height={28} />}
-                {journey.data && journey.data.weaknessTrends.length > 0 ? (
-                  <div style={{ display: "grid", gap: "var(--space-2)" }}>
-                    {journey.data.weaknessTrends.slice(0, 3).map((trend) => (
-                      <TrendRow key={trend.code} label={trend.label} trend={trend.trend} hasComparison={trend.hasComparison} />
-                    ))}
-                  </div>
-                ) : (
-                  journey.status !== "loading" && (
-                    <EmptyState
-                      inline
-                      title="Ainda sem tendências"
-                      description="Analise partidas no Pós-game pra o Sparta acompanhar sua evolução."
-                    />
-                  )
-                )}
-              </Card>
-            </div>
+  if (error && !profile) {
+    return (
+      <Card>
+        <ErrorState
+          title="Dashboard indisponível"
+          description="A API do Sparta não respondeu. Seus dados existentes não foram substituídos."
+          actions={
+            <Button
+              variant="secondary"
+              icon={<RefreshCw size={15} />}
+              onClick={() => void loadProfile()}
+            >
+              Tentar novamente
+            </Button>
           }
         />
-      )}
-    </PageLayout>
-  );
-}
+      </Card>
+    );
+  }
 
-function MatchStreak({ matches, ddragonVersion }: { matches: RecentChampionMatch[]; ddragonVersion: string }) {
-  const wins = matches.filter((match) => match.won).length;
+  if (!profile) return null;
+
+  const metrics = new Map(profile.recentPerformance.metrics.map((metric) => [metric.key, metric]));
+  const headlineMetric = metrics.get("RECENT_PERFORMANCE");
+  const featuredMetrics = [
+    metrics.get("OBJECTIVES"),
+    metrics.get("VISION"),
+    metrics.get("CONSISTENCY"),
+    metrics.get("TEAM_IMPACT"),
+    metrics.get("SURVIVAL")
+  ].filter((metric): metric is ProfileMetric => Boolean(metric));
+  const topChampion = profile.topChampions[0];
+  const recentMatches = profile.recentMatches.slice(0, 5);
+
   return (
-    <div>
-      <div className="sp-streak">
-        {matches.map((match) => (
-          <span
-            key={match.matchId}
-            className={`sp-streak__match${match.won ? " sp-streak__match--won" : ""}`}
-            title={`${match.won ? "Vitória" : "Derrota"} · ${match.kills}/${match.deaths}/${match.assists}`}
+    <div className="sp-dashboard">
+      <DashboardHero
+        profile={profile}
+        headlineMetric={headlineMetric}
+        topChampion={topChampion}
+        ddragonVersion={ddragonVersion}
+        onOpenProfile={() => onNavigate("profile")}
+      />
+
+      {(profile.status === "PARTIAL" || profile.status === "STALE") && (
+        <div
+          className={`sp-dashboard-notice sp-dashboard-notice--${profile.status.toLocaleLowerCase()}`}
+          role="status"
+        >
+          <Database size={16} aria-hidden="true" />
+          <div>
+            <strong>
+              {profile.status === "STALE" ? "Dados desatualizados" : "Cobertura parcial"}
+            </strong>
+            <span>
+              {profile.status === "STALE"
+                ? "O último histórico foi preservado. Sincronize para buscar observações novas."
+                : "Algumas fontes ainda não existem para toda a amostra; cada seção mostra sua cobertura."}
+            </span>
+          </div>
+          <Button
+            size="sm"
+            variant="secondary"
+            icon={<RefreshCw size={14} />}
+            loading={syncState === "syncing"}
+            onClick={() => void synchronize()}
           >
-            <ChampionAvatar
-              championId={match.championId}
-              ddragonVersion={ddragonVersion}
-              size="sm"
-              alt={`Campeão ${match.championId}`}
+            Sincronizar
+          </Button>
+        </div>
+      )}
+
+      {syncMessage && (
+        <div
+          className={`sp-dashboard-notice sp-dashboard-notice--${syncState}`}
+          role={syncState === "error" ? "alert" : "status"}
+        >
+          {syncState === "success" ? <CheckCircle2 size={16} /> : <CloudOff size={16} />}
+          <span>{syncMessage}</span>
+        </div>
+      )}
+
+      <section className="sp-dashboard-section" aria-labelledby="dashboard-indices-title">
+        <SectionHeader
+          eyebrow="Leitura rápida"
+          title="Índices pessoais"
+          description="Índices do Sparta sobre a sua amostra observada — não são notas da Riot nem comparação global."
+        />
+        <div className="sp-dashboard-indices">
+          {headlineMetric && (
+            <DashboardHeadlineMetric metric={headlineMetric} trend={filteredTrend} />
+          )}
+          <div className="sp-dashboard-indices__secondary">
+            {featuredMetrics.map((metric) => (
+              <DashboardMiniMetric key={metric.key} metric={metric} />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <div className="sp-dashboard-main-grid">
+        <Card className="sp-dashboard-trend-card">
+          <SectionHeader
+            eyebrow="Histórico observado"
+            title="Tendência recente"
+            actions={
+              <SegmentedControl<"7" | "14" | "30">
+                ariaLabel="Período do gráfico"
+                value={String(periodDays) as "7" | "14" | "30"}
+                onChange={(value) => setPeriodDays(Number(value) as 7 | 14 | 30)}
+                options={[
+                  { value: "7", label: "7 dias" },
+                  { value: "14", label: "14 dias" },
+                  { value: "30", label: "30 dias" }
+                ]}
+              />
+            }
+          />
+          <SegmentedControl<TrendMetric>
+            ariaLabel="Métrica do gráfico"
+            value={trendMetric}
+            onChange={setTrendMetric}
+            options={[
+              { value: "performance", label: "Desempenho" },
+              { value: "kda", label: "KDA" },
+              { value: "objectives", label: "Objetivos" },
+              { value: "vision", label: "Visão" },
+              { value: "farm", label: "Farm" }
+            ]}
+          />
+          <TrendChart points={filteredTrend} periodDays={periodDays} metric={trendMetric} compact />
+        </Card>
+
+        <SystemStatusCard
+          profile={profile}
+          apiAvailable={!error}
+          leagueConnected={leagueConnected}
+          emailVerified={emailVerified}
+          riotLinked={Boolean(account)}
+          syncState={syncState}
+        />
+      </div>
+
+      <div className="sp-dashboard-content-grid">
+        <Card>
+          <SectionHeader
+            eyebrow="Últimas observações"
+            title="Partidas recentes"
+            actions={
+              <Button
+                variant="ghost"
+                size="sm"
+                icon={<ArrowRight size={14} />}
+                onClick={() => onNavigate("postgame")}
+              >
+                Ver todas
+              </Button>
+            }
+          />
+          {recentMatches.length === 0 ? (
+            <EmptyState
+              inline
+              title="Nenhuma partida sincronizada"
+              description="Sincronize sua conta após jogar para que as partidas apareçam aqui."
+              actions={
+                <Button variant="secondary" onClick={() => void synchronize()}>
+                  Sincronizar agora
+                </Button>
+              }
             />
-          </span>
-        ))}
-        <span className="sp-streak__legend">
-          {wins}V — {matches.length - wins}D nas últimas {matches.length}
-        </span>
+          ) : (
+            <div className="sp-dashboard-matches">
+              {recentMatches.map((match) => (
+                <RecentMatchRow
+                  key={match.matchId}
+                  match={match}
+                  ddragonVersion={ddragonVersion}
+                  onOpen={onOpenMatch}
+                />
+              ))}
+            </div>
+          )}
+        </Card>
+
+        <div className="sp-dashboard-side-stack">
+          <Card>
+            <SectionHeader
+              eyebrow="Experiência observada"
+              title="Campeões em destaque"
+              actions={
+                <Button variant="ghost" size="sm" onClick={() => onNavigate("profile")}>
+                  Perfil
+                </Button>
+              }
+            />
+            {profile.topChampions.length === 0 ? (
+              <EmptyState inline title="Sem campeões observados" />
+            ) : (
+              <div className="sp-dashboard-champions">
+                {profile.topChampions.slice(0, 4).map((champion) => (
+                  <DashboardChampion
+                    key={`${champion.championId}-${champion.role}`}
+                    champion={champion}
+                    ddragonVersion={ddragonVersion}
+                  />
+                ))}
+              </div>
+            )}
+          </Card>
+
+          <QuickActions
+            leagueConnected={leagueConnected}
+            champSelectActive={champSelectActive}
+            hasMatch={recentMatches.length > 0}
+            syncing={syncState === "syncing"}
+            onNavigate={onNavigate}
+            onSync={() => void synchronize()}
+            onOpenLastMatch={() => recentMatches[0] && onOpenMatch(recentMatches[0].matchId)}
+          />
+        </div>
       </div>
     </div>
   );
 }
 
-function TrendRow({ label, trend, hasComparison }: { label: string; trend: string; hasComparison: boolean }) {
-  // Sem um segundo bloco de partidas antigas, `trend` vem sempre "stable" -
-  // mostrar isso como tendencia seria enganoso (achado da Fase 10).
-  if (!hasComparison) {
-    return (
-      <SignalChip tone="info" title="Analise mais partidas no Pós-game pra o Sparta poder comparar dois períodos.">
-        {label} · ainda sem comparação
-      </SignalChip>
-    );
-  }
-  const good = trend === "improving" || trend === "resolved";
-  const bad = trend === "worsening" || trend === "new";
-  const Icon = good ? TrendingUp : bad ? TrendingDown : Minus;
+function DashboardHero({
+  profile,
+  headlineMetric,
+  topChampion,
+  ddragonVersion,
+  onOpenProfile
+}: {
+  profile: PlayerProfileOverview;
+  headlineMetric?: ProfileMetric;
+  topChampion?: PlayerProfileOverview["topChampions"][number];
+  ddragonVersion: string;
+  onOpenProfile: () => void;
+}) {
+  const role = profile.roleProfile.primaryRole
+    ? roleLabels[profile.roleProfile.primaryRole]
+    : "Posição indisponível";
   return (
-    <SignalChip tone={good ? "positive" : bad ? "negative" : "info"}>
-      <span style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-2)" }}>
-        <Icon size={13} />
-        {label}
-      </span>
-    </SignalChip>
+    <header className="sp-dashboard-hero">
+      <div className="sp-dashboard-hero__identity">
+        {topChampion ? (
+          <ChampionAvatar
+            championId={topChampion.championId}
+            ddragonVersion={ddragonVersion}
+            size="xl"
+            alt={`${topChampion.championName}, campeão mais observado no período`}
+          />
+        ) : (
+          <span className="sp-dashboard-hero__initial" aria-label="Ícone de invocador indisponível">
+            {profile.identity.riotId.charAt(0).toLocaleUpperCase()}
+          </span>
+        )}
+        <div>
+          <span className="sp-dashboard-hero__eyebrow">Sua visão geral</span>
+          <h1 title={profile.identity.riotId}>{profile.identity.riotId}</h1>
+          <p>
+            {profile.identity.regionLabel} · {role}
+          </p>
+        </div>
+      </div>
+      <div className="sp-dashboard-hero__facts" aria-label="Resumo do jogador">
+        <HeroValue label="Elo" value={rankLabel(profile)} muted={profile.ranked.tier === null} />
+        <HeroValue label="Partidas" value={String(profile.recentPerformance.sampleSize)} />
+        <HeroValue
+          label="Win rate recente"
+          value={
+            profile.recentPerformance.winRate === null
+              ? "Indisponível"
+              : `${Math.round(profile.recentPerformance.winRate)}%`
+          }
+          muted={profile.recentPerformance.winRate === null}
+        />
+        <HeroValue
+          label="Desempenho"
+          value={
+            headlineMetric?.value === null || !headlineMetric
+              ? "Indisponível"
+              : String(Math.round(headlineMetric.value))
+          }
+          muted={headlineMetric?.value === null || !headlineMetric}
+        />
+      </div>
+      <div className="sp-dashboard-hero__action">
+        <span>
+          <Clock3 size={13} /> {formatSync(profile.identity.updatedAt)}
+        </span>
+        <Button variant="secondary" icon={<UserRound size={15} />} onClick={onOpenProfile}>
+          Abrir perfil
+        </Button>
+      </div>
+    </header>
   );
 }
+
+function HeroValue({
+  label,
+  value,
+  muted = false
+}: {
+  label: string;
+  value: string;
+  muted?: boolean;
+}) {
+  return (
+    <span
+      className={
+        muted ? "sp-dashboard-hero__fact sp-dashboard-hero__fact--muted" : "sp-dashboard-hero__fact"
+      }
+    >
+      <small>{label}</small>
+      <strong>{value}</strong>
+    </span>
+  );
+}
+
+function DashboardHeadlineMetric({
+  metric,
+  trend
+}: {
+  metric: ProfileMetric;
+  trend: PerformanceTrendPoint[];
+}) {
+  const angle = metric.value === null ? 0 : Math.max(0, Math.min(100, metric.value)) * 3.6;
+  const delta = trendDelta(trend);
+  return (
+    <article className="sp-dashboard-score">
+      <div
+        className="sp-dashboard-score__dial"
+        style={{ "--sp-dashboard-angle": `${angle}deg` } as CSSProperties}
+        role="img"
+        aria-label={`${metric.label}: ${metric.value === null ? "indisponível" : Math.round(metric.value)}`}
+      >
+        <span>{metric.value === null ? "—" : Math.round(metric.value)}</span>
+      </div>
+      <div>
+        <span>Índice principal</span>
+        <h3>{metric.label}</h3>
+        <p>
+          {delta === null
+            ? "Sem dois períodos comparáveis"
+            : `${delta >= 0 ? "+" : ""}${delta} pontos entre as metades da janela`}
+        </p>
+        <CoverageBadge
+          status={metric.status}
+          coverage={metric.coverage}
+          reason={metric.unavailableReason}
+        />
+      </div>
+    </article>
+  );
+}
+
+function DashboardMiniMetric({ metric }: { metric: ProfileMetric }) {
+  const value = metric.value === null ? null : Math.round(metric.value);
+  const angle = value === null ? 0 : Math.max(0, Math.min(100, value)) * 3.6;
+  return (
+    <article
+      className="sp-dashboard-mini-metric"
+      title={`${metric.formula} Versão ${metric.algorithmVersion}.`}
+    >
+      <span
+        className="sp-dashboard-mini-metric__ring"
+        style={{ "--sp-dashboard-angle": `${angle}deg` } as CSSProperties}
+        aria-hidden="true"
+      />
+      <div>
+        <small>{metric.label}</small>
+        <strong>
+          {value === null ? "Indisponível" : `${value}${metric.unit === "PERCENT" ? "%" : ""}`}
+        </strong>
+        <span>
+          {metric.availableSampleSize}/{metric.sampleSize} partidas
+        </span>
+      </div>
+    </article>
+  );
+}
+
+function DashboardChampion({
+  champion,
+  ddragonVersion
+}: {
+  champion: PlayerProfileOverview["topChampions"][number];
+  ddragonVersion: string;
+}) {
+  const form =
+    champion.recentForm === "improving"
+      ? "Em alta"
+      : champion.recentForm === "declining"
+        ? "Em queda"
+        : "Estável";
+  return (
+    <article className="sp-dashboard-champion">
+      <ChampionAvatar
+        championId={champion.championId}
+        ddragonVersion={ddragonVersion}
+        size="md"
+        alt={champion.championName}
+      />
+      <div className="sp-dashboard-champion__name">
+        <strong>{champion.championName}</strong>
+        <span>
+          {roleLabels[champion.role]} · {form}
+        </span>
+      </div>
+      <div className="sp-dashboard-champion__stats">
+        <strong>{champion.games}</strong>
+        <span>jogos</span>
+      </div>
+      <div className="sp-dashboard-champion__stats">
+        <strong>{Math.round(champion.winRate)}%</strong>
+        <span>win rate</span>
+      </div>
+      <div className="sp-dashboard-champion__stats">
+        <strong>{champion.kda.toFixed(2)}</strong>
+        <span>KDA</span>
+      </div>
+      <Badge tone={champion.sampleStatus === "SMALL" ? "warning" : "neutral"}>
+        {champion.sampleStatus === "SMALL" ? "Amostra pequena" : "Observado"}
+      </Badge>
+    </article>
+  );
+}
+
+function SystemStatusCard({
+  profile,
+  apiAvailable,
+  leagueConnected,
+  emailVerified,
+  riotLinked,
+  syncState
+}: {
+  profile: PlayerProfileOverview;
+  apiAvailable: boolean;
+  leagueConnected: boolean;
+  emailVerified: boolean;
+  riotLinked: boolean;
+  syncState: SyncState;
+}) {
+  return (
+    <Card className="sp-dashboard-system">
+      <SectionHeader
+        eyebrow="Operação"
+        title="Estado do sistema"
+        description="Problemas aparecem por impacto; estados normais permanecem compactos."
+      />
+      <div className="sp-dashboard-system__list">
+        <SystemRow
+          icon={apiAvailable ? <ShieldCheck /> : <CloudOff />}
+          label="API Sparta"
+          value={apiAvailable ? "Disponível" : "Bloqueador"}
+          tone={apiAvailable ? "ok" : "blocker"}
+        />
+        <SystemRow
+          icon={leagueConnected ? <Wifi /> : <WifiOff />}
+          label="League Client"
+          value={leagueConnected ? "Conectado" : "Fechado"}
+          tone={leagueConnected ? "ok" : "info"}
+        />
+        <SystemRow
+          icon={<RefreshCw />}
+          label="Sincronização"
+          value={syncState === "syncing" ? "Em andamento" : formatSync(profile.identity.updatedAt)}
+          tone={profile.status === "STALE" ? "attention" : "ok"}
+        />
+        <SystemRow
+          icon={<UserRound />}
+          label="Vínculo Riot"
+          value={riotLinked ? "Vinculado" : "Bloqueador"}
+          tone={riotLinked ? "ok" : "blocker"}
+        />
+        <SystemRow
+          icon={<CheckCircle2 />}
+          label="Email"
+          value={emailVerified ? "Confirmado" : "Bloqueador"}
+          tone={emailVerified ? "ok" : "blocker"}
+        />
+      </div>
+    </Card>
+  );
+}
+
+function SystemRow({
+  icon,
+  label,
+  value,
+  tone
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+  tone: "ok" | "attention" | "blocker" | "info";
+}) {
+  return (
+    <div className={`sp-dashboard-system__row sp-dashboard-system__row--${tone}`}>
+      <span aria-hidden="true">{icon}</span>
+      <strong>{label}</strong>
+      <small>{value}</small>
+    </div>
+  );
+}
+
+function QuickActions({
+  leagueConnected,
+  champSelectActive,
+  hasMatch,
+  syncing,
+  onNavigate,
+  onSync,
+  onOpenLastMatch
+}: {
+  leagueConnected: boolean;
+  champSelectActive: boolean;
+  hasMatch: boolean;
+  syncing: boolean;
+  onNavigate: (page: Page) => void;
+  onSync: () => void;
+  onOpenLastMatch: () => void;
+}) {
+  return (
+    <Card>
+      <SectionHeader eyebrow="Atalhos" title="Ações rápidas" />
+      <div className="sp-dashboard-actions">
+        <button type="button" onClick={() => onNavigate("select")}>
+          <Crosshair size={18} />
+          <span>
+            <strong>{champSelectActive ? "Abrir seleção ativa" : "Champion Select"}</strong>
+            <small>
+              {leagueConnected
+                ? "Cliente detectado"
+                : "Modo manual; detecção automática indisponível"}
+            </small>
+          </span>
+          <ArrowRight size={14} />
+        </button>
+        <button type="button" onClick={onSync} disabled={syncing}>
+          <RefreshCw size={18} />
+          <span>
+            <strong>{syncing ? "Sincronizando" : "Sincronizar dados"}</strong>
+            <small>Busca novas partidas da conta vinculada</small>
+          </span>
+          <ArrowRight size={14} />
+        </button>
+        <button type="button" onClick={() => onNavigate("profile")}>
+          <Activity size={18} />
+          <span>
+            <strong>Visualizar perfil</strong>
+            <small>Índices, campeões e cobertura completa</small>
+          </span>
+          <ArrowRight size={14} />
+        </button>
+        <button
+          type="button"
+          onClick={onOpenLastMatch}
+          disabled={!hasMatch}
+          title={!hasMatch ? "Nenhuma partida sincronizada" : undefined}
+        >
+          <Sparkles size={18} />
+          <span>
+            <strong>Abrir última partida</strong>
+            <small>{hasMatch ? "Detalhe e pós-game existente" : "Indisponível sem partidas"}</small>
+          </span>
+          <ArrowRight size={14} />
+        </button>
+        <button type="button" onClick={() => onNavigate("drafts")}>
+          <History size={18} />
+          <span>
+            <strong>Consultar histórico</strong>
+            <small>Drafts e decisões preservadas</small>
+          </span>
+          <ArrowRight size={14} />
+        </button>
+      </div>
+    </Card>
+  );
+}
+
+function DashboardSkeleton() {
+  return (
+    <div className="sp-dashboard" role="status" aria-label="Carregando dashboard">
+      <div className="sp-dashboard-hero">
+        <Skeleton width="38%" height={36} />
+        <Skeleton width="52%" height={16} />
+      </div>
+      <div className="sp-dashboard-indices">
+        <Skeleton height={150} radius="var(--radius-lg)" />
+        <SkeletonRows count={3} height={42} />
+      </div>
+      <div className="sp-dashboard-main-grid">
+        <Skeleton height={360} radius="var(--radius-lg)" />
+        <Skeleton height={360} radius="var(--radius-lg)" />
+      </div>
+    </div>
+  );
+}
+
+function rankLabel(profile: PlayerProfileOverview): string {
+  if (!profile.ranked.tier) return "Indisponível";
+  return [
+    profile.ranked.tier,
+    profile.ranked.division,
+    profile.ranked.leaguePoints === null ? null : `${profile.ranked.leaguePoints} LP`
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+function formatSync(value: string | null): string {
+  return value
+    ? `Atualizado em ${new Date(value).toLocaleDateString("pt-BR")}`
+    : "Atualização indisponível";
+}
+
+function trendDelta(points: PerformanceTrendPoint[]): number | null {
+  if (points.length < 4) return null;
+  const half = Math.floor(points.length / 2);
+  const previous = points.slice(0, half);
+  const recent = points.slice(half);
+  const average = (values: PerformanceTrendPoint[]) =>
+    values.reduce((sum, point) => sum + point.performanceIndex, 0) / values.length;
+  return Math.round(average(recent) - average(previous));
+}
+
+function syncResultMessage(result: PlayerSyncResult): string {
+  if (result.failed.length > 0)
+    return `${result.imported} partida(s) importada(s); ${result.failed.length} não puderam ser sincronizadas.`;
+  if (result.imported > 0) return `${result.imported} nova(s) partida(s) importada(s).`;
+  return "Sincronização concluída; nenhuma partida nova encontrada.";
+}
+
+export const DASHBOARD_METRIC_KEYS: ProfileMetricKey[] = [
+  "RECENT_PERFORMANCE",
+  "OBJECTIVES",
+  "VISION",
+  "CONSISTENCY",
+  "TEAM_IMPACT",
+  "SURVIVAL"
+];

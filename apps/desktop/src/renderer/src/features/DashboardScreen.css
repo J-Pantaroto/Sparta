@@ -1,107 +1,508 @@
-/*
- * Faixa das ultimas partidas: um quadrado por partida, verde/vermelho, do
- * mais recente pro mais antigo. E a leitura mais rapida possivel de "como
- * estao indo os jogos" - o Dashboard antes so mostrava um score agregado,
- * sem nenhuma nocao de sequencia.
- */
-.sp-streak {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  flex-wrap: wrap;
+.sp-dashboard {
+  display: grid;
+  gap: var(--space-5);
+  min-width: 0;
 }
 
-.sp-streak__match {
+.sp-dashboard-hero {
   position: relative;
   display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  border: 0;
-  border-radius: var(--radius-sm);
-  padding: 0;
+  grid-template-columns: minmax(260px, 1fr) minmax(420px, 1.25fr) auto;
+  align-items: center;
+  gap: var(--space-6);
+  min-height: 154px;
+  padding: var(--space-6);
   overflow: hidden;
-  cursor: default;
-  background: var(--surface-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-xl);
+  background:
+    radial-gradient(circle at 88% 20%, var(--color-accent-glow), transparent 34%),
+    linear-gradient(135deg, var(--surface-3), var(--surface-1));
+  box-shadow: var(--shadow-lg);
 }
 
-.sp-streak__match img,
-.sp-streak__match > div {
-  width: 100%;
-  height: 100%;
-  border: 0;
-  border-radius: 0;
-}
-
-/* Faixa inferior colorida em vez de tingir o retrato inteiro: o campeao
-   continua reconhecivel e o resultado continua legivel de relance. */
-.sp-streak__match::after {
+.sp-dashboard-hero::after {
   content: "";
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 3px;
-  background: var(--color-red);
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: var(--color-accent);
 }
 
-.sp-streak__match--won::after {
-  background: var(--color-green);
+.sp-dashboard-hero__identity,
+.sp-dashboard-hero__action,
+.sp-dashboard-notice,
+.sp-dashboard-score,
+.sp-dashboard-mini-metric,
+.sp-dashboard-champion,
+.sp-dashboard-system__row,
+.sp-dashboard-actions button {
+  display: flex;
+  align-items: center;
 }
 
-.sp-streak__legend {
-  color: var(--text-muted);
+.sp-dashboard-hero__identity {
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.sp-dashboard-hero__initial {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--surface-4);
+  color: var(--color-accent);
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-black);
+}
+
+.sp-dashboard-hero__identity > div {
+  min-width: 0;
+}
+
+.sp-dashboard-hero__eyebrow {
+  color: var(--color-accent);
   font-size: var(--text-xs);
-  margin-left: var(--space-2);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
-/* Linha do pool de campeoes no Dashboard (versao curta da tabela do Perfil) */
-.sp-pool {
+.sp-dashboard-hero h1 {
+  margin-top: var(--space-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-3xl);
+  font-weight: var(--weight-black);
+}
+
+.sp-dashboard-hero__identity p,
+.sp-dashboard-hero__action > span {
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+
+.sp-dashboard-hero__facts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.sp-dashboard-hero__fact {
   display: grid;
   gap: var(--space-1);
+  min-width: 0;
+  padding: var(--space-3);
+  border-left: 1px solid var(--border-subtle);
 }
 
-.sp-pool__row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 60px 56px 40px;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-2);
-  border-radius: var(--radius-sm);
-  transition: background-color var(--duration-fast) var(--ease-out);
-}
-
-.sp-pool__row:hover {
-  background: var(--surface-hover);
-}
-
-.sp-pool__rank {
+.sp-dashboard-hero__fact small,
+.sp-dashboard-mini-metric small,
+.sp-dashboard-champion__stats span {
   color: var(--text-muted);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-bold);
+  font-size: var(--text-2xs);
+}
+
+.sp-dashboard-hero__fact strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-lg);
   font-variant-numeric: tabular-nums;
 }
 
-/* Cartao de insight (ponto forte / risco): rotulo pequeno, frase forte. */
-.sp-insight__label {
-  display: block;
-  margin-bottom: var(--space-2);
+.sp-dashboard-hero__fact--muted strong {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.sp-dashboard-hero__action {
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+
+.sp-dashboard-hero__action > span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  white-space: nowrap;
+}
+
+.sp-dashboard-notice {
+  gap: var(--space-3);
+  min-height: 52px;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+}
+
+.sp-dashboard-notice > div {
+  display: grid;
+  flex: 1;
+  gap: var(--space-1);
+}
+
+.sp-dashboard-notice strong {
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+}
+
+.sp-dashboard-notice span {
+  font-size: var(--text-xs);
+}
+
+.sp-dashboard-notice--stale,
+.sp-dashboard-notice--error {
+  border-color: color-mix(in srgb, var(--color-yellow) 34%, var(--border-default));
+}
+
+.sp-dashboard-notice--success {
+  border-color: color-mix(in srgb, var(--color-green) 28%, var(--border-default));
+}
+
+.sp-dashboard-section {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.sp-dashboard-indices {
+  display: grid;
+  grid-template-columns: minmax(300px, 0.8fr) minmax(0, 2.2fr);
+  gap: var(--space-4);
+}
+
+.sp-dashboard-score {
+  gap: var(--space-5);
+  min-height: 148px;
+  padding: var(--space-5);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, var(--surface-3), var(--surface-1));
+  box-shadow: var(--shadow-md);
+}
+
+.sp-dashboard-score__dial {
+  display: grid;
+  place-items: center;
+  width: 92px;
+  height: 92px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: conic-gradient(var(--chart-primary) var(--sp-dashboard-angle), var(--surface-4) 0);
+  box-shadow: 0 0 24px -12px var(--chart-glow);
+}
+
+.sp-dashboard-score__dial::before {
+  content: "";
+  grid-area: 1 / 1;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: var(--surface-2);
+}
+
+.sp-dashboard-score__dial span {
+  grid-area: 1 / 1;
+  z-index: 1;
+  font-size: var(--text-3xl);
+  font-weight: var(--weight-black);
+}
+
+.sp-dashboard-score > div:last-child {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.sp-dashboard-score > div:last-child > span,
+.sp-dashboard-score p {
   color: var(--text-muted);
   font-size: var(--text-xs);
-  font-weight: var(--weight-medium);
 }
 
-.sp-insight__headline {
-  display: block;
-  font-size: var(--text-lg);
-  font-weight: var(--weight-bold);
-  line-height: var(--leading-snug);
+.sp-dashboard-score h3 {
+  font-size: var(--text-xl);
 }
 
-.sp-insight__detail {
-  display: block;
-  margin-top: var(--space-2);
+.sp-dashboard-indices__secondary {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.sp-dashboard-mini-metric {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  min-width: 0;
+  min-height: 148px;
+  padding: var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+  transition: var(--transition-colors), var(--transition-transform);
+}
+
+.sp-dashboard-mini-metric:hover {
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
+}
+
+.sp-dashboard-mini-metric__ring {
+  width: 38px;
+  height: 38px;
+  border: 6px solid transparent;
+  border-radius: 50%;
+  background: conic-gradient(var(--chart-secondary) var(--sp-dashboard-angle), var(--surface-4) 0)
+    border-box;
+  mask:
+    linear-gradient(#000 0 0) padding-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+}
+
+.sp-dashboard-mini-metric > div {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.sp-dashboard-mini-metric strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-xl);
+  font-variant-numeric: tabular-nums;
+}
+
+.sp-dashboard-mini-metric span {
+  color: var(--text-muted);
+  font-size: var(--text-2xs);
+}
+
+.sp-dashboard-main-grid,
+.sp-dashboard-content-grid {
+  display: grid;
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.sp-dashboard-main-grid {
+  grid-template-columns: minmax(0, 2fr) minmax(300px, 0.72fr);
+}
+
+.sp-dashboard-content-grid {
+  grid-template-columns: minmax(0, 1.45fr) minmax(380px, 1fr);
+}
+
+.sp-dashboard-trend-card {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.sp-dashboard-system__list,
+.sp-dashboard-matches,
+.sp-dashboard-champions,
+.sp-dashboard-side-stack,
+.sp-dashboard-actions {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.sp-dashboard-system__row {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  gap: var(--space-2);
+  min-height: 38px;
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--surface-1);
+}
+
+.sp-dashboard-system__row > span {
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+}
+
+.sp-dashboard-system__row svg {
+  width: 15px;
+  height: 15px;
+}
+
+.sp-dashboard-system__row strong,
+.sp-dashboard-system__row small {
+  font-size: var(--text-xs);
+}
+
+.sp-dashboard-system__row small {
+  color: var(--text-muted);
+}
+
+.sp-dashboard-system__row--ok > span {
+  color: var(--color-green);
+}
+
+.sp-dashboard-system__row--attention > span {
+  color: var(--color-yellow);
+}
+
+.sp-dashboard-system__row--blocker > span {
+  color: var(--color-red);
+}
+
+.sp-dashboard-champion {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) repeat(3, auto) auto;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+}
+
+.sp-dashboard-champion__name {
+  display: grid;
+  min-width: 0;
+}
+
+.sp-dashboard-champion__name strong,
+.sp-dashboard-champion__name span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sp-dashboard-champion__name span {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.sp-dashboard-champion__stats {
+  display: grid;
+  justify-items: end;
+}
+
+.sp-dashboard-champion__stats strong {
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.sp-dashboard-actions button {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  min-height: 54px;
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
   color: var(--text-secondary);
-  font-size: var(--text-md);
-  line-height: var(--leading-snug);
+  text-align: left;
+  cursor: pointer;
+  transition: var(--transition-colors), var(--transition-transform);
+}
+
+.sp-dashboard-actions button:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+  color: var(--text-primary);
+  transform: translateX(2px);
+}
+
+.sp-dashboard-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.sp-dashboard-actions button > span {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.sp-dashboard-actions strong {
+  font-size: var(--text-sm);
+}
+
+.sp-dashboard-actions small {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+html[data-density="compact"] .sp-dashboard {
+  gap: var(--space-4);
+}
+
+html[data-density="compact"] .sp-dashboard-hero,
+html[data-density="compact"] .sp-dashboard-score {
+  min-height: 126px;
+  padding: var(--space-4);
+}
+
+html[data-density="compact"] .sp-dashboard-mini-metric {
+  min-height: 120px;
+  padding: var(--space-3);
+}
+
+@media (max-width: 1420px) {
+  .sp-dashboard-hero {
+    grid-template-columns: minmax(260px, 1fr) minmax(360px, 1fr);
+  }
+
+  .sp-dashboard-hero__action {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    justify-content: space-between;
+  }
+
+  .sp-dashboard-indices__secondary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .sp-dashboard-mini-metric {
+    min-height: 112px;
+  }
+}
+
+@media (max-width: 1220px) {
+  .sp-dashboard-main-grid,
+  .sp-dashboard-content-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sp-dashboard-side-stack {
+    grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+  }
+}
+
+@media (max-width: 1080px) {
+  .sp-dashboard-hero,
+  .sp-dashboard-indices,
+  .sp-dashboard-side-stack {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sp-dashboard-hero__facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sp-dashboard-indices__secondary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sp-dashboard-champion {
+    grid-template-columns: auto minmax(0, 1fr) repeat(2, auto);
+  }
+
+  .sp-dashboard-champion > :nth-last-child(2),
+  .sp-dashboard-champion > :last-child {
+    display: none;
+  }
 }

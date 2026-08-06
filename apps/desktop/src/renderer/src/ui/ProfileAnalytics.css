@@ -195,6 +195,15 @@
   border-radius: var(--radius-lg);
   background: linear-gradient(180deg, var(--surface-2), var(--surface-1));
 }
+
+.sp-trend-chart--compact svg {
+  max-height: 248px;
+}
+
+.sp-trend-chart--compact .sp-trend-chart__text-values {
+  max-height: 118px;
+  overflow-y: auto;
+}
 .sp-trend-chart figcaption {
   margin-bottom: var(--space-4);
   font-size: var(--text-base);

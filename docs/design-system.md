@@ -1,5 +1,12 @@
 # Design System
 
+Na Etapa 31F, o sistema visual passou à versão 2 com três temas estruturais (Espartano, Obsidian e
+Adaptativo), densidades confortável/compacta e arte completa/reduzida. A preferência local altera
+superfícies, bordas, elevação, accent, gráficos, foco, hover, seleção, gradiente e glow; cores
+semânticas continuam fixas. O tema Adaptativo é o único que recebe accent extraído de campeão.
+`AppShell`, `Sidebar`, `Topbar` e `GlobalNotice` formam o shell autenticado reutilizável. Ver
+`docs/shell-dashboard-visual-system.md`.
+
 Na Etapa 31E, `ProfileAnalytics.tsx/.css` adicionou a fundação analítica reutilizável:
 `ProfileHero`, `MetricCard`, `TrendChart`, `ChampionPerformanceCard`, `RecentMatchRow`,
 `InsightCard` e `CoverageBadge`, reutilizando os estados e cabeçalhos existentes. O gráfico é SVG
@@ -41,7 +48,7 @@ componentes lá separaria o CSS do TSX e dividiria a fonte de verdade em vez de 
 ## Dois eixos de cor
 
 - **Destaque** (`--color-accent`, `--color-accent-soft`, `--color-accent-glow`) — identidade.
-  Muda com a skin escolhida: o `FeaturedChampionProvider` sobrescreve esses três tokens em
+  No tema Adaptativo, muda com a skin escolhida: o `FeaturedChampionProvider` sobrescreve esses três tokens em
   runtime com a cor extraída da splash art (`theme/accent-color.ts`), travada numa faixa de
   saturação/luminosidade que garante contraste contra o fundo quase preto. **Os nomes não
   podem mudar** — há código em runtime que os escreve por nome.

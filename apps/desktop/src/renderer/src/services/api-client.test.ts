@@ -7,6 +7,7 @@ import {
   fetchSession,
   fetchPersonalLoadoutEvidence,
   fetchRecommendationObservability,
+  syncMyPlayerData,
   PlayerRoleUnavailableError,
   SESSION_EXPIRED_EVENT
 } from "./api-client";
@@ -314,6 +315,33 @@ describe("perfil analítico autenticado (Etapa 31E)", () => {
     expect(String(fetchSpy.mock.calls[0]?.[0])).toContain("/me/player-profile");
     expect(String(fetchSpy.mock.calls[0]?.[0])).not.toMatch(/puuid|riotId|playerId/);
     const request = fetchSpy.mock.calls[0]?.[1] as RequestInit;
+    expect(new globalThis.Headers(request.headers).get("Authorization")).toBe(
+      "Bearer private-profile-session"
+    );
+    vi.unstubAllGlobals();
+  });
+
+  it("sincroniza somente a conta derivada da sessão, sem identificador no payload", async () => {
+    const fetchSpy = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          requested: 0,
+          imported: 0,
+          skippedExisting: 0,
+          failed: [],
+          skippedParticipants: []
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      )
+    );
+    vi.stubGlobal("fetch", fetchSpy);
+
+    await syncMyPlayerData("private-profile-session");
+
+    expect(String(fetchSpy.mock.calls[0]?.[0])).toContain("/players/sync");
+    const request = fetchSpy.mock.calls[0]?.[1] as RequestInit;
+    expect(request.method).toBe("POST");
+    expect(request.body).toBeUndefined();
     expect(new globalThis.Headers(request.headers).get("Authorization")).toBe(
       "Bearer private-profile-session"
     );

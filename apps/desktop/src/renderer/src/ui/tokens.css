@@ -145,4 +145,52 @@
   /* ─── Layout ───────────────────────────────────────────────────────── */
   --sidebar-width: 232px;
   --content-max: 1560px;
+  --topbar-height: 64px;
+  --sidebar-collapsed-width: 76px;
+  --content-padding: clamp(var(--space-5), 2.2vw, var(--space-8));
+  --panel-gap: var(--space-4);
+}
+
+html[data-sparta-theme="obsidian"] {
+  --bg-base: #06070b;
+  --bg-sunken: #030407;
+  --surface-1: #0b0d14;
+  --surface-2: #10131c;
+  --surface-3: #181c29;
+  --surface-4: #212738;
+  --surface-veil: rgba(16, 19, 28, 0.74);
+  --surface-veil-strong: rgba(7, 9, 14, 0.94);
+  --surface-hover: rgba(148, 137, 255, 0.07);
+  --surface-active: rgba(148, 137, 255, 0.11);
+  --border-subtle: #171b27;
+  --border-default: #252b3d;
+  --border-strong: #39425a;
+  --color-accent: #9b8afb;
+  --color-accent-soft: #5c4eb5;
+  --color-accent-glow: rgba(155, 138, 251, 0.26);
+  --chart-primary: #ab9dff;
+  --chart-secondary: #71c7ec;
+  --chart-grid: rgba(170, 180, 215, 0.16);
+  --shadow-md: 0 10px 24px -14px rgba(0, 0, 0, 0.92);
+  --shadow-lg: 0 24px 54px -26px rgba(0, 0, 0, 0.96);
+}
+
+html[data-sparta-theme="adaptive"] {
+  --surface-1: #090a0d;
+  --surface-2: #0e1015;
+  --surface-3: #171a21;
+  --surface-4: #20242d;
+  --surface-hover: color-mix(in srgb, var(--color-accent) 7%, transparent);
+  --surface-active: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  --border-default: color-mix(in srgb, var(--color-accent) 18%, #26262e);
+  --border-strong: color-mix(in srgb, var(--color-accent) 28%, #35353f);
+  --chart-primary: var(--color-accent);
+  --chart-secondary: color-mix(in srgb, var(--color-accent) 48%, #9b8afb);
+  --chart-glow: var(--color-accent-glow);
+}
+
+html[data-density="compact"] {
+  --content-padding: var(--space-5);
+  --panel-gap: var(--space-3);
+  --topbar-height: 56px;
 }

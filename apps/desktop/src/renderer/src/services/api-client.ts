@@ -323,6 +323,23 @@ export function fetchMyPlayerProfile(token: string) {
   });
 }
 
+export interface PlayerSyncResult {
+  requested: number;
+  imported: number;
+  skippedExisting: number;
+  failed: Array<{ matchId: string; reason: string }>;
+  skippedParticipants: Array<{ matchId: string; puuid: string }>;
+  stoppedEarly?: "rate_limited" | "max_reached";
+}
+
+/** Sincroniza somente a conta vinculada ao bearer; nenhum identificador vem do renderer. */
+export function syncMyPlayerData(token: string) {
+  return request<PlayerSyncResult>("/players/sync", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
 export function fetchChampionPerformance(puuid: string) {
   return request<{ puuid: string; champions: ChampionPerformanceScore[] }>(
     `/players/${encodeURIComponent(puuid)}/champion-performance`
