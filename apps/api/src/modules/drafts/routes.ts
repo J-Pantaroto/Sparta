@@ -220,7 +220,7 @@ export const draftsRoutes: FastifyPluginAsync = async (app) => {
     const session = await findActiveDraftSession(account.id);
     if (!session) return { session: null };
 
-    const snapshot = await findLatestSnapshot(session.id);
+    const snapshot = await findLatestSnapshot(account.id, session.id);
     return { session, latestSnapshotId: snapshot?.id ?? null };
   });
 
@@ -247,7 +247,7 @@ export const draftsRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const [snapshot, selectedChampion, revisions] = await Promise.all([
-      findLatestSnapshot(session.id),
+      findLatestSnapshot(account.id, session.id),
       describeSelectedChampion(account.id, session.id),
       listDraftMatchLinkRevisions(account.id, session.id)
     ]);

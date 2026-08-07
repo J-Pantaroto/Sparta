@@ -763,6 +763,7 @@ function SpartaApp() {
       {page === "drafts" && (
         <DraftHistoryScreen
           sessionToken={sessionToken}
+          ddragonVersion={ddragonVersion}
           onOpenMatch={(matchId) => {
             setPostgameInitialMatchId(matchId);
             setPage("postgame");

@@ -1,0 +1,52 @@
+/*
+ * Comparação estrutural do replay (Etapa 31I) - tabela HTML real (não grid),
+ * porque a quantidade de colunas é fixa e a semântica de `<table>` ajuda
+ * leitor de tela a navegar célula a célula numa auditoria técnica.
+ */
+.sp-replay-divergence {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.sp-replay-divergence__title {
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+
+.sp-replay-divergence__table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.sp-replay-divergence__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.sp-replay-divergence__table th,
+.sp-replay-divergence__table td {
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.sp-replay-divergence__table thead th {
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-sunken);
+  color: var(--text-muted);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sp-replay-divergence__table tbody tr:not(:last-child) td {
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.sp-replay-divergence__table tbody tr:hover {
+  background: var(--surface-2);
+}

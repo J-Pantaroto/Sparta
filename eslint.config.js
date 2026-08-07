@@ -33,6 +33,7 @@ export default [
         AbortController: "readonly",
         AbortSignal: "readonly",
         URLSearchParams: "readonly",
+        navigator: "readonly",
         __dirname: "readonly"
       }
     },

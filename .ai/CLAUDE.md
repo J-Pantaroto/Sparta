@@ -1,5 +1,93 @@
 # Sparta - Contexto para Continuidade
 
+## Etapa 31I: redesign do Histórico do Motor e Laboratório de Calibração
+
+Etapa exclusivamente de experiência e visualização, sobre as duas últimas telas "cruas" do
+produto. **Nenhuma fórmula, peso, threshold, experimento, lógica de calibração, release ativa,
+critério de ativação, replay, hash ou persistência científica foi tocado** — tudo aditivo ou
+puramente apresentacional. Relatório completo em
+`docs/engine-history-calibration-lab-redesign.md`.
+
+**Auditoria antes de tocar código**: o nome de navegação "Histórico do motor" é ambíguo entre
+duas telas. `DraftHistoryScreen.tsx` (nav "Histórico de drafts") é quem lista snapshots
+individuais com hash/config/release/replay — o alvo real do pedido de redesenhar o "Histórico do
+Motor". `MotorHistoryScreen.tsx` (observabilidade agregada da Etapa 23, uma linha por dimensão)
+já usava integralmente o design system atual, tokens corretos (`--space-*`/`--text-*`/
+`--border-subtle`), zero barra de progresso repetitiva e um breakpoint responsivo — auditoria
+concluiu **manter**, sem alterar código só para justificar a etapa.
+
+**Backend (aditivo)**: `RecommendationSnapshot.configurationSource`/`configurationReleaseId`/
+`configurationVersion`/`configHash` já existiam no schema desde a Etapa 27b (colunas nullable) e
+nunca eram serializados em `GET /drafts/sessions/:id`. Nova `resolveSnapshotRelease`
+(`draft-session-repository.ts`) resolve a release referenciada + se é a atualmente apontada pelo
+ponteiro; os quatro campos + resumo de release (`id`/`releaseVersion`/`artifactHash`/`status`/
+`currentlyActive`) passam a sair por snapshot. Mudança 100% de leitura — nenhuma query nova,
+nenhum campo computado que não estivesse já persistido.
+
+**`ui/HashChip.tsx`** (novo) — disclosure progressivo pra hash/ID técnico: resumido por padrão
+(6 primeiros + … + 4 últimos), botão pra expandir/recolher, ação separada de copiar
+(`navigator.clipboard`, primeiro uso no repositório — `navigator` entrou nos globals do
+`eslint.config.js` raiz). Usado em `DraftHistoryScreen`/`CalibrationLabScreen` pra todo
+`configHash`/`artifactHash`.
+
+**`DraftHistoryScreen.tsx` reescrito** — filtros de posição/período 100% client-side sobre a
+lista já carregada (`GET /drafts/sessions` só suporta `limit` no servidor; adicionar filtro novo
+seria desproporcional pra uma etapa declaradamente visual, decisão documentada no código).
+Detalhe em três blocos rotulados, nunca misturados: **Contexto congelado** (posição/aliados/
+inimigos/bans/pool como estavam no draft), **Resultado produzido** (ranking numerado com
+`ScoreBadge`, grupo, cobertura, razões, riscos — do snapshot persistido, **nunca** comparado com
+score atual), **Configuração** (versão, hashes via `HashChip`, release associada com badge
+"ATIVA" só quando `currentlyActive === true`). Seção de replay reaproveitando
+`ReplayCapabilitySummary`, agora com **tabela real** (`<table>`) de divergência campo a campo
+quando `REPLAY_INTEGRITY_FAILED`, agrupada pelo vocabulário real do verificador (`presenca`,
+`totalScore`, `dataCoverage`, `rank`, `group`, `metric.<chave>`) — nunca resumida como
+vermelho/verde.
+
+**`CalibrationLabScreen.tsx` redesenhado** — banner fixo "Ambiente histórico / não operacional"
+com três frases explícitas (nada altera produção automaticamente; métricas são congeladas no
+snapshot original; ativar exige o fluxo de release separado). `computeWeightDeltas` mostra só os
+pesos que **de fato divergem** entre a release ativa e a configuração candidata em edição — peso
+igual nos dois lados nunca aparece; a comparação só existe quando há release ativa (a baseline
+embutida varia por cenário do draft, comparar contra "a" baseline fingiria uma configuração única
+que não existe). Os três `<pre>{JSON.stringify(...)}</pre>` anteriores viraram cards/tabelas
+estruturados usando os tipos reais do domínio (`CalibrationExperimentReport`,
+`CalibrationHumanReviewSummary`, `CalibrationExclusionSummary`, `CalibrationReweightedCandidate`)
+— cobertura com total/reavaliados/excluídos/motivo traduzido (nunca enquadrado como falha do
+modelo), bloco de integridade temporal factual (o `ReplayInputBundle` de cada caso só preserva o
+que existia no instante do draft, por construção — sem inventar um "score" de integridade).
+`RELEASE_STATUS_LABELS` traduz o estado cru; badge "ATIVA" aparece só quando
+`currentlyActive === true` (garantia estrutural do ponteiro único, Etapa 27b — nunca duas
+releases marcadas ao mesmo tempo); `HashChip` nos dois hashes de cada release; indicador discreto
+quando a release veio do experimento aberto na tela. Confirmações em dois passos de
+ativação/rollback (já existentes desde a Etapa 27b) preservadas sem alteração de comportamento.
+
+**Validado real** (Docker reconstruído com a imagem contendo as mudanças, Postgres real, conta
+Zekerus#117): `prisma migrate deploy` confirmou **zero migrations pendentes** (etapa 100%
+aditiva); `GET /recommendation-engine/active-release` confirmou `release-etapa27c-v1` `ACTIVE`
+com `artifactHash`/`configHash` **idênticos** aos de antes; recomendação controlada de sempre
+(JUNGLE, pick 3, Ahri aliada, Lee Sin inimigo, bans 55/91) → **5 candidatos idênticos** à linha de
+base (Viego 58.7/0.9, Udyr 58.5/0.5, Vi 55.3/0.5, Nocturne 53.3/0.5, Graves 50.1/0.5); snapshot
+novo persistido com os campos aditivos corretos (`configurationSource: RELEASE`, `configHash`
+batendo, `releaseVersion: release-etapa27c-v1`, `currentlyActive: true`); `verify-replay` no
+snapshot novo → **`EXACT_REPLAY`, 0 divergências**.
+
+**Limitação registrada, não escondida**: validação visual em Electron real via CDP **não foi
+executada nesta sessão**. Desde a Etapa 31D, `App.tsx` chama `window.sparta.session.get()`
+incondicionalmente no primeiro efeito — sem o bridge de preload do processo Electron real essa
+chamada lança, e uma aba de navegador comum (mesmo apontando pro dev server) não reproduz mais as
+telas pós-login, diferente de sessões anteriores a essa etapa. A validação desta etapa se apoiou
+em: leitura/serialização confirmada contra o Postgres/API reais via curl (incluindo os campos
+novos ponta a ponta); suíte de testes de componente com `@testing-library/react`/jsdom cobrindo
+texto exato renderizado (banner, badge ATIVA, hash resumido vs. completo, filtros, blocos do
+detalhe); `typecheck`/`build` do bundle do renderer sem erros. Registrado como limitação
+explícita, mesmo padrão de honestidade de quando um recurso depende do League Client aberto.
+
+**1228 testes** no monorepo (core 635, riot 97, api 353, desktop 127, raiz 15, analyzer 1) — 12
+novos cobrindo especificamente esta etapa. `typecheck`/`lint`/`build` completos nos quatro
+pacotes TypeScript; `apps/api` isolado passou 353/353 numa única execução, sem flakiness desta
+vez; infraestrutura de testes não foi alterada. Ver
+`docs/engine-history-calibration-lab-redesign.md`.
+
 ## Etapa 31H: redesign do pós-game, partidas e histórico pessoal
 
 Escopo exclusivo: pós-game, detalhe de partida, histórico pessoal, comparação factual com o

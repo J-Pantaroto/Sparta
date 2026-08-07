@@ -2,11 +2,32 @@ import { useState } from "react";
 import {
   fetchReplayBundleSummary,
   verifySnapshotReplay,
-  type ReplayBundleSummary
+  type ReplayBundleSummary,
+  type ReplayVerificationResponse
 } from "../services/api-client";
 import { useAsyncData } from "../hooks/use-async-data";
 import { configurationSourceLabels, replayCapabilityLabels } from "../app/labels";
 import { Button, SignalChip } from "../ui";
+import "./ReplayCapabilitySummary.css";
+
+const DIVERGENCE_GROUP_LABELS: Record<string, string> = {
+  presenca: "Presença do candidato",
+  totalScore: "Score",
+  dataCoverage: "Cobertura",
+  rank: "Ranking",
+  group: "Ranking"
+};
+
+/** Rótulo honesto do campo - só agrupa o que o replay de fato compara (nunca inventa "configuração"/"artefato": isso é rejeitado antes do replay rodar, não diverge nele). */
+function divergenceFieldLabel(field: string): string {
+  if (field.startsWith("metric.")) return `Métrica ${field.slice("metric.".length)}`;
+  return DIVERGENCE_GROUP_LABELS[field] ?? field;
+}
+
+function formatDivergenceValue(value: number | string | null): string {
+  if (value === null) return "—";
+  return String(value);
+}
 
 /**
  * Resumo mínimo da capacidade de replay de um snapshot (Etapa 26b).
@@ -30,6 +51,7 @@ export function ReplayCapabilitySummary({
   const [verified, setVerified] = useState<ReplayBundleSummary | null>(null);
   const [verifying, setVerifying] = useState(false);
   const [verifyError, setVerifyError] = useState<string | null>(null);
+  const [divergences, setDivergences] = useState<ReplayVerificationResponse["divergences"]>([]);
 
   const data = verified ?? summary.data;
 
@@ -124,6 +146,7 @@ export function ReplayCapabilitySummary({
                     reweightAvailable: result.reweightAvailable,
                     lastVerification: { status: result.status, verifiedAt: new Date().toISOString() }
                   });
+                  setDivergences(result.divergences);
                 })
                 .catch((error: unknown) => {
                   setVerifyError(error instanceof Error ? error.message : "Falha ao verificar.");
@@ -138,6 +161,53 @@ export function ReplayCapabilitySummary({
           )}
         </div>
       )}
+
+      {divergences.length > 0 && <DivergenceTable divergences={divergences} />}
+    </div>
+  );
+}
+
+/**
+ * Comparação estrutural do replay (Etapa 31I): campo esperado vs obtido,
+ * agrupado só pelo que o motor de fato compara - nunca inventa categoria
+ * "configuração"/"artefato" aqui, porque um descasamento desses barra o
+ * replay antes de rodar (`FULL_DERIVATION_REPLAY_INVALID`), não gera
+ * divergência de campo.
+ */
+function DivergenceTable({
+  divergences
+}: {
+  divergences: ReplayVerificationResponse["divergences"];
+}) {
+  return (
+    <div className="sp-replay-divergence">
+      <p className="sp-replay-divergence__title">
+        {divergences.length} divergência(s) - campo esperado (persistido) vs obtido (reconstruído)
+      </p>
+      <div className="sp-replay-divergence__table-wrap">
+        <table className="sp-replay-divergence__table">
+          <thead>
+            <tr>
+              <th scope="col">Candidato</th>
+              <th scope="col">Campo</th>
+              <th scope="col">Esperado</th>
+              <th scope="col">Obtido</th>
+              <th scope="col">Delta</th>
+            </tr>
+          </thead>
+          <tbody>
+            {divergences.map((entry, index) => (
+              <tr key={`${entry.field}-${entry.championId ?? "geral"}-${index}`}>
+                <td>{entry.championId !== undefined ? `Campeão #${entry.championId}` : "—"}</td>
+                <td>{divergenceFieldLabel(entry.field)}</td>
+                <td>{formatDivergenceValue(entry.expected)}</td>
+                <td>{formatDivergenceValue(entry.reconstructed)}</td>
+                <td>{entry.delta !== undefined ? entry.delta.toFixed(2) : "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

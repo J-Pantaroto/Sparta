@@ -336,6 +336,15 @@ export async function observeExternalGameId(input: {
   });
 }
 
+/** Projeção leve da release referenciada por um snapshot - nunca o artefato completo (pesado). */
+export interface SnapshotReleaseSummary {
+  id: string;
+  releaseVersion: string;
+  artifactHash: string;
+  status: string;
+  currentlyActive: boolean;
+}
+
 export interface SnapshotSummary {
   id: string;
   inputHash: string;
@@ -344,13 +353,55 @@ export interface SnapshotSummary {
   createdAt: string;
   supersededAt: string | null;
   recommendations: PersistedRecommendation[];
+  /**
+   * Eco da configuração efetiva (Etapa 27b), exposto aqui pela primeira vez
+   * (Etapa 31I) - as colunas já existiam desde a 27b, só não saíam na API.
+   * Tudo opcional: snapshot anterior à 27b não tem nada disso gravado.
+   */
+  configurationSource: "BUILT_IN_BASELINE" | "RELEASE" | null;
+  configurationVersion: string | null;
+  configHash: string | null;
+  /** `null` quando `configurationSource` não é `RELEASE`, ou a release referenciada não existe mais. */
+  release: SnapshotReleaseSummary | null;
 }
 
 type PrismaSnapshot = Prisma.RecommendationSnapshotGetPayload<{
   include: { recommendations: true };
 }>;
 
-function toSnapshot(row: PrismaSnapshot): SnapshotSummary {
+/**
+ * Resolve a release referenciada por um snapshot, projetada nos campos leves
+ * de identificação - nunca `artifactJson` (pesado, e fora do que esta tela
+ * precisa mostrar). `riotAccountId` vem de quem já validou a posse da sessão;
+ * a consulta aqui é só leitura adicional, não um novo ponto de autorização.
+ */
+async function resolveSnapshotRelease(
+  riotAccountId: string,
+  releaseId: string | null
+): Promise<SnapshotReleaseSummary | null> {
+  if (!releaseId) return null;
+  const [row, activePointer] = await Promise.all([
+    prisma.recommendationEngineRelease.findFirst({
+      where: { id: releaseId, riotAccountId },
+      select: { id: true, releaseVersion: true, artifactHash: true, status: true }
+    }),
+    prisma.recommendationEngineActivePointer.findUnique({
+      where: { riotAccountId },
+      select: { releaseId: true }
+    })
+  ]);
+  if (!row) return null;
+  return {
+    id: row.id,
+    releaseVersion: row.releaseVersion,
+    artifactHash: row.artifactHash,
+    status: row.status,
+    currentlyActive: activePointer?.releaseId === row.id
+  };
+}
+
+async function toSnapshot(riotAccountId: string, row: PrismaSnapshot): Promise<SnapshotSummary> {
+  const release = await resolveSnapshotRelease(riotAccountId, row.configurationReleaseId);
   return {
     id: row.id,
     inputHash: row.inputHash,
@@ -360,7 +411,11 @@ function toSnapshot(row: PrismaSnapshot): SnapshotSummary {
     supersededAt: row.supersededAt?.toISOString() ?? null,
     recommendations: row.recommendations
       .map((recommendation) => recommendation.detailJson as unknown as PersistedRecommendation)
-      .sort((left, right) => left.rank - right.rank)
+      .sort((left, right) => left.rank - right.rank),
+    configurationSource: (row.configurationSource as SnapshotSummary["configurationSource"]) ?? null,
+    configurationVersion: row.configurationVersion ?? null,
+    configHash: row.configHash ?? null,
+    release
   };
 }
 
@@ -376,17 +431,20 @@ export async function listSnapshots(
     include: { recommendations: true },
     orderBy: { createdAt: "desc" }
   });
-  return rows.map(toSnapshot);
+  return Promise.all(rows.map((row) => toSnapshot(riotAccountId, row)));
 }
 
 /** Snapshot atual da sessao: o unico sem `supersededAt`. */
-export async function findLatestSnapshot(sessionId: string): Promise<SnapshotSummary | null> {
+export async function findLatestSnapshot(
+  riotAccountId: string,
+  sessionId: string
+): Promise<SnapshotSummary | null> {
   const row = await prisma.recommendationSnapshot.findFirst({
     where: { draftSessionId: sessionId },
     include: { recommendations: true },
     orderBy: { createdAt: "desc" }
   });
-  return row ? toSnapshot(row) : null;
+  return row ? toSnapshot(riotAccountId, row) : null;
 }
 
 export type PersistSnapshotResult =
@@ -517,7 +575,7 @@ export async function describeSelectedChampion(
   const session = await findDraftSession(riotAccountId, sessionId);
   if (!session || session.selectedChampionId === null) return null;
 
-  const snapshot = await findLatestSnapshot(sessionId);
+  const snapshot = await findLatestSnapshot(riotAccountId, sessionId);
   return compareSelectedChampion({
     selectedChampionId: session.selectedChampionId,
     ...(snapshot

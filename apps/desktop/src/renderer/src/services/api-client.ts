@@ -772,6 +772,10 @@ export interface DraftSessionSummary {
   role: Role;
   roleSource: "LCU" | "USER";
   selectedChampionId: number | null;
+  /** Já vinha na resposta desde sempre; só faltava no tipo (Etapa 31I). */
+  queueId: number | null;
+  patch: string | null;
+  gameVersion: string | null;
   startedAt: string;
   updatedAt: string;
   lockedInAt: string | null;
@@ -788,6 +792,15 @@ export interface DraftSessionSummary {
     unknownAllyPicks: number;
     unknownEnemyPicks: number;
   };
+}
+
+/** Release referenciada por um snapshot, projeção leve (Etapa 31I). */
+export interface SnapshotReleaseSummary {
+  id: string;
+  releaseVersion: string;
+  artifactHash: string;
+  status: string;
+  currentlyActive: boolean;
 }
 
 export interface PersistedSnapshot {
@@ -807,7 +820,16 @@ export interface PersistedSnapshot {
     poolSource: string;
     personalGames: number;
     category: string;
+    confidence?: string;
+    /** Já vinha na resposta desde sempre; só faltava no tipo (Etapa 31I). */
+    reasons: { code: string; label: string; detail: string; impact: number }[];
+    warnings: { code: string; label: string; detail: string; impact: number }[];
   }[];
+  /** Eco da configuração efetiva (Etapa 27b), exposto na API desde a 31I. */
+  configurationSource: "BUILT_IN_BASELINE" | "RELEASE" | null;
+  configurationVersion: string | null;
+  configHash: string | null;
+  release: SnapshotReleaseSummary | null;
 }
 
 export interface DraftSessionDetail {
@@ -1168,6 +1190,63 @@ export interface CalibrationCandidateRow {
   decision?: { by: string; at: string; note?: string; experimentId?: string };
 }
 
+/** Distribuição por segmento (posição, patch, fila...) - nunca veredito, só deslocamento. */
+export interface CalibrationSegmentSummary {
+  dimension: string;
+  value: string;
+  cases: number;
+  topOnePreservedCases: number;
+  averageRankDisplacement: number | null;
+  medianRankDisplacement: number | null;
+  averageRecommendedSetStability: number | null;
+}
+
+/** Caso excluído da comparação e por quê - nunca contado como falha do modelo. */
+export interface CalibrationExclusionSummary {
+  code: string;
+  cases: number;
+  missingHistoricalInputs: string[];
+}
+
+/** Contagens de revisão humana pré-resultado - contagem, nunca nota agregada. */
+export interface CalibrationHumanReviewSummary {
+  casesWithReview: number;
+  casesWithoutReview: number;
+  strongCasesPreserved: number;
+  strongCasesAltered: number;
+  weakCasesPreserved: number;
+  weakCasesAltered: number;
+  issueTagsAffected: { tag: string; casesAltered: number; casesTotal: number }[];
+}
+
+export interface CalibrationExperimentReport {
+  labVersion: string;
+  candidateId: string;
+  candidateVersion: string;
+  candidateStatus: string;
+  totalCases: number;
+  replayedCases: number;
+  excludedCases: number;
+  nonReproducibleCases: number;
+  topOnePreservedCases: number;
+  averageTopFiveOverlap: number | null;
+  averageRankDisplacement: number | null;
+  medianRankDisplacement: number | null;
+  averageRecommendedSetStability: number | null;
+  totalPromoted: number;
+  totalDemoted: number;
+  totalEnteredPrimary: number;
+  totalLeftPrimary: number;
+  totalPrimaryToAlternative: number;
+  totalAlternativeToPrimary: number;
+  totalComfortStrategicInversions: number;
+  chosenChampionEnteredPrimary: number;
+  chosenChampionLeftPrimary: number;
+  segments: CalibrationSegmentSummary[];
+  exclusions: CalibrationExclusionSummary[];
+  humanReview: CalibrationHumanReviewSummary;
+}
+
 export interface CalibrationExperimentRow {
   id: string;
   candidateId: string;
@@ -1181,10 +1260,68 @@ export interface CalibrationExperimentRow {
   unsupportedCases: number;
   missingInputCases: number;
   excludedCases: number;
-  report?: Record<string, unknown>;
+  report?: CalibrationExperimentReport;
   failureReason?: string;
   createdAt: string;
   completedAt?: string;
+}
+
+export interface CalibrationRankingEntry {
+  championId: number;
+  championName: string;
+  rank: number;
+  group: "PRIMARY" | "ALTERNATIVE" | "NOT_RECOMMENDED";
+  score: number;
+  dataCoverage: number;
+}
+
+export interface CalibrationRanking {
+  entries: CalibrationRankingEntry[];
+  primaryChampionIds: number[];
+  alternativeChampionIds: number[];
+}
+
+export interface CalibrationReweightedCandidate {
+  championId: number;
+  championName: string;
+  category: string;
+  baselineRank: number;
+  baselineGroup: "PRIMARY" | "ALTERNATIVE";
+  baselineScore: number;
+  reconstructedScore: number;
+  baselineDataCoverage: number;
+  candidateScore: number;
+  candidateBaseScore: number;
+  candidatePenalty: number;
+  candidateDataCoverage: number;
+  differenceReasons: string[];
+}
+
+export interface CalibrationCaseComparison {
+  draftSessionId: string;
+  snapshotId: string;
+  role: Role;
+  patch?: string;
+  queue?: string;
+  replayStatus: string;
+  exclusionReasons: { code: string; missingHistoricalInputs: string[] }[];
+  baseline: CalibrationRanking;
+  candidate: CalibrationRanking | null;
+  topOnePreserved: boolean | null;
+  topFiveOverlap: number | null;
+  averageRankDisplacement: number | null;
+  medianRankDisplacement: number | null;
+  maxRankDisplacement: number | null;
+  recommendedSetStability: number | null;
+  promotedChampionIds: number[];
+  demotedChampionIds: number[];
+  enteredPrimaryChampionIds: number[];
+  leftPrimaryChampionIds: number[];
+  primaryToAlternativeChampionIds: number[];
+  alternativeToPrimaryChampionIds: number[];
+  comfortStrategicInversions: number | null;
+  candidates: CalibrationReweightedCandidate[];
+  algorithmVersions: Record<string, string>;
 }
 
 export interface CalibrationCandidateInput {
@@ -1283,7 +1420,7 @@ export function fetchCalibrationExperimentCases(
     total: number;
     limit: number;
     offset: number;
-    cases: Record<string, unknown>[];
+    cases: CalibrationCaseComparison[];
   }>(`/calibration/experiments/${encodeURIComponent(experimentId)}/cases${query}`, {
     headers: auth(token)
   });

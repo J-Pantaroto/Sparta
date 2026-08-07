@@ -22,6 +22,22 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-08-07 06:15 — Etapa 31I: redesign do Histórico do Motor e Laboratório de Calibração
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0050-redesign-historico-motor-laboratorio.md`
+
+`DraftHistoryScreen` (Histórico do Motor) e `CalibrationLabScreen` (Laboratório/Releases)
+redesenhados: blocos separados de contexto congelado/resultado produzido/configuração, disclosure
+progressivo de hash (`ui/HashChip.tsx`, novo), tabela real de divergência de replay campo a campo,
+banner "ambiente histórico/não operacional", comparação base×candidata só com pesos que divergem,
+cards estruturados no lugar de `<pre>JSON</pre>`, badge ATIVA sem ambiguidade. `MotorHistoryScreen`
+auditada e mantida sem alteração — já atendia ao padrão. Backend expõe `configurationSource`/
+`configHash`/release por snapshot (colunas já existiam desde a Etapa 27b, só nunca serializadas).
+Não regressão: 5 candidatos idênticos, `release-etapa27c-v1` com hashes iguais, `EXACT_REPLAY`, 0
+migrations pendentes. Ver `docs/engine-history-calibration-lab-redesign.md`.
+
+---
+
 ## 2026-08-07 05:55 — Etapa 31H: redesign do pós-game, partidas e histórico pessoal
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0049-redesign-pos-game-partidas-historico.md`

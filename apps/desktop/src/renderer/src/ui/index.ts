@@ -27,6 +27,7 @@ export { ChampionAvatar, EmptyAvatarSlot } from "./ChampionAvatar";
 export { ChampionGrid } from "./ChampionGrid";
 export { DataRow, DataTable, IdentityCell, NumCell } from "./DataTable";
 export { Field, NumberField, ReadOnlyValue, SearchInput, Select, TextField } from "./Field";
+export { HashChip } from "./HashChip";
 export {
   Columns,
   Grid,

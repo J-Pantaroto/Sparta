@@ -1,5 +1,15 @@
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from "react";
-import { AlertTriangle, FlaskConical, Lock, Play, Rocket, RotateCcw, ShieldCheck } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowRight,
+  FlaskConical,
+  History,
+  Lock,
+  Play,
+  Rocket,
+  RotateCcw,
+  ShieldCheck
+} from "lucide-react";
 import {
   activateRelease,
   createCalibrationCandidate,
@@ -19,8 +29,10 @@ import {
   type ActiveReleaseResponse,
   type CalibrationCandidateInput,
   type CalibrationCandidateRow,
+  type CalibrationCaseComparison,
   type CalibrationExperimentRow,
   type CalibrationParameterCatalog,
+  type CalibrationRankingEntry,
   type CalibrationValidationResult,
   type EffectiveConfigurationView,
   type ReleaseRow
@@ -31,9 +43,10 @@ import { Button } from "../ui/Button";
 import { Card, SectionHeader } from "../ui/Card";
 import { EmptyState, ErrorState, Loading } from "../ui/States";
 import { Field, NumberField, TextField } from "../ui/Field";
+import { HashChip } from "../ui/HashChip";
 import { Grid, PageLayout, PageSection } from "../ui/PageLayout";
-import { SignalChip } from "../ui/SignalChip";
-import { StatusBadge } from "../ui/Badge";
+import { SignalChip, SignalChipList } from "../ui/SignalChip";
+import { Badge, StatusBadge } from "../ui/Badge";
 import "./CalibrationLabScreen.css";
 
 /**
@@ -70,6 +83,43 @@ const METRIC_LABELS: Record<string, string> = {
 
 const ROLE_OPTIONS = ["TOP", "JUNGLE", "MID", "ADC", "SUPPORT"] as const;
 
+/** Estado de release cru → rótulo em pt-BR. `ACTIVE` fica marcado à parte (badge ATIVA). */
+const RELEASE_STATUS_LABELS: Record<ReleaseRow["status"], string> = {
+  DRAFT: "Rascunho",
+  VALIDATING: "Validando",
+  VALIDATION_FAILED: "Validação falhou",
+  READY_FOR_ACTIVATION: "Pronta para ativação",
+  ACTIVE: "Ativa (não é a atual)",
+  ROLLED_BACK: "Revertida",
+  REJECTED: "Rejeitada"
+};
+
+const EXCLUSION_REASON_LABELS: Record<string, string> = {
+  UNSUPPORTED_PARAMETER: "Parâmetro fora do que pode ser reproduzido historicamente",
+  MISSING_HISTORICAL_INPUT: "Histórico necessário não preservado no snapshot",
+  UNSUPPORTED_ALGORITHM_VERSION: "Versão do motor não suportada pelo replay",
+  INVALID_BUNDLE: "Bundle de replay inválido"
+};
+
+/**
+ * Deltas entre a configuração base e a candidata - só o que de fato mudou
+ * (Etapa 31I, §10). Pesos iguais nas duas ficam de fora, não aparecem como
+ * "0.20 → 0.20".
+ */
+function computeWeightDeltas(
+  base: Record<string, number> | null,
+  candidate: Record<string, number>
+): { metric: string; from: number | null; to: number }[] {
+  const keys = new Set([...Object.keys(base ?? {}), ...Object.keys(candidate)]);
+  const deltas: { metric: string; from: number | null; to: number }[] = [];
+  for (const metric of keys) {
+    const from = base?.[metric] ?? null;
+    const to = candidate[metric] ?? 0;
+    if (from !== to) deltas.push({ metric, from, to });
+  }
+  return deltas;
+}
+
 interface Props {
   token: string;
 }
@@ -88,7 +138,7 @@ export function CalibrationLabScreen({ token }: Props): ReactElement {
   const [candidates, setCandidates] = useState<CalibrationCandidateRow[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [experiments, setExperiments] = useState<CalibrationExperimentRow[]>([]);
-  const [cases, setCases] = useState<Record<string, unknown>[]>([]);
+  const [cases, setCases] = useState<CalibrationCaseComparison[]>([]);
   const [openCaseId, setOpenCaseId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -144,7 +194,17 @@ export function CalibrationLabScreen({ token }: Props): ReactElement {
 
   const selected = candidates.find((entry) => entry.id === selectedId) ?? null;
   const latestExperiment = experiments[0] ?? null;
-  const report = (latestExperiment?.report ?? null) as Record<string, unknown> | null;
+  const report = latestExperiment?.report ?? null;
+
+  // Comparação base × candidata (Etapa 31I, §10) - só existe uma "base" única
+  // pra comparar quando há release ativa; a baseline embutida varia por
+  // cenário do draft (blind/lane revelada/meio do draft), então comparar
+  // contra "a" baseline fingiria uma configuração única que não existe.
+  const baseWeights =
+    activeConfig?.source === "RELEASE" && activeConfig.release
+      ? activeConfig.release.artifact.configuration.metricWeights
+      : null;
+  const weightDeltas = useMemo(() => computeWeightDeltas(baseWeights, weights), [baseWeights, weights]);
 
   async function withBusy(action: () => Promise<void>) {
     setBusy(true);
@@ -161,11 +221,27 @@ export function CalibrationLabScreen({ token }: Props): ReactElement {
   return (
     <PageLayout>
       <PageSection>
-        <Card>
+        <Card tone="inset">
           <SectionHeader
+            eyebrow={
+              <>
+                <History size={12} /> Ambiente histórico / não operacional
+              </>
+            }
             title="Laboratório do motor"
             description="Testa uma configuração candidata contra os drafts já registrados, sem tocar no motor em uso."
           />
+          <SignalChipList stacked>
+            <SignalChip tone="info">
+              Nada aqui altera automaticamente a produção - experimentos são registros históricos.
+            </SignalChip>
+            <SignalChip tone="info">
+              Métricas usadas são congeladas no instante do snapshot original, nunca recalculadas com dado atual.
+            </SignalChip>
+            <SignalChip tone="info">
+              Ativar uma configuração exige o fluxo de release abaixo, em etapas separadas e confirmadas.
+            </SignalChip>
+          </SignalChipList>
         </Card>
       </PageSection>
 
@@ -177,10 +253,20 @@ export function CalibrationLabScreen({ token }: Props): ReactElement {
           />
           {activeConfig?.source === "RELEASE" && activeConfig.release ? (
             <>
-              <p className="sp-calib-note">
-                <ShieldCheck size={14} aria-hidden /> Release ativa: {activeConfig.release.releaseVersion} ·
-                candidata {activeConfig.release.candidateVersion} · hash {activeConfig.release.configHash.slice(0, 12)}…
-              </p>
+              <div className="sp-calib-config-row">
+                <Badge tone="positive">ATIVA</Badge>
+                <ShieldCheck size={14} aria-hidden />
+                <span>
+                  {activeConfig.release.releaseVersion} · candidata {activeConfig.release.candidateVersion}
+                </span>
+                <HashChip label="config" value={activeConfig.release.configHash} />
+                <HashChip label="artefato" value={activeConfig.release.artifactHash} />
+                {latestExperiment && activeConfig.release.experimentId === latestExperiment.id ? (
+                  <span className="sp-calib-lineage">
+                    <ArrowRight size={12} aria-hidden /> originada do experimento aberto abaixo
+                  </span>
+                ) : null}
+              </div>
               <div className="sp-calib-weights">
                 {Object.entries(activeConfig.release.artifact.configuration.metricWeights).map(([metric, value]) => (
                   <Metric key={metric} label={METRIC_LABELS[metric] ?? metric} value={value} />
@@ -215,6 +301,32 @@ export function CalibrationLabScreen({ token }: Props): ReactElement {
           <Field label="Nome">
             <TextField value={name} onChange={setName} />
           </Field>
+
+          {baseWeights ? (
+            <div className="sp-calib-delta-block">
+              <SectionHeader
+                title="Diferença contra a release ativa"
+                description="Só os pesos que de fato mudaram - iguais nas duas ficam de fora."
+              />
+              {weightDeltas.length === 0 ? (
+                <p className="sp-calib-note">Nenhuma diferença: os pesos batem com a release ativa.</p>
+              ) : (
+                <ul className="sp-calib-delta-list">
+                  {weightDeltas.map((delta) => (
+                    <li key={delta.metric}>
+                      <span>{METRIC_LABELS[delta.metric] ?? delta.metric}</span>
+                      <span className="sp-calib-delta-value">
+                        {delta.from === null ? "—" : delta.from.toFixed(2)}
+                        <ArrowRight size={12} aria-hidden />
+                        {delta.to.toFixed(2)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ) : null}
+
           <div className="sp-calib-weights">
             {Object.keys(DEFAULT_WEIGHTS).map((metric) => (
               <Field key={metric} label={METRIC_LABELS[metric] ?? metric}>
@@ -346,6 +458,7 @@ export function CalibrationLabScreen({ token }: Props): ReactElement {
                     <span>
                       {entry.name} · rev {entry.revision}
                     </span>
+                    <HashChip value={entry.configHash} />
                     <StatusBadge state="offline">{entry.status}</StatusBadge>
                   </button>
                 </li>
@@ -428,28 +541,85 @@ export function CalibrationLabScreen({ token }: Props): ReactElement {
 
             <SectionHeader title="Segmentos" />
             <ul className="sp-calib-segments">
-              {((report?.segments ?? []) as Record<string, unknown>[]).map((segment, index) => (
-                <li key={`${String(segment.dimension)}-${String(segment.value)}-${index}`}>
+              {(report?.segments ?? []).map((segment, index) => (
+                <li key={`${segment.dimension}-${segment.value}-${index}`}>
                   <strong>
-                    {String(segment.dimension)}: {String(segment.value)}
+                    {segment.dimension}: {segment.value}
                   </strong>
                   <span>
-                    {String(segment.cases)} caso(s) · top 1 preservado{" "}
-                    {String(segment.topOnePreservedCases)} · deslocamento{" "}
-                    {String(segment.averageRankDisplacement)}
+                    {segment.cases} caso(s) · top 1 preservado {segment.topOnePreservedCases} · deslocamento{" "}
+                    {segment.averageRankDisplacement ?? "—"}
                   </span>
                 </li>
               ))}
             </ul>
+
+            <SectionHeader
+              title="Cobertura"
+              description="Quantos casos foram de fato reavaliados - exclusão não é falha do modelo."
+            />
+            {report ? (
+              <>
+                <Grid cols={4}>
+                  <Metric label="Total" value={report.totalCases} />
+                  <Metric label="Reavaliados" value={report.replayedCases} />
+                  <Metric label="Excluídos" value={report.excludedCases} />
+                  <Metric label="Não reproduzíveis" value={report.nonReproducibleCases} />
+                </Grid>
+                {report.exclusions.length > 0 ? (
+                  <ul className="sp-calib-segments">
+                    {report.exclusions.map((exclusion) => (
+                      <li key={exclusion.code}>
+                        <strong>{EXCLUSION_REASON_LABELS[exclusion.code] ?? exclusion.code}</strong>
+                        <span>
+                          {exclusion.cases} caso(s)
+                          {exclusion.missingHistoricalInputs.length
+                            ? ` · falta: ${exclusion.missingHistoricalInputs.join(", ")}`
+                            : ""}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </>
+            ) : null}
+
+            <SectionHeader
+              title="Integridade temporal"
+              description="Nenhum caso usa dado posterior ao instante do próprio snapshot histórico."
+            />
+            <SignalChip tone="info">
+              Cada caso é reavaliado só com o que o `ReplayInputBundle` daquele snapshot preservou -
+              histórico posterior ao momento do draft nunca entra na reavaliação, por construção.
+            </SignalChip>
 
             <SectionHeader title="Revisões humanas pré-resultado" />
             <p className="sp-calib-note">
               Contagens de avaliação feita antes de o resultado ser revelado. A avaliação
               pós-resultado não é carregada por este fluxo.
             </p>
-            <pre className="sp-calib-raw">
-              {JSON.stringify(report?.humanReview ?? {}, null, 2)}
-            </pre>
+            {report ? (
+              <Grid cols={4}>
+                <Metric label="Casos com revisão" value={report.humanReview.casesWithReview} />
+                <Metric label="Casos sem revisão" value={report.humanReview.casesWithoutReview} />
+                <Metric label="Fortes preservados" value={report.humanReview.strongCasesPreserved} />
+                <Metric label="Fortes alterados" value={report.humanReview.strongCasesAltered} />
+                <Metric label="Fracos preservados" value={report.humanReview.weakCasesPreserved} />
+                <Metric label="Fracos alterados" value={report.humanReview.weakCasesAltered} />
+              </Grid>
+            ) : null}
+            {report && report.humanReview.issueTagsAffected.length > 0 ? (
+              <ul className="sp-calib-segments">
+                {report.humanReview.issueTagsAffected.map((tag) => (
+                  <li key={tag.tag}>
+                    <strong>{tag.tag}</strong>
+                    <span>
+                      {tag.casesAltered} de {tag.casesTotal} caso(s) com esta tag mudaram de resultado
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
 
             <div className="sp-calib-actions">
               <Button
@@ -480,16 +650,14 @@ export function CalibrationLabScreen({ token }: Props): ReactElement {
             />
             <ul className="sp-calib-cases">
               {cases.map((entry) => {
-                const id = String(entry.snapshotId);
+                const id = entry.snapshotId;
                 const open = openCaseId === id;
                 return (
                   <li key={id}>
                     <button type="button" onClick={() => setOpenCaseId(open ? null : id)}>
-                      <span>{String(entry.role)}</span>
-                      <StatusBadge
-                        state={entry.replayStatus === "EXACT_REPLAY" ? "live" : "warning"}
-                      >
-                        {String(entry.replayStatus)}
+                      <span>{entry.role}</span>
+                      <StatusBadge state={entry.replayStatus === "EXACT_REPLAY" ? "live" : "warning"}>
+                        {entry.replayStatus}
                       </StatusBadge>
                     </button>
                     {open ? <CaseDetail comparison={entry} token={token} /> : null}
@@ -596,13 +764,20 @@ export function CalibrationLabScreen({ token }: Props): ReactElement {
               {releases.map((release) => (
                 <li key={release.id}>
                   <div className="sp-calib-release-row">
+                    {release.currentlyActive ? <Badge tone="positive">ATIVA</Badge> : null}
                     <span>
                       {release.releaseVersion} · candidata {release.candidateVersion}
-                      {release.currentlyActive ? " · Release ativa" : ""}
                     </span>
-                    <StatusBadge state={release.status === "ACTIVE" ? "live" : "offline"}>
-                      {release.status === "READY_FOR_ACTIVATION" ? "Release pronta para ativação" : release.status}
+                    <HashChip label="config" value={release.configHash} />
+                    <HashChip label="artefato" value={release.artifactHash} />
+                    <StatusBadge state={release.currentlyActive ? "live" : "offline"}>
+                      {RELEASE_STATUS_LABELS[release.status]}
                     </StatusBadge>
+                    {latestExperiment && release.experimentId === latestExperiment.id ? (
+                      <span className="sp-calib-lineage">
+                        <ArrowRight size={12} aria-hidden /> do experimento aberto acima
+                      </span>
+                    ) : null}
                   </div>
                   {release.validation && release.status === "VALIDATION_FAILED" ? (
                     <p className="sp-calib-note">
@@ -737,46 +912,47 @@ function CaseDetail({
   comparison,
   token
 }: {
-  comparison: Record<string, unknown>;
+  comparison: CalibrationCaseComparison;
   token: string;
 }): ReactElement {
-  const baseline = (comparison.baseline ?? {}) as { entries?: Record<string, unknown>[] };
-  const candidate = (comparison.candidate ?? null) as { entries?: Record<string, unknown>[] } | null;
-  const snapshotId = comparison.snapshotId ? String(comparison.snapshotId) : null;
+  const { candidate, snapshotId } = comparison;
 
   if (!candidate) {
     return (
       <div className="sp-calib-case-detail">
-        <p className="sp-calib-note">
-          Caso fora da comparação: {String(comparison.replayStatus)}.
-        </p>
-        <pre className="sp-calib-raw">
-          {JSON.stringify(comparison.exclusionReasons ?? [], null, 2)}
-        </pre>
-        {snapshotId && (
-          <div style={{ marginTop: "var(--space-3)" }}>
-            <ReplayCapabilitySummary token={token} snapshotId={snapshotId} />
-          </div>
-        )}
+        <p className="sp-calib-note">Caso fora da comparação: {comparison.replayStatus}.</p>
+        {comparison.exclusionReasons.length > 0 ? (
+          <ul className="sp-calib-segments">
+            {comparison.exclusionReasons.map((reason) => (
+              <li key={reason.code}>
+                <strong>{EXCLUSION_REASON_LABELS[reason.code] ?? reason.code}</strong>
+                {reason.missingHistoricalInputs.length ? (
+                  <span>Falta: {reason.missingHistoricalInputs.join(", ")}</span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        <div style={{ marginTop: "var(--space-3)" }}>
+          <ReplayCapabilitySummary token={token} snapshotId={snapshotId} />
+        </div>
       </div>
     );
   }
 
   return (
     <div className="sp-calib-case-detail">
-      {snapshotId && (
-        <div style={{ marginBottom: "var(--space-3)" }}>
-          <ReplayCapabilitySummary token={token} snapshotId={snapshotId} />
-        </div>
-      )}
+      <div style={{ marginBottom: "var(--space-3)" }}>
+        <ReplayCapabilitySummary token={token} snapshotId={snapshotId} />
+      </div>
       <div className="sp-calib-side-by-side">
         <div>
           <h4>Histórico</h4>
-          <RankingList entries={baseline.entries ?? []} />
+          <RankingList entries={comparison.baseline.entries} />
         </div>
         <div>
           <h4>Candidato</h4>
-          <RankingList entries={candidate.entries ?? []} />
+          <RankingList entries={candidate.entries} />
         </div>
       </div>
       <h4>Diferenças</h4>
@@ -785,36 +961,49 @@ function CaseDetail({
         <li>Rebaixados: {list(comparison.demotedChampionIds)}</li>
         <li>Entraram no principal: {list(comparison.enteredPrimaryChampionIds)}</li>
         <li>Saíram do principal: {list(comparison.leftPrimaryChampionIds)}</li>
-        <li>Integridade do replay: {String(comparison.replayStatus)}</li>
+        <li>Integridade do replay: {comparison.replayStatus}</li>
       </ul>
       <h4>Componentes que explicam a alteração</h4>
-      <pre className="sp-calib-raw">
-        {JSON.stringify(
-          ((comparison.candidates ?? []) as Record<string, unknown>[]).map((entry) => ({
-            championName: entry.championName,
-            baselineScore: entry.baselineScore,
-            reconstructedScore: entry.reconstructedScore,
-            candidateScore: entry.candidateScore,
-            baselineDataCoverage: entry.baselineDataCoverage,
-            candidateDataCoverage: entry.candidateDataCoverage,
-            differenceReasons: entry.differenceReasons
-          })),
-          null,
-          2
-        )}
-      </pre>
+      <div className="sp-calib-table-wrap">
+        <table className="sp-calib-table">
+          <thead>
+            <tr>
+              <th scope="col">Campeão</th>
+              <th scope="col">Score histórico</th>
+              <th scope="col">Score reconstruído</th>
+              <th scope="col">Score candidato</th>
+              <th scope="col">Cobertura histórica</th>
+              <th scope="col">Cobertura candidata</th>
+              <th scope="col">Motivos da diferença</th>
+            </tr>
+          </thead>
+          <tbody>
+            {comparison.candidates.map((entry) => (
+              <tr key={entry.championId}>
+                <td>{entry.championName}</td>
+                <td>{entry.baselineScore.toFixed(1)}</td>
+                <td>{entry.reconstructedScore.toFixed(1)}</td>
+                <td>{entry.candidateScore.toFixed(1)}</td>
+                <td>{(entry.baselineDataCoverage * 100).toFixed(0)}%</td>
+                <td>{(entry.candidateDataCoverage * 100).toFixed(0)}%</td>
+                <td>{entry.differenceReasons.length ? entry.differenceReasons.join("; ") : "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
 
-function RankingList({ entries }: { entries: Record<string, unknown>[] }): ReactElement {
+function RankingList({ entries }: { entries: CalibrationRankingEntry[] }): ReactElement {
   return (
     <ol className="sp-calib-ranking">
       {entries.map((entry) => (
-        <li key={String(entry.championId)}>
-          <span>{String(entry.championName)}</span>
-          <span>{String(entry.score)}</span>
-          <StatusBadge state="offline">{String(entry.group)}</StatusBadge>
+        <li key={entry.championId}>
+          <span>{entry.championName}</span>
+          <span>{entry.score}</span>
+          <StatusBadge state="offline">{entry.group}</StatusBadge>
         </li>
       ))}
     </ol>
