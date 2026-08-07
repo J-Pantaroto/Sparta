@@ -18,7 +18,6 @@ import {
   EmptyState,
   Field,
   HashChip,
-  InteractiveCard,
   Loading,
   PageHero,
   PageLayout,
@@ -161,41 +160,49 @@ export function DraftHistoryScreen({
       {filtered.length > 0 && (
         <div className="sp-draft-history__list">
           {filtered.map((session) => (
-            <InteractiveCard
-              key={session.id}
-              onClick={() => setSelectedId(session.id === selectedId ? null : session.id)}
-              selected={session.id === selectedId}
-              ariaCurrent={session.id === selectedId}
-              label={`Sessão de ${roleLabels[session.role]} em ${new Date(session.startedAt).toLocaleString("pt-BR")}`}
-            >
-              <div className="sp-draft-history__row">
-                {session.selectedChampionId !== null ? (
-                  <ChampionAvatar
-                    championId={session.selectedChampionId}
-                    ddragonVersion={ddragonVersion}
-                    alt={`Campeão confirmado nesta sessão`}
-                  />
-                ) : (
-                  <div className="sp-draft-history__avatar-empty" aria-hidden="true" />
-                )}
-                <div className="sp-draft-history__identity">
-                  <strong>
-                    {roleLabels[session.role]} · {new Date(session.startedAt).toLocaleString("pt-BR")}
-                  </strong>
-                  <span>{describeKnownDraft(session)}</span>
+            <Card key={session.id} selected={session.id === selectedId} className="sp-draft-history__item">
+              {/*
+                O botão cobre só o resumo (não o detalhe expandido): o
+                detalhe traz botões próprios (HashChip, revisão humana,
+                verificar replay), e HTML não permite <button> aninhado -
+                bug real achado no QA visual da Etapa 31J.
+              */}
+              <button
+                type="button"
+                className="sp-draft-history__toggle"
+                onClick={() => setSelectedId(session.id === selectedId ? null : session.id)}
+                aria-current={session.id === selectedId ? "true" : undefined}
+                aria-label={`Sessão de ${roleLabels[session.role]} em ${new Date(session.startedAt).toLocaleString("pt-BR")}`}
+              >
+                <div className="sp-draft-history__row">
+                  {session.selectedChampionId !== null ? (
+                    <ChampionAvatar
+                      championId={session.selectedChampionId}
+                      ddragonVersion={ddragonVersion}
+                      alt={`Campeão confirmado nesta sessão`}
+                    />
+                  ) : (
+                    <div className="sp-draft-history__avatar-empty" aria-hidden="true" />
+                  )}
+                  <div className="sp-draft-history__identity">
+                    <strong>
+                      {roleLabels[session.role]} · {new Date(session.startedAt).toLocaleString("pt-BR")}
+                    </strong>
+                    <span>{describeKnownDraft(session)}</span>
+                  </div>
+                  <SignalChipList>
+                    <SignalChip tone="info" pill>
+                      {statusLabels[session.status]}
+                    </SignalChip>
+                    <SignalChip tone="info" pill>
+                      {session.source === "LCU" ? "Lida do League Client" : "Simulação manual"}
+                    </SignalChip>
+                    <SignalChip tone="info" pill>
+                      {matchLinkStatusLabels[session.matchLinkStatus]}
+                    </SignalChip>
+                  </SignalChipList>
                 </div>
-                <SignalChipList>
-                  <SignalChip tone="info" pill>
-                    {statusLabels[session.status]}
-                  </SignalChip>
-                  <SignalChip tone="info" pill>
-                    {session.source === "LCU" ? "Lida do League Client" : "Simulação manual"}
-                  </SignalChip>
-                  <SignalChip tone="info" pill>
-                    {matchLinkStatusLabels[session.matchLinkStatus]}
-                  </SignalChip>
-                </SignalChipList>
-              </div>
+              </button>
               {session.id === selectedId && (
                 <>
                   <SessionDetail
@@ -212,7 +219,7 @@ export function DraftHistoryScreen({
                   </div>
                 </>
               )}
-            </InteractiveCard>
+            </Card>
           ))}
         </div>
       )}

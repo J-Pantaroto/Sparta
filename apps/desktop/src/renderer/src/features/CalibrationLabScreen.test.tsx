@@ -128,6 +128,9 @@ describe("CalibrationLabScreen", () => {
     await waitFor(() => expect(screen.getAllByText("ATIVA").length).toBeGreaterThan(0));
     expect(screen.getAllByText("fa9dbd…aa38").length).toBeGreaterThan(0);
     expect(screen.queryByText(release.configHash)).toBeNull();
+    // Achado real do QA visual (Etapa 31J): o badge ATIVA e o rótulo de status
+    // nunca podem se contradizer - a release ativa não pode dizer "não é a atual".
+    expect(screen.queryByText("Ativa (não é a atual)")).toBeNull();
   });
 
   it("mostra só os pesos que divergem entre a release ativa e a configuração candidata", async () => {
@@ -160,6 +163,17 @@ describe("CalibrationLabScreen", () => {
     render(<CalibrationLabScreen token="token-1" />);
 
     await waitFor(() => expect(screen.getByText("Revertida")).toBeTruthy());
+    expect(screen.queryByText("ATIVA")).toBeNull();
+  });
+
+  it("release com status ACTIVE mas superada (ponteiro em outra) mostra 'não é a atual', sem badge ATIVA", async () => {
+    fetchActiveReleaseMock.mockResolvedValue({ source: "BUILT_IN_BASELINE", scenarios: [] } as ActiveReleaseResponse);
+    const superseded = activeRelease({ id: "release-superseded", status: "ACTIVE", currentlyActive: false });
+    listReleasesMock.mockResolvedValue({ releases: [superseded] });
+
+    render(<CalibrationLabScreen token="token-1" />);
+
+    await waitFor(() => expect(screen.getByText("Ativa (não é a atual)")).toBeTruthy());
     expect(screen.queryByText("ATIVA")).toBeNull();
   });
 });

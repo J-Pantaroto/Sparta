@@ -22,6 +22,20 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-08-07 12:10 — Etapa 31J: QA visual integrado e acabamento final do Desktop
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0051-qa-visual-integrado-acabamento-desktop.md`
+
+Primeira validação Electron real via CDP dentro da própria sessão (login real por token assinado
+injetado via `window.sparta.session.set`, navegação/teclado/viewport reais). 11 telas em matriz
+representativa (1000/1280/1600px, 3 temas, densidade/intensidade, teclado), zero overflow/erro de
+console residual. 3 bugs reais corrigidos com teste: `<button>` aninhado no Laboratório (hydration
+error), badge ATIVA contradizendo o rótulo de status ao lado, campo "Novo email" pré-preenchido
+com o e-mail atual sem máscara. Não regressão: 5 candidatos idênticos, `release-etapa27c-v1` com
+hashes iguais, `EXACT_REPLAY`. Ver `docs/desktop-visual-qa-31j.md`.
+
+---
+
 ## 2026-08-07 06:15 — Etapa 31I: redesign do Histórico do Motor e Laboratório de Calibração
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0050-redesign-historico-motor-laboratorio.md`

@@ -83,16 +83,32 @@ const METRIC_LABELS: Record<string, string> = {
 
 const ROLE_OPTIONS = ["TOP", "JUNGLE", "MID", "ADC", "SUPPORT"] as const;
 
-/** Estado de release cru → rótulo em pt-BR. `ACTIVE` fica marcado à parte (badge ATIVA). */
-const RELEASE_STATUS_LABELS: Record<ReleaseRow["status"], string> = {
+/**
+ * Estado de release cru → rótulo em pt-BR. `status === "ACTIVE"` não significa
+ * "é a ativa agora" (Etapa 27b: uma release superada continua com esse status
+ * até ser revertida) - por isso o rótulo de `ACTIVE` é resolvido à parte, via
+ * `releaseStatusLabel`, que também confere `currentlyActive`.
+ */
+const RELEASE_STATUS_LABELS: Record<Exclude<ReleaseRow["status"], "ACTIVE">, string> = {
   DRAFT: "Rascunho",
   VALIDATING: "Validando",
   VALIDATION_FAILED: "Validação falhou",
   READY_FOR_ACTIVATION: "Pronta para ativação",
-  ACTIVE: "Ativa (não é a atual)",
   ROLLED_BACK: "Revertida",
   REJECTED: "Rejeitada"
 };
+
+/**
+ * O badge "ATIVA" ao lado já comunica quando `currentlyActive` é verdadeiro -
+ * mostrar "Ativa (não é a atual)" nesse caso seria contradizer o próprio
+ * badge. Sem o ponteiro, `ACTIVE` é sempre uma release superada.
+ */
+function releaseStatusLabel(release: ReleaseRow): string {
+  if (release.status === "ACTIVE") {
+    return release.currentlyActive ? "Ativa" : "Ativa (não é a atual)";
+  }
+  return RELEASE_STATUS_LABELS[release.status];
+}
 
 const EXCLUSION_REASON_LABELS: Record<string, string> = {
   UNSUPPORTED_PARAMETER: "Parâmetro fora do que pode ser reproduzido historicamente",
@@ -442,7 +458,7 @@ export function CalibrationLabScreen({ token }: Props): ReactElement {
           ) : (
             <ul className="sp-calib-list">
               {candidates.map((entry) => (
-                <li key={entry.id}>
+                <li key={entry.id} className="sp-calib-list__row">
                   <button
                     type="button"
                     className={entry.id === selectedId ? "is-selected" : ""}
@@ -458,9 +474,11 @@ export function CalibrationLabScreen({ token }: Props): ReactElement {
                     <span>
                       {entry.name} · rev {entry.revision}
                     </span>
-                    <HashChip value={entry.configHash} />
                     <StatusBadge state="offline">{entry.status}</StatusBadge>
                   </button>
+                  {/* Fora do <button> de seleção - HashChip tem botões próprios
+                      (expandir/copiar), e HTML não permite <button> aninhado. */}
+                  <HashChip value={entry.configHash} />
                 </li>
               ))}
             </ul>
@@ -771,7 +789,7 @@ export function CalibrationLabScreen({ token }: Props): ReactElement {
                     <HashChip label="config" value={release.configHash} />
                     <HashChip label="artefato" value={release.artifactHash} />
                     <StatusBadge state={release.currentlyActive ? "live" : "offline"}>
-                      {RELEASE_STATUS_LABELS[release.status]}
+                      {releaseStatusLabel(release)}
                     </StatusBadge>
                     {latestExperiment && release.experimentId === latestExperiment.id ? (
                       <span className="sp-calib-lineage">

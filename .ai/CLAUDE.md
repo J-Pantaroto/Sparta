@@ -1,5 +1,84 @@
 # Sparta - Contexto para Continuidade
 
+## Etapa 31J: QA visual integrado e acabamento final do Desktop
+
+Revisão visual de acabamento sobre o app inteiro, com validação real no Electron via CDP — não
+numa aba de navegador comum. **Nenhuma funcionalidade nova, nenhuma lógica de domínio ou motor
+alterada.** Relatório completo em `docs/desktop-visual-qa-31j.md`.
+
+**Metodologia — primeira etapa deste projeto com validação Electron real via CDP dentro da
+própria sessão de implementação** (etapas anteriores relatavam essa validação como limitação não
+executável): `app.commandLine.appendSwitch("remote-debugging-port", "9222")` adicionado
+**temporariamente** em `main/index.ts`, revertido antes do commit (diff líquido zero, confirmado
+por `git diff`). Conexão via WebSocket (pacote `ws`, presente no store do pnpm por dependência
+transitiva, requerido pelo caminho absoluto já que não está hoisted na raiz) ao target `page`
+exposto em `http://localhost:9222/json/list`. Login real: token HMAC assinado com o mesmo
+`AUTH_TOKEN_SECRET` do container Docker, injetado via `window.sparta.session.set(token)` — a
+mesma API IPC que a tela de login usa de verdade, protegida por `safeStorage`, só preenchida
+programaticamente em vez de por formulário (não é bypass: é o mecanismo real de sessão).
+Navegação/clique/teclado/viewport via `Runtime.evaluate`, `Input.dispatchKeyEvent`
+(`type: "keyDown"`, não `"rawKeyDown"` — só o primeiro dispara o avanço de foco nativo do
+Chromium) e `Emulation.setDeviceMetricsOverride`; console/exceções/rede capturados ao vivo via
+`Runtime.consoleAPICalled`/`Runtime.exceptionThrown`/`Network.responseReceived`.
+
+**11 telas validadas em matriz representativa** (Dashboard, Perfil, Champion Select, Histórico de
+drafts, Pré-game, Partidas e pós-game, Evolução pessoal, Histórico do motor agregado, Laboratório,
+Configurações, Conta e segurança): 1000/1280/1600px, os 3 temas (Espartano/Obsidiana/Adaptativo)
+aplicados pela tela real de Configurações, densidade e intensidade visual combinadas (Obsidiana +
+compacta + reduzida simultâneas sobre o Dashboard), 14 tabs consecutivos de teclado real
+percorrendo sidebar → skip-link → topbar sem nunca perder ou prender o foco. Zero overflow
+estrutural, zero erro de console residual, zero exceção não tratada, zero 401 silencioso (o
+padrão de bug da Etapa 31H não reapareceu) em toda a navegação.
+
+**3 bugs reais encontrados pela própria validação e corrigidos, cada um com teste**:
+
+1. **`<button>` aninhado em `CalibrationLabScreen.tsx`** (lista de candidatas salvas) — a Etapa
+   31I colocou `<HashChip>` (que tem os próprios botões de expandir/copiar) dentro do `<button>`
+   de seleção de cada linha; HTML não permite `<button>` dentro de `<button>`, e o React acusava
+   2 erros de hydration mismatch no console a cada abertura do Laboratório. Corrigido: o `<li>`
+   virou o contêiner flex, o botão de seleção cobre só nome+status, `HashChip` é irmão dele fora
+   do botão. CSS `.sp-calib-list button` (que sem querer também estilizava os botões de ação da
+   lista de releases mais abaixo na mesma tela) trocado por `.sp-calib-list > li > button`,
+   escopo correto — efeito colateral positivo: os botões Validar/Ativar/Reverter das releases
+   passaram a usar só o próprio estilo do componente `Button`, sem a sobreposição indevida.
+2. **Badge "ATIVA" contradizendo o rótulo de status ao lado**, na própria release atualmente
+   ativa — mostrava simultaneamente o badge verde "ATIVA" e o texto "Ativa (não é a atual)".
+   `RELEASE_STATUS_LABELS.ACTIVE` tinha sido escrito só para o caso de release **superada**
+   (status ainda `ACTIVE` no banco, ponteiro já em outra — Etapa 27b), sem considerar o caso em
+   que é de fato a atual. Nova `releaseStatusLabel(release)` decide o texto olhando
+   `currentlyActive`.
+3. **Campo "Novo email" pré-preenchido com o e-mail atual, sem máscara**, em Conta e segurança —
+   `AccountScreen.tsx` inicializava `useState(user.email ?? "")`; ao lado, o campo "Email" (só
+   leitura) já mostra o mesmo e-mail corretamente mascarado, então o campo de edição parecia ter
+   um valor já digitado. Corrigido: estado inicial vazio + `placeholder` explicativo.
+
+**Problemas observados e conscientemente mantidos** (não são bugs críticos, registrados para não
+esconder): quebra de linha (não overflow) na lista de "Histórico de drafts" em 1000px; rótulo
+bruto "HORDE" (junto de "DRAGON"/"RIFTHERALD"/"TOWER_BUILDING") na timeline do pós-game — vem
+direto do tipo de evento do Match-V5, consistente com o princípio já documentado de "só fatos
+preservados, sem interpretação" daquela seção.
+
+**Não regressão**: mesma recomendação controlada de sempre (JUNGLE, pick 3, Ahri aliada, Lee Sin
+inimigo, bans 55/91) → **5 candidatos idênticos** (Viego 58.7/0.9, Udyr 58.5/0.5, Vi 55.3/0.5,
+Nocturne 53.3/0.5, Graves 50.1/0.5); `release-etapa27c-v1` `ACTIVE` com `artifactHash`/
+`configHash` **idênticos** aos de antes; snapshot novo → **`EXACT_REPLAY`, 0 divergências**; zero
+migrations pendentes (nenhum arquivo de `apps/api` foi tocado nesta etapa).
+
+**1230 testes** no monorepo (core 635, riot 97, api 353, desktop 129, raiz 15, analyzer 1) — 1
+arquivo novo (`AccountScreen.test.tsx`, 1 teste) + 1 teste novo em `CalibrationLabScreen.test.tsx`
+(mais uma asserção no teste já existente). `typecheck`/`lint`/`build` completos nos quatro
+pacotes TypeScript (lint precisou de `HTMLInputElement` novo nos globals do `eslint.config.js`
+raiz, mesmo padrão de remediação de `navigator`/`AbortSignal` de etapas anteriores). `apps/api`
+isolado reproduziu **1 flakiness já documentada** (timeout em `/docs existe em desenvolvimento`)
+na primeira execução, **353/353 na reexecução imediata**, sem nenhuma alteração de código —
+registrado, não mascarado, mesmo padrão desde a Etapa 26b. `pnpm --filter @sparta/desktop
+package:dir` (electron-builder, sem publicar) empacotou com sucesso, confirmando que o pipeline
+de build produz um app funcional com o `main/index.ts` já revertido.
+
+Nenhuma tela foi redesenhada por completo — só acabamento. Modo carreira, coach ao vivo, dado
+global, RSO real, serviço de email real, site institucional, domínio, VPS seguem fora de escopo.
+Ver `docs/desktop-visual-qa-31j.md`.
+
 ## Etapa 31I: redesign do Histórico do Motor e Laboratório de Calibração
 
 Etapa exclusivamente de experiência e visualização, sobre as duas últimas telas "cruas" do

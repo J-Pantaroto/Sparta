@@ -30,7 +30,10 @@ export function AccountScreen({
   onOnboardingChanged: () => void;
   onLogout: () => void;
 }) {
-  const [email, setEmail] = useState(user.email ?? "");
+  // Achado real do QA visual (Etapa 31J): começava pré-preenchido com o
+  // e-mail atual (sem máscara), parecendo um valor já digitado - o campo
+  // "Email" acima já mostra o atual mascarado; este é só o novo.
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -136,6 +139,7 @@ export function AccountScreen({
                 value={email}
                 onChange={setEmail}
                 autoComplete="email"
+                placeholder="novo-email@exemplo.com"
               />
             </Field>
             <Field label="Senha atual" htmlFor={ids.password}>
