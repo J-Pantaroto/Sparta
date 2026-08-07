@@ -1,5 +1,104 @@
 # Sparta - Contexto para Continuidade
 
+## Etapa 31K: fundação pública do Sparta GG — `BLOCKED_BY_OWNER_INFRASTRUCTURE_PROVISIONING`
+
+Pedido explícito do usuário: preparar (e publicar, se os recursos já existissem) domínio, site
+institucional e infraestrutura base do "Sparta GG" — marca, domínio pretendido
+`spartagg.com.br`, contato pretendido `suporte@spartagg.com.br`, infra pretendida "VPS
+Hostinger", nenhum dos três decidido como já contratado. Explicitamente fora de escopo: publicar
+a API funcional, republicar o instalador Desktop, submeter à Riot. Relatório completo em
+`docs/public-foundation-infrastructure.md`.
+
+**FASE 0 (obrigatória antes de tocar em infraestrutura)**: determinar exclusivamente por
+configuração/documentação já presente no repositório se domínio/VPS/SSH/e-mail já existem, **sem
+nunca tentar descobrir credenciais**. `git grep` case-insensitive por `spartagg`/`hostinger`/
+`registro.br`/`suporte@spartagg` em todo o repositório: zero ocorrência fora desta própria
+etapa. `~/.ssh/config`: ausente. O histórico de `.claude/CLAUDE.md` (Etapas 30-31J) já registra
+que nenhuma infraestrutura pública jamais foi provisionada — o desktop 0.9.0 foi retirado
+justamente por depender de uma API pública que nunca existiu. Conclusão: **nenhum dos três
+recursos existe hoje**, e nenhuma senha/chave/token foi solicitada, adivinhada ou testada em
+nenhum momento desta etapa.
+
+**Site institucional (`apps/site/`, novo workspace pnpm)** — Vite multi-page (9 entry points
+HTML, sem framework de UI), layout compartilhado (`src/scripts/layout.ts`) montando header/
+footer/disclaimer da Riot em todas as páginas sem duplicar markup. Nove páginas: Home (hero
+honesto "Análise pessoal e apoio à tomada de decisão no League of Legends", sem promessa de
+vitória/elo/recomendação perfeita, "Download em preparação" como `<span aria-disabled>` nunca um
+link funcional, 3 capturas reais sanitizadas), Como funciona (fluxo Conta Sparta → vínculo Riot
+→ sincronização → análise), Funcionalidades (só os 8 recursos reais e implementados — Dashboard/
+Perfil/Champion Select/pré-game/histórico/pós-game/evolução/conta, explicitamente sem modo
+carreira/coach/dado global; Laboratório/Histórico do Motor citados como ferramentas técnicas
+internas, fora do foco da página), Privacidade (14 seções, cobrindo identidade do app/dados da
+conta/e-mail/vínculo Riot/histórico/identificadores técnicos/logs, política de retenção enquanto
+a conta estiver ativa + exclusão em até 30 dias, pontos marcados `[Revisão jurídica necessária]`
+em vez de fingir certeza jurídica que não existe), Termos (11 seções + **disclaimer oficial da
+Riot verbatim**, confirmado via busca na página legal real da Riot em vez de parafraseado: "Sparta
+GG was created under Riot Games' 'Legal Jibber Jabber' policy using assets owned by Riot Games.
+Riot Games does not endorse or sponsor this project."), Excluir conta (o que é removido/prazo de
+30 dias/consequências, sem simular um formulário funcional já que a API pública não existe),
+Segurança (8 práticas reais já implementadas, não aspiracionais), Status (só estados públicos
+reais — site operacional, o resto "em preparação", nenhum painel interno), 404 (`noindex`).
+
+**SEO técnico e acessibilidade**: `canonical`/`og:*`/`robots` consistentes nas 9 páginas (as 5
+páginas legais inicialmente só tinham `canonical`, corrigido pra ter o mesmo conjunto completo
+das demais); `robots.txt` + `sitemap.xml` reais; skip-link, `:focus-visible`, `prefers-reduced-
+motion`, landmarks semânticos, nav mobile com `aria-expanded` real (testado via JS — o toggle
+alterna `aria-expanded`/`display` corretamente). Screenshots: 3 usadas no site (Dashboard,
+Champion Select, Pós-game), com a identidade da conta de teste redigida por região de pixel
+(Python/PIL) antes de publicar; uma quarta captura (Perfil, com um heading grande exibindo o
+nome da conta) foi deliberadamente **descartada** em vez de forçar uma redação visualmente
+grosseira — 3 capturas limpas valem mais que 4 com uma malfeita.
+
+**Infraestrutura como código, testada localmente, nada aplicado contra infra real**:
+`Dockerfile.site` (multi-estágio: build Node do site estático → runtime só com Caddy + os
+arquivos gerados, mesmo padrão de `Dockerfile.api`, imagem-base fixada por **digest real**
+obtido via `docker pull` nesta sessão, não inventado) — build real bem-sucedido via `docker
+build`. `infra/Caddyfile` (TLS automático, redirect `www`→apex, cabeçalhos de segurança/CSP,
+compressão, 404 customizado, bloco `handle /api/*` **reservado e comentado** para quando a API
+pública for liberada) — validado com `caddy validate` e **smoke-testado num container real**
+contra `:80` puro (sem depender de DNS real): 200 com headers corretos e gzip em página real,
+404 real devolvendo a página customizada com status 404 correto (não 200). `infra/docker-
+compose.yml` (serviço `site` isolado do `docker-compose.yml` da raiz — que é dev local da API —
+com volumes nomeados para persistir certificados TLS entre deploys; API pública e Postgres de
+produção **deliberadamente ausentes** deste arquivo enquanto os gates da Etapa 31D continuarem
+de pé, para não ter infraestrutura fantasma).
+
+**Documentação completa em `docs/public-foundation-infrastructure.md`**: arquitetura (diagrama
+spartagg.com.br → Caddy → site + api.spartagg.com.br reservado/desligado → Postgres não
+provisionado), plano de DNS por tipo/hostname/destino/TTL/finalidade (site, `www`, `api`
+reservado, e-mail SPF/DKIM/DMARC — nenhum aplicado, todos pretendidos), runbook de hardening
+mínimo de VPS (Linux LTS, usuário não-root com chave SSH confirmada **antes** de desabilitar
+senha/root, firewall só 22/80/443, Docker, nunca porta 5432 exposta), runbooks de deploy/
+rollback (site é estático e sem estado — rollback é `git checkout` + rebuild, sem migration),
+política de backup (semanal do provedor, aceita explicitamente, com o risco "dependência de
+backup de um único provedor" **documentado, não escondido**), e o **checklist exato de
+aquisição** que só o responsável pode executar (registrar o domínio, contratar o VPS, gerar
+chave SSH local, apontar DNS, contratar e-mail com SPF/DKIM/DMARC) — nada desses itens foi
+presumido como já feito.
+
+**Auditoria de secrets**: `git grep` nos arquivos novos desta etapa por padrões de credencial/
+chave/senha — zero ocorrência; nenhum arquivo `.env`/credencial/chave stray criado;
+`.dockerignore` já exclui `dist`.
+
+**Não regressão medida** (Docker/Postgres reais já em execução desta sessão, `apps/api`/
+`apps/desktop` **não tocados** por esta etapa): `release-etapa27c-v1` `ACTIVE` com
+`artifactHash`/`configHash` **idênticos** aos documentados (`8878a657…`/`fa9dbde1…`), ponteiro
+confere; snapshot mais recente em **`EXACT_REPLAY`**; a única linha `_prisma_migrations` sem
+`finished_at` é a tentativa histórica já documentada da Etapa 28b (`20260727234500_http_cache_
+states`, não é regressão). `typecheck`/`lint`/`build`/`test` completos nos **5 pacotes**
+TypeScript (core, riot, api, desktop, e o novo `site`); `apps/api` isolado 353/353 (a mesma
+flakiness documentada de `/docs existe em desenvolvimento` sob contenção de recursos, já
+registrada desde a Etapa 26b, reapareceu na execução paralela e não na isolada); analyzer Python
+1/1.
+
+**Estado final: `BLOCKED_BY_OWNER_INFRASTRUCTURE_PROVISIONING`.** Código, configuração e
+conteúdo prontos e testados localmente; nada publicado porque domínio, VPS e e-mail não existem.
+Quando os três itens do checklist existirem, os próximos passos são os runbooks já escritos —
+nenhuma auditoria nova necessária. API pública, Postgres de produção, submissão à Riot e
+republicação do Desktop seguem fora de escopo, nenhum tocado. Modo carreira e coach ficam
+explicitamente adiados até depois da submissão Production à Riot (próxima etapa recomendada:
+31L), por decisão estratégica do usuário registrada nesta etapa.
+
 ## Etapa 31J: QA visual integrado e acabamento final do Desktop
 
 Revisão visual de acabamento sobre o app inteiro, com validação real no Electron via CDP — não

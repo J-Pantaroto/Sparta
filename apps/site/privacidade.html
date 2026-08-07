@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Política de Privacidade — Sparta GG</title>
+    <meta name="description" content="Como o Sparta GG coleta, usa, retém e permite excluir dados pessoais e dados da conta Riot vinculada." />
+    <link rel="canonical" href="https://spartagg.com.br/privacidade.html" />
+    <link rel="icon" type="image/png" href="/img/favicon.png" />
+    <meta name="robots" content="index, follow" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Sparta GG" />
+    <meta property="og:title" content="Política de Privacidade — Sparta GG" />
+    <meta property="og:description" content="Como o Sparta GG coleta, usa, retém e permite excluir dados pessoais e dados da conta Riot vinculada." />
+    <meta property="og:url" content="https://spartagg.com.br/privacidade.html" />
+    <link rel="stylesheet" href="/src/styles/tokens.css" />
+    <link rel="stylesheet" href="/src/styles/base.css" />
+    <link rel="stylesheet" href="/src/styles/site.css" />
+  </head>
+  <body>
+    <a class="sp-skip-link" href="#sp-main">Ir para o conteúdo</a>
+    <header class="sp-header" id="sp-header"></header>
+
+    <main id="sp-main">
+      <section class="sp-hero" style="padding-bottom: var(--space-6)">
+        <div class="sp-container">
+          <span class="sp-hero__eyebrow">Privacidade</span>
+          <h1>Política de Privacidade</h1>
+          <p class="sp-updated">Última atualização: 07 de agosto de 2026 · versão de preparação, pendente de revisão jurídica antes de operação comercial.</p>
+        </div>
+      </section>
+
+      <section class="sp-section" style="border-top: none">
+        <div class="sp-container sp-prose">
+          <div class="sp-callout sp-callout--warning">
+            <span>
+              <strong>Aviso de estágio.</strong> O Sparta GG ainda não tem API pública nem serviço de
+              e-mail configurado. Esta política descreve o comportamento real do sistema tal como
+              implementado no aplicativo Desktop e será atualizada quando novos componentes (API
+              pública, site com formulários) entrarem em operação. Nenhum trecho aqui foi revisado
+              por um profissional jurídico — marcado explicitamente onde essa revisão é necessária
+              antes de qualquer operação comercial relevante.
+            </span>
+          </div>
+
+          <h2>1. Quem é o responsável</h2>
+          <p>
+            O Sparta GG é um projeto independente, mantido por um desenvolvedor individual, sem
+            personalidade jurídica constituída até o momento desta versão.
+            <strong>[Revisão jurídica necessária: definir a titularidade formal do tratamento de
+            dados — pessoa física ou pessoa jurídica — antes de operação comercial.]</strong>
+            Contato: consulte a <a href="/status.html">página de status</a> para o canal de suporte
+            vigente, publicado apenas quando estiver funcional.
+          </p>
+
+          <h2>2. Dados da conta Sparta</h2>
+          <p>Ao criar uma conta, coletamos:</p>
+          <ul>
+            <li><strong>E-mail</strong>, usado para login e confirmação de identidade.</li>
+            <li>
+              <strong>Senha</strong>, armazenada apenas como hash irreversível (scrypt) — o Sparta
+              nunca guarda a senha em texto puro e não consegue recuperá-la, apenas permitir a
+              troca.
+            </li>
+            <li>Nome de exibição, opcional.</li>
+            <li>Estado de confirmação do e-mail e de atividade da conta.</li>
+          </ul>
+
+          <h2>3. Dados da conta Riot vinculada</h2>
+          <p>Quando você vincula uma conta Riot, coletamos e armazenamos:</p>
+          <ul>
+            <li>PUUID, Riot ID (nome + tag) e região da conta vinculada.</li>
+            <li>Estado do vínculo (verificado, pendente, revogado) e data da última verificação.</li>
+          </ul>
+          <p>
+            A partir do vínculo, sincronizamos junto à Riot Games API — apenas quando você aciona a
+            sincronização — o histórico de partidas dessa conta: resultado, campeões, estatísticas de
+            desempenho, itens, runas, feitiços de invocador e linha do tempo de eventos da partida.
+            Não coletamos dados de nenhuma conta Riot que você não tenha vinculado.
+          </p>
+
+          <h2>4. O que o Sparta produz a partir desses dados</h2>
+          <p>
+            Índices pessoais, tendências, recomendações de campeão e relatórios pós-partida — todos
+            calculados sobre a sua própria amostra de partidas. O Sparta não mantém uma base de
+            dados de outros jogadores nem meta global; onde esse dado não existe, o produto mostra
+            "indisponível" em vez de inventar um valor.
+          </p>
+
+          <h2>5. Identificadores técnicos e logs</h2>
+          <p>
+            Requisições ao servidor geram logs operacionais (método, rota, tempo de resposta,
+            código de status) usados apenas para operação e diagnóstico. Identificadores pessoais
+            (como PUUID) que apareceriam em uma URL são substituídos por um rótulo opaco antes de
+            irem para o log; cabeçalhos de autenticação e cookies de sessão nunca são registrados.
+            Não usamos essas informações para perfilamento fora do próprio produto.
+          </p>
+
+          <h2>6. Sessão e cookies</h2>
+          <p>
+            No aplicativo Desktop, a sessão é um token assinado, armazenado localmente de forma
+            cifrada pelo próprio sistema operacional (não em texto puro, não em cookie de
+            navegador). Quando uma versão web existir, esta seção será atualizada para descrever
+            exatamente o mecanismo de sessão usado (cookie, armazenamento local, ou ambos) antes de
+            entrar em operação.
+          </p>
+
+          <h2>7. Finalidade</h2>
+          <p>
+            Usamos os dados exclusivamente para operar as funcionalidades descritas em
+            <a href="/como-funciona.html">Como funciona</a> e em
+            <a href="/funcionalidades.html">Funcionalidades</a>: autenticação, vínculo com a Riot,
+            sincronização, análise pessoal e suporte à conta. Não vendemos dados pessoais, não
+            fazemos publicidade direcionada e não compartilhamos seu histórico de partidas com
+            terceiros além da própria Riot Games (fonte do dado) e do provedor de infraestrutura que
+            hospeda o serviço.
+          </p>
+
+          <h2>8. Retenção e exclusão</h2>
+          <ul>
+            <li>Seus dados são mantidos enquanto a conta estiver ativa.</li>
+            <li>
+              Você pode solicitar a exclusão da conta e dos dados associados a qualquer momento —
+              veja <a href="/excluir-conta.html">Excluir conta</a>.
+            </li>
+            <li>Contas inativas por mais de 365 dias podem ter os dados removidos.</li>
+            <li>Solicitações de exclusão são concluídas em até 30 dias corridos.</li>
+          </ul>
+          <p>
+            <strong>[Revisão jurídica necessária: confirmar se alguma categoria de dado precisa ser
+            preservada por período legal mínimo mesmo após pedido de exclusão — por exemplo, registros
+            fiscais, caso o produto passe a ter cobrança.]</strong> Hoje o Sparta não processa
+            pagamentos, então nenhuma retenção dessa natureza se aplica.
+          </p>
+
+          <h2>9. Segurança</h2>
+          <p>
+            Conexões com o serviço são feitas via HTTPS quando publicamente disponível. Senhas são
+            hasheadas (nunca reversíveis); tokens de sessão são assinados e verificados a cada
+            requisição; o acesso a recursos pessoais é isolado por conta — um usuário não consegue
+            ler dados de outro através de identificadores previsíveis. Mais detalhes em
+            <a href="/seguranca.html">Segurança</a>.
+          </p>
+
+          <h2>10. Terceiros</h2>
+          <p>
+            Usamos a Riot Games API como fonte dos dados de partida, e um provedor de infraestrutura
+            (VPS) para hospedar o site e, futuramente, a API. Não usamos ferramentas de analytics de
+            terceiros, pixels de rastreamento ou publicidade nesta versão.
+          </p>
+
+          <h2>11. Seus direitos</h2>
+          <p>
+            Você pode solicitar acesso aos dados vinculados à sua conta, correção de informações
+            incorretas e exclusão da conta. Como o Sparta ainda não tem canal de suporte funcional
+            publicado, essas solicitações ficam registradas como pendentes até a
+            <a href="/status.html">infraestrutura de suporte</a> estar ativa —
+            <strong>nenhum formulário funcional é oferecido nesta versão do site.</strong>
+          </p>
+
+          <h2>12. Menores de idade</h2>
+          <p>
+            O Sparta é destinado a jogadores de League of Legends que atendam aos requisitos de
+            idade da própria Riot Games para manter uma conta. O Sparta não realiza verificação de
+            idade própria e depende da elegibilidade já estabelecida pela conta Riot vinculada.
+          </p>
+
+          <h2>13. Alterações nesta política</h2>
+          <p>
+            Esta página será atualizada conforme o produto evolui — especialmente quando a API
+            pública, o serviço de e-mail e formulários do site entrarem em operação. A data no topo
+            desta página sempre reflete a versão vigente.
+          </p>
+
+          <h2>14. Contato</h2>
+          <p>
+            Consulte a <a href="/status.html">página de status</a> para o canal de contato vigente.
+            Não publicamos um endereço de e-mail até que ele receba mensagens de fato.
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="sp-footer" id="sp-footer"></footer>
+    <script type="module" src="/src/scripts/layout.ts"></script>
+  </body>
+</html>

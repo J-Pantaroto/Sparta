@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Como funciona — Sparta GG</title>
+    <meta
+      name="description"
+      content="Como o Sparta GG vincula sua conta Riot, sincroniza o histórico e produz análises pessoais de draft e pós-game."
+    />
+    <link rel="canonical" href="https://spartagg.com.br/como-funciona.html" />
+    <link rel="icon" type="image/png" href="/img/favicon.png" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Sparta GG" />
+    <meta property="og:title" content="Como funciona — Sparta GG" />
+    <meta property="og:description" content="Do vínculo com a conta Riot à análise pessoal do seu histórico." />
+    <meta property="og:url" content="https://spartagg.com.br/como-funciona.html" />
+    <link rel="stylesheet" href="/src/styles/tokens.css" />
+    <link rel="stylesheet" href="/src/styles/base.css" />
+    <link rel="stylesheet" href="/src/styles/site.css" />
+  </head>
+  <body>
+    <a class="sp-skip-link" href="#sp-main">Ir para o conteúdo</a>
+    <header class="sp-header" id="sp-header"></header>
+
+    <main id="sp-main">
+      <section class="sp-hero" style="padding-bottom: var(--space-8)">
+        <div class="sp-container">
+          <span class="sp-hero__eyebrow">Como funciona</span>
+          <h1>Do vínculo com a Riot até a análise</h1>
+          <p class="sp-hero__subtitle">
+            Cada etapa usa só dado que já existe — nada é inferido além do que a própria partida
+            registrou.
+          </p>
+        </div>
+      </section>
+
+      <section class="sp-section" style="border-top: none">
+        <div class="sp-container">
+          <div class="sp-flow">
+            <span class="sp-flow__step">1. Conta Sparta</span>
+            <span class="sp-flow__arrow" aria-hidden="true">→</span>
+            <span class="sp-flow__step">2. Vínculo com conta Riot</span>
+            <span class="sp-flow__arrow" aria-hidden="true">→</span>
+            <span class="sp-flow__step">3. Sincronização autorizada</span>
+            <span class="sp-flow__arrow" aria-hidden="true">→</span>
+            <span class="sp-flow__step">4. Análise do histórico pessoal</span>
+            <span class="sp-flow__arrow" aria-hidden="true">→</span>
+            <span class="sp-flow__step">5. Apoio ao draft</span>
+            <span class="sp-flow__arrow" aria-hidden="true">→</span>
+            <span class="sp-flow__step">6. Análise pós-partida</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="sp-section">
+        <div class="sp-container sp-prose">
+          <h2>1. Conta Sparta</h2>
+          <p>
+            Você cria uma conta com e-mail e senha e confirma o e-mail antes de acessar qualquer
+            recurso pessoal. Sem confirmação, o acesso fica bloqueado — é o que garante que o
+            endereço vinculado é realmente seu.
+          </p>
+
+          <h2>2. Vínculo com conta Riot</h2>
+          <p>
+            Você vincula sua conta Riot (Riot ID) à sua conta Sparta. O vínculo identifica de qual
+            conta o Sparta deve ler partidas — o Sparta não acessa nenhuma conta Riot que você não
+            tenha vinculado explicitamente.
+          </p>
+
+          <h2>3. Sincronização autorizada</h2>
+          <p>
+            Com a conta vinculada, você aciona a sincronização; o Sparta busca partidas novas junto
+            à Riot API e as persiste. Nenhuma sincronização acontece sem uma ação sua, e o número
+            de partidas analisadas é configurável por você.
+          </p>
+
+          <h2>4. Análise do histórico pessoal</h2>
+          <p>
+            Com o histórico sincronizado, o Sparta calcula índices e tendências <strong>sobre a sua
+            própria amostra</strong> — nunca comparados com uma base global de outros jogadores, que
+            o Sparta não possui.
+          </p>
+
+          <h2>5. Apoio ao draft</h2>
+          <p>
+            Durante o Champion Select, o Sparta lê a sessão local do League Client (posição, ordem
+            de pick, time revelado) e sugere campeões do seu próprio histórico, com razões
+            explicadas. O Sparta nunca seleciona, bane, trava ou troca campeão nem runas — é
+            leitura, nunca ação.
+          </p>
+
+          <h2>6. Análise pós-partida</h2>
+          <p>
+            Depois da partida, o Sparta compara o que foi esperado (com base no seu histórico
+            anterior com aquele campeão e posição) com o que foi observado de fato — sem transformar
+            vitória ou derrota em "acerto" ou "erro" da recomendação.
+          </p>
+
+          <div class="sp-callout">
+            <span>
+              <strong>Dados pessoais × dados Riot × dados globais.</strong> O Sparta usa dois tipos
+              de dado: o que você fornece diretamente (e-mail, senha) e o que a Riot API expõe sobre
+              a conta vinculada (partidas, estatísticas). O Sparta não tem — e não afirma ter — uma
+              base de dados globais de outros jogadores, meta de patch consolidado ou builds
+              agregadas de terceiros.
+            </span>
+          </div>
+        </div>
+      </section>
+
+      <section class="sp-section" aria-labelledby="sp-cta">
+        <div class="sp-container" style="text-align: center">
+          <h2 id="sp-cta">Veja o que já está pronto</h2>
+          <p><a class="sp-btn sp-btn--secondary" href="/funcionalidades.html">Funcionalidades atuais</a></p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="sp-footer" id="sp-footer"></footer>
+    <script type="module" src="/src/scripts/layout.ts"></script>
+  </body>
+</html>

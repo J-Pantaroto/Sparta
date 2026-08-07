@@ -22,6 +22,19 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-08-07 21:20 — Etapa 31K: fundação pública do Sparta GG (site institucional + infra preparada)
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0052-fundacao-publica-sparta-gg.md`
+
+Site institucional (`apps/site`, 9 páginas: Home/Como funciona/Funcionalidades/Privacidade/
+Termos/Excluir conta/Segurança/Status/404) e infraestrutura como código (`Dockerfile.site`,
+`infra/Caddyfile`, `infra/docker-compose.yml`) construídos, testados localmente com Docker real
+(build da imagem, `caddy validate`, smoke test de headers/gzip/404) e documentados
+(`docs/public-foundation-infrastructure.md`), mas **nada publicado** — domínio `spartagg.com.br`,
+VPS e e-mail de suporte não existem ainda. Estado final: `BLOCKED_BY_OWNER_INFRASTRUCTURE_
+PROVISIONING`, com checklist exato de aquisição para o responsável. Desktop/API intocados;
+`release-etapa27c-v1` `ACTIVE`, hashes e `EXACT_REPLAY` confirmados sem regressão.
+
 ## 2026-08-07 12:10 — Etapa 31J: QA visual integrado e acabamento final do Desktop
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0051-qa-visual-integrado-acabamento-desktop.md`

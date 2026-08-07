@@ -1,0 +1,19 @@
+{
+  "name": "@sparta/site",
+  "version": "0.9.0",
+  "private": true,
+  "type": "module",
+  "description": "Site institucional publico do Sparta GG - sem runtime compartilhado com o Desktop",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src --ext .ts",
+    "test": "vitest run --passWithNoTests"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.10",
+    "vite": "^6.3.5"
+  }
+}

@@ -1,0 +1,55 @@
+/*
+ * Tokens do site institucional - inspirados na identidade visual do Desktop
+ * (preto profundo, vermelho contido, Manrope), mas um arquivo proprio: o
+ * site nao importa nada do renderer do Electron, por decisao explicita
+ * (runtimes separados).
+ */
+:root {
+  --bg-base: #050506;
+  --bg-sunken: #030304;
+  --surface-1: #0a0a0c;
+  --surface-2: #0f0f13;
+  --surface-3: #16161b;
+  --border-subtle: #1a1a20;
+  --border-default: #26262e;
+
+  --text-primary: #f4f4f6;
+  --text-secondary: #a5a5b0;
+  --text-muted: #6f6f7b;
+  --text-on-accent: #08080a;
+
+  --color-accent: #dc2626;
+  --color-accent-soft: #7f1d1d;
+  --color-accent-glow: rgba(220, 38, 38, 0.28);
+
+  --color-green: #4ade80;
+  --color-yellow: #fbbf24;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-full: 999px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 40px;
+  --space-10: 64px;
+  --space-12: 96px;
+
+  --font-sans: "Manrope", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --text-xs: 12px;
+  --text-sm: 14px;
+  --text-base: 16px;
+  --text-lg: 19px;
+  --text-xl: 24px;
+  --text-2xl: 32px;
+  --text-3xl: 44px;
+  --leading-tight: 1.2;
+  --leading-normal: 1.6;
+
+  --content-max: 1120px;
+}

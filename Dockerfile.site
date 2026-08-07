@@ -1,0 +1,43 @@
+# Site institucional estático (apps/site). Multi-estágio: builda o HTML/CSS/TS
+# num estágio Node descartável e serve o resultado com Caddy — o mesmo
+# processo que faz TLS/redirecionamento/headers também serve os arquivos,
+# evitando um salto de rede extra só para servir HTML estático (decisão
+# registrada em docs/public-foundation-infrastructure.md).
+#
+# Imagem-base fixada por versão E digest, mesmo padrão do Dockerfile.api.
+# Para atualizar:
+#   docker pull node:20-slim
+#   docker inspect --format '{{index .RepoDigests 0}}' node:20-slim
+ARG NODE_IMAGE=node:20-slim@sha256:2cf067cfed83d5ea958367df9f966191a942351a2df77d6f0193e162b5febfc0
+ARG CADDY_IMAGE=caddy:2.10-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d
+
+# ---------------------------------------------------------------------------
+# Estágio 1: build. Site estático multi-página (Vite), sem framework de UI.
+# ---------------------------------------------------------------------------
+FROM ${NODE_IMAGE} AS build
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable
+WORKDIR /app
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/site/package.json ./apps/site/
+RUN pnpm install --frozen-lockfile --filter "@sparta/site..."
+
+COPY tsconfig.base.json ./
+COPY apps/site ./apps/site
+RUN pnpm --filter @sparta/site build
+
+# ---------------------------------------------------------------------------
+# Estágio 2: runtime. Só o Caddy e os arquivos estáticos gerados — nenhum
+# node_modules, nenhum código-fonte TypeScript chega na imagem final.
+# ---------------------------------------------------------------------------
+FROM ${CADDY_IMAGE} AS runtime
+
+COPY infra/Caddyfile /etc/caddy/Caddyfile
+COPY --from=build /app/apps/site/dist /srv
+
+EXPOSE 80 443
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget -q -O- http://127.0.0.1:80/ >/dev/null || exit 1

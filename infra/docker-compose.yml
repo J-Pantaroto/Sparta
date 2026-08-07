@@ -1,0 +1,39 @@
+# Compose de produção do site institucional (spartagg.com.br).
+#
+# Preparado nesta etapa (31K), NÃO executado contra infraestrutura real —
+# não existe VPS nem domínio registrado ainda. Ver
+# docs/public-foundation-infrastructure.md para o checklist de aquisição
+# (domínio, VPS, e-mail) e o runbook de deploy quando os recursos existirem.
+#
+# Deliberadamente separado do docker-compose.yml da raiz (Postgres/Redis/
+# API/analyzer de desenvolvimento local) — os dois arquivos têm ciclos de
+# vida e ambientes diferentes, e misturá-los faria um `docker compose up`
+# local acidentalmente tentar abrir a porta 80/443 ou provisionar TLS.
+#
+# A API pública e o Postgres de produção NÃO entram neste arquivo enquanto
+# os gates da Etapa 31D (BLOCKED_BY_EMAIL_PROVIDER_CONFIGURATION /
+# BLOCKED_BY_RIOT_APPROVAL) não forem resolvidos — adicioná-los aqui sem
+# uso real seria infraestrutura fantasma. Quando a API for liberada, este
+# arquivo ganha um serviço `api` + `postgres` e o Caddyfile descomenta o
+# bloco `handle /api/*`.
+
+services:
+  site:
+    build:
+      context: ..
+      dockerfile: Dockerfile.site
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      # Certificados e estado interno do Caddy (renovação automática do
+      # Let's Encrypt) — precisa sobreviver a `docker compose up` novos,
+      # senão o site reprovisiona certificado a cada deploy.
+      - caddy-data:/data
+      - caddy-config:/config
+    stop_grace_period: 10s
+
+volumes:
+  caddy-data:
+  caddy-config:

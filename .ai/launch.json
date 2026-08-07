@@ -6,6 +6,12 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["pnpm@10.34.4", "--filter", "@sparta/desktop", "dev"],
       "port": 5173
+    },
+    {
+      "name": "site",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["pnpm@10.34.4", "--filter", "@sparta/site", "dev"],
+      "port": 5174
     }
   ]
 }
