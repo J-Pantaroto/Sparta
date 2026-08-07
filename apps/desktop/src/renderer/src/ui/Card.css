@@ -11,9 +11,12 @@
 
 .sp-card {
   position: relative;
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
   background: var(--surface-veil);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  box-shadow: var(--glass-highlight);
   transition: var(--transition-colors), var(--transition-transform), box-shadow var(--duration-fast) var(--ease-out);
 }
 
@@ -33,7 +36,7 @@
   background:
     linear-gradient(150deg, var(--color-accent-glow), transparent 42%),
     var(--surface-veil-strong);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--glass-highlight), var(--shadow-md);
 }
 
 /* Marca a borda esquerda no tema - usado quando o card representa o item
@@ -84,7 +87,7 @@
 
 .sp-card--interactive:hover {
   border-color: var(--border-strong);
-  background: var(--surface-2);
+  background: var(--surface-veil-strong);
   transform: translateY(-1px);
 }
 

@@ -25,6 +25,8 @@
   padding: var(--space-4) var(--space-3) var(--space-3);
   border-right: 1px solid var(--border-subtle);
   background: linear-gradient(180deg, var(--surface-veil-strong), var(--bg-sunken));
+  backdrop-filter: blur(var(--glass-blur-sm));
+  -webkit-backdrop-filter: blur(var(--glass-blur-sm));
   box-shadow: var(--shadow-md);
   overflow: hidden;
   z-index: var(--z-nav);
@@ -224,9 +226,11 @@
   gap: var(--space-2);
   min-height: 34px;
   padding: 0 var(--space-3);
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-md);
-  background: var(--surface-1);
+  background: var(--surface-veil);
+  backdrop-filter: blur(var(--glass-blur-sm));
+  -webkit-backdrop-filter: blur(var(--glass-blur-sm));
   color: var(--text-muted);
   font-size: var(--text-xs);
   white-space: nowrap;
@@ -236,9 +240,11 @@
   gap: var(--space-3);
   min-width: 0;
   padding: var(--space-2);
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-md);
-  background: var(--surface-2);
+  background: var(--surface-veil);
+  backdrop-filter: blur(var(--glass-blur-sm));
+  -webkit-backdrop-filter: blur(var(--glass-blur-sm));
 }
 
 .sp-player__art {
@@ -299,7 +305,8 @@
   padding: 0 var(--content-padding);
   border-bottom: 1px solid var(--border-subtle);
   background: color-mix(in srgb, var(--surface-veil-strong) 94%, transparent);
-  backdrop-filter: blur(14px);
+  backdrop-filter: blur(var(--glass-blur-sm));
+  -webkit-backdrop-filter: blur(var(--glass-blur-sm));
   z-index: var(--z-sticky);
 }
 
@@ -329,9 +336,11 @@
   gap: var(--space-2);
   min-height: 28px;
   padding: 0 var(--space-3);
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-full);
-  background: var(--surface-2);
+  background: var(--surface-veil);
+  backdrop-filter: blur(var(--glass-blur-sm));
+  -webkit-backdrop-filter: blur(var(--glass-blur-sm));
   color: var(--text-muted);
   font-size: var(--text-xs);
   white-space: nowrap;
@@ -354,9 +363,11 @@
   max-width: 190px;
   min-height: 34px;
   padding: var(--space-1) var(--space-2);
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-md);
-  background: var(--surface-2);
+  background: var(--surface-veil);
+  backdrop-filter: blur(var(--glass-blur-sm));
+  -webkit-backdrop-filter: blur(var(--glass-blur-sm));
   cursor: pointer;
 }
 
@@ -387,10 +398,12 @@
   display: grid;
   width: 210px;
   padding: var(--space-2);
-  border: 1px solid var(--border-default);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-md);
-  background: var(--surface-2);
-  box-shadow: var(--shadow-lg);
+  background: var(--surface-veil-strong);
+  backdrop-filter: blur(var(--glass-blur-sm));
+  -webkit-backdrop-filter: blur(var(--glass-blur-sm));
+  box-shadow: var(--glass-highlight), var(--shadow-lg);
 }
 
 .sp-account-menu__popover button {

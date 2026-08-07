@@ -11,12 +11,20 @@ html {
 body {
   margin: 0;
   min-height: 100vh;
-  background: var(--bg-base);
   color: var(--text-primary);
   font-family: var(--font-sans);
   font-size: var(--text-base);
   line-height: var(--leading-normal);
   -webkit-font-smoothing: antialiased;
+  /* Brilho ambiente na cor de marca, ancorado no viewport (`fixed`) pra o
+     gradiente nao "descer" junto com o scroll - sem isso os paineis de
+     vidro (backdrop-filter) nao teriam nada com cor por tras pra desfocar. */
+  background:
+    radial-gradient(ellipse 65% 50% at 10% -10%, var(--color-accent-glow), transparent 62%),
+    radial-gradient(ellipse 55% 45% at 92% 18%, color-mix(in srgb, var(--color-accent) 20%, transparent), transparent 65%),
+    linear-gradient(180deg, var(--bg-base) 0%, var(--surface-1) 55%, var(--bg-sunken) 100%);
+  background-attachment: fixed;
+  background-color: var(--bg-base);
 }
 
 img {

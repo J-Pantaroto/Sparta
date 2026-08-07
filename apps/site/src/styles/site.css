@@ -10,9 +10,10 @@
   position: sticky;
   top: 0;
   z-index: 20;
-  background: rgba(5, 5, 6, 0.85);
-  backdrop-filter: blur(8px);
-  border-bottom: 1px solid var(--border-subtle);
+  background: rgba(5, 5, 6, 0.68);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border-bottom: 1px solid var(--glass-border);
 }
 
 .sp-header__row {
@@ -70,8 +71,10 @@
     flex-direction: column;
     align-items: flex-start;
     gap: var(--space-3);
-    background: var(--surface-1);
-    border-bottom: 1px solid var(--border-subtle);
+    background: rgba(10, 10, 12, 0.78);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border-bottom: 1px solid var(--glass-border);
     padding: var(--space-4) var(--space-5) var(--space-5);
   }
 
@@ -198,9 +201,12 @@
 
 .sp-card {
   padding: var(--space-6);
-  background: var(--surface-1);
-  border: 1px solid var(--border-subtle);
+  background: rgba(10, 10, 12, 0.6);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
+  box-shadow: var(--glass-highlight);
 }
 
 .sp-card h3 {
@@ -222,8 +228,10 @@
 
 .sp-flow__step {
   padding: var(--space-3) var(--space-4);
-  background: var(--surface-1);
-  border: 1px solid var(--border-subtle);
+  background: rgba(10, 10, 12, 0.6);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-md);
   font-size: var(--text-sm);
   font-weight: 600;
@@ -235,16 +243,19 @@
 
 .sp-shot {
   border-radius: var(--radius-lg);
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--glass-border);
   overflow: hidden;
-  background: var(--surface-1);
+  background: rgba(10, 10, 12, 0.6);
 }
 
 .sp-shot figcaption {
   padding: var(--space-3) var(--space-4);
   color: var(--text-muted);
   font-size: var(--text-xs);
-  border-top: 1px solid var(--border-subtle);
+  background: rgba(10, 10, 12, 0.6);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border-top: 1px solid var(--glass-border);
 }
 
 /* ─── Callouts ──────────────────────────────────────────────────────── */
@@ -254,15 +265,17 @@
   gap: var(--space-3);
   padding: var(--space-4) var(--space-5);
   border-radius: var(--radius-md);
-  border: 1px solid var(--border-default);
-  background: var(--surface-2);
+  border: 1px solid var(--glass-border);
+  background: rgba(15, 15, 19, 0.62);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
   font-size: var(--text-sm);
   color: var(--text-secondary);
 }
 
 .sp-callout--warning {
   border-color: rgba(251, 191, 36, 0.35);
-  background: rgba(251, 191, 36, 0.08);
+  background: rgba(251, 191, 36, 0.1);
 }
 
 .sp-callout strong {
@@ -321,8 +334,10 @@
   justify-content: space-between;
   gap: var(--space-3);
   padding: var(--space-4) var(--space-5);
-  background: var(--surface-1);
-  border: 1px solid var(--border-subtle);
+  background: rgba(10, 10, 12, 0.6);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-md);
 }
 

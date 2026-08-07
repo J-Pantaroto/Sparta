@@ -29,11 +29,13 @@
   position: relative;
   width: 100%;
   max-width: 390px;
-  border: 1px solid var(--border-default);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-xl);
   background: var(--surface-veil-strong);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
   padding: var(--space-7);
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--glass-highlight), var(--shadow-lg);
   animation: sp-fade-in var(--duration-slow) var(--ease-out);
 }
 

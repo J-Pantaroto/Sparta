@@ -22,6 +22,16 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-08-07 22:50 — Etapa 31K.1: glassmorphism no site e no Desktop
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0053-glassmorphism-site-desktop.md`
+
+Tokens de vidro (blur/borda clara/realce) aplicados às superfícies-painel do site institucional e
+do Desktop (cards, tabela, shell, popover, herói do Perfil, cartão de login) — nunca em botões/
+campos, e desligável via `data-visual-intensity="reduced"` no Desktop. Etapa 100% CSS, validada
+real no dev server do site e no Electron real via CDP (mesma metodologia da 31J). Zero regressão:
+`release-etapa27c-v1` inalterada, 1215 testes verdes.
+
 ## 2026-08-07 21:20 — Etapa 31K: fundação pública do Sparta GG (site institucional + infra preparada)
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0052-fundacao-publica-sparta-gg.md`

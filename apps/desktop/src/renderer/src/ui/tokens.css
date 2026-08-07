@@ -34,6 +34,16 @@
   --surface-hover: rgba(255, 255, 255, 0.035);
   --surface-active: rgba(255, 255, 255, 0.06);
 
+  /* Glassmorphism: desfoque do que esta por tras de um painel translucido
+     (`--surface-veil*`) + borda clara/realce que imita luz pegando a borda
+     do vidro. Token unico de desfoque por painel/pilula pra
+     `[data-visual-intensity="reduced"]` zerar tudo num so lugar, sem repetir
+     a regra em cada arquivo que usa `backdrop-filter`. */
+  --glass-blur: 20px;
+  --glass-blur-sm: 12px;
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+
   /* ─── Bordas ───────────────────────────────────────────────────────── */
   --border-subtle: #1a1a20;
   --border-default: #26262e;
@@ -193,4 +203,12 @@ html[data-density="compact"] {
   --content-padding: var(--space-5);
   --panel-gap: var(--space-3);
   --topbar-height: 56px;
+}
+
+/* Intensidade reduzida ja tira splash art de fundo (base.css) - o mesmo
+   pedido de "menos decoracao" cobre o desfoque de vidro, e zerar aqui
+   desliga `backdrop-filter` em todo painel/pilula sem tocar cada arquivo. */
+html[data-visual-intensity="reduced"] {
+  --glass-blur: 0px;
+  --glass-blur-sm: 0px;
 }

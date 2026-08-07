@@ -25,6 +25,14 @@
   --color-green: #4ade80;
   --color-yellow: #fbbf24;
 
+  /* Glassmorphism: desfoque do que esta atras de um painel translucido +
+     borda clara/realce que imita luz pegando a borda do vidro. So faz
+     sentido com um fundo com alguma cor por tras pra desfocar - ver o
+     gradiente ambiente adicionado ao body em base.css. */
+  --glass-blur: 18px;
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 14px;

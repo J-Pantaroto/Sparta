@@ -1,5 +1,56 @@
 # Sparta - Contexto para Continuidade
 
+## Etapa 31K.1: glassmorphism no site e no Desktop
+
+Pedido do usuário entre a 31K e a 31L: aplicar glassmorphism tanto no site institucional quanto
+no app Desktop. Etapa **100% CSS** — nenhum arquivo TypeScript, rota ou lógica de domínio
+tocado. Relatório completo em `docs/glassmorphism.md`.
+
+**Os três ingredientes de vidro, aplicados juntos** (sem os três não lê como "vidro"):
+translucidez (fundo com alpha), `backdrop-filter: blur(...)` (o que de fato desfoca o que está
+atrás — sem isso translucidez sozinha só suja a superfície) e borda clara + realce interno
+(`rgba(255,255,255,0.08)` de borda, `inset 0 1px 0 rgba(255,255,255,0.05)` no topo, luz pegando a
+borda do vidro). Um quarto ingrediente silencioso e necessário: **fundo com cor por trás pra
+desfocar** — sem isso o blur roda sem produzir efeito visível nenhum.
+
+**Onde foi aplicado, e onde não** (deliberado): superfícies lidas como painel/contêiner
+flutuando — cards, tabela, sidebar, topbar, popover de conta, selos pequenos da topbar/sidebar,
+cartão de login, herói do Perfil no Desktop; header, menu mobile, cards de recurso, callouts,
+passos do fluxo, capturas e linhas de status no site. **Não** em botões, campos de formulário,
+badges pequenos ou tooltips — controles interativos pedem contorno nítido pra affordance, e
+vidro-sobre-vidro em elemento pequeno borra a leitura (anti-padrão comum de glassmorphism
+apressado). O `.sp-hero`/`.sp-hero--feature` do Desktop (splash art de campeão) também ficou de
+fora - ali o fundo já é uma imagem real com scrim próprio, desfocar destruiria a arte.
+
+**Desktop**: três tokens novos em `ui/tokens.css` (`--glass-blur` 20px, `--glass-blur-sm` 12px
+pra elementos menores, `--glass-border`, `--glass-highlight`). Todo `backdrop-filter` do app
+referencia esses tokens, nunca um `px` literal - isso permite desligar o efeito **num só lugar**:
+`html[data-visual-intensity="reduced"] { --glass-blur: 0px; --glass-blur-sm: 0px; }`, reusando o
+atributo que a Fase 13/14 já usa pra tirar splash art de fundo. Confirmado real no Electron:
+alternar o atributo derruba `getComputedStyle(...).backdropFilter` pra `blur(0px)` na hora.
+
+**Site**: não tinha nenhum gradiente de fundo fora do herói - só preto sólido. `base.css` ganhou
+um fundo fixo (`background-attachment: fixed`) com dois glows radiais na cor de marca (vermelho),
+mesmo padrão que o Desktop já usa desde a Fase 13, adaptado pro site (sem tema por skin).
+
+**Validado real, não só buildado**: site no dev server real (Vite), 9 páginas sem erro de
+console, `getComputedStyle` confirmando `blur(18px)` em header/cards, menu mobile abrindo como
+painel de vidro real sobre o herói (screenshot). Desktop no **Electron real via CDP** (mesma
+metodologia da Etapa 31J - debug port temporário em `main/index.ts`, revertido antes do commit
+com diff líquido zero confirmado por `git diff`; login real via `window.sparta.session.set` com
+token HMAC assinado pelo mesmo `AUTH_TOKEN_SECRET` do container Docker): Dashboard com o glow do
+tema visivelmente desfocado atrás do retrato do jogador no card `feature`, sidebar/topbar
+translúcidas, popover de conta como vidro flutuando (`blur(12px)`), Perfil com o mesmo tratamento
+no herói analítico, desligamento por `data-visual-intensity="reduced"` confirmado (`blur(0px)`).
+**Zero erro de console, zero exceção não tratada** em toda a sessão de validação.
+
+**Não regressão**: etapa 100% CSS - nenhum arquivo de `packages/core`/`apps/api`/lógica de
+`apps/desktop` tocado. `release-etapa27c-v1` continua `ACTIVE` com `artifactHash`/`configHash`
+idênticos aos documentados, confirmado direto no Postgres (CSS não pode afetar o motor por
+construção, não foi necessário gerar recomendação nova). **1215 testes** no monorepo (core 635,
+riot 97, api 353, desktop 129, analyzer 1), todos verdes; `typecheck`/`lint`/`build` completos
+nos 5 pacotes TypeScript.
+
 ## Etapa 31K: fundação pública do Sparta GG — `BLOCKED_BY_OWNER_INFRASTRUCTURE_PROVISIONING`
 
 Pedido explícito do usuário: preparar (e publicar, se os recursos já existissem) domínio, site
