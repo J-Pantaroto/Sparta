@@ -1,5 +1,46 @@
 # Sparta - Contexto para Continuidade
 
+## Etapa 31G.1: alerta Dependabot high (js-yaml) resolvido
+
+O GitHub sinalizou `js-yaml` `GHSA-5p4m-2wfm-xmqj` (CVSS 7.5, DoS por consumo quadrático de CPU em
+`!!omap`, `>= 4.0.0 < 4.3.1`) logo após o push da Etapa 31G. Relatório completo em
+`docs/dependabot-js-yaml-2026-08.md`.
+
+**Exposição real — `BUILD_TIME_ONLY`, com evidência, não presunção.** `js-yaml@4.3.0` só é
+alcançado por dois `devDependencies`: `eslint` (via `@eslint/eslintrc`) e `electron-builder` (via
+`app-builder-lib`/`dmg-builder`/`builder-util`). `pnpm --filter <pkg> why js-yaml --prod` devolveu
+vazio nos quatro workspaces; ausente dos dois SBOM de produção da Etapa 29; nenhum código do
+projeto importa YAML; sem `.eslintrc.yml`/`.yaml` no repo (flat config desde a 28a, então o caminho
+YAML do ESLint nunca ativa); `electron-builder.yml` é arquivo local autoral sem bloco `publish`
+(nada busca YAML remoto); `electron-builder` nem roda no CI. O cenário de ataque do advisório
+(`yaml.load(untrustedInput)`) não existe neste projeto — nem em produção, nem no único contexto
+onde a dependência de fato executa.
+
+**Correção — atualização transitiva normal, sem override.** `@eslint/eslintrc@3.3.5` declara
+`js-yaml: ^4.1.1` e `app-builder-lib`/`builder-util`/`dmg-builder` declaram `^4.1.0` — as duas
+faixas já permitiam `4.3.1`, publicada no registro antes deste alerta. `pnpm update js-yaml -r`
+bastou. Diff do lockfile: só `js-yaml@4.3.0` → `js-yaml@4.3.1`, nada mais; `package.json` e
+`pnpm-workspace.yaml` intocados.
+
+**Validado contra os dois consumidores reais**: `pnpm lint` (roda `eslint` de verdade, resolvendo
+`js-yaml@4.3.1`) e `pnpm --filter @sparta/desktop package:win` (exercita o próprio
+`electron-builder` que motivou o alerta — instalador gerado com sucesso, `app.asar` com 2587
+entradas e **0** ocorrências de `js-yaml`). `pnpm audit` → 0 em todas as severidades, dev+prod e
+prod isolado.
+
+**`apps/api` isolado passou 46/46, 336/336, três vezes seguidas** — `pnpm -r test` (paralelo)
+reproduziu de novo a flakiness por contenção de recursos já documentada na Etapa 26b/31G: a cada
+execução um conjunto **diferente e não sobreposto** de testes de `apps/api` falhava (mais de dez
+nomes distintos ao todo, nunca repetido), nunca fora de `apps/api`, que nem depende de `js-yaml`.
+
+**Não regressão**: mesma recomendação controlada de sempre → 5 candidatos idênticos;
+`release-etapa27c-v1` `ACTIVE` com `artifactHash`/`configHash` iguais antes e depois; replay
+`EXACT_REPLAY`, 0 divergências. Zero arquivo de aplicação tocado — só `pnpm-lock.yaml` mudou, então
+Champion Select, pré-game, perfil, dashboard, autenticação e onboarding não têm como ter sido
+afetados.
+
+Resultado: **`DEPENDABOT_HIGH_RESOLVED`**.
+
 ## Etapa 31G: redesign do Champion Select e pré-game
 
 Continuação de uma sessão do Codex que atingiu o limite com ~16 arquivos alterados e não

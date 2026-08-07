@@ -22,6 +22,24 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-08-06 23:50 — Etapa 31G.1: correção do alerta Dependabot high (js-yaml)
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0048-dependabot-js-yaml.md`
+
+O GitHub sinalizou `js-yaml` `GHSA-5p4m-2wfm-xmqj` (CVSS 7.5, DoS por consumo quadrático de CPU em
+`!!omap`) depois do push da Etapa 31G. Classificado como `BUILD_TIME_ONLY` com evidências: `js-yaml`
+ausente do grafo `--prod` dos quatro workspaces, ausente dos SBOM de produção, nenhum código do
+projeto usa YAML, sem `.eslintrc.yml` no repo (flat config), `electron-builder.yml` é arquivo local
+sem bloco `publish`. Corrigido com atualização transitiva normal (`pnpm update js-yaml -r`, sem
+override, sem tocar `package.json`/`pnpm-workspace.yaml`) — as faixas já declaradas por
+`@eslint/eslintrc` (`^4.1.1`) e `app-builder-lib`/`builder-util`/`dmg-builder` (`^4.1.0`) já
+permitiam a versão corrigida `4.3.1`. `pnpm audit` volta 0 em todas as severidades (dev+prod e
+prod). Instalador reempacotado com sucesso (exercitando o próprio `electron-builder` que motivou o
+alerta), `app.asar` confirmado sem `js-yaml`. Não regressão: recomendação controlada idêntica,
+`release-etapa27c-v1` intacta, replay `EXACT_REPLAY`. Resultado: **`DEPENDABOT_HIGH_RESOLVED`**.
+
+---
+
 ## 2026-08-06 22:40 — Etapa 31G: redesign do Champion Select e pré-game
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0047-redesign-champion-select-pre-game.md`
