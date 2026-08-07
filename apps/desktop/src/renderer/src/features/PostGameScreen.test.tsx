@@ -1,8 +1,19 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import type { DraftPostGameComparison } from "@sparta/core";
+import type {
+  DraftPostGameComparison,
+  MatchParticipantSummary,
+  MatchPerformanceMetrics,
+  MatchVsRecentHistoryComparison
+} from "@sparta/core";
 import type { ChampionRoleEvidenceResponse, DraftComparisonResponse } from "../services/api-client";
-import { ChampionRoleEvidenceCard, DraftComparisonSection } from "./PostGameScreen";
+import {
+  ChampionRoleEvidenceCard,
+  DraftComparisonSection,
+  MatchParticipantsCard,
+  MatchTimelineCard,
+  RecentHistoryComparisonCard
+} from "./PostGameScreen";
 
 function response(status: "AVAILABLE" | "UNAVAILABLE"): ChampionRoleEvidenceResponse {
   const unavailableReason =
@@ -158,5 +169,156 @@ describe("DraftComparisonSection", () => {
 
     expect(screen.getByText(/Nenhuma sessão de draft vinculada/)).toBeTruthy();
     expect(screen.getByText(/sem inventar contexto de draft/)).toBeTruthy();
+  });
+});
+
+describe("RecentHistoryComparisonCard", () => {
+  it("mostra valor da partida e média das partidas estritamente anteriores", () => {
+    const comparison: MatchVsRecentHistoryComparison = {
+      matchId: "BR1_1",
+      status: "AVAILABLE",
+      priorSampleSize: 5,
+      metrics: [
+        {
+          metric: "kda",
+          status: "AVAILABLE",
+          matchValue: 4.2,
+          recentAverage: 2.8,
+          sampleSize: 5
+        },
+        {
+          metric: "objectiveParticipation",
+          status: "UNAVAILABLE",
+          matchValue: null,
+          recentAverage: null,
+          sampleSize: 1,
+          unavailableReason: "Histórico insuficiente para comparar (mínimo 3 partidas anteriores)."
+        }
+      ]
+    };
+
+    render(<RecentHistoryComparisonCard comparison={comparison} />);
+
+    expect(screen.getByText("Comparado com sua média recente")).toBeTruthy();
+    expect(screen.getByText("4.20")).toBeTruthy();
+    expect(screen.getByText(/média recente 2.80/)).toBeTruthy();
+    expect(screen.getByText(/Histórico insuficiente para comparar/)).toBeTruthy();
+  });
+
+  it("estado geral indisponível mostra o motivo, sem métrica nenhuma", () => {
+    const comparison: MatchVsRecentHistoryComparison = {
+      matchId: "BR1_1",
+      status: "UNAVAILABLE",
+      priorSampleSize: 0,
+      metrics: [],
+      unavailableReason: "Partida não encontrada no histórico de tendência do jogador."
+    };
+
+    render(<RecentHistoryComparisonCard comparison={comparison} />);
+
+    expect(screen.getByText(/Partida não encontrada no histórico/)).toBeTruthy();
+    expect(screen.queryByText("KDA")).toBeNull();
+  });
+});
+
+describe("MatchTimelineCard", () => {
+  it("mostra fatos com timestamp, sem narrativa causal", () => {
+    const metrics: MatchPerformanceMetrics = {
+      kills: 3,
+      deaths: 5,
+      assists: 4,
+      csPerMinute: 6,
+      goldPerMinute: 350,
+      damagePerMinute: 500,
+      visionScorePerMinute: 0.8,
+      deathsBefore10: 1,
+      deathsBefore15: 2,
+      goldDiffAt15: -450,
+      objectiveEvents: ["DRAGON@14:23", "TOWER@18:05"]
+    };
+
+    render(<MatchTimelineCard metrics={metrics} />);
+
+    expect(screen.getByText("Linha do tempo registrada")).toBeTruthy();
+    expect(screen.getByText(/1 morte\(s\) registrada\(s\) antes dos 10 minutos/)).toBeTruthy();
+    expect(screen.getByText(/-450/)).toBeTruthy();
+    expect(screen.getByText("14:23")).toBeTruthy();
+    expect(screen.getByText(/DRAGON registrado/)).toBeTruthy();
+    // Nunca narra causa e efeito - nenhuma palavra de causalidade na tela.
+    expect(screen.queryByText(/causou|por causa|resultou em/i)).toBeNull();
+  });
+
+  it("sem nenhum fato preservado, não renderiza nada", () => {
+    const metrics: MatchPerformanceMetrics = {
+      kills: 0,
+      deaths: 0,
+      assists: 0,
+      csPerMinute: 0,
+      goldPerMinute: 0,
+      damagePerMinute: 0,
+      visionScorePerMinute: 0
+    };
+
+    const { container } = render(<MatchTimelineCard metrics={metrics} />);
+
+    expect(container.firstChild).toBeNull();
+  });
+});
+
+describe("MatchParticipantsCard", () => {
+  function participant(overrides: Partial<MatchParticipantSummary> = {}): MatchParticipantSummary {
+    return {
+      puuid: "p1",
+      teamId: 100,
+      championId: 61,
+      championName: "Orianna",
+      won: true,
+      kills: 1,
+      deaths: 2,
+      assists: 3,
+      csPerMinute: 6,
+      goldPerMinute: 350,
+      damagePerMinute: 500,
+      visionScorePerMinute: 1,
+      isTrackedPlayer: false,
+      ...overrides
+    };
+  }
+
+  it("mostra carregando enquanto os participantes não chegam", () => {
+    render(<MatchParticipantsCard participants={null} participantsError={null} ddragonVersion="16.14.1" />);
+    expect(screen.getByText("Carregando os dois times...")).toBeTruthy();
+  });
+
+  it("mostra o motivo quando os participantes não puderam ser carregados", () => {
+    render(
+      <MatchParticipantsCard
+        participants={null}
+        participantsError="Os 10 participantes não puderam ser carregados."
+        ddragonVersion="16.14.1"
+      />
+    );
+    expect(screen.getByText(/não puderam ser carregados/)).toBeTruthy();
+  });
+
+  it("agrupa os dois times e marca o jogador rastreado, sem exibir nível (dado inexistente)", () => {
+    render(
+      <MatchParticipantsCard
+        participants={[
+          participant({ puuid: "own", championName: "Orianna", isTrackedPlayer: true, teamId: 100 }),
+          participant({ puuid: "ally", championName: "Ahri", teamId: 100 }),
+          participant({ puuid: "enemy", championName: "Zed", teamId: 200, won: false })
+        ]}
+        participantsError={null}
+        ddragonVersion="16.14.1"
+      />
+    );
+
+    expect(screen.getByText("Participantes da partida")).toBeTruthy();
+    expect(screen.getByText("Orianna")).toBeTruthy();
+    expect(screen.getByText("Ahri")).toBeTruthy();
+    expect(screen.getByText("Zed")).toBeTruthy();
+    // MatchParticipantSummary não tem campo de nível - nunca deveria aparecer na tela.
+    expect(screen.queryByText(/n[íi]vel/i)).toBeNull();
   });
 });

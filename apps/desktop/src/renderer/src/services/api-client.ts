@@ -19,6 +19,7 @@ import type {
   GlobalChampionRoleEligibility,
   GrowthJourney,
   MatchLoadoutObservation,
+  MatchParticipantsOverview,
   LongitudinalRecommendationReport,
   LongitudinalReportFilters,
   PatchRelease,
@@ -26,6 +27,7 @@ import type {
   PersonalLoadoutEvidence,
   PickRecommendation,
   PlayerProfileOverview,
+  ProfileRecentMatch,
   PlayerChampionPoolEntry,
   PlayerChampionPoolRoleSummary,
   PlayerChampionRoleEvidence,
@@ -340,21 +342,30 @@ export function syncMyPlayerData(token: string) {
   });
 }
 
-export function fetchChampionPerformance(puuid: string) {
+/**
+ * `champion-performance`/`recent-matches`/`growth-journey` viraram
+ * `OWN_RESOURCE` na Etapa 31C (identidade deriva do bearer, não do puuid da
+ * URL) - as três nunca receberam o header aqui, e caíram em 401 em silêncio.
+ * Achado real durante a validação real do Electron na Etapa 31H.
+ */
+export function fetchChampionPerformance(token: string, puuid: string) {
   return request<{ puuid: string; champions: ChampionPerformanceScore[] }>(
-    `/players/${encodeURIComponent(puuid)}/champion-performance`
+    `/players/${encodeURIComponent(puuid)}/champion-performance`,
+    { headers: { Authorization: `Bearer ${token}` } }
   );
 }
 
-export function fetchRecentMatches(puuid: string, limit = 10) {
+export function fetchRecentMatches(token: string, puuid: string, limit = 10) {
   return request<{ puuid: string; matches: RecentChampionMatch[] }>(
-    `/players/${encodeURIComponent(puuid)}/recent-matches?limit=${limit}`
+    `/players/${encodeURIComponent(puuid)}/recent-matches?limit=${limit}`,
+    { headers: { Authorization: `Bearer ${token}` } }
   );
 }
 
-export function fetchGrowthJourney(puuid: string) {
+export function fetchGrowthJourney(token: string, puuid: string) {
   return request<{ puuid: string } & GrowthJourney>(
-    `/players/${encodeURIComponent(puuid)}/growth-journey`
+    `/players/${encodeURIComponent(puuid)}/growth-journey`,
+    { headers: { Authorization: `Bearer ${token}` } }
   );
 }
 
@@ -625,9 +636,49 @@ export function fetchMatchObservation(token: string, matchId: string) {
   });
 }
 
-export function fetchChampionRoleEvidence(puuid: string, championId: number, role: Role) {
+export function fetchMatchParticipants(token: string, matchId: string) {
+  return request<MatchParticipantsOverview>(`/matches/${encodeURIComponent(matchId)}/participants`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
+export interface MatchHistoryFilters {
+  role?: Role;
+  won?: boolean;
+  queueId?: number;
+  championId?: number;
+  periodDays?: 7 | 14 | 30;
+  limit?: number;
+  offset?: number;
+}
+
+export interface MatchHistoryPage {
+  puuid: string;
+  matches: ProfileRecentMatch[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export function fetchMatchHistory(token: string, puuid: string, filters: MatchHistoryFilters = {}) {
+  const query = new URLSearchParams();
+  if (filters.role) query.set("role", filters.role);
+  if (filters.won !== undefined) query.set("won", String(filters.won));
+  if (filters.queueId !== undefined) query.set("queueId", String(filters.queueId));
+  if (filters.championId !== undefined) query.set("championId", String(filters.championId));
+  if (filters.periodDays !== undefined) query.set("periodDays", String(filters.periodDays));
+  query.set("limit", String(filters.limit ?? 20));
+  query.set("offset", String(filters.offset ?? 0));
+  return request<MatchHistoryPage>(
+    `/players/${encodeURIComponent(puuid)}/match-history?${query.toString()}`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+}
+
+export function fetchChampionRoleEvidence(token: string, puuid: string, championId: number, role: Role) {
   return request<ChampionRoleEvidenceResponse>(
-    `/players/${encodeURIComponent(puuid)}/champions/${championId}/role-evidence?role=${role}`
+    `/players/${encodeURIComponent(puuid)}/champions/${championId}/role-evidence?role=${role}`,
+    { headers: { Authorization: `Bearer ${token}` } }
   );
 }
 

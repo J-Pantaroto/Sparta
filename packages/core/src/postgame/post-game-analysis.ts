@@ -191,7 +191,9 @@ function buildMetrics(context: PostGameMatchContext): MatchPerformanceMetrics {
     deathsBefore10: context.timeline.deathsBefore10,
     deathsBefore15: context.timeline.deathsBefore15,
     csAt10: context.timeline.csAt10,
-    csAt15: context.timeline.csAt15
+    csAt15: context.timeline.csAt15,
+    goldDiffAt15: context.timeline.goldDiffAt15,
+    objectiveEvents: context.timeline.objectiveEvents
   };
 }
 

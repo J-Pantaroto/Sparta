@@ -769,7 +769,9 @@ function SpartaApp() {
           }}
         />
       )}
-      {page === "growth" && <GrowthJourneyScreen riotAccounts={riotAccounts} />}
+      {page === "growth" && (
+        <GrowthJourneyScreen riotAccounts={riotAccounts} sessionToken={sessionToken} />
+      )}
       {page === "motor" && (
         <MotorHistoryScreen riotAccounts={riotAccounts} sessionToken={sessionToken} />
       )}

@@ -10,6 +10,7 @@ import {
   type Role
 } from "@sparta/core";
 import { prisma } from "../../db/prisma.js";
+import { mapParticipantRowToProfileRecentMatch, matchHistoryInclude } from "../matches/match-history-mapper.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const RECENT_MATCH_LIMIT = 10;
@@ -17,18 +18,6 @@ const ROLES = new Set<Role>(["TOP", "JUNGLE", "MID", "ADC", "SUPPORT"]);
 
 function asRole(value: string | null | undefined): Role | null {
   return value && ROLES.has(value as Role) ? (value as Role) : null;
-}
-
-function queueLabel(queueId: number | null): string {
-  const labels: Record<number, string> = {
-    400: "Normal alternada",
-    420: "Ranqueada Solo/Duo",
-    430: "Normal às cegas",
-    440: "Ranqueada Flex",
-    450: "ARAM",
-    490: "Quickplay"
-  };
-  return queueId === null ? "Fila não informada" : (labels[queueId] ?? `Fila ${queueId}`);
 }
 
 function coverageItem(input: {
@@ -69,31 +58,7 @@ export async function findPlayerProfileOverviewByUserId(
     // A posição normalizada pode existir mesmo quando o campo legado do
     // participante está ausente; a filtragem final acontece em `asRole`.
     where: { riotAccountId: account.id },
-    include: {
-      champion: true,
-      match: {
-        include: {
-          timeline: { select: { id: true } },
-          postgameReports: {
-            where: { puuid: account.puuid },
-            select: { id: true },
-            take: 1
-          },
-          draftComparisons: {
-            where: { riotAccountId: account.id },
-            select: { id: true },
-            take: 1
-          }
-        }
-      },
-      observation: {
-        include: {
-          itemSlots: { orderBy: { slot: "asc" } },
-          runeSelections: { orderBy: [{ tree: "asc" }, { slotOrder: "asc" }] },
-          summonerSpellSlots: { orderBy: { slot: "asc" } }
-        }
-      }
-    },
+    include: matchHistoryInclude(account),
     orderBy: { match: { startedAt: "desc" } },
     take: analysisLimit
   });
@@ -139,54 +104,7 @@ export async function findPlayerProfileOverviewByUserId(
 
   const recentMatches: ProfileRecentMatch[] = usable
     .slice(0, RECENT_MATCH_LIMIT)
-    .map(({ row, role }) => ({
-      matchId: row.match.matchId,
-      championId: row.championId,
-      championName: row.champion.name,
-      role,
-      won: row.won,
-      kills: row.kills,
-      deaths: row.deaths,
-      assists: row.assists,
-      csPerMinute: row.csPerMinute,
-      damagePerMinute: row.damagePerMinute,
-      visionScorePerMinute: row.visionScorePerMinute,
-      killParticipation: row.killParticipation,
-      objectiveParticipation: row.objectiveParticipation,
-      objectiveTakedowns: row.objectiveTakedowns,
-      teamObjectiveKills: row.teamObjectiveKills,
-      durationSeconds: row.match.durationSeconds,
-      queueId: row.match.queueId,
-      queueLabel: queueLabel(row.match.queueId),
-      patch: row.match.patch,
-      observedAt: row.match.startedAt?.toISOString() ?? null,
-      items:
-        row.observation?.itemSlots.map((item) => ({
-          slot: item.slot,
-          state: item.state,
-          itemId: item.itemId,
-          itemName: item.itemName
-        })) ?? [],
-      runes:
-        row.observation?.runeSelections.map((rune) => ({
-          tree: rune.tree,
-          slotOrder: rune.slotOrder,
-          perkId: rune.perkId,
-          perkName: rune.perkName,
-          isKeystone: rune.isKeystone
-        })) ?? [],
-      spells:
-        row.observation?.summonerSpellSlots.map((spell) => ({
-          slot: spell.slot,
-          state: spell.state,
-          spellId: spell.spellId,
-          spellName: spell.spellName
-        })) ?? [],
-      timelineAvailable: row.match.timeline !== null,
-      postGameAvailable: row.match.postgameReports.length > 0,
-      draftComparisonAvailable: row.match.draftComparisons.length > 0,
-      positionStatus: row.observation?.positionStatus ?? null
-    }));
+    .map(({ row, role }) => mapParticipantRowToProfileRecentMatch(row, role));
 
   const sampleSize = usable.length;
   const coverage = {

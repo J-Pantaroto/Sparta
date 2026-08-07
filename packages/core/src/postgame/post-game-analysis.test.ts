@@ -132,6 +132,25 @@ describe("generatePostGameAnalysis", () => {
     expect(result.pickAssessment).toContain("não classifica a escolha");
   });
 
+  it("repassa goldDiffAt15 e objectiveEvents da timeline pras métricas de saída", () => {
+    const context = baseContext({
+      timeline: {
+        matchId: "m1",
+        deathsBefore10: 0,
+        deathsBefore15: 1,
+        csAt10: 80,
+        csAt15: 120,
+        goldDiffAt15: -820,
+        objectiveEvents: ["DRAGON@14:23", "TOWER@18:05"]
+      }
+    });
+
+    const result = generatePostGameAnalysis(context);
+
+    expect(result.metrics.goldDiffAt15).toBe(-820);
+    expect(result.metrics.objectiveEvents).toEqual(["DRAGON@14:23", "TOWER@18:05"]);
+  });
+
   it("expectedPlan reconhece a ausência de histórico pessoal com o campeão", () => {
     const context = baseContext({ championHistory: undefined });
     const result = generatePostGameAnalysis(context);

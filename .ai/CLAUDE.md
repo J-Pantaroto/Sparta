@@ -1,5 +1,87 @@
 # Sparta - Contexto para Continuidade
 
+## Etapa 31H: redesign do pós-game, partidas e histórico pessoal
+
+Escopo exclusivo: pós-game, detalhe de partida, histórico pessoal, comparação factual com o
+snapshot pré-game e visualização de métricas observadas. **Nenhum cálculo, inferência, vínculo
+Match-V5, snapshot ou motor de recomendação foi tocado** — tudo aditivo. Relatório completo em
+`docs/post-game-match-history-redesign.md`.
+
+**Backend (aditivo)**: `MatchParticipantSummary`/`MatchParticipantsOverview`
+(`packages/core/src/types/match-participants.ts`) — um jogador de uma partida específica, dos
+dois times; **sem campo de nível**, porque a Riot não persiste isso em nenhuma tabela do Sparta
+e inventar violaria o princípio de dado real do projeto. `teamId` opcional cobre linhas legadas
+anteriores ao backfill de participantes da Etapa 3. `compareMatchToRecentHistory`
+(`packages/core/src/aggregation/match-vs-recent-history.ts`) compara uma partida com a média das
+partidas **estritamente anteriores** (por `observedAt`) - nunca inclui a própria partida nem
+partidas futuras, evitando vazamento temporal por construção. `MatchPerformanceMetrics` ganhou
+`goldDiffAt15`/`objectiveEvents` (aditivo, opcional - já existiam internamente em
+`generatePostGameAnalysis` e só não saíam no contrato).
+
+**Duas rotas novas**, as duas `OWN_RESOURCE` na matriz de autorização (Etapa 31C):
+`GET /matches/:matchId/participants` (os 10 participantes, posse implícita via linha
+`MatchParticipant` do próprio usuário, reusa `findMatchLoadoutObservation` por participante em
+paralelo, sem parsear `rawJson`) e `GET /players/:puuid/match-history` (filtrável por
+posição/resultado/fila/campeão/período, paginado por `limit`/`offset`, reusa o mesmo
+enriquecimento por partida de `/me/player-profile` via mapper compartilhado extraído
+`match-history-mapper.ts` - o comportamento daquela rota não mudou).
+
+**Frontend**: `MatchHistoryList.tsx` (novo) substitui a antiga lista fixa de 10 partidas numa
+barra de 300px - filtros + agrupamento temporal (Hoje/Ontem/Esta semana/Mais antigas/Sem data
+registrada, nunca mistura partida sem data com "Hoje") + "Carregar mais". O pós-game virou
+histórico em largura total no topo + relatório completo abaixo (a lista antiga não cabia
+`RecentMatchRow`, que precisa de ~700px de grade). `MatchParticipantsCard` (os dois times, jogador
+do Sparta discretamente destacado, sem julgamento sobre os outros 9), `MatchTimelineCard` (só
+fatos com timestamp, zero narrativa causal - "14:23 DRAGON registrado", nunca "X causou Y"),
+`RecentHistoryComparisonCard` ("nesta partida" vs "sua média recente" em cards de valor, não mais
+barras empilhadas - pedido explícito de reduzir dependência de progress bar). `DraftComparisonSection`
+reestruturada em dois blocos rotulados "Antes da partida"/"Observado na partida", mesmo
+texto/dado de sempre, só separação visual entre decisão e resultado.
+
+**Bug real corrigido no caminho, achado só na validação real do Electron**: a Etapa 31C (auditoria
+de autorização) tornou `/players/:puuid/recent-matches`, `/growth-journey`,
+`/champion-performance` e `/champions/:championId/role-evidence` todas `OWN_RESOURCE`, mas as
+quatro funções correspondentes em `api-client.ts` nunca foram atualizadas pra mandar o header
+`Authorization` - foram escritas quando essas rotas ainda eram públicas por puuid (Fase 1/2). Ou
+seja, desde a Etapa 31C, toda chamada real dessas quatro funções vinha devolvendo 401 em
+silêncio, e nenhuma etapa entre a 31C e a 31G tinha revalidado Pós-game/Evolução no Electron real
+depois do endurecimento - só apareceu porque esta etapa finalmente reabriu o pós-game via CDP de
+verdade. Corrigido: as quatro funções passaram a exigir `token` como primeiro parâmetro;
+`GrowthJourneyScreen` ganhou a prop `sessionToken`, que nunca tinha recebido nenhuma.
+`fetchMatchHistory` (nova nesta etapa) já nasceu correta.
+
+**Validado real** (Docker reconstruído, Postgres real, conta Zekerus#117, 22 partidas
+sincronizadas): as duas rotas novas responderam 200 com dado real via curl com token assinado
+(10 participantes com times 100/200 corretos e jogador rastreado identificado; histórico
+paginado/filtrado correto). Reanálise de uma partida real expôs `goldDiffAt15: -2181` e 24
+eventos de objetivo com timestamp reais (antes, ambos `undefined` - confirma o campo aditivo
+funcionando ponta a ponta). Electron real via CDP (`electron-vite dev`, não aba de navegador
+comum): login real (token HMAC assinado, mesmo `AUTH_TOKEN_SECRET` do container), navegação até
+"Partidas e pós-game", histórico com 20 de 22 partidas reais agrupadas em "Mais antigas", abertura
+de uma partida real (Vel'Koz SUPPORT, derrota) com os 10 participantes, timeline real
+(mortes/ouro/objetivos com timestamp), comparação com a média recente real (21 partidas
+anteriores, valores batendo), **zero erro de console em todo o fluxo** (login → navegação →
+seleção de partida, escutado via `Runtime.consoleAPICalled`/`Runtime.exceptionThrown`), zero
+`NaN`/`Infinity`/`undefined` no texto renderizado, zero imagem quebrada, e `scrollWidth ===
+clientWidth` em 1000/1280/1600px (sem scroll horizontal).
+
+**Não regressão**: mesma recomendação controlada de sempre (JUNGLE, pick 3, Ahri aliada, Lee Sin
+inimigo, bans 55/91) → 5 candidatos idênticos à linha de base (Viego 58.7/0.9, Udyr 58.5/0.5, Vi
+55.3/0.5, Nocturne 53.3/0.5, Graves 50.1/0.5). `release-etapa27c-v1` `ACTIVE` com `artifactHash`
+(`8878a657…`) e `configHash` (`fa9dbde1…`) iguais antes e depois. Replay do snapshot novo:
+**`EXACT_REPLAY`, 0 divergências**.
+
+**1211 testes** no monorepo (core 635, riot 97, api 348, desktop 115, raiz 15, analyzer 1) - 28
+novos cobrindo especificamente o comportamento desta etapa. `pnpm -r test` completo (todos os
+workspaces em paralelo) passou sem flakiness desta vez - a contenção de recursos documentada
+desde a Etapa 26b não se manifestou nesta execução (executado uma única vez, não é garantia de
+que não reapareça). `typecheck`/`lint`/`build` completos nos quatro pacotes TypeScript.
+
+Histórico do motor e Laboratório de calibração não foram tocados, conforme instrução explícita
+("pare antes do redesign do Histórico do motor e Laboratório"). Modo carreira, coach ao vivo,
+dado global, RSO real, serviço de email real, site institucional, domínio e VPS seguem fora de
+escopo. Ver `docs/post-game-match-history-redesign.md`.
+
 ## Etapa 31G.1: alerta Dependabot high (js-yaml) resolvido
 
 O GitHub sinalizou `js-yaml` `GHSA-5p4m-2wfm-xmqj` (CVSS 7.5, DoS por consumo quadrático de CPU em

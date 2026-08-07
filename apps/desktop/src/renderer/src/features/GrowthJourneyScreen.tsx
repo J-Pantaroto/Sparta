@@ -36,11 +36,18 @@ const trendLabels: Record<WeaknessTrend["trend"], string> = {
  * existe um segundo bloco de partidas antigas o valor nem significa
  * "estável" - significa "ainda não dá pra saber".
  */
-export function GrowthJourneyScreen({ riotAccounts }: { riotAccounts: RiotAccountSummary[] }) {
+export function GrowthJourneyScreen({
+  riotAccounts,
+  sessionToken
+}: {
+  riotAccounts: RiotAccountSummary[];
+  sessionToken: string | null;
+}) {
   const account = riotAccounts[0];
   const journey = useAsyncData<{ puuid: string } & GrowthJourney>(
-    () => (account ? fetchGrowthJourney(account.puuid) : undefined),
-    [account?.puuid]
+    () =>
+      account && sessionToken ? fetchGrowthJourney(sessionToken, account.puuid) : undefined,
+    [account?.puuid, sessionToken]
   );
 
   if (!account) {

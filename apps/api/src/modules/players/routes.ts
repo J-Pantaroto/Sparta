@@ -35,6 +35,7 @@ import {
 } from "./player-pool-repository.js";
 import { findPersonalLoadoutObservations } from "./personal-loadout-repository.js";
 import { findPlayerProfileOverviewByUserId } from "./player-profile-overview-repository.js";
+import { findMatchHistoryByPuuid } from "../matches/match-history-repository.js";
 
 export const linkRiotAccountSchema = z.object({
   gameName: z.string().min(3, "Informe o nome do invocador"),
@@ -375,6 +376,42 @@ export const playersRoutes: FastifyPluginAsync = async (app) => {
     }));
 
     return { puuid: params.puuid, matches };
+  });
+
+  /**
+   * Histórico pessoal moderno (Etapa 31H): filtros e paginação sobre o
+   * mesmo enriquecimento por partida que `/me/player-profile` já usa
+   * (`match-history-mapper.ts`) - contrato/comportamento daquela rota não
+   * mudam. Sem novo cálculo, inferência ou vínculo Match-V5.
+   */
+  app.get("/players/:puuid/match-history", async (request, reply) => {
+    const params = z.object({ puuid: z.string() }).parse(request.params);
+    const query = z
+      .object({
+        role: z.enum(["TOP", "JUNGLE", "MID", "ADC", "SUPPORT"]).optional(),
+        // z.coerce.boolean() trataria a string "false" como truthy - aceita
+        // só os dois literais esperados e converte explicitamente.
+        won: z
+          .enum(["true", "false"])
+          .transform((value) => value === "true")
+          .optional(),
+        queueId: z.coerce.number().int().optional(),
+        championId: z.coerce.number().int().optional(),
+        periodDays: z
+          .enum(["7", "14", "30"])
+          .transform((value) => Number(value) as 7 | 14 | 30)
+          .optional(),
+        limit: z.coerce.number().min(1).max(100).default(20),
+        offset: z.coerce.number().min(0).default(0)
+      })
+      .parse(request.query);
+
+    const page = await findMatchHistoryByPuuid(params.puuid, query);
+    if (!page) {
+      reply.code(404);
+      return { error: "Nenhuma conta Riot vinculada." };
+    }
+    return { puuid: params.puuid, ...page };
   });
 
   app.get("/players/:puuid/champion-performance", async (request) => {

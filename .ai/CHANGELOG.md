@@ -22,6 +22,20 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-08-07 05:55 — Etapa 31H: redesign do pós-game, partidas e histórico pessoal
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0049-redesign-pos-game-partidas-historico.md`
+
+Histórico pessoal filtrável/paginado/agrupado por período, visão dos 10 participantes, timeline
+factual sem causalidade, comparação "nesta partida × sua média recente" sem vazamento temporal e
+comparação pré-game × observado reestruturada em "Antes da partida"/"Observado" — tudo aditivo,
+sem tocar cálculo, vínculo Match-V5, snapshot ou motor. Validação real encontrou e corrigiu um
+401 silencioso desde a Etapa 31C em quatro chamadas do desktop que nunca mandavam o bearer. Não
+regressão: 5 candidatos idênticos, `release-etapa27c-v1` com hashes iguais, `EXACT_REPLAY`. Ver
+`docs/post-game-match-history-redesign.md`.
+
+---
+
 ## 2026-08-06 23:50 — Etapa 31G.1: correção do alerta Dependabot high (js-yaml)
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0048-dependabot-js-yaml.md`

@@ -192,6 +192,10 @@ export interface MatchPerformanceMetrics {
   deathsBefore15?: number;
   csAt10?: number;
   csAt15?: number;
+  /** Diferença de ouro aos 15min (jogador - laner oposto). Ver `MatchTimelineSummary`. */
+  goldDiffAt15?: number;
+  /** Eventos factuais da timeline, formato `"LABEL@M:SS"`. Ver `MatchTimelineSummary`. */
+  objectiveEvents?: string[];
 }
 
 export interface MatchTimelineSummary {

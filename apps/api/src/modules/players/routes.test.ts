@@ -16,7 +16,8 @@ const {
   findPlayerPoolMock,
   addUserProvidedPoolEntryMock,
   disableUserProvidedPoolEntryMock,
-  findPlayerProfileOverviewByUserIdMock
+  findPlayerProfileOverviewByUserIdMock,
+  findMatchHistoryByPuuidMock
 } = vi.hoisted(() => ({
   findRiotAccountByRiotIdMock: vi.fn(),
   findChampionStatsByPuuidMock: vi.fn(),
@@ -33,7 +34,8 @@ const {
   findPlayerPoolMock: vi.fn(),
   addUserProvidedPoolEntryMock: vi.fn(),
   disableUserProvidedPoolEntryMock: vi.fn(),
-  findPlayerProfileOverviewByUserIdMock: vi.fn()
+  findPlayerProfileOverviewByUserIdMock: vi.fn(),
+  findMatchHistoryByPuuidMock: vi.fn()
 }));
 
 vi.mock("./player-stats-repository.js", () => ({
@@ -87,6 +89,10 @@ vi.mock("./player-pool-repository.js", () => ({
 
 vi.mock("./player-profile-overview-repository.js", () => ({
   findPlayerProfileOverviewByUserId: findPlayerProfileOverviewByUserIdMock
+}));
+
+vi.mock("../matches/match-history-repository.js", () => ({
+  findMatchHistoryByPuuid: findMatchHistoryByPuuidMock
 }));
 
 import { buildApp } from "../../app.js";
@@ -384,6 +390,52 @@ describe("players routes", () => {
     expect(response.statusCode).toBe(200);
     expect(response.json().matches).toEqual([]);
     await app.close();
+  });
+
+  describe("GET /players/:puuid/match-history", () => {
+    it("repassa filtros validados e devolve a página", async () => {
+      findMatchHistoryByPuuidMock.mockResolvedValue({
+        matches: [],
+        total: 0,
+        limit: 20,
+        offset: 0
+      });
+      const app = await buildApp();
+      const response = await app.inject({
+        method: "GET",
+        url: "/players/puuid-x/match-history?role=JUNGLE&won=false&periodDays=7&limit=5&offset=10"
+      });
+      expect(response.statusCode).toBe(200);
+      expect(findMatchHistoryByPuuidMock).toHaveBeenCalledWith("puuid-x", {
+        role: "JUNGLE",
+        won: false,
+        periodDays: 7,
+        limit: 5,
+        offset: 10
+      });
+      await app.close();
+    });
+
+    it("404 quando a conta nao existe", async () => {
+      findMatchHistoryByPuuidMock.mockResolvedValue(null);
+      const app = await buildApp();
+      const response = await app.inject({
+        method: "GET",
+        url: "/players/puuid-x/match-history"
+      });
+      expect(response.statusCode).toBe(404);
+      await app.close();
+    });
+
+    it("rejeita periodDays fora dos três valores aceitos (7/14/30)", async () => {
+      const app = await buildApp();
+      const response = await app.inject({
+        method: "GET",
+        url: "/players/puuid-x/match-history?periodDays=15"
+      });
+      expect(response.statusCode).toBe(400);
+      await app.close();
+    });
   });
 
   it("champion-performance devolve lista vazia quando nao ha stats", async () => {

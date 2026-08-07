@@ -136,3 +136,18 @@ export const configurationSourceLabels: Record<string, string> = {
   BUILT_IN_BASELINE: "Baseline",
   RELEASE: "Release"
 };
+
+/**
+ * Filas conhecidas pro filtro de histórico de partidas (Etapa 31H) - espelha
+ * `queueLabel` do backend (`match-history-mapper.ts`). Só as filas que o
+ * Sparta já sabe rotular; qualquer outro ID fica de fora do filtro (não tem
+ * como oferecer "Fila 999" como opção significativa).
+ */
+export const QUEUE_FILTER_OPTIONS: { value: number; label: string }[] = [
+  { value: 420, label: "Ranqueada Solo/Duo" },
+  { value: 440, label: "Ranqueada Flex" },
+  { value: 400, label: "Normal alternada" },
+  { value: 430, label: "Normal às cegas" },
+  { value: 450, label: "ARAM" },
+  { value: 490, label: "Quickplay" }
+];
