@@ -1,5 +1,120 @@
 # Sparta - Contexto para Continuidade
 
+## Etapa 31L: dossiê final para submissão Production à Riot — `RIOT_APPLICATION_PACKAGE_READY`
+
+Pedido explícito do usuário: preparar (sem enviar) o pacote completo de submissão do Sparta GG
+para uma Production API Key da Riot. Etapa **100% documental** — nenhum arquivo de `packages/`
+ou `apps/` foi tocado, confirmado por `git status` antes de fechar (só 4 arquivos novos em
+`docs/`, mais os espelhos em `.ai/specs/`). Quatro documentos entregues: `docs/riot-production-
+application.md`, `docs/riot-policy-compliance-matrix.md`, `docs/riot-api-inventory.md`,
+`docs/riot-submission-checklist.md`.
+
+**Políticas revalidadas contra fontes oficiais atuais, não contra o histórico deste repositório**
+(instrução explícita do pedido) — 9 fontes consultadas em 2026-08-07 via web, cada uma com URL,
+data de última atualização informada pela Riot (quando exposta) e regra extraída: General
+Policies (`developer.riotgames.com/policies/general`, última atualização 11/mar/2025 — registro
+de produto, monetização, segurança de API key), Game Specific/Developer API Policy de League of
+Legends (`developer.riotgames.com/docs/lol#game-policy` — regras de Game Integrity, casos de uso
+não aprovados, texto do disclaimer obrigatório), Legal Jibber Jabber
+(`riotgames.com/en/legal`, última atualização ago/2018 — disclaimer de conteúdo de fã e o
+carve-out explícito pra produtos comerciais com API key válida), RSO (Riot Sign-On — exige
+Production Key aprovada antes de qualquer acesso), mudança da política da LCU API
+(`riotgames.com/en/DevRel/changes-to-the-lcu-api-policy`, publicado 24/jan/2019 — contato prévio
+obrigatório com a Riot antes de lançar/atualizar app que usa a LCU, restrição a endpoints de uma
+lista aprovada), e PUUID/camada de segurança (PUUID é criptografado e específico por API key —
+rotação de key invalida o mapeamento). **Duas fontes retornaram HTTP 403** por exigirem login no
+portal de suporte da Riot (API Terms and Conditions completo, espelho autenticado das General
+Policies) — registrado como limitação explícita que o responsável precisa fechar com a própria
+conta antes do envio real, não escondido nem contornado.
+
+**Achado real que corrige uma decisão da própria Etapa 31K**: o site publica, desde a 31K, só o
+disclaimer do Legal Jibber Jabber ("Sparta GG was created under Riot Games' 'Legal Jibber
+Jabber' policy..."). A releitura contra a fonte oficial nesta etapa mostrou que essa mesma
+política declara explicitamente uma categoria separada — *"commercial Projects that both (1)
+comply with our API Terms and API Policies; and (2) use a currently valid Riot API key"* — e que
+a política específica de LoL exige **seu próprio** texto de disclaimer ("[Your Product Name] is
+not endorsed by Riot Games and does not reflect the views or opinions of Riot Games or anyone
+officially involved in producing or managing Riot Games properties."), **não intercambiável** com
+o primeiro. Os dois precisam coexistir no site (o Sparta usa a API Riot, não é só um "fan asset
+project"), e nenhum disclaimer existe hoje dentro do próprio aplicativo Desktop (confirmado por
+busca no código-fonte, zero ocorrência) — as duas correções ficaram registradas como pendência no
+checklist, não corrigidas nesta etapa por ser puramente documental.
+
+**Matriz de conformidade completa** (`docs/riot-policy-compliance-matrix.md`) cobrindo 20 regras
+— registro do produto, uso de APIs suportadas, HTTPS, segurança de API key, uso da LCU
+(`NEEDS_RIOT_REVIEW`: pedir confirmação explícita de que os 3 endpoints de leitura usados estão
+na lista aprovada da Riot, já que essa lista não é pública), integridade competitiva, apoio à
+decisão vs. decisão automática, múltiplas opções, dados previamente visíveis, dados pessoais,
+match history, RSO, identidade, monetização, disclaimer, propriedade intelectual, screenshots,
+atualização futura de features. Resultado: 12 `COMPLIANT`, 4 `COMPLIANT_WITH_LIMITATION` (nenhum
+por falha de implementação — HTTPS de produção real ainda não provisionado, API Terms completos
+não relidos por causa do 403, disclaimer incompleto, todos com ação clara), 1 `NOT_APPLICABLE`
+(monetização), 2 `BLOCKED` esperados e corretos nesta fase (registro do produto e RSO — só se
+resolvem depois da aprovação da Riot, não antes), 1 `NEEDS_RIOT_REVIEW`. **Zero
+`BLOCKED_BY_POLICY_REMEDIATION`** — nenhuma inconformidade irremediável foi encontrada.
+
+**Auditoria de código, não de memória do projeto** (confirmando cada zero técnico exigido pelo
+pedido com evidência direta, não com o histórico já documentado em etapas anteriores): único
+método HTTP usado em `packages/riot/src/lcu/read-only-client.ts` é `"GET"` (LCU write
+operations = 0, confirmado por busca textual no arquivo inteiro); zero handler IPC em
+`apps/desktop/src/main/index.ts` envia comando ao League Client (os 6 handlers existentes são
+`session:get/set/clear`, `riot-auth:open`, `download-skin`, `lcu-state` — automatic champion
+selection = 0, automatic lock-in = 0); `RIOT_API_KEY` só existe em 5 arquivos de `apps/api`,
+busca em todo o repositório confirma zero ocorrência em `apps/desktop`; zero ocorrência de "win
+probability"/"chance de vitória"/"melhor campeão"/"counter pick"/"calculadora de MMR/ELO" fora de
+**negação explícita** já existente na própria interface (`PostGameScreen.tsx`/
+`PreGameScreen.tsx` dizem literalmente "não é... chance de vitória"); zero asset de campeão/item/
+runa/splash da Riot commitado no repositório ou embutido no binário — tudo buscado ao vivo da CDN
+pública da Data Dragon/Community Dragon em tempo de execução (busca por todo arquivo de imagem
+versionado: só o ícone próprio do Sparta e 3 screenshots).
+
+**Revisão contraditória de linguagem** (seção 33 do pedido, perspectiva de auditor Riot): todos
+os termos de risco listados no pedido (win probability, MMR/ELO, counter, best champion, IA que
+decide, informação oculta, meta global) foram buscados no código e no site. Toda ocorrência
+encontrada está em posição de **negação explícita** do comportamento proibido — nenhuma correção
+funcional foi necessária. Única recomendação editorial (não funcional): qualificar a palavra
+"automatic" com "read-only"/"detection"/"no action taken" nas descrições em inglês do Developer
+Portal, já aplicado nas descrições finais do dossiê.
+
+**Inventário de dados definitivo** (`docs/riot-production-application.md` §12): 10 categorias de
+dado, cada uma com fonte/finalidade/retenção/visibilidade — conta Sparta, Riot ID, PUUID (com a
+nota de que é específico por API key), região, histórico de partidas, participantes de partida,
+observações de loadout, draft observado, estatísticas agregadas pessoais, catálogo estático da
+Data Dragon. Nenhum dado global de outros jogadores fora de uma partida compartilhada.
+
+**Inventário de APIs** (`docs/riot-api-inventory.md`): Account-V1 (2 endpoints), Match-V5 (3
+endpoints), Data Dragon, Community Dragon (fallback opcional), LCU (3 endpoints de leitura), RSO
+(futuro) — cada um classificado `REQUIRED`/`OPTIONAL`/`FUTURE`, com evidência de onde é chamado
+no código. Explicitamente **não solicitadas**: League-V4, Spectator-V5, Tournament-V4/V5,
+Clash-V1, Champion-Mastery-V4 — nenhuma é usada em código algum. Estimativa de tráfego modelada
+(piloto/100/1000 usuários, baseada nas constantes reais de `riot-sync-service.ts`:
+`DEFAULT_MAX_NEW_MATCHES=20`, `MAX_NEW_MATCHES_CEILING=50`), explicitamente **não** representando
+usuários reais. Tratamento real de rate limit documentado (429/`Retry-After`/backoff/interrupção
+de rodada/cache/dedup/stale por categoria), tudo já implementado e testado, nada prometido sem
+existir.
+
+**Checklist bloqueante** (`docs/riot-submission-checklist.md` §32): estado **`DO_NOT_SUBMIT`** —
+faltam domínio registrado, site publicado, Privacy/Terms públicos, disclaimer completo (as duas
+correções encontradas), suporte funcional, fluxo de exclusão público, `riot.txt`, e revisão final
+do responsável. Os itens que dependiam só desta etapa (screenshots sanitizados, site correspondendo
+ao produto, descrição final, inventário de API, zero secret no Desktop, zero feature proibida
+anunciada) já estão marcados prontos.
+
+**Não regressão**: como nenhum arquivo de `packages/`/`apps/` foi tocado (confirmado por
+`git status` antes de fechar), a ausência de diff já é a prova — não foi necessário reexecutar a
+suíte completa. Confirmado direto no Postgres real desta sessão: `release-etapa27c-v1` `ACTIVE`,
+`artifactHash`/`configHash` idênticos aos documentados desde a Etapa 27c, ponteiro conferindo.
+
+**Estado final: `RIOT_APPLICATION_PACKAGE_READY` + `BLOCKED_BY_PUBLIC_SITE` +
+`BLOCKED_BY_SUPPORT_EMAIL` + `BLOCKED_BY_OWNER_INFRASTRUCTURE_PROVISIONING`.** O conteúdo do
+dossiê está pronto para revisão final do responsável; o que falta não é mais preparação, é
+publicação real do site (mesmo bloqueio da Etapa 31K) e as duas correções de disclaimer
+identificadas nesta etapa. Estados não usados, como instruído: `SUBMITTED_TO_RIOT`,
+`RIOT_APPROVED`, `PRODUCTION_KEY_GRANTED`, `RSO_READY`. **Nada foi submetido à Riot.** Próximos
+passos, na ordem correta: responsável registra domínio + contrata VPS/e-mail → retomar a Etapa
+31K só para publicação real → validação externa completa do site publicado → aplicar as duas
+correções de disclaimer → revisão final do dossiê pelo responsável → só então submissão.
+
 ## Etapa 31K.1: glassmorphism no site e no Desktop
 
 Pedido do usuário entre a 31K e a 31L: aplicar glassmorphism tanto no site institucional quanto

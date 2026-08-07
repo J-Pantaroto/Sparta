@@ -22,6 +22,19 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-08-08 01:40 — Etapa 31L: dossiê final para submissão Production à Riot
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0054-dossie-producao-riot.md`
+
+Etapa 100% documental: políticas Riot revalidadas contra 9 fontes oficiais atuais (não só
+histórico do repo), matriz de conformidade completa, descrição canônica/curta/detalhada do
+produto, Champion Select explicado sob Game Integrity, inventário de dados e de APIs, checklist
+bloqueante e revisão contraditória de linguagem. Achado real: o site (Etapa 31K) publica só o
+disclaimer do Legal Jibber Jabber, mas a política específica de LoL exige um segundo texto
+próprio — os dois precisam coexistir, registrado como pendência. Auditoria de código confirma
+zero LCU write, zero API key no Desktop, zero alegação de win-probability. Nada foi submetido à
+Riot; estado final `RIOT_APPLICATION_PACKAGE_READY` + bloqueios já conhecidos da Etapa 31K.
+
 ## 2026-08-07 22:50 — Etapa 31K.1: glassmorphism no site e no Desktop
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0053-glassmorphism-site-desktop.md`
