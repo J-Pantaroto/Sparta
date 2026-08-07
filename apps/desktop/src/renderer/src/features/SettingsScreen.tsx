@@ -1,7 +1,8 @@
-import { Check, Palette, SlidersHorizontal } from "lucide-react";
+import { Check, Info, Palette, SlidersHorizontal } from "lucide-react";
 import { useState } from "react";
 import { useAsyncData } from "../hooks/use-async-data";
 import { fetchSettings, updateSettings } from "../services/api-client";
+import { AboutSection } from "./AboutSection";
 import { ThemeGallery } from "../theme/ThemeGallery";
 import { ThemedPageHero } from "../theme/ThemedPageHero";
 import {
@@ -22,7 +23,7 @@ const QUICK_LIMITS = [20, 50, 100];
 const MIN_LIMIT = 1;
 const MAX_LIMIT = 200;
 
-type Section = "theme" | "analysis";
+type Section = "theme" | "analysis" | "about";
 
 export function SettingsScreen({
   ddragonVersion,
@@ -57,14 +58,24 @@ export function SettingsScreen({
                 <SlidersHorizontal size={14} /> Análise
               </span>
             )
+          },
+          {
+            value: "about",
+            label: (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-2)" }}>
+                <Info size={14} /> Sobre
+              </span>
+            )
           }
         ]}
       />
 
       {section === "theme" ? (
         <ThemeGallery ddragonVersion={ddragonVersion} />
-      ) : (
+      ) : section === "analysis" ? (
         <AnalysisSettings sessionToken={sessionToken} />
+      ) : (
+        <AboutSection />
       )}
     </PageLayout>
   );

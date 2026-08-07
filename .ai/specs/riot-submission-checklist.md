@@ -13,8 +13,10 @@ Enquanto qualquer item obrigatório abaixo estiver ausente: **`DO_NOT_SUBMIT`**.
       nada publicado ainda)
 - [ ] Privacy pública (conteúdo pronto em `apps/site/privacidade.html`, não publicado)
 - [ ] Terms públicos (conteúdo pronto em `apps/site/termos.html`, não publicado)
-- [ ] disclaimer Riot visível — **parcialmente pendente**: falta o segundo texto (política
-      específica de LoL) no site e falta qualquer disclaimer no Desktop (ver §19 do dossiê e
+- [x] disclaimer Riot visível — **corrigido na Etapa 31L.1**: os dois textos (Legal Jibber Jabber
+      + política específica de LoL) coexistem em `apps/site/termos.html` §11.1/§11.2, com
+      referência no rodapé de todas as páginas; o Desktop ganhou uma seção "Sobre o Sparta GG"
+      (Configurações) com os dois textos embutidos, disponível offline (ver §19 do dossiê e
       matriz de conformidade §2)
 - [ ] suporte funcional (`suporte@spartagg.com.br` precisa existir e receber e-mail de verdade
       antes de ser publicado — Etapa 31K)
@@ -38,9 +40,11 @@ Enquanto qualquer item obrigatório abaixo estiver ausente: **`DO_NOT_SUBMIT`**.
       confirmados ausentes do site e do dossiê — ver §23-25 do dossiê)
 - [ ] owner fez revisão final (pendente — este documento é a entrega para essa revisão)
 
-**Itens obrigatórios ainda ausentes**: domínio, site publicado, Privacy/Terms publicados,
-disclaimer completo, suporte funcional, fluxo de exclusão público, `riot.txt`, revisão final do
-responsável. **Estado: `DO_NOT_SUBMIT`.**
+**Itens obrigatórios ainda ausentes**: domínio, site publicado, Privacy/Terms publicados, suporte
+funcional, fluxo de exclusão público, `riot.txt`, revisão final do responsável. O disclaimer foi
+corrigido na Etapa 31L.1 e não bloqueia mais o envio — os bloqueios remanescentes são todos de
+infraestrutura (site público, e-mail de suporte), não de conteúdo legal. **Estado: `DO_NOT_SUBMIT`
+— ainda bloqueado, agora só por infraestrutura.**
 
 ## 33. Revisão contraditória (perspectiva de um auditor Riot)
 
@@ -168,9 +172,50 @@ e e-mail de suporte ainda não foram provisionados pelo responsável.
 `PRODUCTION_KEY_GRANTED`, `RSO_READY`.
 
 **Próximos passos, na ordem correta** (já resumidos ao usuário ao final da Etapa 31K, reafirmados
-aqui): o responsável registra `spartagg.com.br`, contrata VPS e e-mail → uma etapa futura retoma
-a 31K só para publicação real → validação externa completa do site publicado → adicionar o
-disclaimer da política específica de LoL (site) e um disclaimer no Desktop, pendências identificadas
-nesta etapa → revisão final do dossiê pelo responsável → só então submissão à Riot.
+aqui, e atualizados pela Etapa 31L.1 — ver §38): o responsável registra `spartagg.com.br`,
+contrata VPS e e-mail → uma etapa futura retoma a 31K só para publicação real → validação externa
+completa do site publicado → revisão final do dossiê pelo responsável → só então submissão à
+Riot. O passo de corrigir os disclaimers, antes listado aqui, já foi concluído na Etapa 31L.1.
 
 **Esta etapa não submeteu nada à Riot.**
+
+## 38. Correção da Etapa 31L.1 — disclaimers
+
+Pedido explícito do usuário, motivado diretamente pelas duas pendências registradas acima (§32,
+item de disclaimer) e em `docs/riot-policy-compliance-matrix.md` §2: o site publicava só o
+disclaimer do Legal Jibber Jabber, faltava o disclaimer específico da política de Desenvolvedor de
+LoL, e o Desktop não tinha disclaimer nenhum.
+
+**Corrigido, sem tocar em nenhuma funcionalidade, motor, UX principal ou infraestrutura:**
+
+- `apps/site/termos.html` §11 passou a ter os dois avisos, verbatim, lado a lado — §11.1 (Legal
+  Jibber Jabber) e §11.2 (política de desenvolvedor de LoL, novo) — com fonte/data de consulta
+  citada e link pras duas páginas oficiais. O rodapé de todas as 9 páginas do site
+  (`apps/site/src/scripts/layout.ts`) ganhou uma referência curta de não-afiliação apontando pros
+  Termos de Uso.
+- O Desktop ganhou uma nova aba "Sobre" em Configurações
+  (`apps/desktop/src/renderer/src/features/AboutSection.tsx`), com nome do produto, versão, os
+  dois textos legais embutidos como constantes literais no bundle (funcionam **offline**, sem
+  chamada de rede/API) e três ações desabilitadas ("Em preparação") pros links institucionais que
+  só serão ativados quando o site publicado existir de verdade — nenhuma aponta pra localhost ou
+  GitHub como substituto.
+- Auditoria de linguagem em todo `apps/` por termos de risco (`oficial`, `aprovado`, `parceiro`,
+  `endorsed`, `sponsor`, `partner`) confirmou: toda ocorrência é negação explícita de afiliação ou
+  rótulo técnico de proveniência de dado (ex. "Fonte oficial Riot" descrevendo de onde vieram as
+  notas de patch) — nenhuma sugere aprovação, parceria ou produto oficial da Riot.
+- 26 testes automatizados novos cobrindo especificamente este comportamento (7 em
+  `AboutSection.test.tsx`, 2 em `SettingsScreen.test.tsx`, 4 em `layout.test.ts`, 13 em
+  `disclaimers-content.test.ts`) — presença dos dois textos, coexistência, ausência de link pra
+  localhost/GitHub, botões desabilitados (não âncoras funcionais), acessibilidade por teclado da
+  aba "Sobre", nenhuma string obrigatória alterada por acidente.
+- Validado real: site no dev server (Vite) nas páginas afetadas, sem erro de console; Desktop no
+  **Electron real via CDP** (mesma metodologia da Etapa 31J/31K.1 — debug port temporário revertido
+  antes do commit, diff líquido zero confirmado por `git diff`), login real, navegação até
+  Configurações → Sobre, os dois textos renderizados, `backdropFilter: blur(20px)` confirmando que
+  o glassmorphism da Etapa 31K.1 continua intacto, zero erro de console, zero exceção.
+
+**Estado atualizado**: o item de disclaimer no checklist §32 passou de pendente para `[x]`; a
+matriz de conformidade §3 do documento irmão passou de `COMPLIANT_WITH_LIMITATION` para
+`COMPLIANT`. O checklist geral **continua `DO_NOT_SUBMIT`** — os bloqueios remanescentes (domínio,
+site publicado, e-mail de suporte, revisão final do responsável) são todos de infraestrutura, não
+de conteúdo legal. **Nada foi submetido à Riot nesta correção.**

@@ -22,6 +22,16 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-08-08 02:30 — Etapa 31L.1: remediação dos disclaimers Riot no site e Desktop
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0055-remediacao-disclaimers-riot.md`
+
+Corrige as duas pendências de disclaimer da Etapa 31L: `apps/site/termos.html` §11 agora traz
+os dois avisos legais da Riot lado a lado (Legal Jibber Jabber + política de desenvolvedor de
+LoL), e o Desktop ganhou uma aba "Sobre" em Configurações com os dois textos embutidos no bundle
+(funciona offline). 26 testes novos; validado real no site (dev server) e no Electron (CDP).
+Checklist de submissão segue `DO_NOT_SUBMIT`, agora só por infraestrutura, não por conteúdo legal.
+
 ## 2026-08-08 01:40 — Etapa 31L: dossiê final para submissão Production à Riot
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0054-dossie-producao-riot.md`

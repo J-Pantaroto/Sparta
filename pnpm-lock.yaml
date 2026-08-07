@@ -141,6 +141,9 @@ importers:
       '@types/node':
         specifier: ^24.0.10
         version: 24.13.2
+      jsdom:
+        specifier: ^26.1.0
+        version: 26.1.0
       vite:
         specifier: ^6.3.5
         version: 6.4.3(@types/node@24.13.2)(jiti@2.7.0)(tsx@4.23.0)(yaml@2.9.0)

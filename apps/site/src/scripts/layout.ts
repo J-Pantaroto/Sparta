@@ -26,10 +26,17 @@ const FOOTER_LINKS: NavLink[] = [
   { href: "/status.html", label: "Status" }
 ];
 
-const RIOT_DISCLAIMER =
-  "Sparta GG foi criado sob a política “Legal Jibber Jabber” da Riot Games, " +
-  "usando recursos de propriedade da Riot Games. A Riot Games não endossa nem " +
-  "patrocina este projeto.";
+/*
+ * Referência curta e discreta no rodapé de todas as páginas - o texto legal
+ * COMPLETO dos dois avisos obrigatórios da Riot (política de conteúdo de fã
+ * "Legal Jibber Jabber" + política de desenvolvedor específica de League of
+ * Legends, que são exigências distintas e não substituem uma à outra, ver
+ * `docs/riot-policy-compliance-matrix.md`) mora só em termos.html - aqui é
+ * só a referência que aponta pra lá, igual a qualquer outro rodapé legal.
+ */
+export const RIOT_DISCLAIMER =
+  "Sparta GG não é afiliado, endossado nem patrocinado pela Riot Games. " +
+  "Consulte os Termos de Uso para o aviso legal completo.";
 
 function currentPath(): string {
   const path = window.location.pathname;
@@ -60,7 +67,7 @@ function renderHeader(): string {
   `;
 }
 
-function renderFooter(): string {
+export function renderFooter(): string {
   const year = new Date().getFullYear();
   const links = FOOTER_LINKS.map((link) => `<a href="${link.href}">${link.label}</a>`).join("");
 

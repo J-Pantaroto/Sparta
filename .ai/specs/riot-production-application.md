@@ -456,20 +456,27 @@ existe até a Riot fornecer o conteúdo real.
 
 ## 19. Disclaimer
 
-Verificado nesta etapa (ver `docs/riot-policy-compliance-matrix.md` §2 para a análise completa):
+Verificado na Etapa 31L (ver `docs/riot-policy-compliance-matrix.md` §2 para a análise completa) e
+**corrigido na Etapa 31L.1**:
 
 - O disclaimer do **Legal Jibber Jabber** está presente e verbatim em `apps/site/termos.html`
-  (seção 11 daquela página), confirmado contra a fonte oficial nesta sessão.
-- **Falta** o disclaimer específico da política de Desenvolvedor de League of Legends ("[Your
-  Product Name] is not endorsed by Riot Games and does not reflect the views or opinions of Riot
-  Games or anyone officially involved in producing or managing Riot Games properties.") — os dois
-  não são intercambiáveis, cobrem políticas diferentes que se aplicam simultaneamente ao Sparta.
-- **Falta** qualquer disclaimer dentro do próprio aplicativo Desktop — confirmado por busca no
-  código-fonte, zero ocorrência.
+  (§11.1 daquela página), confirmado contra a fonte oficial.
+- O disclaimer específico da política de Desenvolvedor de League of Legends ("Sparta GG is not
+  endorsed by Riot Games and does not reflect the views or opinions of Riot Games or anyone
+  officially involved in producing or managing Riot Games properties. Riot Games and all
+  associated properties are trademarks or registered trademarks of Riot Games, Inc.") agora
+  coexiste com o primeiro, em `apps/site/termos.html` §11.2 — os dois não são intercambiáveis,
+  cobrem políticas diferentes que se aplicam simultaneamente ao Sparta, e nenhum substitui o
+  outro. O rodapé de todas as páginas do site (`apps/site/src/scripts/layout.ts`) traz uma
+  referência curta de não-afiliação apontando pros Termos de Uso, onde o texto completo mora.
+- O aplicativo Desktop, que não tinha nenhum disclaimer, ganhou uma seção "Sobre o Sparta GG"
+  (aba nova em Configurações, `apps/desktop/src/renderer/src/features/AboutSection.tsx`) com os
+  dois textos embutidos como constantes literais no bundle — funcionam offline, sem depender de
+  chamada de rede, API ou site publicado.
 
-Ação registrada no checklist (`docs/riot-submission-checklist.md`): adicionar o segundo texto ao
-site (junto ao já existente, não em substituição) e adicionar um dos dois textos a uma tela do
-Desktop (ex.: Configurações → Sobre) antes do envio.
+Checklist (`docs/riot-submission-checklist.md`) atualizado para refletir a correção — o item de
+disclaimer não bloqueia mais o envio; os bloqueios remanescentes são infraestrutura (site público,
+e-mail de suporte), não conteúdo legal.
 
 ## 20. Propriedade intelectual
 

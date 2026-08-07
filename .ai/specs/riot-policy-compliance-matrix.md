@@ -52,6 +52,14 @@ Sparta. Ação necessária, registrada na matriz abaixo e no checklist: publicar
 não substituir um pelo outro. Isso é uma correção de escopo desta etapa, não uma falha de
 implementação anterior — a Etapa 31K nunca tinha revalidado contra a política específica de LoL.
 
+**Correção aplicada na Etapa 31L.1.** Os dois textos passaram a coexistir em
+`apps/site/termos.html` (§11.1 Legal Jibber Jabber, §11.2 política de desenvolvedor de LoL), com
+uma referência discreta de não-afiliação no rodapé de todas as páginas do site. O Desktop, que não
+tinha disclaimer nenhum, ganhou uma seção "Sobre o Sparta GG" (aba nova em Configurações,
+`apps/desktop/src/renderer/src/features/AboutSection.tsx`) com os dois textos embutidos
+diretamente no bundle — disponíveis mesmo offline, sem depender de rede, API ou site publicado.
+Ver `docs/riot-submission-checklist.md` §32 para o estado atualizado do checklist.
+
 ## 3. Matriz de conformidade
 
 Estados possíveis: `COMPLIANT`, `COMPLIANT_WITH_LIMITATION`, `NOT_APPLICABLE`, `BLOCKED`,
@@ -73,17 +81,18 @@ Estados possíveis: `COMPLIANT`, `COMPLIANT_WITH_LIMITATION`, `NOT_APPLICABLE`, 
 | **RSO** — só disponível após Production Key aprovada (fonte 6) | `BLOCKED` | `docs/identity-authorization-riot-readiness.md`: fluxo preparado (endpoints, state one-time, callback), adapter real não existe, nenhuma credencial RSO foi inventada | Nenhum (bloqueio é esperado e correto nesta fase) | Ativar somente após aprovação da Production Key, conforme a própria política da Riot |
 | **Identidade** — não aceitar Riot ID digitado como prova de propriedade em produção (fonte 6, 8) | `COMPLIANT` | `UNVERIFIED_LEGACY` nunca libera rotas pessoais em produção (`RSO_REQUIRED` é o único modo aceito com `NODE_ENV=production`); só `VERIFIED_BY_RSO` autoriza | Baixo | Nenhuma |
 | **Monetização** — sem apostas/gambling; tier gratuito obrigatório se cobrar; conteúdo transformador (fonte 1) | `NOT_APPLICABLE` | Sparta não monetiza hoje — ver `docs/riot-production-application.md` §22 | Nenhum | Nenhuma enquanto não houver monetização |
-| **Disclaimer** — texto obrigatório visível (fontes 4, 5) | `COMPLIANT_WITH_LIMITATION` | Disclaimer do Legal Jibber Jabber presente e verbatim em `apps/site/termos.html`. **Falta** o disclaimer específico da política de LoL (fonte 4) — ver achado da seção 2. **Falta também** qualquer disclaimer dentro do próprio aplicativo Desktop (busca no repositório: zero ocorrência em `apps/desktop`) | Médio | Adicionar o disclaimer da fonte 4 ao site (além do já existente) e adicionar pelo menos um dos dois disclaimers a uma tela do Desktop (ex.: Configurações/Sobre) antes da submissão |
+| **Disclaimer** — texto obrigatório visível (fontes 4, 5) | `COMPLIANT` | **Corrigido na Etapa 31L.1.** Os dois avisos (Legal Jibber Jabber, fonte 5, e o disclaimer específico da política de LoL, fonte 4) coexistem, verbatim, em `apps/site/termos.html` §11.1/§11.2, com referência discreta no rodapé de todas as páginas do site (`apps/site/src/scripts/layout.ts`). O Desktop ganhou uma seção "Sobre" (`apps/desktop/src/renderer/src/features/AboutSection.tsx`, aba nova em Configurações) com os dois textos embutidos no bundle — funciona offline, sem depender de rede/API/site publicado | Baixo | Nenhuma |
 | **Propriedade intelectual** — não usar assets sem licença, não imitar produto oficial (fonte 1, 5) | `COMPLIANT` | Auditoria de assets (`docs/riot-production-application.md` §20): nenhum ícone/splash/arte da Riot está commitado no repositório ou embutido no binário — tudo é buscado ao vivo da CDN oficial da Data Dragon/Community Dragon em tempo de execução; os únicos assets versionados são o ícone próprio do Sparta (`apps/desktop/build/icon.png`) e 3 screenshots do produto | Baixo | Nenhuma |
 | **Screenshots** — não usar como principal telas técnicas internas (fonte 1, princípio geral de clareza) | `COMPLIANT` | As 3 screenshots publicadas (`apps/site/public/img/`) são Dashboard, Champion Select e Pós-game — nenhuma é Laboratório ou tela de releases | Baixo | Nenhuma |
 | **Atualização futura de features** — features novas exigem novo audit (fonte 1) | `COMPLIANT` | Reconhecido explicitamente no pacote: modo carreira, coach ao vivo e Laboratório (como feature de jogador) estão fora do escopo desta submissão — ver `docs/riot-production-application.md` §23-25 | Baixo | Reauditar com a Riot antes de ativar qualquer uma dessas features publicamente |
 
 ## 4. Resumo
 
-- `COMPLIANT`: 12 itens.
-- `COMPLIANT_WITH_LIMITATION`: 4 itens (HTTPS de produção real ainda não provisionado; dados
-  pessoais dependem de reler a fonte 8; disclaimer incompleto; nenhum é um problema de
-  implementação, todos têm ação clara e não bloqueiam a preparação do dossiê).
+- `COMPLIANT`: 13 itens (o disclaimer passou de `COMPLIANT_WITH_LIMITATION` para `COMPLIANT` na
+  Etapa 31L.1 — ver seção 2).
+- `COMPLIANT_WITH_LIMITATION`: 3 itens (HTTPS de produção real ainda não provisionado; dados
+  pessoais dependem de reler a fonte 8; nenhum é um problema de implementação, os dois têm ação
+  clara e não bloqueiam a preparação do dossiê).
 - `NOT_APPLICABLE`: 1 item (monetização).
 - `BLOCKED`: 2 itens, **ambos esperados e corretos nesta fase** (registro do produto e RSO — os
   dois só se resolvem depois que a Riot aprovar, não antes).

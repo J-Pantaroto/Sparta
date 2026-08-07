@@ -1,5 +1,106 @@
 # Sparta - Contexto para Continuidade
 
+## Etapa 31L.1: remediação dos disclaimers Riot no site e Desktop — `RIOT_DISCLAIMERS_COMPLIANT`
+
+Pedido explícito do usuário, motivado diretamente pelas duas pendências que a própria Etapa 31L
+encontrou: o site publicava só o disclaimer do Legal Jibber Jabber, faltava o disclaimer
+específico da política de Desenvolvedor de League of Legends, e o Desktop não tinha disclaimer
+nenhum da Riot em lugar algum. Etapa **exclusivamente de correção desses dois pontos** — nenhuma
+funcionalidade, motor, UX principal ou infraestrutura tocada além disso.
+
+**Fontes relidas antes de editar texto**: `developer.riotgames.com/docs/lol` (disclaimer
+específico de LoL) e `riotgames.com/en/legal` (Legal Jibber Jabber), ambas em 2026-08-08.
+Cross-verificado via busca independente que a sentença de marca registrada ("Riot Games and all
+associated properties are trademarks or registered trademarks of Riot Games, Inc.") realmente
+faz parte do texto oficial do disclaimer de LoL, e não era um artefato do fetch.
+
+**Site** (`apps/site/termos.html` §11, reescrito de "11. Aviso legal" pra "11. Avisos legais"):
+§11.1 preserva o texto já publicado desde a Etapa 31K (Legal Jibber Jabber, verbatim). §11.2 é
+novo — o disclaimer específico de LoL, também verbatim em inglês + tradução em português — com
+uma frase explícita de que as duas políticas são exigências distintas que não se substituem
+(o Sparta usa a API Riot com key, não é só um "fan asset project", por isso as duas se aplicam
+simultaneamente, achado da própria 31L). Fonte/data de consulta citadas com link real pras duas
+páginas. O rodapé global (`apps/site/src/scripts/layout.ts`, `RIOT_DISCLAIMER`, agora exportado
+pra teste) virou uma referência curta de não-afiliação apontando pros Termos de Uso, presente nas
+9 páginas — nunca escondido em tooltip, modal, comentário HTML ou página sem link.
+
+**Desktop** (`apps/desktop/src/renderer/src/features/AboutSection.tsx`, novo; wired como terceira
+aba "Sobre" em `SettingsScreen.tsx`, ao lado de Tema e Análise): nome do produto, versão real
+(`window.sparta.version`, já exposta pelo preload desde sempre), três botões `disabled` (não
+âncoras) rotulados "Em preparação" pros links futuros de site/privacidade/termos — nenhum aponta
+pra `localhost` nem usa o GitHub como substituto, conforme instrução explícita — e os dois
+disclaimers embutidos como **constantes literais no arquivo** (mesmo texto exato do site), o que
+os torna disponíveis **offline**, sem nenhuma chamada de rede/API. CSS novo (`AboutSection.css`)
+reusa só tokens já existentes (superfície, borda, espaço, tipografia) — nenhum token novo, nenhuma
+quebra do glassmorphism/tema/densidade da Etapa 31K.1.
+
+**Auditoria de linguagem** (seção 9 do pedido): busca em todo `apps/` por `oficial`/`aprovado`/
+`parceiro`/`endorsed`/`sponsor`/`partner`. Toda ocorrência é ou (a) parte da negação explícita do
+próprio disclaimer ("não é... aprovado... parceiro da Riot Games"), ou (b) rótulo técnico de
+proveniência de dado já existente desde a Etapa 8/19 (ex. badge "Fonte oficial Riot" no resumo de
+patch, que descreve de onde vieram as notas oficiais da Riot — não uma claim de que o Sparta é
+produto oficial). Nenhuma correção funcional foi necessária; nenhum texto histórico foi alterado.
+
+**26 testes novos**: `AboutSection.test.tsx` (7 — os dois textos verbatim, coexistência, ausência
+de rede, ausência de link localhost/GitHub, botões desabilitados não são âncoras, nenhuma
+afirmação de afiliação fora de negação, versão exibida), `SettingsScreen.test.tsx` (2 — a aba
+Sobre é alcançável e ativável por teclado via `role="tab"` nativo, os textos aparecem sem chamada
+de rede), `layout.test.ts` (4 — `RIOT_DISCLAIMER`/`renderFooter` puros, sem link localhost/
+GitHub), `disclaimers-content.test.ts` (13 — lê as 9 páginas HTML reais do disco via `fs`, sem
+precisar de jsdom pra isso: nenhuma contém `localhost`/`github.com`, os dois disclaimers
+coexistem verbatim em `termos.html`, nenhum escondido dentro de comentário HTML).
+
+**Bug de teste, não de produto, corrigido no caminho**: a primeira versão de dois testes usava
+`getByText(/Legal Jibber Jabber/)` esperando um único match, mas a frase aparece 2x de propósito
+(no rótulo da seção e dentro do próprio texto oficial) — corrigido para `getAllByText` com
+`length >= 2`, e a asserção de "nenhuma claim de parceria" foi reescrita pra checar a presença da
+frase de negação exata em vez de tentar provar ausência de substrings que legitimamente aparecem
+dentro da própria negação.
+
+**`apps/site` ganhou infraestrutura de teste que não existia** (`vitest.config.ts` novo, jsdom
+como devDependency nova — necessário porque `layout.ts` roda `mount()` no carregamento do módulo,
+que referencia `document`). `pnpm-lock.yaml` mudou só por isso, confirmado por `git diff`.
+
+**Validado real, não só buildado**: site no dev server (Vite), `termos.html` e o rodapé
+conferidos via `get_page_text`/`getComputedStyle`, zero erro de console em nenhuma página tocada.
+Desktop no **Electron real via CDP** (mesma metodologia da Etapa 31J/31K.1 — `remote-debugging-
+port` temporário em `main/index.ts`, revertido antes do commit com diff líquido zero confirmado
+por `git diff`; login real via `window.sparta.session.set` com token HMAC assinado pelo mesmo
+`AUTH_TOKEN_SECRET` do container Docker): navegação até Configurações → Sobre, os dois
+disclaimers renderizados por completo (confirmado por screenshot), `getComputedStyle(...)
+.backdropFilter === "blur(20px)"` no card, confirmando que o glassmorphism da Etapa 31K.1
+continua intacto sobre a seção nova, botão "Site institucional" com `disabled === true`
+confirmado via DOM, **zero erro de console, zero exceção não tratada**.
+
+**Dossiê da Etapa 31L atualizado, só para registrar a correção** (instrução explícita: não
+marcar `READY_TO_SUBMIT`): `docs/riot-policy-compliance-matrix.md` — item "Disclaimer" passou de
+`COMPLIANT_WITH_LIMITATION` pra `COMPLIANT`, resumo da seção 4 recontado (13 `COMPLIANT`, 3
+`COMPLIANT_WITH_LIMITATION`, o resto inalterado). `docs/riot-production-application.md` §19
+reescrita para descrever o estado corrigido. `docs/riot-submission-checklist.md` — item de
+disclaimer marcado `[x]`, nova seção 38 documentando a correção com evidência, texto do estado
+final ajustado pra deixar claro que os bloqueios remanescentes (domínio, site publicado, e-mail
+de suporte, revisão final do responsável) são **todos de infraestrutura**, não de conteúdo legal.
+Os três espelhos em `.ai/specs/` foram sincronizados byte a byte com `docs/`.
+
+**Não regressão**: nenhum arquivo de `packages/`/`apps/api`/lógica de `apps/desktop` fora dos
+tocados (`SettingsScreen.tsx`, `AboutSection.tsx`/`.css`/`.test.tsx`) foi alterado. Confirmado
+direto no Postgres real desta sessão: `release-etapa27c-v1` `ACTIVE`, `artifactHash`
+(`8878a657…`) e `configHash` (`fa9dbde1…`) **idênticos** aos documentados desde a Etapa 27c,
+ponteiro conferindo. `pnpm typecheck`/`lint`/`build`/`test` completos nos **5 pacotes**
+TypeScript (core 635, riot 97, api 353, desktop 138, site 17 — **1240 testes** no total) +
+analyzer Python 1/1, todos verdes.
+
+**Estado final: `RIOT_DISCLAIMERS_COMPLIANT` + `RIOT_APPLICATION_PACKAGE_READY` +
+`BLOCKED_BY_OWNER_INFRASTRUCTURE_PROVISIONING` + `BLOCKED_BY_PUBLIC_SITE` +
+`BLOCKED_BY_SUPPORT_EMAIL`.** Os dois avisos legais aplicáveis da Riot estão presentes no site e
+no Desktop; nenhuma claim pública sugere afiliação/aprovação; o dossiê registra a correção sem
+avançar o estado de submissão. Estados não usados, como instruído: `SUBMITTED_TO_RIOT`,
+`RIOT_APPROVED`, `READY_TO_SUBMIT`. **Nada foi submetido à Riot; nenhum domínio, VPS ou e-mail
+foi provisionado.** Próximos passos, na mesma ordem já registrada pela Etapa 31L: responsável
+registra domínio + contrata VPS/e-mail → retomar a Etapa 31K só para publicação real → validação
+externa completa do site publicado → revisão final do dossiê pelo responsável → só então
+submissão.
+
 ## Etapa 31L: dossiê final para submissão Production à Riot — `RIOT_APPLICATION_PACKAGE_READY`
 
 Pedido explícito do usuário: preparar (sem enviar) o pacote completo de submissão do Sparta GG
