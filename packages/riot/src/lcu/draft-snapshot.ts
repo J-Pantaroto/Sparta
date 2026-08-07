@@ -23,6 +23,8 @@ export interface LcuDraftSnapshot {
   enemyLaneChampionId?: number;
   /** Campeao do proprio jogador, quando ja escolhido. */
   selectedChampionId?: number;
+  /** A acao de pick do jogador local foi concluida pelo LCU. */
+  selectedChampionLocked: boolean;
 }
 
 /** `0` e o valor do LCU pra "ainda nao escolheu". */
@@ -55,14 +57,17 @@ function toMember(member: { championId: number; assignedPosition?: string }): Lc
  * Retorna `undefined` quando ainda nao ha sessao - o chamador mantem o que
  * tinha em vez de limpar o draft a cada piscada da API.
  */
-export function deriveDraftSnapshot(snapshot: LcuChampionSelectSnapshot): LcuDraftSnapshot | undefined {
+export function deriveDraftSnapshot(
+  snapshot: LcuChampionSelectSnapshot
+): LcuDraftSnapshot | undefined {
   if (!snapshot.sessionExists) return undefined;
 
   const localCellId = snapshot.localPlayerCellId;
   const myTeam = snapshot.myTeam ?? [];
   const theirTeam = snapshot.theirTeam ?? [];
 
-  const localMember = localCellId === undefined ? undefined : myTeam.find((member) => member.cellId === localCellId);
+  const localMember =
+    localCellId === undefined ? undefined : myTeam.find((member) => member.cellId === localCellId);
 
   const allies = myTeam
     .filter((member) => member.cellId !== localCellId && member.championId !== NO_CHAMPION)
@@ -84,15 +89,30 @@ export function deriveDraftSnapshot(snapshot: LcuChampionSelectSnapshot): LcuDra
 
   const playerRole = derivePlayerRole(snapshot);
   const enemyLaneChampionId =
-    playerRole === undefined ? undefined : enemies.find((enemy) => enemy.position === playerRole)?.championId;
+    playerRole === undefined
+      ? undefined
+      : enemies.find((enemy) => enemy.position === playerRole)?.championId;
+  const selectedChampionId =
+    localMember && localMember.championId !== NO_CHAMPION ? localMember.championId : undefined;
+  const selectedChampionLocked =
+    selectedChampionId !== undefined &&
+    (snapshot.actions ?? [])
+      .flat()
+      .some(
+        (action) =>
+          action.actorCellId === localCellId &&
+          action.type === "pick" &&
+          action.completed &&
+          action.championId === selectedChampionId
+      );
 
   return {
     allies,
     enemies,
     bannedChampionIds,
     enemyLaneChampionId,
-    selectedChampionId:
-      localMember && localMember.championId !== NO_CHAMPION ? localMember.championId : undefined
+    selectedChampionId,
+    selectedChampionLocked
   };
 }
 
@@ -102,7 +122,10 @@ export function deriveDraftSnapshot(snapshot: LcuChampionSelectSnapshot): LcuDra
  * renderer receberia um objeto novo toda vez e refaria a busca de
  * recomendacoes a cada 2.5 segundos.
  */
-export function isSameDraftSnapshot(a: LcuDraftSnapshot | undefined, b: LcuDraftSnapshot | undefined): boolean {
+export function isSameDraftSnapshot(
+  a: LcuDraftSnapshot | undefined,
+  b: LcuDraftSnapshot | undefined
+): boolean {
   if (a === undefined || b === undefined) return a === b;
   return JSON.stringify(a) === JSON.stringify(b);
 }

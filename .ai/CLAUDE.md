@@ -1,5 +1,75 @@
 # Sparta - Contexto para Continuidade
 
+## Etapa 31G: redesign do Champion Select e pré-game
+
+Continuação de uma sessão do Codex que atingiu o limite com ~16 arquivos alterados e não
+commitados. Auditoria completa do diff herdado antes de tocar em qualquer coisa: `git status`,
+`git diff --check`, revisão arquivo a arquivo, separando mudança funcional legítima de ajuste
+acidental de ambiente. Relatório em `docs/champion-select-pre-game-experience.md`.
+
+**Revertido**: `pnpm-workspace.yaml` — o Codex tinha duplicado `onlyBuiltDependencies`/`overrides`
+que já existem em `package.json` (campo `pnpm`, desde a Etapa 28a/29). `pnpm install
+--frozen-lockfile` funciona idêntico sem a duplicata; sem aviso de config obsoleta. Ajuste de
+ambiente local do Codex, não é parte do produto.
+
+**Herdado íntegro**: `selectedChampionLocked` em `LcuDraftSnapshot`
+(`packages/riot/src/lcu/draft-snapshot.ts`) — distingue "escolhi mas não travei" de "travado" lendo
+`snapshot.actions` do LCU, campo que a Riot já expõe e que o Sparta nunca tinha consumido.
+Cancelamento real de requisição: `useAsyncData` cria um `AbortController` por execução do efeito e
+aborta no cleanup; `fetchDraftRecommendations`/`fetchPreGameAnalysis` propagam o `signal` até
+`fetchWithPolicy` (Etapa 9), que já sabia combinar sinal externo com timeout interno — o
+cancelamento chega à rede de verdade, não só ao estado do componente. Canal IPC novo
+`sparta:lcu-status` transmite o `LcuReadStatus` real (os nove valores já existentes) só quando
+muda; `App.tsx` passou a derivar `leagueConnected` dele em vez de `phase !== null`. Congelamento
+visual do snapshot: ao detectar lock-in real (ou clicar "Confirmar" no modo manual), a tela copia
+as recomendações correntes pra um `frozenSnapshot` e para de reagir a atualizações — sem isso,
+trocar de inimigo depois do lock-in reordenaria cards embaixo de uma escolha que já não pode
+mudar. Reescrita quase completa do Champion Select (1210 linhas de diff) e do pré-game (242
+linhas): três estados operacionais distintos (League fechado / LCU instável / cliente aberto fora
+do champ select), rail de recomendações + painel de detalhe com filtros progressivos, resumo
+honesto de escolha fora do snapshot ("nenhum score ou ranking retroativo foi criado"), quadro do
+draft no pré-game sem inferir adversário direto sem evidência, guarda de resposta obsoleta em duas
+camadas (`AbortController` + comparação de `championId`/`role` no client).
+
+**Corrigido nesta sessão**: import morto (`useMemo`) em `ChampionSelectScreen.tsx`; dois globals
+faltando no `eslint.config.js` da raiz (`AbortSignal`/`AbortController`) — o cancelamento real que
+o Codex introduziu expôs esse gap, mesma lista fechada que já tinha `RequestInit`/`Response` por
+causa do `fetch`.
+
+**Investigado e descartado**: `pnpm -r test` reprovava 2-4 testes de `apps/api` por execução, um
+conjunto **diferente** a cada vez — mesmo padrão de contenção de recursos sob paralelismo já
+documentado na Etapa 26b. `apps/api` isolado passou **46/46 arquivos, 336/336 testes**, duas vezes
+seguidas, sem nenhuma alteração de código (e `apps/api` não tem nenhum arquivo tocado por este
+redesign). Uma terceira execução completa de `pnpm -r test` passou os cinco pacotes sem falha.
+
+**Validação real, achado incomum**: Electron real via CDP (`file://…/out/renderer/index.html`, sem
+Vite), conta Zekerus#117. Pela **primeira vez neste projeto**, um cliente real do League estava
+aberto na máquina de validação — `getLcuState()` leu de verdade `{status:
+"OUTSIDE_CHAMP_SELECT", phase: "Lobby"}`, e a tela mostrou "Lobby aberto" corretamente,
+confirmando o caminho main→preload→renderer com dado real, não simulado. **Nenhuma ação foi
+tomada no cliente real** (sem fila, sem partida) — entrar de fato numa sessão de champion select
+ficou fora do alcance desta sessão, mesmo limite documentado em toda etapa anterior. O resto usou
+o modo "Simular manualmente" (existente desde a Fase 11): posição Jungle → recomendações reais
+(Viego, Udyr, alternativas); dois inimigos adicionados pelo grid (Lee Sin, Ahri); "Confirmar" →
+"Snapshot preservado" imediato; pré-game com "Inimigos revelados 2/5", "Cobertura dos dados 22%",
+"Confronto direto: Ainda sem dado" (correto — inimigo manual sem `role`, nada inferido); build
+sugerida presente. **1000/1280/1600px** sem scroll horizontal em nenhuma combinação; foco por
+**Tab real** (`Input.dispatchKeyEvent`) pousando num `<button class="sp-card...
+sp-card--interactive">` com anel de 2px; temas Obsidian (compacto/reduzido) e Adaptativo
+(confortável/completo) aplicados e confirmados no `dataset` do `<html>`; **zero erro de console,
+zero imagem quebrada, zero `NaN`/`Infinity`/`undefined`** em toda a sessão.
+
+**Não regressão**: mesma recomendação controlada desde a Etapa 27b (JUNGLE, pick 3, Ahri aliada,
+Lee Sin inimigo, bans 55/91) → **5 candidatos idênticos** à linha de base (Viego 58.7/0.9, Udyr
+58.5/0.5, Vi 55.3/0.5, Nocturne 53.3/0.5, Graves 50.1/0.5). `release-etapa27c-v1` `ACTIVE` com
+`artifactHash`/`configHash` **iguais** antes e depois; replay `EXACT_REPLAY`, 0 divergências.
+
+`typecheck`/`lint`/`build` completos; **1177 testes** no monorepo (core 629, riot 97, api 336,
+desktop 100, raiz 15) + analyzer Python. Conta de teste local teve `emailVerifiedAt` definido
+direto no Postgres pra sair de `EMAIL_UNVERIFIED` (Etapa 31D) — manutenção de fixture local em
+`NODE_ENV=development`, não mudança de código nem bypass de produção. Referências:
+`docs/champion-select-pre-game-experience.md`.
+
 ## Etapa 31F: shell, dashboard e sistema visual v2
 
 O shell autenticado agora possui sidebar hierárquica/recolhível, topbar contextual, status compactos

@@ -20,6 +20,7 @@ declare global {
       };
       openRiotAuthorization: (url: string) => Promise<void>;
       onGameflowPhase: (callback: (phase: LcuGameflowPhase | null) => void) => () => void;
+      onLcuStatus: (callback: (status: LcuReadStatus) => void) => () => void;
       /** Baixa a imagem pro disco e devolve um data URL carregavel pelo renderer. */
       downloadSkin: (url: string, fileName: string) => Promise<string>;
       onPickOrder: (callback: (pickOrder: number | null) => void) => () => void;

@@ -22,6 +22,29 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-08-06 22:40 — Etapa 31G: redesign do Champion Select e pré-game
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0047-redesign-champion-select-pre-game.md`
+
+Continuação de uma sessão do Codex que atingiu o limite com ~16 arquivos não commitados. Auditoria
+completa do diff herdado: revertido `pnpm-workspace.yaml` (duplicata de `package.json.pnpm`, ajuste
+de ambiente do Codex sem efeito comprovado); corrigidos um import morto e dois globals faltando no
+ESLint (`AbortSignal`/`AbortController`, expostos pelo cancelamento real de requisição que o Codex
+introduziu via `AbortController` em `useAsyncData`, propagado até `fetchWithPolicy`). Mantido íntegro
+o que o Codex já tinha construído: `selectedChampionLocked` no `LcuDraftSnapshot` (distingue seleção
+de lock-in via `snapshot.actions`), canal IPC `sparta:lcu-status`, congelamento visual do snapshot no
+lock-in, e a reescrita quase completa do Champion Select e do pré-game (rail de recomendações +
+painel de detalhe, filtros progressivos, estados operacionais distintos para League fechado vs. LCU
+instável vs. fora do champion select). Validado no Electron real via CDP — pela primeira vez neste
+projeto com um cliente real do League aberto na máquina (leitura real confirmada, nenhuma ação
+tomada nele) — mais o modo de simulação manual para o resto do fluxo: recomendações reais, seleção de
+inimigos, confirmação/lock-in, pré-game com cobertura proporcional, 3 breakpoints sem scroll
+horizontal, foco por teclado real, 2 combinações de tema/densidade/intensidade, zero erro de console.
+Não regressão confirmada: mesma recomendação controlada de sempre, `release-etapa27c-v1` intacta,
+replay `EXACT_REPLAY`. 1177 testes no monorepo.
+
+---
+
 ## 2026-08-06 19:14 — Etapa 31F: shell, dashboard e sistema visual v2
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0046-redesign-shell-dashboard-sistema-visual.md`

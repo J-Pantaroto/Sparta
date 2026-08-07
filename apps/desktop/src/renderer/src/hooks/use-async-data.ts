@@ -15,11 +15,15 @@ export interface AsyncData<T> {
  * "idle" - usado quando a tela ainda nao tem o que precisa pra buscar
  * (ex.: sem conta Riot vinculada ainda).
  */
-export function useAsyncData<T>(fn: () => Promise<T> | undefined, deps: unknown[]): AsyncData<T> {
+export function useAsyncData<T>(
+  fn: (signal: AbortSignal) => Promise<T> | undefined,
+  deps: unknown[]
+): AsyncData<T> {
   const [state, setState] = useState<AsyncData<T>>({ data: null, status: "idle", error: null });
 
   useEffect(() => {
-    const promise = fn();
+    const controller = new AbortController();
+    const promise = fn(controller.signal);
     if (!promise) {
       setState({ data: null, status: "idle", error: null });
       return;
@@ -34,12 +38,17 @@ export function useAsyncData<T>(fn: () => Promise<T> | undefined, deps: unknown[
       })
       .catch((error: unknown) => {
         if (!cancelled) {
-          setState({ data: null, status: "error", error: error instanceof Error ? error.message : "Erro desconhecido." });
+          setState({
+            data: null,
+            status: "error",
+            error: error instanceof Error ? error.message : "Erro desconhecido."
+          });
         }
       });
 
     return () => {
       cancelled = true;
+      controller.abort();
     };
   }, deps);
 

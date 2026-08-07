@@ -1,0 +1,163 @@
+.sp-pregame-draft {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 180px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-4);
+  background:
+    radial-gradient(
+      circle at center,
+      color-mix(in srgb, var(--color-accent) 9%, transparent),
+      transparent 45%
+    ),
+    var(--surface-card);
+}
+
+.sp-pregame-team > strong {
+  display: block;
+  margin-bottom: var(--space-2);
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.sp-pregame-team:last-child > strong {
+  text-align: right;
+}
+
+.sp-pregame-team > div {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  justify-items: center;
+  gap: var(--space-2);
+}
+
+.sp-pregame-team > div > span {
+  position: relative;
+}
+
+.sp-pregame-team__direct {
+  border-radius: var(--radius-sm);
+  outline: 2px solid var(--color-warning);
+  outline-offset: 2px;
+}
+
+.sp-pregame-team__direct small {
+  position: absolute;
+  right: -8px;
+  bottom: -9px;
+  padding: 1px 4px;
+  border-radius: 999px;
+  background: var(--color-warning);
+  color: var(--text-on-accent);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-black);
+}
+
+.sp-pregame-draft__center {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-1);
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.sp-pregame-draft__center strong {
+  color: var(--text-primary);
+}
+
+.sp-pregame-draft__center span,
+.sp-pregame-draft__center small {
+  font-size: var(--text-xs);
+}
+
+.sp-pregame-draft__center small {
+  color: var(--text-muted);
+}
+
+.sp-pregame-capabilities {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: var(--space-2);
+}
+
+.sp-pregame-capabilities > div {
+  padding: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 24%, var(--border-subtle));
+  border-radius: var(--radius-md);
+  background: var(--surface-inset);
+}
+
+.sp-pregame-capabilities strong,
+.sp-pregame-capabilities span {
+  display: block;
+}
+
+.sp-pregame-capabilities strong {
+  font-size: var(--text-sm);
+  text-transform: capitalize;
+}
+
+.sp-pregame-capabilities span,
+.sp-pregame-capabilities__empty {
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.sp-pregame-details {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-card);
+  overflow: hidden;
+}
+
+.sp-pregame-details > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 48px;
+  padding: 0 var(--space-4);
+  color: var(--text-primary);
+  font-weight: var(--weight-bold);
+  cursor: pointer;
+}
+
+.sp-pregame-details > summary > span {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.sp-pregame-details[open] > summary {
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.sp-pregame-details > .sp-card {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+@media (max-width: 1100px) {
+  .sp-pregame-draft {
+    grid-template-columns: minmax(0, 1fr) 126px minmax(0, 1fr);
+    gap: var(--space-2);
+  }
+
+  .sp-pregame-team > div {
+    gap: 2px;
+  }
+
+  .sp-pregame-draft__center small {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sp-pregame-details > summary svg {
+    transition: none;
+  }
+}

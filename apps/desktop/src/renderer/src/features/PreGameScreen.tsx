@@ -3,12 +3,13 @@ import type {
   AnalysisSignal,
   ChampionClassProfile,
   ChampionTagProvenance,
+  DraftStrategicAnalysis,
   DraftState,
   PreGameAnalysis
 } from "@sparta/core";
 import type { ReactNode } from "react";
-import { summarizeEnemyDamageLean } from "@sparta/core";
-import { Shield } from "lucide-react";
+import { STRATEGIC_CAPABILITY_LABELS, summarizeEnemyDamageLean } from "@sparta/core";
+import { ChevronDown, Shield } from "lucide-react";
 import { roleLabels } from "../app/labels";
 import { useAsyncData } from "../hooks/use-async-data";
 import { fetchPreGameAnalysis } from "../services/api-client";
@@ -36,6 +37,7 @@ import {
 } from "../ui";
 import { BuildPanel } from "./BuildPanel";
 import { PersonalLoadoutHistory } from "./PersonalLoadoutHistory";
+import "./PreGameScreen.css";
 
 const MAX_ENEMIES = 5;
 
@@ -70,18 +72,21 @@ export function PreGameScreen({
   // A análise é refeita a cada mudança relevante do draft. O `deps` inclui
   // campeão e posição de propósito: trocar qualquer um dos dois invalida a
   // leitura anterior por completo.
-  const analysis = useAsyncData<PreGameAnalysis>(() => {
-    if (!sessionToken || !draft.playerRole || draft.selectedChampionId === undefined)
-      return undefined;
-    return fetchPreGameAnalysis(sessionToken, draft);
-  }, [
-    sessionToken,
-    draft.playerRole,
-    draft.selectedChampionId,
-    draft.enemyLaneChampionId,
-    draft.allies.map((pick) => pick.championId).join(","),
-    draft.enemies.map((pick) => pick.championId).join(",")
-  ]);
+  const analysis = useAsyncData<PreGameAnalysis>(
+    (signal) => {
+      if (!sessionToken || !draft.playerRole || draft.selectedChampionId === undefined)
+        return undefined;
+      return fetchPreGameAnalysis(sessionToken, draft, signal);
+    },
+    [
+      sessionToken,
+      draft.playerRole,
+      draft.selectedChampionId,
+      draft.enemyLaneChampionId,
+      draft.allies.map((pick) => pick.championId).join(","),
+      draft.enemies.map((pick) => pick.championId).join(",")
+    ]
+  );
 
   const ownChampion = catalog.data?.find((champion) => champion.id === draft.selectedChampionId);
   const enemyChampions = draft.enemies
@@ -92,6 +97,14 @@ export function PreGameScreen({
     .filter((profile): profile is ChampionClassProfile => profile !== undefined);
   const enemyLean = classProfiles.data ? summarizeEnemyDamageLean(enemyProfiles) : undefined;
   const heroSplash = ownChampion ? championSplashUrl(ownChampion.key, 0) : undefined;
+  const compatibleAnalysis = {
+    ...analysis,
+    data:
+      analysis.data?.selectedChampion.championId === draft.selectedChampionId &&
+      analysis.data?.selectedChampion.role === draft.playerRole
+        ? analysis.data
+        : null
+  };
 
   if (!ownChampion) {
     return (
@@ -149,11 +162,17 @@ export function PreGameScreen({
         }
       />
 
+      <PreGameDraftBoard
+        draft={draft}
+        catalog={catalog.data ?? []}
+        ddragonVersion={ddragonVersion}
+      />
+
       <Columns
         asideWidth="360px"
         main={
           <div style={{ display: "grid", gap: "var(--space-4)" }}>
-            <AnalysisBody state={analysis} />
+            <AnalysisBody state={compatibleAnalysis} />
 
             {draft.playerRole && (
               <PersonalLoadoutHistory
@@ -256,7 +275,7 @@ function AnalysisBody({
     );
   }
 
-  if (state.status === "loading") {
+  if (state.status === "loading" && !state.data) {
     return (
       <Card>
         <Loading label="Analisando o draft atual..." />
@@ -284,7 +303,9 @@ function AnalysisBody({
           eyebrow="Resumo da escolha"
           title={analysis.summary.description}
           actions={
-            analysis.status === "PARTIAL" ? (
+            state.status === "loading" ? (
+              <Badge tone="accent">Atualizando draft</Badge>
+            ) : analysis.status === "PARTIAL" ? (
               <Badge tone="warning">Draft incompleto</Badge>
             ) : undefined
           }
@@ -311,27 +332,34 @@ function AnalysisBody({
         </p>
       </Card>
 
+      {analysis.strategicAnalysis && <PreGameCapabilityMap analysis={analysis.strategicAnalysis} />}
+
       <SectionCard
         section={analysis.selectedChampionFit}
         footer={<ProfileSourceNote provenance={analysis.selectedChampion.profileProvenance} />}
       />
       <SectionCard section={analysis.knownRisks} />
-      <SectionCard section={analysis.alliedComposition} />
-      <SectionCard section={analysis.enemyComposition} />
+      <CollapsibleAnalysis section={analysis.alliedComposition} />
+      <CollapsibleAnalysis section={analysis.enemyComposition} />
 
-      <Card tone="flat">
-        <SectionHeader
-          title="Sinais ainda indisponíveis"
-          description="O Sparta reconhece estes conceitos mas não tem fonte pra eles hoje. Ficam listados aqui pra você saber o que a análise acima não cobre."
-        />
-        <SignalChipList stacked>
-          {analysis.unavailableSignals.map((signal) => (
-            <SignalChip key={signal.key} tone="info" title={signal.description}>
-              <strong>{signal.title}:</strong> {signal.unavailableReason}
-            </SignalChip>
-          ))}
-        </SignalChipList>
-      </Card>
+      <details className="sp-pregame-details">
+        <summary>
+          Dados indisponiveis e limitacoes <ChevronDown size={15} aria-hidden="true" />
+        </summary>
+        <Card tone="flat">
+          <SectionHeader
+            title="Sinais ainda indisponíveis"
+            description="O Sparta reconhece estes conceitos mas não tem fonte pra eles hoje. Ficam listados aqui pra você saber o que a análise acima não cobre."
+          />
+          <SignalChipList stacked>
+            {analysis.unavailableSignals.map((signal) => (
+              <SignalChip key={signal.key} tone="info" title={signal.description}>
+                <strong>{signal.title}:</strong> {signal.unavailableReason}
+              </SignalChip>
+            ))}
+          </SignalChipList>
+        </Card>
+      </details>
     </>
   );
 }
@@ -419,4 +447,154 @@ function chipTone(signal: AnalysisSignal): "positive" | "negative" | "info" {
   if (signal.tone === "POSITIVE") return "positive";
   if (signal.tone === "WARNING") return "negative";
   return "info";
+}
+
+function PreGameDraftBoard({
+  draft,
+  catalog,
+  ddragonVersion
+}: {
+  draft: DraftState;
+  catalog: DataDragonChampionSummary[];
+  ddragonVersion: string;
+}) {
+  const allies = [
+    ...(draft.selectedChampionId === undefined
+      ? []
+      : [
+          {
+            championId: draft.selectedChampionId,
+            championName:
+              catalog.find((champion) => champion.id === draft.selectedChampionId)?.name ??
+              `Campeao ${draft.selectedChampionId}`,
+            role: draft.playerRole,
+            team: "ally" as const
+          }
+        ]),
+    ...draft.allies
+  ].slice(0, 5);
+  return (
+    <Card className="sp-pregame-draft" pad="sm">
+      <PreGameTeam title="Seu time" picks={allies} ddragonVersion={ddragonVersion} />
+      <div className="sp-pregame-draft__center">
+        <Shield size={20} aria-hidden="true" />
+        <strong>Leitura do draft</strong>
+        <span>
+          {draft.allies.length + draft.enemies.length + (draft.selectedChampionId ? 1 : 0)} de 10
+          campeoes conhecidos
+        </span>
+        <small>Sem completar picks ou posicoes ausentes</small>
+      </div>
+      <PreGameTeam
+        title="Time inimigo"
+        picks={draft.enemies}
+        ddragonVersion={ddragonVersion}
+        directOpponentId={draft.enemyLaneChampionId}
+      />
+    </Card>
+  );
+}
+
+function PreGameTeam({
+  title,
+  picks,
+  ddragonVersion,
+  directOpponentId
+}: {
+  title: string;
+  picks: DraftState["allies"];
+  ddragonVersion: string;
+  directOpponentId?: number;
+}) {
+  return (
+    <div className="sp-pregame-team">
+      <strong>{title}</strong>
+      <div>
+        {Array.from({ length: 5 }, (_, index) => {
+          const pick = picks[index];
+          if (!pick)
+            return (
+              <EmptyAvatarSlot
+                key={`${title}-${index}`}
+                label={`${title}: vaga ${index + 1} desconhecida`}
+              />
+            );
+          const direct = pick.championId === directOpponentId;
+          return (
+            <span
+              key={`${pick.championId}-${index}`}
+              className={direct ? "sp-pregame-team__direct" : undefined}
+            >
+              <ChampionAvatar
+                championId={pick.championId}
+                ddragonVersion={ddragonVersion}
+                alt={`${pick.championName}${pick.role ? `, ${roleLabels[pick.role]}` : ", posicao desconhecida"}${direct ? ", adversario direto confirmado" : ""}`}
+              />
+              {direct && <small>Direto</small>}
+            </span>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function PreGameCapabilityMap({ analysis }: { analysis: DraftStrategicAnalysis }) {
+  const contribution = analysis.candidateContribution;
+  const cells = [
+    ...contribution.filledKnownGaps.map((key) => ({ key, state: "Cobre lacuna" })),
+    ...contribution.addedCapabilities.map((key) => ({ key, state: "Adiciona" })),
+    ...contribution.reinforcedCapabilities.map((key) => ({ key, state: "Reforca" })),
+    ...contribution.remainingKnownGaps.map((key) => ({ key, state: "Lacuna conhecida" }))
+  ].filter(
+    (entry, index, list) => list.findIndex((candidate) => candidate.key === entry.key) === index
+  );
+  return (
+    <Card>
+      <SectionHeader
+        eyebrow="Estrategia 5x5"
+        title="Mapa de capacidades calculadas"
+        description={`Cobertura ${Math.round(analysis.coverage * 100)}%. Representa somente dimensoes sustentadas pelo modelo atual.`}
+      />
+      <div
+        className="sp-pregame-capabilities"
+        role="list"
+        aria-label="Equivalente textual do mapa de capacidades"
+      >
+        {cells.length === 0 ? (
+          <span className="sp-pregame-capabilities__empty">
+            Nenhuma contribuicao ou lacuna especifica foi identificada.
+          </span>
+        ) : (
+          cells.map((cell) => (
+            <div key={cell.key} role="listitem">
+              <strong>{STRATEGIC_CAPABILITY_LABELS[cell.key]}</strong>
+              <span>{cell.state}</span>
+            </div>
+          ))
+        )}
+      </div>
+    </Card>
+  );
+}
+
+function CollapsibleAnalysis({ section }: { section: AnalysisSection }) {
+  return (
+    <details className="sp-pregame-details">
+      <summary>
+        {section.title}
+        <span>
+          {section.knownCount !== undefined && section.expectedCount !== undefined
+            ? `${section.knownCount}/${section.expectedCount}`
+            : section.status === "UNAVAILABLE"
+              ? "Indisponivel"
+              : section.status === "PARTIAL"
+                ? "Parcial"
+                : "Disponivel"}
+          <ChevronDown size={15} aria-hidden="true" />
+        </span>
+      </summary>
+      <SectionCard section={section} />
+    </details>
+  );
 }

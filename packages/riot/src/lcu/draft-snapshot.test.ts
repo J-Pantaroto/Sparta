@@ -50,6 +50,7 @@ describe("deriveDraftSnapshot", () => {
     const draft = deriveDraftSnapshot(sessaoCompleta())!;
     expect(draft.allies.map((ally) => ally.championId)).not.toContain(234);
     expect(draft.selectedChampionId).toBe(234);
+    expect(draft.selectedChampionLocked).toBe(true);
   });
 
   it("descarta quem ainda nao escolheu (championId 0)", () => {
@@ -91,6 +92,21 @@ describe("deriveDraftSnapshot", () => {
     const sessao = sessaoCompleta();
     sessao.myTeam![0].championId = 0;
     expect(deriveDraftSnapshot(sessao)!.selectedChampionId).toBeUndefined();
+    expect(deriveDraftSnapshot(sessao)!.selectedChampionLocked).toBe(false);
+  });
+
+  it("distingue campeao selecionado de pick travado", () => {
+    const sessao = sessaoCompleta();
+    sessao.actions = sessao.actions!.map((round) =>
+      round.map((action) =>
+        action.actorCellId === 0 && action.type === "pick"
+          ? { ...action, completed: false }
+          : action
+      )
+    );
+    const draft = deriveDraftSnapshot(sessao)!;
+    expect(draft.selectedChampionId).toBe(234);
+    expect(draft.selectedChampionLocked).toBe(false);
   });
 
   it("aguenta sessao recem-criada, ainda sem times nem acoes", () => {
@@ -115,13 +131,20 @@ describe("deriveDraftSnapshot", () => {
 
 describe("isSameDraftSnapshot", () => {
   it("considera iguais dois ticks sem mudanca", () => {
-    expect(isSameDraftSnapshot(deriveDraftSnapshot(sessaoCompleta()), deriveDraftSnapshot(sessaoCompleta()))).toBe(true);
+    expect(
+      isSameDraftSnapshot(
+        deriveDraftSnapshot(sessaoCompleta()),
+        deriveDraftSnapshot(sessaoCompleta())
+      )
+    ).toBe(true);
   });
 
   it("detecta um pick novo", () => {
     const sessao = sessaoCompleta();
     sessao.theirTeam![2].championId = 412;
-    expect(isSameDraftSnapshot(deriveDraftSnapshot(sessaoCompleta()), deriveDraftSnapshot(sessao))).toBe(false);
+    expect(
+      isSameDraftSnapshot(deriveDraftSnapshot(sessaoCompleta()), deriveDraftSnapshot(sessao))
+    ).toBe(false);
   });
 
   it("trata undefined dos dois lados como igual", () => {

@@ -30,6 +30,8 @@ export default [
         HTMLSelectElement: "readonly",
         RequestInit: "readonly",
         Response: "readonly",
+        AbortController: "readonly",
+        AbortSignal: "readonly",
         __dirname: "readonly"
       }
     },

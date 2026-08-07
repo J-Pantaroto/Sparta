@@ -1,17 +1,30 @@
 import {
   type DraftState,
+  type DraftStrategicAnalysis,
   type PickRecommendation,
   type PatchChange,
   type PlayerChampionPoolEntry,
   type PlayerChampionPoolRoleSummary,
   type RecommendationPoolSummary,
   type Role,
+  type RecommendationMetric,
+  type RecommendationMetricKey,
   type StrategicChampionReference,
   type StrategicSignal,
   STRATEGIC_CAPABILITY_LABELS
 } from "@sparta/core";
-import { Check, Crosshair, Pencil, Plus, X } from "lucide-react";
-import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import type { LcuGameflowPhase, LcuReadStatus } from "@sparta/riot";
+import {
+  Check,
+  ChevronDown,
+  Crosshair,
+  LockKeyhole,
+  Pencil,
+  Plus,
+  ShieldAlert,
+  X
+} from "lucide-react";
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import {
   ROLES,
   categoryLabels,
@@ -84,6 +97,10 @@ interface ChampionSelectScreenProps {
   onPoolChanged?: () => void;
   /** O draft veio da sessao do LCU - a edicao manual sai de cena. */
   draftAutoFilled: boolean;
+  lcuStatus?: LcuReadStatus;
+  gameflowPhase?: LcuGameflowPhase | null;
+  selectedChampionLocked?: boolean;
+  selectedChampionName?: string;
 }
 
 /**
@@ -107,7 +124,11 @@ export function ChampionSelectScreen({
   riotAccounts,
   sessionToken = null,
   onPoolChanged,
-  draftAutoFilled
+  draftAutoFilled,
+  lcuStatus = champSelectActive ? "OK" : "CLIENT_CLOSED",
+  gameflowPhase = champSelectActive ? "ChampSelect" : null,
+  selectedChampionLocked = false,
+  selectedChampionName
 }: ChampionSelectScreenProps) {
   const [confirmedChampion, setConfirmedChampion] = useState<{
     championId: number;
@@ -116,6 +137,16 @@ export function ChampionSelectScreen({
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [editingEnemies, setEditingEnemies] = useState(false);
   const [editingPool, setEditingPool] = useState(false);
+  const [recommendationGroup, setRecommendationGroup] = useState<"ALL" | "PRIMARY" | "ALTERNATIVE">(
+    "ALL"
+  );
+  const [explanationGroup, setExplanationGroup] = useState<ExplanationGroup>("WORKS");
+  const [frozenSnapshot, setFrozenSnapshot] = useState<{
+    primary: PickRecommendation[];
+    alternatives: PickRecommendation[];
+  } | null>(null);
+  const previousRole = useRef(draft.playerRole);
+  const wasLocked = useRef(false);
   const [poolRevision, setPoolRevision] = useState(0);
   const [poolError, setPoolError] = useState<string | null>(null);
   // Simulação manual: só quando NÃO há sessão real detectada (com sessão a
@@ -142,20 +173,51 @@ export function ChampionSelectScreen({
   // A recomendação #1 muda conforme o draft evolui; sem seleção explícita, o
   // detalhe acompanha o topo da lista em vez de ficar preso num campeão que
   // já não é mais o melhor.
-  const allRecommendations = [...recommendations, ...alternatives];
+  const compatiblePrimary = recommendations
+    .filter((item) => item.role === undefined || item.role === draft.playerRole)
+    .slice(0, 5);
+  const compatibleAlternatives = alternatives
+    .filter((item) => item.role === undefined || item.role === draft.playerRole)
+    .slice(0, 3);
+  const effectivePrimary = frozenSnapshot?.primary ?? compatiblePrimary;
+  const effectiveAlternatives = frozenSnapshot?.alternatives ?? compatibleAlternatives;
+  const allRecommendations = [...effectivePrimary, ...effectiveAlternatives];
   const selected =
     allRecommendations.find((recommendation) => recommendation.championId === selectedId) ??
-    recommendations[0] ??
-    alternatives[0];
+    effectivePrimary[0] ??
+    effectiveAlternatives[0];
+  const chosenCandidate = allRecommendations.find(
+    (item) => item.championId === draft.selectedChampionId
+  );
+  const chosenPrimaryIndex = effectivePrimary.findIndex(
+    (item) => item.championId === draft.selectedChampionId
+  );
+  const chosenAlternativeIndex = effectiveAlternatives.findIndex(
+    (item) => item.championId === draft.selectedChampionId
+  );
+  const chosenGroup =
+    draft.selectedChampionId === undefined
+      ? undefined
+      : chosenPrimaryIndex >= 0
+        ? "PRIMARY"
+        : chosenAlternativeIndex >= 0
+          ? "ALTERNATIVE"
+          : "NOT_IN_SNAPSHOT";
+  const chosenRank =
+    chosenPrimaryIndex >= 0
+      ? chosenPrimaryIndex + 1
+      : chosenAlternativeIndex >= 0
+        ? effectivePrimary.length + chosenAlternativeIndex + 1
+        : undefined;
+  const visiblePrimary = recommendationGroup === "ALTERNATIVE" ? [] : effectivePrimary;
+  const visibleAlternatives = recommendationGroup === "PRIMARY" ? [] : effectiveAlternatives;
   const patchChangesFor = (championId: number) =>
     patch.data?.changes.filter(
       (change) => change.entityType === "CHAMPION" && change.entityId === championId
     ) ?? [];
   const selectedPatchChanges = selected ? patchChangesFor(selected.championId) : [];
   const selectedTheoreticalImpact = selected
-    ? theoreticalImpacts.data?.impacts.find(
-        (impact) => impact.championId === selected.championId
-      )
+    ? theoreticalImpacts.data?.impacts.find((impact) => impact.championId === selected.championId)
     : undefined;
   const changedPoolChampions = new Set(
     theoreticalImpacts.data?.impacts
@@ -169,10 +231,36 @@ export function ChampionSelectScreen({
   ).size;
 
   useEffect(() => {
-    if (selectedId !== null && !allRecommendations.some((item) => item.championId === selectedId)) {
-      setSelectedId(null);
+    if (previousRole.current === draft.playerRole) return;
+    previousRole.current = draft.playerRole;
+    setSelectedId(null);
+    setFrozenSnapshot(null);
+  }, [draft.playerRole]);
+
+  useEffect(() => {
+    if (selectedChampionLocked && !wasLocked.current && allRecommendations.length > 0) {
+      setFrozenSnapshot({
+        primary: [...effectivePrimary],
+        alternatives: [...effectiveAlternatives]
+      });
     }
-  }, [recommendations, alternatives, selectedId]);
+    wasLocked.current = selectedChampionLocked;
+  }, [selectedChampionLocked, allRecommendations.length]);
+
+  useEffect(() => {
+    if (
+      draft.selectedChampionId === undefined ||
+      !allRecommendations.some((item) => item.championId === draft.selectedChampionId)
+    )
+      return;
+    setSelectedId(draft.selectedChampionId);
+  }, [draft.selectedChampionId, allRecommendations]);
+
+  useEffect(() => {
+    if (draft.selectedChampionId !== undefined || selectedChampionLocked) return;
+    setFrozenSnapshot(null);
+    setConfirmedChampion(null);
+  }, [draft.selectedChampionId, selectedChampionLocked]);
 
   function refreshPool() {
     setPoolRevision((current) => current + 1);
@@ -236,6 +324,7 @@ export function ChampionSelectScreen({
   }
 
   function confirmChampion(recommendation: PickRecommendation) {
+    setFrozenSnapshot({ primary: [...effectivePrimary], alternatives: [...effectiveAlternatives] });
     setConfirmedChampion({
       championId: recommendation.championId,
       championName: recommendation.championName
@@ -246,6 +335,7 @@ export function ChampionSelectScreen({
   // Champion Select não é módulo de uso livre (feedback do usuário): sem
   // sessão real e sem o usuário pedir simulação, mostra a espera.
   if (!champSelectActive && !devOverride) {
+    const operational = championSelectOperationalState(lcuStatus, gameflowPhase);
     return (
       <PageLayout>
         <ThemedPageHero
@@ -255,7 +345,15 @@ export function ChampionSelectScreen({
             <StatusBadge state="offline">League Client sem seleção de campeões ativa</StatusBadge>
           }
         />
-        <Card>
+        <Card className="sp-cs-operational">
+          <div className="sp-cs-operational__state" role="status">
+            {operational.error ? <ShieldAlert size={20} /> : <Crosshair size={20} />}
+            <div>
+              <strong>{operational.heading}</strong>
+              <p>{operational.description}</p>
+            </div>
+            <StatusBadge state={operational.badgeState}>{operational.badge}</StatusBadge>
+          </div>
           <EmptyState
             icon={<Crosshair size={22} />}
             title="Esta tela abre sozinha"
@@ -289,6 +387,13 @@ export function ChampionSelectScreen({
         }
       />
 
+      {champSelectActive && lcuStatus !== "OK" && (
+        <SignalChip tone="negative" title={lcuStatus}>
+          A leitura local do League esta instavel ({lcuStatus}). O ultimo draft conhecido e
+          mantido, sem completar dados ausentes.
+        </SignalChip>
+      )}
+
       {noAccountLinked && (
         <SignalChip tone="info">
           Sem conta Riot vinculada — as recomendações usam a referência geral do papel, não seu
@@ -297,6 +402,24 @@ export function ChampionSelectScreen({
       )}
 
       <Card pad="md">
+        <DraftStage
+          draft={draft}
+          ddragonVersion={ddragonVersion}
+          selectedChampionName={selectedChampionName ?? confirmedChampion?.championName}
+          selectedChampionLocked={selectedChampionLocked}
+          phase={champSelectActive ? gameflowPhase : "Manual"}
+        />
+        {!draftAutoFilled && (
+          <div className="sp-draft-stage__manual-actions">
+            <Button
+              variant="secondary"
+              icon={editingEnemies ? <X size={14} /> : <Pencil size={14} />}
+              onClick={() => setEditingEnemies((current) => !current)}
+            >
+              {editingEnemies ? "Fechar editor de inimigos" : "Editar time inimigo"}
+            </Button>
+          </div>
+        )}
         <div className="sp-draftbar">
           <div className="sp-draftbar__field">
             <Field label="Posição">
@@ -462,9 +585,11 @@ export function ChampionSelectScreen({
           {changedPoolCount > 0 && (
             <p className="sp-pool-patch-context">
               {changedPoolCount}{" "}
-              {changedPoolCount === 1 ? "campeão do seu pool recebeu" : "campeões do seu pool receberam"}{" "}
-              mudanças oficiais neste patch. O contexto teórico permanece separado do seu
-              histórico pessoal.
+              {changedPoolCount === 1
+                ? "campeão do seu pool recebeu"
+                : "campeões do seu pool receberam"}{" "}
+              mudanças oficiais neste patch. O contexto teórico permanece separado do seu histórico
+              pessoal.
             </p>
           )}
           {pool.status === "loading" && <Loading block label="Atualizando pool..." />}
@@ -522,10 +647,15 @@ export function ChampionSelectScreen({
         </Card>
       ) : (
         <>
-          {recommendationsStatus === "loading" && (
+          {recommendationsStatus === "loading" && allRecommendations.length === 0 && (
             <Card>
               <Loading block label="Calculando recomendações..." />
             </Card>
+          )}
+          {recommendationsStatus === "loading" && allRecommendations.length > 0 && (
+            <div className="sp-cs-updating" role="status" aria-live="polite">
+              Atualizando com o draft atual; a ultima leitura compativel continua visivel.
+            </div>
           )}
           {recommendationsStatus === "error" && (
             <Card>
@@ -541,7 +671,7 @@ export function ChampionSelectScreen({
           {/* Durante o recálculo nada da posição anterior fica visível: o hook
           preserva o último `data` pra evitar flicker, o que aqui significaria
           exibir os cards do papel antigo como se fossem os atuais. */}
-          {recommendationsStatus === "loading" ? null : allRecommendations.length === 0 ? (
+          {allRecommendations.length === 0 ? (
             <Card>
               <EmptyState
                 icon={<Crosshair size={22} />}
@@ -557,340 +687,780 @@ export function ChampionSelectScreen({
               />
             </Card>
           ) : (
-            <Columns
-              asideFirst
-              asideWidth="286px"
-              aside={
-                <div className="sp-reclist">
-                  {recommendations.map((recommendation, index) => (
-                    <InteractiveCard
-                      key={recommendation.championId}
-                      pad="sm"
-                      tone={index === 0 ? "feature" : "default"}
-                      selected={selected?.championId === recommendation.championId}
-                      onClick={() => setSelectedId(recommendation.championId)}
-                      label={`Ver detalhes de ${recommendation.championName}`}
-                    >
-                      <span className="sp-rec__rank">#{index + 1}</span>
-                      <div className="sp-rec">
-                        <ChampionAvatar
-                          championId={recommendation.championId}
-                          ddragonVersion={ddragonVersion}
-                          alt={recommendation.championName}
-                          ring={confirmedChampion?.championId === recommendation.championId}
-                        />
-                        <span style={{ minWidth: 0 }}>
-                          <strong className="sp-rec__name">{recommendation.championName}</strong>
-                          <span className="sp-rec__category">
-                            {categoryLabels[recommendation.category]}
-                          </span>
-                          <span className="sp-rec__category">
-                            {poolSourceLabel(recommendation)} · {personalGamesLabel(recommendation)}
-                          </span>
-                          <span
-                            className="sp-rec__category"
-                            title={executionRiskExplanation(recommendation)}
-                          >
-                            {executionRiskCompactLabel(recommendation)}
-                          </span>
-                          {strategicCompactSummary(recommendation) && (
-                            <span className="sp-rec__category">
-                              {strategicCompactSummary(recommendation)}
-                            </span>
-                          )}
-                          {patchIndicator(patchChangesFor(recommendation.championId)) && (
-                            <span className="sp-rec__patch">
-                              {patchIndicator(patchChangesFor(recommendation.championId))!.label}
-                            </span>
-                          )}
-                        </span>
-                        <ScoreBadge score={recommendation.totalScore} size="xs" />
-                      </div>
-                    </InteractiveCard>
-                  ))}
-                  {alternatives.length > 0 && (
-                    <>
-                      <span className="sp-pool-section-label">Alternativas</span>
-                      {alternatives.map((recommendation, index) => (
-                        <InteractiveCard
-                          key={recommendation.championId}
-                          pad="sm"
-                          selected={selected?.championId === recommendation.championId}
-                          onClick={() => setSelectedId(recommendation.championId)}
-                          label={`Ver alternativa ${recommendation.championName}`}
-                        >
-                          <span className="sp-rec__rank">
-                            #{recommendations.length + index + 1}
-                          </span>
-                          <div className="sp-rec">
-                            <ChampionAvatar
-                              championId={recommendation.championId}
-                              ddragonVersion={ddragonVersion}
-                              alt={recommendation.championName}
-                            />
-                            <span style={{ minWidth: 0 }}>
-                              <strong className="sp-rec__name">
-                                {recommendation.championName}
-                              </strong>
-                              <span className="sp-rec__category">
-                                {poolSourceLabel(recommendation)} ·{" "}
-                                {personalGamesLabel(recommendation)}
-                              </span>
-                              <span
-                                className="sp-rec__category"
-                                title={executionRiskExplanation(recommendation)}
-                              >
-                                {executionRiskCompactLabel(recommendation)}
-                              </span>
-                              {strategicCompactSummary(recommendation) && (
-                                <span className="sp-rec__category">
-                                  {strategicCompactSummary(recommendation)}
-                                </span>
-                              )}
-                              {patchIndicator(patchChangesFor(recommendation.championId)) && (
-                                <span className="sp-rec__patch">
-                                  {
-                                    patchIndicator(patchChangesFor(recommendation.championId))!
-                                      .label
-                                  }
-                                </span>
-                              )}
-                            </span>
-                            <ScoreBadge score={recommendation.totalScore} size="xs" />
-                          </div>
-                        </InteractiveCard>
-                      ))}
-                    </>
-                  )}
-                </div>
-              }
-              main={
-                selected && (
-                  <div style={{ display: "grid", gap: "var(--space-4)" }}>
-                    <Card>
-                      <div className="sp-recdetail__head">
-                        <ChampionAvatar
-                          championId={selected.championId}
-                          ddragonVersion={ddragonVersion}
-                          size="xl"
-                          alt={selected.championName}
-                          ring={confirmedChampion?.championId === selected.championId}
-                        />
-                        <div className="sp-recdetail__title">
-                          <strong className="sp-recdetail__name">{selected.championName}</strong>
-                          <div className="sp-recdetail__badges">
-                            <Badge tone="accent" square>
-                              {categoryLabels[selected.category]}
-                            </Badge>
-                            <Badge tone="neutral">{roleLabels[selected.role]}</Badge>
-                            {selected.confidence && (
-                              <Badge tone="neutral">
-                                confiança {confidenceLabels[selected.confidence]}
-                              </Badge>
-                            )}
-                            <Badge tone="neutral">{poolSourceLabel(selected)}</Badge>
-                            <Badge tone="neutral">{personalGamesLabel(selected)}</Badge>
-                            {patchIndicator(selectedPatchChanges) && (
-                              <Badge tone={patchIndicator(selectedPatchChanges)!.tone}>
-                                {patchIndicator(selectedPatchChanges)!.label}
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                        <ScoreBadge score={selected.totalScore} size="lg" />
-                      </div>
-
-                      {selectedPatchChanges.length > 0 && patch.data && (
-                        <div className="sp-patch-detail">
-                          <SectionHeader
-                            title="Mudanças oficiais neste patch"
-                            description="Informação editorial da Riot, separada dos sinais usados pelo ranking."
+            <>
+              {draft.selectedChampionId !== undefined && (
+                <SelectedChoiceSummary
+                  championId={draft.selectedChampionId}
+                  championName={selectedChampionName ?? chosenCandidate?.championName}
+                  group={chosenGroup ?? "NOT_IN_SNAPSHOT"}
+                  rank={chosenRank}
+                  recommendation={chosenCandidate}
+                  locked={selectedChampionLocked || frozenSnapshot !== null}
+                  ddragonVersion={ddragonVersion}
+                />
+              )}
+              <div
+                className="sp-cs-group-tabs"
+                role="group"
+                aria-label="Filtrar recomendacoes por grupo"
+              >
+                {(["ALL", "PRIMARY", "ALTERNATIVE"] as const).map((group) => (
+                  <button
+                    key={group}
+                    type="button"
+                    className="sp-cs-filter"
+                    aria-pressed={recommendationGroup === group}
+                    onClick={() => setRecommendationGroup(group)}
+                  >
+                    {group === "ALL"
+                      ? "Todas"
+                      : group === "PRIMARY"
+                        ? "Principais"
+                        : "So alternativas"}
+                  </button>
+                ))}
+              </div>
+              <Columns
+                asideFirst
+                asideWidth="420px"
+                aside={
+                  <div className="sp-reclist">
+                    {visiblePrimary.map((recommendation, index) => (
+                      <InteractiveCard
+                        key={recommendation.championId}
+                        pad="sm"
+                        tone={index === 0 ? "feature" : "default"}
+                        selected={selected?.championId === recommendation.championId}
+                        onClick={() => setSelectedId(recommendation.championId)}
+                        label={`Ver detalhes de ${recommendation.championName}`}
+                      >
+                        <span className="sp-rec__rank">#{index + 1}</span>
+                        <div className="sp-rec">
+                          <ChampionAvatar
+                            championId={recommendation.championId}
+                            ddragonVersion={ddragonVersion}
+                            alt={recommendation.championName}
+                            ring={confirmedChampion?.championId === recommendation.championId}
                           />
-                          {selectedPatchChanges.map((change) => (
-                            <article key={change.id} className="sp-patch-change">
-                              <strong>{change.affectedComponent ?? change.entityName}</strong>
-                              {change.officialSummary && <p>{change.officialSummary}</p>}
-                              <ul>
-                                {change.officialDetails.map((detail, index) => {
-                                  const delta = change.structuredChanges[index];
-                                  return (
-                                    <li key={`${change.id}-${index}`}>
-                                      {detail}
-                                      {delta?.previousValue !== undefined &&
-                                        delta.newValue !== undefined && (
-                                          <span>
-                                            Antes: {delta.previousValue} · Agora: {delta.newValue}
-                                          </span>
-                                        )}
-                                    </li>
-                                  );
-                                })}
-                              </ul>
-                            </article>
-                          ))}
-                          <p className="sp-patch-detail__warning">
-                            Mudança oficial não representa força observada no meta.{" "}
-                            <a href={patch.data.sourceUrl} target="_blank" rel="noreferrer">
-                              Fonte oficial
-                            </a>
-                          </p>
+                          <span style={{ minWidth: 0 }}>
+                            <strong className="sp-rec__name">{recommendation.championName}</strong>
+                            <span className="sp-rec__category">
+                              {categoryLabels[recommendation.category]}
+                            </span>
+                            <span className="sp-rec__category">
+                              {poolSourceLabel(recommendation)} ·{" "}
+                              {personalGamesLabel(recommendation)}
+                            </span>
+                            <span
+                              className="sp-rec__category"
+                              title={executionRiskExplanation(recommendation)}
+                            >
+                              {executionRiskCompactLabel(recommendation)}
+                            </span>
+                            {strategicCompactSummary(recommendation) && (
+                              <span className="sp-rec__category">
+                                {strategicCompactSummary(recommendation)}
+                              </span>
+                            )}
+                            {patchIndicator(patchChangesFor(recommendation.championId)) && (
+                              <span className="sp-rec__patch">
+                                {patchIndicator(patchChangesFor(recommendation.championId))!.label}
+                              </span>
+                            )}
+                            <RecommendationQuickSignals recommendation={recommendation} />
+                          </span>
+                          <ScoreBadge score={recommendation.totalScore} size="xs" />
                         </div>
-                      )}
+                      </InteractiveCard>
+                    ))}
+                    {visibleAlternatives.length > 0 && (
+                      <>
+                        <span className="sp-pool-section-label">Alternativas</span>
+                        {visibleAlternatives.map((recommendation, index) => (
+                          <InteractiveCard
+                            key={recommendation.championId}
+                            pad="sm"
+                            selected={selected?.championId === recommendation.championId}
+                            onClick={() => setSelectedId(recommendation.championId)}
+                            label={`Ver alternativa ${recommendation.championName}`}
+                          >
+                            <span className="sp-rec__rank">
+                              #{effectivePrimary.length + index + 1}
+                            </span>
+                            <div className="sp-rec">
+                              <ChampionAvatar
+                                championId={recommendation.championId}
+                                ddragonVersion={ddragonVersion}
+                                alt={recommendation.championName}
+                              />
+                              <span style={{ minWidth: 0 }}>
+                                <strong className="sp-rec__name">
+                                  {recommendation.championName}
+                                </strong>
+                                <span className="sp-rec__category">
+                                  {poolSourceLabel(recommendation)} ·{" "}
+                                  {personalGamesLabel(recommendation)}
+                                </span>
+                                <span
+                                  className="sp-rec__category"
+                                  title={executionRiskExplanation(recommendation)}
+                                >
+                                  {executionRiskCompactLabel(recommendation)}
+                                </span>
+                                {strategicCompactSummary(recommendation) && (
+                                  <span className="sp-rec__category">
+                                    {strategicCompactSummary(recommendation)}
+                                  </span>
+                                )}
+                                {patchIndicator(patchChangesFor(recommendation.championId)) && (
+                                  <span className="sp-rec__patch">
+                                    {
+                                      patchIndicator(patchChangesFor(recommendation.championId))!
+                                        .label
+                                    }
+                                  </span>
+                                )}
+                                <RecommendationQuickSignals recommendation={recommendation} />
+                              </span>
+                              <ScoreBadge score={recommendation.totalScore} size="xs" />
+                            </div>
+                          </InteractiveCard>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                }
+                main={
+                  selected && (
+                    <div style={{ display: "grid", gap: "var(--space-4)" }}>
+                      <Card>
+                        <div className="sp-recdetail__head">
+                          <ChampionAvatar
+                            championId={selected.championId}
+                            ddragonVersion={ddragonVersion}
+                            size="xl"
+                            alt={selected.championName}
+                            ring={confirmedChampion?.championId === selected.championId}
+                          />
+                          <div className="sp-recdetail__title">
+                            <strong className="sp-recdetail__name">{selected.championName}</strong>
+                            <div className="sp-recdetail__badges">
+                              <Badge tone="accent" square>
+                                {categoryLabels[selected.category]}
+                              </Badge>
+                              <Badge tone="neutral">{roleLabels[selected.role]}</Badge>
+                              {selected.confidence && (
+                                <Badge tone="neutral">
+                                  confiança {confidenceLabels[selected.confidence]}
+                                </Badge>
+                              )}
+                              <Badge tone="neutral">{poolSourceLabel(selected)}</Badge>
+                              <Badge tone="neutral">{personalGamesLabel(selected)}</Badge>
+                              {patchIndicator(selectedPatchChanges) && (
+                                <Badge tone={patchIndicator(selectedPatchChanges)!.tone}>
+                                  {patchIndicator(selectedPatchChanges)!.label}
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                          <ScoreBadge score={selected.totalScore} size="lg" />
+                        </div>
 
-                      {selectedTheoreticalImpact && (
-                        <TheoreticalPatchImpactPanel impact={selectedTheoreticalImpact} />
-                      )}
+                        {selectedPatchChanges.length > 0 && patch.data && (
+                          <div className="sp-patch-detail">
+                            <SectionHeader
+                              title="Mudanças oficiais neste patch"
+                              description="Informação editorial da Riot, separada dos sinais usados pelo ranking."
+                            />
+                            {selectedPatchChanges.map((change) => (
+                              <article key={change.id} className="sp-patch-change">
+                                <strong>{change.affectedComponent ?? change.entityName}</strong>
+                                {change.officialSummary && <p>{change.officialSummary}</p>}
+                                <ul>
+                                  {change.officialDetails.map((detail, index) => {
+                                    const delta = change.structuredChanges[index];
+                                    return (
+                                      <li key={`${change.id}-${index}`}>
+                                        {detail}
+                                        {delta?.previousValue !== undefined &&
+                                          delta.newValue !== undefined && (
+                                            <span>
+                                              Antes: {delta.previousValue} · Agora: {delta.newValue}
+                                            </span>
+                                          )}
+                                      </li>
+                                    );
+                                  })}
+                                </ul>
+                              </article>
+                            ))}
+                            <p className="sp-patch-detail__warning">
+                              Mudança oficial não representa força observada no meta.{" "}
+                              <a href={patch.data.sourceUrl} target="_blank" rel="noreferrer">
+                                Fonte oficial
+                              </a>
+                            </p>
+                          </div>
+                        )}
 
-                      <SectionHeader
-                        title="Por que este pick"
-                        description="Os sinais do draft formam o score base; o risco pessoal aplica somente uma penalização limitada e explicada."
-                      />
-                      {Number.isFinite(selected.dataCoverage) && (
-                        <p className="sp-recdetail__coverage">
-                          {Math.round(selected.dataCoverage * 100)}% dos sinais previstos possuem
-                          dados disponíveis.
-                        </p>
-                      )}
-                      <div className="sp-recdetail__metrics">
-                        {/* Ordena por valor, mas empurra o que nao tem valor
+                        {selectedTheoreticalImpact && (
+                          <TheoreticalPatchImpactPanel impact={selectedTheoreticalImpact} />
+                        )}
+
+                        <ExplanationFilters
+                          value={explanationGroup}
+                          onChange={setExplanationGroup}
+                        />
+                        <SectionHeader
+                          title="Por que este pick"
+                          description="Os sinais do draft formam o score base; o risco pessoal aplica somente uma penalização limitada e explicada."
+                        />
+                        {Number.isFinite(selected.dataCoverage) && (
+                          <p className="sp-recdetail__coverage">
+                            {Math.round(selected.dataCoverage * 100)}% dos sinais previstos possuem
+                            dados disponíveis.
+                          </p>
+                        )}
+                        <div className="sp-recdetail__metrics">
+                          {/* Ordena por valor, mas empurra o que nao tem valor
                           pro fim: metrica ausente nao disputa posicao com
                           metrica calculada. */}
-                        {[...selected.metricDetails]
-                          .sort((a, b) => (b.value ?? -1) - (a.value ?? -1))
-                          .map((metric) => (
-                            <MetricRow
-                              key={metric.key}
-                              metric={metric}
-                              label={metricKeyLabels[metric.key]}
-                            />
-                          ))}
-                      </div>
+                          {metricsForExplanationGroup(selected, explanationGroup)
+                            .sort((a, b) => (b.value ?? -1) - (a.value ?? -1))
+                            .map((metric) => (
+                              <MetricRow
+                                key={metric.key}
+                                metric={metric}
+                                label={metricKeyLabels[metric.key]}
+                              />
+                            ))}
+                        </div>
 
-                      {selected.strategicAnalysis && (
-                        <div style={{ marginTop: "var(--space-5)" }}>
-                          <SectionHeader
-                            title="Análise estratégica 5×5"
-                            description={`Análise parcial: ${selected.strategicAnalysis.alliedProfile.knownChampions.length + selected.strategicAnalysis.enemyProfile.knownChampions.length} de 10 campeões conhecidos · cobertura ${Math.round(selected.strategicAnalysis.coverage * 100)}%.`}
-                          />
-                          <SignalChipList stacked>
-                            {selected.strategicAnalysis.strengths.map((signal) => (
-                              <SignalChip
-                                key={signal.key}
-                                tone="positive"
-                                title={strategicEvidenceTitle(signal)}
-                              >
-                                {signal.description}
-                              </SignalChip>
-                            ))}
-                            {selected.strategicAnalysis.gaps.map((signal) => (
-                              <SignalChip
-                                key={signal.key}
-                                tone="negative"
-                                title={strategicEvidenceTitle(signal)}
-                              >
-                                {signal.description}
-                              </SignalChip>
-                            ))}
-                            {selected.strategicAnalysis.risks.map((signal) => (
-                              <SignalChip
-                                key={signal.key}
-                                tone="negative"
-                                title={strategicEvidenceTitle(signal)}
-                              >
-                                {signal.description}
-                              </SignalChip>
-                            ))}
-                            {selected.strategicAnalysis.unavailableSignals
-                              .slice(0, 4)
-                              .map((signal) => (
+                        {selected.strategicAnalysis && (
+                          <div style={{ marginTop: "var(--space-5)" }}>
+                            <SectionHeader
+                              title="Análise estratégica 5×5"
+                              description={`Análise parcial: ${selected.strategicAnalysis.alliedProfile.knownChampions.length + selected.strategicAnalysis.enemyProfile.knownChampions.length} de 10 campeões conhecidos · cobertura ${Math.round(selected.strategicAnalysis.coverage * 100)}%.`}
+                            />
+                            <CapabilityMap analysis={selected.strategicAnalysis} />
+                            <SignalChipList stacked>
+                              {selected.strategicAnalysis.strengths.map((signal) => (
                                 <SignalChip
                                   key={signal.key}
-                                  tone="info"
-                                  title={signal.unavailableReason}
+                                  tone="positive"
+                                  title={strategicEvidenceTitle(signal)}
                                 >
                                   {signal.description}
                                 </SignalChip>
                               ))}
-                          </SignalChipList>
-                          <p className="sp-recdetail__coverage">
-                            Aliados considerados:{" "}
-                            {strategicChampionNames(
-                              selected.strategicAnalysis.alliedProfile.knownChampions
-                            )}
-                            . Inimigos considerados:{" "}
-                            {strategicChampionNames(
-                              selected.strategicAnalysis.enemyProfile.knownChampions
-                            )}
-                            .
-                          </p>
-                        </div>
-                      )}
+                              {selected.strategicAnalysis.gaps.map((signal) => (
+                                <SignalChip
+                                  key={signal.key}
+                                  tone="negative"
+                                  title={strategicEvidenceTitle(signal)}
+                                >
+                                  {signal.description}
+                                </SignalChip>
+                              ))}
+                              {selected.strategicAnalysis.risks.map((signal) => (
+                                <SignalChip
+                                  key={signal.key}
+                                  tone="negative"
+                                  title={strategicEvidenceTitle(signal)}
+                                >
+                                  {signal.description}
+                                </SignalChip>
+                              ))}
+                              {selected.strategicAnalysis.unavailableSignals
+                                .slice(0, 4)
+                                .map((signal) => (
+                                  <SignalChip
+                                    key={signal.key}
+                                    tone="info"
+                                    title={signal.unavailableReason}
+                                  >
+                                    {signal.description}
+                                  </SignalChip>
+                                ))}
+                            </SignalChipList>
+                            <p className="sp-recdetail__coverage">
+                              Aliados considerados:{" "}
+                              {strategicChampionNames(
+                                selected.strategicAnalysis.alliedProfile.knownChampions
+                              )}
+                              . Inimigos considerados:{" "}
+                              {strategicChampionNames(
+                                selected.strategicAnalysis.enemyProfile.knownChampions
+                              )}
+                              .
+                            </p>
+                          </div>
+                        )}
 
-                      <div style={{ marginTop: "var(--space-5)" }}>
-                        <PersonalLoadoutHistory
-                          token={sessionToken}
-                          playerId={riotAccounts[0]?.puuid}
-                          championId={selected.championId}
-                          role={draft.playerRole}
-                          requestedPatch={draft.patch}
+                        <details className="sp-cs-details" style={{ marginTop: "var(--space-5)" }}>
+                          <summary>
+                            Loadout pessoal conhecido <ChevronDown size={15} aria-hidden="true" />
+                          </summary>
+                          <PersonalLoadoutHistory
+                            token={sessionToken}
+                            playerId={riotAccounts[0]?.puuid}
+                            championId={selected.championId}
+                            role={draft.playerRole}
+                            requestedPatch={draft.patch}
+                          />
+                        </details>
+
+                        {(selected.reasons.length > 0 || selected.warnings.length > 0) && (
+                          <div style={{ marginTop: "var(--space-5)" }}>
+                            <SignalChipList stacked>
+                              {selected.reasons.map((reason) => (
+                                <SignalChip key={reason.code} tone="positive" title={reason.detail}>
+                                  {reason.detail}
+                                </SignalChip>
+                              ))}
+                              {selected.warnings.map((warning) => (
+                                <SignalChip
+                                  key={warning.code}
+                                  tone="negative"
+                                  title={warning.detail}
+                                >
+                                  {warning.detail}
+                                </SignalChip>
+                              ))}
+                            </SignalChipList>
+                          </div>
+                        )}
+
+                        <div style={{ marginTop: "var(--space-6)" }}>
+                          <Button
+                            variant={
+                              confirmedChampion?.championId === selected.championId
+                                ? "confirmed"
+                                : "primary"
+                            }
+                            size="lg"
+                            icon={
+                              confirmedChampion?.championId === selected.championId ? (
+                                <Check size={16} />
+                              ) : undefined
+                            }
+                            onClick={() => confirmChampion(selected)}
+                          >
+                            {confirmedChampion?.championId === selected.championId
+                              ? `${selected.championName} confirmado`
+                              : `Confirmar ${selected.championName}`}
+                          </Button>
+                        </div>
+                      </Card>
+
+                      {confirmedChampion && (
+                        <BuildPanel
+                          confirmedChampion={confirmedChampion}
+                          enemies={draft.enemies}
+                          ddragonVersion={ddragonVersion}
                         />
-                      </div>
-
-                      {(selected.reasons.length > 0 || selected.warnings.length > 0) && (
-                        <div style={{ marginTop: "var(--space-5)" }}>
-                          <SignalChipList stacked>
-                            {selected.reasons.map((reason) => (
-                              <SignalChip key={reason.code} tone="positive" title={reason.detail}>
-                                {reason.detail}
-                              </SignalChip>
-                            ))}
-                            {selected.warnings.map((warning) => (
-                              <SignalChip key={warning.code} tone="negative" title={warning.detail}>
-                                {warning.detail}
-                              </SignalChip>
-                            ))}
-                          </SignalChipList>
-                        </div>
                       )}
-
-                      <div style={{ marginTop: "var(--space-6)" }}>
-                        <Button
-                          variant={
-                            confirmedChampion?.championId === selected.championId
-                              ? "confirmed"
-                              : "primary"
-                          }
-                          size="lg"
-                          icon={
-                            confirmedChampion?.championId === selected.championId ? (
-                              <Check size={16} />
-                            ) : undefined
-                          }
-                          onClick={() => confirmChampion(selected)}
-                        >
-                          {confirmedChampion?.championId === selected.championId
-                            ? `${selected.championName} confirmado`
-                            : `Confirmar ${selected.championName}`}
-                        </Button>
-                      </div>
-                    </Card>
-
-                    {confirmedChampion && (
-                      <BuildPanel
-                        confirmedChampion={confirmedChampion}
-                        enemies={draft.enemies}
-                        ddragonVersion={ddragonVersion}
-                      />
-                    )}
-                  </div>
-                )
-              }
-            />
+                    </div>
+                  )
+                }
+              />
+            </>
           )}
         </>
       )}
     </PageLayout>
   );
+}
+
+type ExplanationGroup = "WORKS" | "RISKS" | "PERSONAL" | "COMPOSITION" | "MATCHUP" | "UNAVAILABLE";
+
+const explanationLabels: Record<ExplanationGroup, string> = {
+  WORKS: "Por que funciona",
+  RISKS: "Riscos",
+  PERSONAL: "Contexto pessoal",
+  COMPOSITION: "Composicao",
+  MATCHUP: "Matchup pessoal",
+  UNAVAILABLE: "Dados indisponiveis"
+};
+
+const PERSONAL_METRICS = new Set<RecommendationMetricKey>([
+  "PERSONAL_PERFORMANCE",
+  "PERSONAL_EXPERIENCE",
+  "RECENT_FORM",
+  "CHAMPION_DIFFICULTY"
+]);
+const COMPOSITION_METRICS = new Set<RecommendationMetricKey>([
+  "BLIND_SAFETY",
+  "ALLY_SYNERGY",
+  "TEAM_COMPOSITION",
+  "ENEMY_COMPOSITION_ANSWER"
+]);
+const MATCHUP_METRICS = new Set<RecommendationMetricKey>([
+  "PERSONAL_MATCHUP",
+  "GLOBAL_MATCHUP",
+  "LANE_MATCHUP"
+]);
+
+function metricsForExplanationGroup(
+  recommendation: PickRecommendation,
+  group: ExplanationGroup
+): RecommendationMetric[] {
+  const metrics = recommendation.metricDetails ?? [];
+  if (group === "UNAVAILABLE") return metrics.filter((metric) => metric.status === "UNAVAILABLE");
+  if (group === "RISKS") return metrics.filter((metric) => metric.key === "EXECUTION_RISK");
+  if (group === "PERSONAL") return metrics.filter((metric) => PERSONAL_METRICS.has(metric.key));
+  if (group === "COMPOSITION")
+    return metrics.filter((metric) => COMPOSITION_METRICS.has(metric.key));
+  if (group === "MATCHUP") return metrics.filter((metric) => MATCHUP_METRICS.has(metric.key));
+  return metrics.filter(
+    (metric) =>
+      metric.status !== "UNAVAILABLE" &&
+      metric.key !== "EXECUTION_RISK" &&
+      !MATCHUP_METRICS.has(metric.key)
+  );
+}
+
+function ExplanationFilters({
+  value,
+  onChange
+}: {
+  value: ExplanationGroup;
+  onChange: (value: ExplanationGroup) => void;
+}) {
+  return (
+    <div className="sp-cs-explanation-tabs" role="group" aria-label="Filtrar explicacoes">
+      {(Object.keys(explanationLabels) as ExplanationGroup[]).map((group) => (
+        <button
+          key={group}
+          type="button"
+          className="sp-cs-filter"
+          aria-pressed={value === group}
+          onClick={() => onChange(group)}
+        >
+          {explanationLabels[group]}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function DraftStage({
+  draft,
+  ddragonVersion,
+  selectedChampionName,
+  selectedChampionLocked,
+  phase
+}: {
+  draft: DraftState;
+  ddragonVersion: string;
+  selectedChampionName?: string;
+  selectedChampionLocked: boolean;
+  phase: string | null;
+}) {
+  return (
+    <section className="sp-draft-stage" aria-label="Estado visual do draft">
+      <DraftTeam
+        title="Aliados"
+        picks={draft.allies}
+        ddragonVersion={ddragonVersion}
+        directOpponentId={undefined}
+      />
+      <div className="sp-draft-stage__center">
+        <span className="sp-draft-stage__eyebrow">Draft atual</span>
+        {draft.selectedChampionId === undefined ? (
+          <EmptyAvatarSlot size="lg" label="Seu campeao ainda nao foi selecionado" />
+        ) : (
+          <ChampionAvatar
+            championId={draft.selectedChampionId}
+            ddragonVersion={ddragonVersion}
+            size="lg"
+            alt={selectedChampionName ?? `Campeao ${draft.selectedChampionId}`}
+            ring
+          />
+        )}
+        <strong>{selectedChampionName ?? "Sua escolha"}</strong>
+        <span>
+          {selectedChampionLocked
+            ? "Campeao travado"
+            : draft.selectedChampionId
+              ? "Campeao selecionado"
+              : "Aguardando selecao"}
+        </span>
+        <Badge tone={draft.playerRole ? "accent" : "warning"}>
+          {draft.playerRole ? roleLabels[draft.playerRole] : "Posicao desconhecida"}
+        </Badge>
+        <small>{phase ? phaseLabel(phase) : "League nao detectado"}</small>
+      </div>
+      <DraftTeam
+        title="Inimigos"
+        picks={draft.enemies}
+        ddragonVersion={ddragonVersion}
+        directOpponentId={draft.enemyLaneChampionId}
+      />
+      <div
+        className="sp-draft-stage__bans"
+        aria-label={`${draft.bannedChampionIds.length} banimentos confirmados`}
+      >
+        <span>Bans confirmados</span>
+        {draft.bannedChampionIds.length === 0 ? (
+          <small>Nenhum ban revelado</small>
+        ) : (
+          draft.bannedChampionIds.map((championId) => (
+            <ChampionAvatar
+              key={championId}
+              championId={championId}
+              ddragonVersion={ddragonVersion}
+              size="xs"
+              alt={`Campeao banido ${championId}`}
+            />
+          ))
+        )}
+      </div>
+    </section>
+  );
+}
+
+function DraftTeam({
+  title,
+  picks,
+  ddragonVersion,
+  directOpponentId
+}: {
+  title: string;
+  picks: DraftState["allies"];
+  ddragonVersion: string;
+  directOpponentId?: number;
+}) {
+  return (
+    <div className="sp-draft-team">
+      <strong>{title}</strong>
+      <div className="sp-draft-team__slots">
+        {Array.from({ length: 5 }, (_, index) => {
+          const pick = picks[index];
+          if (!pick) {
+            return (
+              <div className="sp-draft-pick sp-draft-pick--unknown" key={`${title}-${index}`}>
+                <EmptyAvatarSlot label={`${title}: pick ${index + 1} ainda desconhecido`} />
+                <span>Pick {index + 1}</span>
+                <small>Desconhecido</small>
+              </div>
+            );
+          }
+          const direct = directOpponentId === pick.championId;
+          return (
+            <div
+              className={`sp-draft-pick${direct ? " sp-draft-pick--direct" : ""}`}
+              key={`${pick.championId}-${index}`}
+              aria-label={`${pick.championName}${pick.role ? `, ${roleLabels[pick.role]}` : ", posicao desconhecida"}${direct ? ", adversario direto confirmado" : ""}`}
+            >
+              <ChampionAvatar
+                championId={pick.championId}
+                ddragonVersion={ddragonVersion}
+                alt={pick.championName}
+              />
+              <span>{pick.championName}</span>
+              <small>{pick.role ? roleLabels[pick.role] : "Posicao desconhecida"}</small>
+              {direct && <Badge tone="warning">Direto</Badge>}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function SelectedChoiceSummary({
+  championId,
+  championName,
+  group,
+  rank,
+  recommendation,
+  locked,
+  ddragonVersion
+}: {
+  championId: number;
+  championName?: string;
+  group: "PRIMARY" | "ALTERNATIVE" | "NOT_IN_SNAPSHOT";
+  rank?: number;
+  recommendation?: PickRecommendation;
+  locked: boolean;
+  ddragonVersion: string;
+}) {
+  return (
+    <Card tone="feature" className="sp-selected-choice">
+      <ChampionAvatar
+        championId={championId}
+        ddragonVersion={ddragonVersion}
+        size="lg"
+        alt={championName ?? `Campeao ${championId}`}
+        ring
+      />
+      <div>
+        <span className="sp-draft-stage__eyebrow">Escolha registrada</span>
+        <strong>{championName ?? `Campeao ${championId}`}</strong>
+        <p>
+          {group === "NOT_IN_SNAPSHOT"
+            ? "Fora do snapshot: nenhum score ou ranking retroativo foi criado."
+            : `${group} / #${rank} no ranking original / score ${Math.round(recommendation?.totalScore ?? 0)} / cobertura ${formatCoverage(recommendation?.dataCoverage)}`}
+        </p>
+      </div>
+      <Badge tone={locked ? "positive" : "accent"}>
+        {locked ? <LockKeyhole size={13} aria-hidden="true" /> : null}
+        {locked ? "Snapshot preservado" : "Selecionado"}
+      </Badge>
+    </Card>
+  );
+}
+
+function RecommendationQuickSignals({ recommendation }: { recommendation: PickRecommendation }) {
+  return (
+    <span className="sp-rec__quick">
+      <span>
+        Cobertura {formatCoverage(recommendation.dataCoverage)} /{" "}
+        {recommendation.role ? roleLabels[recommendation.role] : "posicao nao informada"}
+      </span>
+      <span className="sp-rec__signal sp-rec__signal--positive">
+        {topFavorableSignal(recommendation)}
+      </span>
+      <span className="sp-rec__signal sp-rec__signal--limit">
+        {principalLimitation(recommendation)}
+      </span>
+    </span>
+  );
+}
+
+function CapabilityMap({ analysis }: { analysis: DraftStrategicAnalysis }) {
+  const states = new Map<
+    string,
+    { label: string; state: "added" | "reinforced" | "gap" | "risk" | "unavailable" }
+  >();
+  const add = (keys: readonly string[], state: "added" | "reinforced" | "gap") =>
+    keys.forEach((key) =>
+      states.set(key, {
+        label: STRATEGIC_CAPABILITY_LABELS[key as keyof typeof STRATEGIC_CAPABILITY_LABELS],
+        state
+      })
+    );
+  add(
+    [
+      ...analysis.candidateContribution.addedCapabilities,
+      ...analysis.candidateContribution.filledKnownGaps
+    ],
+    "added"
+  );
+  add(analysis.candidateContribution.reinforcedCapabilities, "reinforced");
+  add(analysis.candidateContribution.remainingKnownGaps, "gap");
+  analysis.risks.forEach((signal) =>
+    states.set(signal.dimension, {
+      label: STRATEGIC_CAPABILITY_LABELS[signal.dimension],
+      state: "risk"
+    })
+  );
+  analysis.unavailableSignals.forEach((signal) => {
+    if (!states.has(signal.dimension))
+      states.set(signal.dimension, {
+        label: STRATEGIC_CAPABILITY_LABELS[signal.dimension],
+        state: "unavailable"
+      });
+  });
+  return (
+    <div
+      className="sp-capability-map"
+      role="list"
+      aria-label="Mapa textual de capacidades calculadas"
+    >
+      {[...states.entries()].map(([key, item]) => (
+        <div
+          key={key}
+          role="listitem"
+          className={`sp-capability-map__cell sp-capability-map__cell--${item.state}`}
+        >
+          <strong>{item.label}</strong>
+          <span>{capabilityStateLabel(item.state)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function capabilityStateLabel(state: "added" | "reinforced" | "gap" | "risk" | "unavailable") {
+  if (state === "added") return "adiciona / cobre lacuna";
+  if (state === "reinforced") return "reforca";
+  if (state === "gap") return "lacuna conhecida";
+  if (state === "risk") return "risco conhecido";
+  return "dado indisponivel";
+}
+
+function topFavorableSignal(recommendation: PickRecommendation): string {
+  return (
+    recommendation.reasons[0]?.detail ??
+    strategicCompactSummary(recommendation) ??
+    "Sem motivo favoravel destacado"
+  );
+}
+
+function principalLimitation(recommendation: PickRecommendation): string {
+  return (
+    recommendation.warnings[0]?.detail ??
+    recommendation.metricDetails.find((metric) => metric.status === "UNAVAILABLE")
+      ?.unavailableReason ??
+    "Nenhuma limitacao adicional registrada"
+  );
+}
+
+function formatCoverage(value?: number): string {
+  return value !== undefined && Number.isFinite(value)
+    ? `${Math.round(value * 100)}%`
+    : "indisponivel";
+}
+
+function phaseLabel(phase: string): string {
+  const labels: Record<string, string> = {
+    None: "Cliente aberto, sem lobby",
+    Lobby: "Lobby aberto",
+    Matchmaking: "Na fila",
+    ReadyCheck: "Partida encontrada",
+    ChampSelect: "Champion Select iniciado",
+    GameStart: "Draft encerrado",
+    InProgress: "Partida em andamento",
+    EndOfGame: "Partida encerrada",
+    Manual: "Simulacao manual"
+  };
+  return labels[phase] ?? phase;
+}
+
+function championSelectOperationalState(status: LcuReadStatus, phase: LcuGameflowPhase | null) {
+  const unavailable = !["OK", "OUTSIDE_CHAMP_SELECT"].includes(status);
+  if (status === "CLIENT_CLOSED" || status === "LOCKFILE_MISSING") {
+    return {
+      title: "Aguardando sua selecao de campeoes",
+      heading: "League nao detectado",
+      description:
+        "Abra o League Client. O Sparta apenas observa a sessao local e nunca escolhe ou trava campeoes.",
+      badge: "League Client fechado",
+      badgeState: "offline" as const,
+      error: false
+    };
+  }
+  if (unavailable) {
+    return {
+      title: "Leitura do League indisponivel",
+      heading: "A LCU nao respondeu de forma estavel",
+      description: `Estado ${status}. A interface local do League nao possui garantia oficial de estabilidade; nenhum dado ausente sera inferido.`,
+      badge: "LCU indisponivel",
+      badgeState: "warning" as const,
+      error: true
+    };
+  }
+  return {
+    title: "Aguardando sua selecao de campeoes",
+    heading: phase ? phaseLabel(phase) : "Cliente aberto, fase desconhecida",
+    description:
+      "O Champion Select ainda nao comecou. Esta tela muda automaticamente quando a sessao aparecer.",
+    badge: phase ? phaseLabel(phase) : "Cliente aberto",
+    badgeState: "warning" as const,
+    error: false
+  };
 }
 
 function poolSourceLabel(recommendation: PickRecommendation): string {

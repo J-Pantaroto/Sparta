@@ -33,6 +33,11 @@ contextBridge.exposeInMainWorld("sparta", {
     ipcRenderer.on("sparta:gameflow-phase", listener);
     return () => ipcRenderer.removeListener("sparta:gameflow-phase", listener);
   },
+  onLcuStatus(callback: (status: LcuReadStatus) => void) {
+    const listener = (_event: unknown, status: LcuReadStatus) => callback(status);
+    ipcRenderer.on("sparta:lcu-status", listener);
+    return () => ipcRenderer.removeListener("sparta:lcu-status", listener);
+  },
   /**
    * Baixa uma imagem pro disco local (userData/skins) e devolve um data URL
    * (nao um caminho de disco) - usado pra aplicar tema de skin offline.

@@ -10,7 +10,8 @@ import type {
   LcuDraftMember,
   LcuDraftSnapshot,
   LcuGameflowPhase,
-  LcuObservedGame
+  LcuObservedGame,
+  LcuReadStatus
 } from "@sparta/riot";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { navGroups, pageContext, type Page } from "./app/navigation";
@@ -96,6 +97,8 @@ function SpartaApp() {
     () => localStorage.getItem("sparta:sidebar-collapsed") === "true"
   );
   const [leagueConnected, setLeagueConnected] = useState(false);
+  const [lcuStatus, setLcuStatus] = useState<LcuReadStatus>("CLIENT_CLOSED");
+  const [gameflowPhase, setGameflowPhase] = useState<LcuGameflowPhase | null>(null);
   const [dashboardRefreshRequest, setDashboardRefreshRequest] = useState(0);
   const [dashboardLoading, setDashboardLoading] = useState(false);
   const [apiAvailable, setApiAvailable] = useState(true);
@@ -150,9 +153,9 @@ function SpartaApp() {
   const recommendationsQuery = useAsyncData<
     DraftRecommendationResponse & { persistence?: DraftPersistenceInfo }
   >(
-    () =>
+    (signal) =>
       sessionToken && draft.playerRole
-        ? fetchDraftRecommendations(sessionToken, draft, draftSession ?? undefined)
+        ? fetchDraftRecommendations(sessionToken, draft, draftSession ?? undefined, signal)
         : undefined,
     [sessionToken, draft, poolRevision, draftSession]
   );
@@ -241,7 +244,7 @@ function SpartaApp() {
   useEffect(() => {
     if (sessionStatus !== "ready" || !window.sparta?.onGameflowPhase) return;
     const unsubscribe = window.sparta.onGameflowPhase((phase) => {
-      setLeagueConnected(phase !== null);
+      setGameflowPhase(phase);
       const previous = lastGameflowPhaseRef.current;
       lastGameflowPhaseRef.current = phase;
       const active = phase === "ChampSelect";
@@ -276,6 +279,14 @@ function SpartaApp() {
     });
     return unsubscribe;
   }, [sessionStatus, sessionToken]);
+
+  useEffect(() => {
+    if (sessionStatus !== "ready" || !window.sparta?.onLcuStatus) return;
+    return window.sparta.onLcuStatus((status) => {
+      setLcuStatus(status);
+      setLeagueConnected(!["CLIENT_CLOSED", "LOCKFILE_MISSING"].includes(status));
+    });
+  }, [sessionStatus]);
 
   useEffect(() => {
     if (sessionStatus !== "ready" || !window.sparta?.onObservedGame) return;
@@ -395,6 +406,8 @@ function SpartaApp() {
     void window.sparta.getLcuState().then((state) => {
       if (cancelled) return;
       setLeagueConnected(!["CLIENT_CLOSED", "LOCKFILE_MISSING"].includes(state.status));
+      setLcuStatus(state.status);
+      setGameflowPhase(state.phase);
       if (state.phase === "ChampSelect") {
         setChampSelectActive(true);
         setPage("select");
@@ -711,6 +724,14 @@ function SpartaApp() {
           autoPickOrder={autoPickOrder}
           autoPlayerRole={autoPlayerRole}
           champSelectActive={champSelectActive}
+          lcuStatus={lcuStatus}
+          gameflowPhase={gameflowPhase}
+          selectedChampionLocked={autoDraft?.selectedChampionLocked ?? false}
+          selectedChampionName={
+            draft.selectedChampionId === undefined
+              ? undefined
+              : championNames.get(draft.selectedChampionId)
+          }
           recommendations={recommendationsQuery.data?.primaryRecommendations ?? []}
           alternatives={recommendationsQuery.data?.alternatives ?? []}
           poolSummary={recommendationsQuery.data?.poolSummary ?? null}

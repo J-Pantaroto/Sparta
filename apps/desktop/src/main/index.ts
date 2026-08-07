@@ -204,6 +204,7 @@ function registerLcuStateHandler() {
 
 function startGameflowWatcher() {
   const client = new LcuReadOnlyClient();
+  let lastStatus: LcuReadStatus = lcuState.status;
   let lastPhase: LcuGameflowPhase | null = null;
   let lastPickOrder: number | null = null;
   let lastPlayerRole: Role | null = null;
@@ -216,7 +217,14 @@ function startGameflowWatcher() {
     }
   }
 
+  function publishStatus(status: LcuReadStatus) {
+    if (lastStatus === status) return;
+    lastStatus = status;
+    broadcast("sparta:lcu-status", status);
+  }
+
   function clearObservedState(status: LcuReadStatus, phase: LcuGameflowPhase | null = null) {
+    publishStatus(status);
     if (lastPhase !== phase) {
       lastPhase = phase;
       broadcast("sparta:gameflow-phase", phase);
@@ -246,6 +254,7 @@ function startGameflowWatcher() {
       return;
     }
     const phase = phaseResult.data;
+    publishStatus("OK");
     if (phase !== lastPhase) {
       lastPhase = phase;
       broadcast("sparta:gameflow-phase", phase);

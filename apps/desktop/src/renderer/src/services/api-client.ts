@@ -423,7 +423,8 @@ export interface DraftPersistenceInfo {
 export async function fetchDraftRecommendations(
   token: string,
   draft: DraftState,
-  session?: DraftSessionIdentity
+  session?: DraftSessionIdentity,
+  signal?: AbortSignal
 ) {
   // Proteção central: a requisição não sai sem posição. A API também recusa
   // (422 `PLAYER_ROLE_UNAVAILABLE`), mas uma API anterior a esta etapa
@@ -443,7 +444,8 @@ export async function fetchDraftRecommendations(
     headers: { Authorization: `Bearer ${token}` },
     // Sem `session` a análise roda igual e nada é gravado: a persistência
     // nunca é pré-requisito da recomendação.
-    body: JSON.stringify(session ? { draft, session } : { draft })
+    body: JSON.stringify(session ? { draft, session } : { draft }),
+    signal
   });
 
   const normalize = (recommendations: PickRecommendation[]) =>
@@ -540,7 +542,7 @@ export class PreGameAnalysisIncompatibleError extends Error {
   }
 }
 
-export async function fetchPreGameAnalysis(token: string, draft: DraftState) {
+export async function fetchPreGameAnalysis(token: string, draft: DraftState, signal?: AbortSignal) {
   // Mesma proteção dupla das recomendações: os pré-requisitos são checados
   // antes de sair a requisição, e a API os recusa de novo com 422.
   if (!draft.playerRole) throw new PlayerRoleUnavailableError();
@@ -551,7 +553,8 @@ export async function fetchPreGameAnalysis(token: string, draft: DraftState) {
     payload = await request<unknown>("/drafts/pre-game-analysis", {
       method: "POST",
       headers: { Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ draft })
+      body: JSON.stringify({ draft }),
+      signal
     });
   } catch (error) {
     if (error instanceof ApiError && error.status === 422) {
