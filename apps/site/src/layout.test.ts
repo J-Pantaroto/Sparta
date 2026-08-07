@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { RIOT_DISCLAIMER, renderFooter } from "./layout";
+import { RIOT_DISCLAIMER, renderFooter } from "./scripts/layout";
 
 /**
  * Etapa 31L.1, seção 8: o rodapé global (presente nas 9 páginas via
