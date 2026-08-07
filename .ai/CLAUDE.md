@@ -39,7 +39,9 @@ nomes distintos ao todo, nunca repetido), nunca fora de `apps/api`, que nem depe
 Champion Select, pré-game, perfil, dashboard, autenticação e onboarding não têm como ter sido
 afetados.
 
-Resultado: **`DEPENDABOT_HIGH_RESOLVED`**.
+Resultado: **`DEPENDABOT_HIGH_RESOLVED`** — confirmado direto na API do GitHub após o push
+(commit `be4b1bd`): alerta #43 em `"state": "fixed"`, `fixed_at: 2026-08-07T01:41:23Z`, **0**
+alertas abertos no repositório.
 
 ## Etapa 31G: redesign do Champion Select e pré-game
 
