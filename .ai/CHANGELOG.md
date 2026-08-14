@@ -22,7 +22,7 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
-## 2026-08-14 18:30 — Etapa 31P: resolvido Dependabot high #44 (extract-zip)
+## 2026-08-14 19:10 — Etapa 31P: resolvido Dependabot high #44 (extract-zip)
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0059-triagem-dependabot-extract-zip.md`
 
@@ -31,7 +31,11 @@ validado), transitivo via `electron` (devDependency, exposição só em `pnpm in
 `app.asar`). Sem versão corrigida publicada upstream (pacote sem release desde 2020) — corrigido
 com um patch local via `pnpm patch` (`patches/extract-zip@2.0.1.patch`) que valida o alvo do
 symlink contra o diretório de extração, mesma lógica de contenção que o pacote já usa pro
-destino da entrada. 3 testes novos provam o bloqueio do path traversal sem quebrar symlink
+destino da entrada. Uma primeira versão do teste declarou `extract-zip` como devDependency
+direta e sem querer criou um segundo alerta duplicado (#45) — corrigido resolvendo o pacote via
+`createRequire` ancorado no `electron` real, sem declarar nada novo; #45 fechou automaticamente,
+#44 foi dispensado com justificativa (`tolerable_risk`). **0 alertas abertos no repositório.**
+3 testes novos provam o bloqueio do path traversal sem quebrar symlink
 legítimo. Ver `docs/dependabot-extract-zip-2026-08.md`.
 
 ## 2026-08-14 17:20 — Etapa 31O: refino tipográfico e largura de conteúdo do site

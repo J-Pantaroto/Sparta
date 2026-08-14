@@ -59,6 +59,22 @@ desktop 138) + analyzer 1/1, todos verdes. `typecheck`/`lint`/`build` completos 
 Nenhum arquivo de `apps/`/`packages/` fora do lockfile/patch/teste novo foi tocado — confirmado
 por `git diff --stat` antes do commit.
 
+**Erro real cometido e corrigido na própria sessão**: a primeira versão do teste declarou
+`extract-zip` como `devDependency` **direta** da raiz só pra conseguir `import`. Isso criou um
+**segundo alerta Dependabot** (#45, mesmo pacote/versão, `manifest_path: "package.json"` em vez
+de `pnpm-lock.yaml`) — o oposto do pedido ("nenhum novo alerta relevante"). Corrigido num commit
+separado (`d6e7085`): a declaração direta foi removida, e o teste passou a resolver o pacote via
+`node:module` `createRequire`, subindo até o `package.json` real do `electron` (devDependency
+existente de `apps/desktop`) e criando um `require` ancorado ali — o mesmo caminho de resolução
+que o próprio `electron` usa em produção, sem declarar nada novo em manifesto nenhum do
+monorepo. Confirmado via API depois dos dois pushes: **#45 foi pro estado `fixed`
+automaticamente** (a declaração que o gerou deixou de existir), sem precisar de dispensa manual.
+
+**Estado final confirmado via `gh api repos/.../dependabot/alerts`**: `#44` → `dismissed`
+(`tolerable_risk`, comentário registrando a mitigação real); `#45` → `fixed`; **0 alertas
+abertos no repositório** (`gh api "repos/.../dependabot/alerts?state=open"` → array vazio).
+`DEPENDABOT_HIGH_RESOLVED`.
+
 ## Etapa 31O: refino tipográfico e largura de conteúdo do site
 
 Pedido explícito do usuário logo após a 31N: **não** um redesign — passe exclusivo de largura de

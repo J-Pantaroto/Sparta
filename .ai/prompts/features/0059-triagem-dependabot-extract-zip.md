@@ -50,5 +50,12 @@ Relatório técnico completo em `docs/dependabot-extract-zip-2026-08.md` (espelh
   testes no total (raiz 18, eram 15). `pnpm audit` continua reportando `extract-zip` como high
   (esperado e documentado: audit lê a versão declarada, `2.0.1`, não o conteúdo patchado — não
   existe hoje ferramenta de auditoria que entenda `pnpm.patchedDependencies` como remediação).
-- Estado final do alerta #44 no GitHub, incluindo se precisou de dispensa manual com
-  justificativa (dado que o patch não muda a versão declarada), registrado em `.ai/CLAUDE.md`.
+- **Erro cometido e corrigido na própria sessão**: a primeira versão declarou `extract-zip` como
+  `devDependency` direta da raiz só pro teste importar — isso criou um segundo alerta Dependabot
+  duplicado (#45, `manifest_path: "package.json"`). Corrigido removendo a declaração e resolvendo
+  o pacote via `createRequire` ancorado no `package.json` real do `electron` (mesmo caminho que o
+  próprio Electron usa em produção), sem declarar nada novo em manifesto nenhum.
+- **Estado final confirmado via `gh api`**: `#44` dispensado (`dismissed_reason: tolerable_risk`,
+  já que não existe versão corrigida upstream pra fazer o alerta fechar sozinho); `#45` fechado
+  automaticamente (`state: fixed`) assim que a declaração que o gerou deixou de existir; **0
+  alertas abertos** no repositório.

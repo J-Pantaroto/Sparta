@@ -195,8 +195,14 @@ repositório depois.
 O erro do `devDependency` direto (ver §"Testes" acima) criou um **segundo**
 alerta, #45, com `manifest_path: "package.json"`. Corrigido na raiz (removida
 a declaração direta, teste reescrito pra resolver via `electron`) antes do
-commit final — não foi necessário dispensar #45 manualmente, porque a
-declaração que o gerou deixou de existir.
+commit final — confirmado via API que #45 foi pro estado **`fixed`**
+automaticamente, sem dispensa manual, porque a declaração que o gerou de
+fato deixou de existir do manifesto.
+
+**Confirmado via `gh api repos/.../dependabot/alerts` depois dos dois
+pushes (commits `7e0ec0c` e `d6e7085`)**: `#44` → `dismissed`
+(`tolerable_risk`); `#45` → `fixed` (automático); **0 alertas abertos** no
+repositório.
 
 ## Não regressão
 
@@ -213,5 +219,7 @@ a confirmação estática disso.
 Vulnerabilidade real (path traversal via symlink não validado) **fechada no
 código que de fato executa**, via patch local rastreado em `patches/` e
 registrado no lockfile. Nenhuma versão corrigida existe upstream pra apontar
-em seu lugar. Ver `.ai/CLAUDE.md` pro estado exato do alerta #44 no GitHub
-depois do push, incluindo se precisou de dispensa manual.
+em seu lugar. **`DEPENDABOT_HIGH_RESOLVED`**: #44 dispensado com
+justificativa (`tolerable_risk`), #45 (o duplicado que a primeira tentativa
+introduziu por engano) corrigido pela raiz e fechado automaticamente pelo
+GitHub — **0 alertas abertos** no repositório, confirmado via API.
