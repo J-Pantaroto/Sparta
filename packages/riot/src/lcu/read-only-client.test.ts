@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   classifyLcuNetworkFailure,
+  extractChampionSelectSessionId,
   extractObservedGame,
   parseLcuLockfile
 } from "./read-only-client.js";
@@ -34,5 +35,11 @@ describe("LCU read-only resilience", () => {
     });
     expect(extractObservedGame({ gameData: { gameId: 0 } })).toBeUndefined();
     expect(extractObservedGame({ gameData: { gameId: "não-confiável" } })).toBeUndefined();
+  });
+
+  it("usa somente gameId numérico positivo como identidade da champion select", () => {
+    expect(extractChampionSelectSessionId({ gameId: 1234567890 })).toBe("1234567890");
+    expect(extractChampionSelectSessionId({ gameId: 0 })).toBeUndefined();
+    expect(extractChampionSelectSessionId({ gameId: "1234567890" })).toBeUndefined();
   });
 });

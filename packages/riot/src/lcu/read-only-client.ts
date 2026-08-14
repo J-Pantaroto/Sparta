@@ -67,11 +67,22 @@ export interface LcuChampSelectTeamMember {
 
 export interface LcuChampionSelectSnapshot {
   sessionExists: boolean;
+  /** Identidade da sessão fornecida pelo LCU quando `gameId` já está disponível. */
+  sessionId?: string;
   localPlayerCellId?: number;
   /** Array de rodadas - cada rodada e um array de acoes (pick/ban). */
   actions?: LcuChampSelectAction[][];
   myTeam?: LcuChampSelectTeamMember[];
   theirTeam?: LcuChampSelectTeamMember[];
+}
+
+export function extractChampionSelectSessionId(
+  payload: Record<string, unknown>
+): string | undefined {
+  const gameId = payload.gameId;
+  return typeof gameId === "number" && Number.isSafeInteger(gameId) && gameId > 0
+    ? String(gameId)
+    : undefined;
 }
 
 const DEFAULT_LOCKFILE_PATHS = [
@@ -265,10 +276,13 @@ export class LcuReadOnlyClient {
       "OUTSIDE_CHAMP_SELECT"
     );
     if (session.status !== "OK") return session;
+    const sessionId = extractChampionSelectSessionId(session.data);
+
     return {
       status: "OK",
       data: {
         sessionExists: true,
+        ...(sessionId ? { sessionId } : {}),
         localPlayerCellId: session.data.localPlayerCellId as number | undefined,
         actions: session.data.actions as LcuChampSelectAction[][] | undefined,
         myTeam: session.data.myTeam as LcuChampSelectTeamMember[] | undefined,

@@ -22,6 +22,16 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-08-14 20:55 — Correções bloqueantes pré-polish do Desktop
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0061-correcoes-bloqueantes-pre-polish.md`
+
+Fechados cinco bloqueios técnicos: propagação do patch local no Docker da API, preservação de
+sessão em falhas offline, isolamento de draft LCU stale, corrida entre partidas no pós-game e
+origem/navegação dos IPCs Electron. Foram adicionados 23 testes de regressão; o monorepo passou
+1.366 testes TS, analyzer, typecheck, lint, build, Docker saudável e QA Electron/CDP real sem erros.
+Email confirmation e password recovery permanecem pendentes; nenhuma feature visual foi criada.
+
 ## 2026-08-14 19:15 — Auditoria pré-final do Desktop Sparta GG
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0060-auditoria-pre-final-desktop.md`

@@ -15,7 +15,12 @@ import type {
 } from "@sparta/riot";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { navGroups, pageContext, type Page } from "./app/navigation";
-import { accessRouteForOnboarding } from "./app/session-routing";
+import { accessRouteForOnboarding, restorePersistedSession } from "./app/session-routing";
+import {
+  acceptLcuDraftObservation,
+  clearObservedLcuDraft,
+  type VersionedLcuDraft
+} from "./app/lcu-draft-lifecycle";
 import { useAsyncData } from "./hooks/use-async-data";
 import {
   fetchDraftRecommendations,
@@ -65,7 +70,7 @@ import {
 } from "./ui";
 
 type SessionStatus =
-  "checking" | "auth" | "email-verification" | "link-account" | "complete" | "ready";
+  "checking" | "offline" | "auth" | "email-verification" | "link-account" | "complete" | "ready";
 
 /**
  * Chave técnica opaca da sessão de draft. Aleatória de propósito: qualquer
@@ -121,6 +126,7 @@ function SpartaApp() {
     servedAsFallback: false
   });
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>("checking");
+  const [sessionRestoreError, setSessionRestoreError] = useState<string | null>(null);
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
   const [onboarding, setOnboarding] = useState<AccountOnboardingStatus | null>(null);
@@ -205,6 +211,29 @@ function SpartaApp() {
     }
   }
 
+  async function attemptSessionRestore(token: string) {
+    setSessionStatus("checking");
+    setSessionRestoreError(null);
+    const result = await restorePersistedSession(token, fetchSession, () =>
+      window.sparta.session.clear()
+    );
+    if (result.state === "AUTHENTICATED") {
+      setSessionToken(token);
+      applySession(result.session);
+      return;
+    }
+    if (result.state === "INVALID") {
+      setSessionToken(null);
+      setSessionStatus("auth");
+      return;
+    }
+    // O bearer continua exclusivamente em memória/safeStorage, mas o shell
+    // permanece fechado até a API confirmar a sessão.
+    setSessionToken(token);
+    setSessionRestoreError(result.message);
+    setSessionStatus("offline");
+  }
+
   // Restaura somente o bearer cifrado pelo processo main. A chave antiga do
   // localStorage e removida sem ser lida para eliminar o legado inseguro.
   useEffect(() => {
@@ -214,14 +243,7 @@ function SpartaApp() {
         setSessionStatus("auth");
         return;
       }
-      try {
-        const result = await fetchSession(storedToken);
-        setSessionToken(storedToken);
-        applySession(result);
-      } catch {
-        await window.sparta.session.clear();
-        setSessionStatus("auth");
-      }
+      await attemptSessionRestore(storedToken);
     });
   }, []);
 
@@ -390,9 +412,27 @@ function SpartaApp() {
   // Draft real (aliados, inimigos, banimentos) lido da sessao do LCU.
   // null fora do champion select - ai o preenchimento manual volta a valer.
   const [autoDraft, setAutoDraft] = useState<LcuDraftSnapshot | null>(null);
+  const lcuDraftObservationRef = useRef<VersionedLcuDraft>({ revision: 0, draft: null });
+  const lcuDraftAppliedRef = useRef(false);
   useEffect(() => {
     if (sessionStatus !== "ready" || !window.sparta?.onDraftSnapshot) return;
-    const unsubscribe = window.sparta.onDraftSnapshot(setAutoDraft);
+    const unsubscribe = window.sparta.onDraftSnapshot((nextDraft, revision) => {
+      const accepted = acceptLcuDraftObservation(lcuDraftObservationRef.current, {
+        revision,
+        draft: nextDraft
+      });
+      if (accepted === lcuDraftObservationRef.current) return;
+      lcuDraftObservationRef.current = accepted;
+      setAutoDraft(accepted.draft);
+      if (accepted.draft) {
+        lcuDraftAppliedRef.current = true;
+      } else if (lcuDraftAppliedRef.current) {
+        lcuDraftAppliedRef.current = false;
+        setAutoPickOrder(null);
+        setAutoPlayerRole(null);
+        setDraft(clearObservedLcuDraft);
+      }
+    });
     return unsubscribe;
   }, [sessionStatus]);
 
@@ -414,7 +454,15 @@ function SpartaApp() {
       }
       if (state.pickOrder !== null) setAutoPickOrder(state.pickOrder);
       if (state.playerRole !== null) setAutoPlayerRole(state.playerRole);
-      if (state.draft !== null) setAutoDraft(state.draft);
+      const acceptedDraft = acceptLcuDraftObservation(lcuDraftObservationRef.current, {
+        revision: state.draftRevision,
+        draft: state.draft
+      });
+      lcuDraftObservationRef.current = acceptedDraft;
+      if (acceptedDraft.draft !== null) {
+        lcuDraftAppliedRef.current = true;
+        setAutoDraft(acceptedDraft.draft);
+      }
       if (state.observedGame !== null) setObservedGame(state.observedGame);
     });
     return () => {
@@ -480,13 +528,7 @@ function SpartaApp() {
   async function handleAuthenticated(token: string) {
     await window.sparta.session.set(token);
     setSessionToken(token);
-    try {
-      applySession(await fetchSession(token));
-    } catch {
-      await window.sparta.session.clear();
-      setSessionToken(null);
-      setSessionStatus("auth");
-    }
+    await attemptSessionRestore(token);
   }
 
   async function refreshOnboarding(showCompletion = false) {
@@ -542,6 +584,27 @@ function SpartaApp() {
           setSessionStatus("email-verification");
         }}
       />
+    );
+  }
+
+  if (sessionStatus === "offline" && sessionToken) {
+    return (
+      <AuthLayout
+        splashUrl={splashUrl}
+        title="API indisponível"
+        subtitle="Sua sessão foi preservada, mas precisa ser confirmada antes de liberar o Sparta."
+      >
+        <p style={{ color: "var(--color-text-secondary)", margin: "0 0 var(--space-5)" }}>
+          {sessionRestoreError ?? "Não foi possível confirmar sua sessão agora."}
+        </p>
+        <button
+          type="button"
+          className="sp-button sp-button--primary"
+          onClick={() => void attemptSessionRestore(sessionToken)}
+        >
+          Tentar novamente
+        </button>
+      </AuthLayout>
     );
   }
 

@@ -22,6 +22,7 @@ RUN corepack enable
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY patches ./patches
 COPY packages/core/package.json ./packages/core/
 COPY packages/riot/package.json ./packages/riot/
 COPY apps/api/package.json ./apps/api/
@@ -43,6 +44,7 @@ COPY --from=deps /app/packages/core/node_modules ./packages/core/node_modules
 COPY --from=deps /app/packages/riot/node_modules ./packages/riot/node_modules
 COPY --from=deps /app/apps/api/node_modules ./apps/api/node_modules
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json tsconfig.node.json ./
+COPY patches ./patches
 COPY packages ./packages
 COPY apps/api ./apps/api
 

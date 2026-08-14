@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain, safeStorage, shell } from "electron";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { basename, join } from "node:path";
-import { URL } from "node:url";
+import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import {
   deriveDraftSnapshot,
   derivePickOrder,
@@ -16,6 +16,14 @@ import {
   type LcuReadStatus
 } from "@sparta/riot";
 import type { Role } from "@sparta/core";
+import {
+  allowedRiotAuthorizationUrl,
+  allowedSkinDownload,
+  assertTrustedIpcSender,
+  isExpectedRendererUrl,
+  isValidSessionToken,
+  windowOpenPolicy
+} from "./security-policy";
 
 /**
  * O Electron deriva `app.getName()` do campo `name` do `package.json`
@@ -34,6 +42,13 @@ app.setName("Sparta");
 
 const GAMEFLOW_POLL_INTERVAL_MS = 2500;
 
+function expectedRendererUrl(): string {
+  return (
+    process.env.ELECTRON_RENDERER_URL ??
+    pathToFileURL(join(__dirname, "../renderer/index.html")).toString()
+  );
+}
+
 /**
  * O bearer de sessao nunca e persistido pelo renderer. No Windows, o
  * `safeStorage` usa DPAPI e vincula o ciphertext ao usuario do sistema. Se a
@@ -42,7 +57,8 @@ const GAMEFLOW_POLL_INTERVAL_MS = 2500;
  */
 function registerProtectedSessionStore() {
   const sessionPath = join(app.getPath("userData"), "session-token.bin");
-  ipcMain.handle("sparta:session:get", async () => {
+  ipcMain.handle("sparta:session:get", async (event) => {
+    assertTrustedIpcSender(event, expectedRendererUrl());
     if (!safeStorage.isEncryptionAvailable()) return null;
     try {
       return safeStorage.decryptString(await readFile(sessionPath));
@@ -50,23 +66,26 @@ function registerProtectedSessionStore() {
       return null;
     }
   });
-  ipcMain.handle("sparta:session:set", async (_event, token: string) => {
-    if (!safeStorage.isEncryptionAvailable() || typeof token !== "string" || token.length > 8_192) {
+  ipcMain.handle("sparta:session:set", async (event, token: unknown) => {
+    assertTrustedIpcSender(event, expectedRendererUrl());
+    if (!safeStorage.isEncryptionAvailable() || !isValidSessionToken(token)) {
       return false;
     }
     await mkdir(app.getPath("userData"), { recursive: true });
     await writeFile(sessionPath, safeStorage.encryptString(token));
     return true;
   });
-  ipcMain.handle("sparta:session:clear", async () => {
+  ipcMain.handle("sparta:session:clear", async (event) => {
+    assertTrustedIpcSender(event, expectedRendererUrl());
     await rm(sessionPath, { force: true });
   });
 }
 
 function registerRiotAuthorizationHandler() {
-  ipcMain.handle("sparta:riot-auth:open", async (_event, target: string) => {
-    const url = new URL(target);
-    if (url.protocol !== "https:" || url.hostname !== "auth.riotgames.com") {
+  ipcMain.handle("sparta:riot-auth:open", async (event, target: unknown) => {
+    assertTrustedIpcSender(event, expectedRendererUrl());
+    const url = allowedRiotAuthorizationUrl(target);
+    if (!url) {
       throw new Error("Destino de autorizacao Riot nao permitido.");
     }
     await shell.openExternal(url.toString());
@@ -88,17 +107,17 @@ function registerRiotAuthorizationHandler() {
  * origem, e o arquivo em disco continua sendo a copia offline.
  */
 function registerSkinDownloadHandler() {
-  ipcMain.handle("sparta:download-skin", async (_event, url: string, fileName: string) => {
-    const parsedUrl = new URL(url);
-    const allowedHosts = new Set(["ddragon.leagueoflegends.com", "raw.communitydragon.org"]);
-    if (parsedUrl.protocol !== "https:" || !allowedHosts.has(parsedUrl.hostname)) {
+  ipcMain.handle("sparta:download-skin", async (event, url: unknown, fileName: unknown) => {
+    assertTrustedIpcSender(event, expectedRendererUrl());
+    const allowed = allowedSkinDownload(url, fileName);
+    if (!allowed) {
       throw new Error("Fonte de imagem não permitida.");
     }
     // A CDN da Data Dragon (Akamai) responde 403 pra requisicoes sem
     // User-Agent - o fetch do processo main (Node/Electron) nao manda um por
     // padrao, entao o download quebrava (bug real reportado). Um UA de
     // navegador resolve.
-    const response = await fetchWithPolicy(url, {
+    const response = await fetchWithPolicy(allowed.url.toString(), {
       integration: "REMOTE_ASSET",
       timeoutMs: HTTP_TIMEOUTS.remoteAssetMs,
       throwOnHttpError: true,
@@ -112,16 +131,16 @@ function registerSkinDownloadHandler() {
       throw new Error("A fonte externa não devolveu uma imagem válida.");
     const buffer = Buffer.from(await response.arrayBuffer());
 
-    const safeName = basename(fileName);
     const skinsDir = join(app.getPath("userData"), "skins");
     await mkdir(skinsDir, { recursive: true });
-    await writeFile(join(skinsDir, safeName), buffer);
+    await writeFile(join(skinsDir, allowed.safeName), buffer);
 
     return `data:${contentType};base64,${buffer.toString("base64")}`;
   });
 }
 
 function createWindow() {
+  const rendererUrl = expectedRendererUrl();
   const window = new BrowserWindow({
     width: 1280,
     height: 820,
@@ -148,17 +167,13 @@ function createWindow() {
   // `BrowserWindow` nova com as preferências padrão, fora da CSP desta
   // janela. Negar por padrão é o comportamento correto, e um link legítimo
   // futuro deve passar por `shell.openExternal` com destino conferido.
-  window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  window.webContents.setWindowOpenHandler(windowOpenPolicy);
 
   // A janela do app não navega para fora dela mesma. Sem esta guarda, uma
   // navegação induzida no renderer substituiria a aplicação inteira por
   // conteúdo externo, mantendo o preload e o bridge no lugar.
   window.webContents.on("will-navigate", (event, targetUrl) => {
-    const allowed = process.env.ELECTRON_RENDERER_URL;
-    const isDevServer = allowed !== undefined && targetUrl.startsWith(allowed);
-    if (!isDevServer && !targetUrl.startsWith("file://")) {
-      event.preventDefault();
-    }
+    if (!isExpectedRendererUrl(targetUrl, rendererUrl)) event.preventDefault();
   });
 
   if (process.env.ELECTRON_RENDERER_URL) {
@@ -186,6 +201,7 @@ interface LcuState {
   pickOrder: number | null;
   playerRole: Role | null;
   draft: LcuDraftSnapshot | null;
+  draftRevision: number;
   observedGame: LcuObservedGame | null;
 }
 
@@ -195,11 +211,15 @@ let lcuState: LcuState = {
   pickOrder: null,
   playerRole: null,
   draft: null,
+  draftRevision: 0,
   observedGame: null
 };
 
 function registerLcuStateHandler() {
-  ipcMain.handle("sparta:lcu-state", () => lcuState);
+  ipcMain.handle("sparta:lcu-state", (event) => {
+    assertTrustedIpcSender(event, expectedRendererUrl());
+    return lcuState;
+  });
 }
 
 function startGameflowWatcher() {
@@ -209,11 +229,13 @@ function startGameflowWatcher() {
   let lastPickOrder: number | null = null;
   let lastPlayerRole: Role | null = null;
   let lastDraft: LcuDraftSnapshot | undefined;
+  let draftRevision = lcuState.draftRevision;
+  let lastLcuSessionIdentity: string | undefined;
   let lastObservedGame: LcuObservedGame | undefined;
 
-  function broadcast(channel: string, payload: unknown) {
+  function broadcast(channel: string, ...payload: unknown[]) {
     for (const window of BrowserWindow.getAllWindows()) {
-      window.webContents.send(channel, payload);
+      window.webContents.send(channel, ...payload);
     }
   }
 
@@ -231,11 +253,15 @@ function startGameflowWatcher() {
     }
     if (lastPickOrder !== null) broadcast("sparta:pick-order", null);
     if (lastPlayerRole !== null) broadcast("sparta:player-role", null);
-    if (lastDraft !== undefined) broadcast("sparta:draft-snapshot", null);
+    if (lastDraft !== undefined || lcuState.draft !== null) {
+      draftRevision += 1;
+      broadcast("sparta:draft-snapshot", null, draftRevision);
+    }
     if (lastObservedGame !== undefined) broadcast("sparta:observed-game", null);
     lastPickOrder = null;
     lastPlayerRole = null;
     lastDraft = undefined;
+    lastLcuSessionIdentity = undefined;
     lastObservedGame = undefined;
     lcuState = {
       status,
@@ -243,8 +269,16 @@ function startGameflowWatcher() {
       pickOrder: null,
       playerRole: null,
       draft: null,
+      draftRevision,
       observedGame: null
     };
+  }
+
+  function beginDraftObservation() {
+    draftRevision += 1;
+    lastDraft = undefined;
+    broadcast("sparta:draft-snapshot", null, draftRevision);
+    lcuState = { ...lcuState, draft: null, draftRevision };
   }
 
   async function poll() {
@@ -256,6 +290,7 @@ function startGameflowWatcher() {
     const phase = phaseResult.data;
     publishStatus("OK");
     if (phase !== lastPhase) {
+      if (phase === "ChampSelect") beginDraftObservation();
       lastPhase = phase;
       broadcast("sparta:gameflow-phase", phase);
     }
@@ -281,17 +316,22 @@ function startGameflowWatcher() {
       }
       if (lastPickOrder !== null) broadcast("sparta:pick-order", null);
       if (lastPlayerRole !== null) broadcast("sparta:player-role", null);
-      if (lastDraft !== undefined) broadcast("sparta:draft-snapshot", null);
+      if (lastDraft !== undefined || lcuState.draft !== null) {
+        draftRevision += 1;
+        broadcast("sparta:draft-snapshot", null, draftRevision);
+      }
       lastPickOrder = null;
       lastPlayerRole = null;
       lastDraft = undefined;
+      lastLcuSessionIdentity = undefined;
       lcuState = {
         ...lcuState,
         status: "OUTSIDE_CHAMP_SELECT",
         phase,
         pickOrder: null,
         playerRole: null,
-        draft: null
+        draft: null,
+        draftRevision
       };
       return;
     }
@@ -302,6 +342,14 @@ function startGameflowWatcher() {
       return;
     }
     const snapshot = sessionResult.data;
+    if (
+      snapshot.sessionId !== undefined &&
+      lastLcuSessionIdentity !== undefined &&
+      snapshot.sessionId !== lastLcuSessionIdentity
+    ) {
+      beginDraftObservation();
+    }
+    lastLcuSessionIdentity = snapshot.sessionId ?? lastLcuSessionIdentity;
     const pickOrder = derivePickOrder(snapshot);
     if (pickOrder !== lastPickOrder) {
       lastPickOrder = pickOrder ?? null;
@@ -316,8 +364,9 @@ function startGameflowWatcher() {
 
     const draft = deriveDraftSnapshot(snapshot);
     if (!isSameDraftSnapshot(draft, lastDraft)) {
+      draftRevision += 1;
       lastDraft = draft;
-      broadcast("sparta:draft-snapshot", draft ?? null);
+      broadcast("sparta:draft-snapshot", draft ?? null, draftRevision);
     }
 
     lcuState = {
@@ -326,6 +375,7 @@ function startGameflowWatcher() {
       pickOrder: lastPickOrder,
       playerRole: lastPlayerRole,
       draft: lastDraft ?? null,
+      draftRevision,
       observedGame: lastObservedGame ?? null
     };
   }

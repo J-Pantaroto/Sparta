@@ -584,17 +584,19 @@ export async function fetchPreGameAnalysis(token: string, draft: DraftState, sig
   return payload as PreGameAnalysis;
 }
 
-export function analyzePostgame(token: string, matchId: string) {
+export function analyzePostgame(token: string, matchId: string, signal?: AbortSignal) {
   return request<PostGameAnalysis>("/postgame/analyze", {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ matchId })
+    body: JSON.stringify({ matchId }),
+    signal
   });
 }
 
-export function fetchPostgameReport(token: string, matchId: string) {
+export function fetchPostgameReport(token: string, matchId: string, signal?: AbortSignal) {
   return request<PostGameAnalysis>(`/postgame/${encodeURIComponent(matchId)}`, {
-    headers: { Authorization: `Bearer ${token}` }
+    headers: { Authorization: `Bearer ${token}` },
+    signal
   });
 }
 
@@ -613,33 +615,39 @@ export interface DraftComparisonResponse {
   reason?: string;
 }
 
-export function fetchDraftComparison(token: string, matchId: string) {
+export function fetchDraftComparison(token: string, matchId: string, signal?: AbortSignal) {
   return request<DraftComparisonResponse>(
     `/matches/${encodeURIComponent(matchId)}/draft-comparison`,
-    { headers: { Authorization: `Bearer ${token}` } }
+    { headers: { Authorization: `Bearer ${token}` }, signal }
   );
 }
 
-export function generateDraftComparison(token: string, sessionId: string) {
+export function generateDraftComparison(token: string, sessionId: string, signal?: AbortSignal) {
   return request<{ created: boolean; report: DraftPostGameComparison }>(
     `/draft-sessions/${encodeURIComponent(sessionId)}/post-game-comparison/generate`,
     {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}` }
+      headers: { Authorization: `Bearer ${token}` },
+      signal
     }
   );
 }
 
-export function fetchMatchObservation(token: string, matchId: string) {
+export function fetchMatchObservation(token: string, matchId: string, signal?: AbortSignal) {
   return request<MatchLoadoutObservation>(`/matches/${encodeURIComponent(matchId)}/observation`, {
-    headers: { Authorization: `Bearer ${token}` }
+    headers: { Authorization: `Bearer ${token}` },
+    signal
   });
 }
 
-export function fetchMatchParticipants(token: string, matchId: string) {
-  return request<MatchParticipantsOverview>(`/matches/${encodeURIComponent(matchId)}/participants`, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
+export function fetchMatchParticipants(token: string, matchId: string, signal?: AbortSignal) {
+  return request<MatchParticipantsOverview>(
+    `/matches/${encodeURIComponent(matchId)}/participants`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+      signal
+    }
+  );
 }
 
 export interface MatchHistoryFilters {
@@ -675,10 +683,16 @@ export function fetchMatchHistory(token: string, puuid: string, filters: MatchHi
   );
 }
 
-export function fetchChampionRoleEvidence(token: string, puuid: string, championId: number, role: Role) {
+export function fetchChampionRoleEvidence(
+  token: string,
+  puuid: string,
+  championId: number,
+  role: Role,
+  signal?: AbortSignal
+) {
   return request<ChampionRoleEvidenceResponse>(
     `/players/${encodeURIComponent(puuid)}/champions/${championId}/role-evidence?role=${role}`,
-    { headers: { Authorization: `Bearer ${token}` } }
+    { headers: { Authorization: `Bearer ${token}` }, signal }
   );
 }
 

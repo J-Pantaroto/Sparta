@@ -389,8 +389,8 @@ export function ChampionSelectScreen({
 
       {champSelectActive && lcuStatus !== "OK" && (
         <SignalChip tone="negative" title={lcuStatus}>
-          A leitura local do League esta instavel ({lcuStatus}). O ultimo draft conhecido e
-          mantido, sem completar dados ausentes.
+          A leitura local do League está instável ({lcuStatus}). Os dados automáticos da sessão
+          foram descartados e não participam das recomendações até uma nova leitura confirmada.
         </SignalChip>
       )}
 

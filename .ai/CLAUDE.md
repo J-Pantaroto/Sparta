@@ -1,5 +1,25 @@
 # Sparta - Contexto para Continuidade
 
+## Correções bloqueantes pré-polish: confiabilidade e segurança
+
+Etapa 0061 concluída em 2026-08-14 sobre
+`baa12c2c91cb55ba2f6784b31cb82d1c859b8bf3`. Relatório em
+`docs/pre-polish-blocking-fixes.md` e espelho em `.ai/specs/pre-polish-blocking-fixes.md`.
+
+Cinco bloqueios fechados: `Dockerfile.api` copia `patches/` antes dos installs congelados apenas nos
+estágios `deps`/`build`; restauração remove sessão somente após 401 autoritativo e preserva
+`safeStorage` em offline/timeout/network/5xx; LCU usa `gameId` + `draftRevision` monotônica e limpa
+todos os campos observados ao invalidar/trocar sessão; pós-game usa coordenador latest-only com um
+`AbortSignal` comum às cinco fontes; todos os IPCs privilegiados validam frame principal, renderer
+URL exata e payload, com navegação/window fail-closed.
+
+Gates: install frozen, version/Prisma/typecheck/lint/build, **1.366 testes TS**, analyzer 1/1,
+Docker API build/health e QA Electron real. A QA cobriu offline/retry, duas sessões LCU separadas por
+desconexão, troca rápida de partida, Configurações, navegação externa e logout; zero erro de runtime
+ou HTTP inesperado. Instrumentação/conta/certificado efêmeros removidos. Confirmação de e-mail,
+provider e recuperação de senha continuam pendentes, e o Desktop não entra automaticamente no
+polish visual.
+
 ## Auditoria pré-final do Desktop: bloqueios antes do polish visual
 
 Auditoria diagnóstica concluída em 2026-08-14 sobre a `main`

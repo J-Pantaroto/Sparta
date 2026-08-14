@@ -83,12 +83,14 @@ contextBridge.exposeInMainWorld("sparta", {
     pickOrder: number | null;
     playerRole: Role | null;
     draft: LcuDraftSnapshot | null;
+    draftRevision: number;
     observedGame: LcuObservedGame | null;
   }> {
     return ipcRenderer.invoke("sparta:lcu-state");
   },
-  onDraftSnapshot(callback: (draft: LcuDraftSnapshot | null) => void) {
-    const listener = (_event: unknown, draft: LcuDraftSnapshot | null) => callback(draft);
+  onDraftSnapshot(callback: (draft: LcuDraftSnapshot | null, revision: number) => void) {
+    const listener = (_event: unknown, draft: LcuDraftSnapshot | null, revision: number) =>
+      callback(draft, revision);
     ipcRenderer.on("sparta:draft-snapshot", listener);
     return () => ipcRenderer.removeListener("sparta:draft-snapshot", listener);
   },

@@ -12,8 +12,9 @@ import {
   type Role
 } from "@sparta/core";
 import { AlertTriangle, ListChecks, RefreshCw, UserPlus, Users } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { roleLabels, severityLabels } from "../app/labels";
+import { LatestRequestCoordinator } from "../app/latest-request";
 import { useAsyncData } from "../hooks/use-async-data";
 import {
   analyzePostgame,
@@ -93,11 +94,15 @@ export function PostGameScreen({
   const [selectedMatch, setSelectedMatch] = useState<ReportMatchSummary | null>(null);
   const [participants, setParticipants] = useState<MatchParticipantSummary[] | null>(null);
   const [participantsError, setParticipantsError] = useState<string | null>(null);
+  const selectionRequests = useRef(new LatestRequestCoordinator());
+
+  useEffect(() => () => selectionRequests.current.cancel(), []);
 
   // Só pro deep link vindo do Dashboard (initialMatchId) - a lista real de
   // navegação/filtro é o MatchHistoryList abaixo, que busca sob demanda.
   const matches = useAsyncData<{ puuid: string; matches: RecentChampionMatch[] }>(
-    () => (account && sessionToken ? fetchRecentMatches(sessionToken, account.puuid, 10) : undefined),
+    () =>
+      account && sessionToken ? fetchRecentMatches(sessionToken, account.puuid, 10) : undefined,
     [account?.puuid, sessionToken]
   );
   const catalog = useAsyncData<DataDragonChampionSummary[]>(
@@ -114,6 +119,7 @@ export function PostGameScreen({
   async function openMatch(match: ReportMatchSummary) {
     if (!sessionToken) return;
     const matchId = match.matchId;
+    const request = selectionRequests.current.begin(matchId);
     setSelectedMatchId(matchId);
     setSelectedMatch(match);
     setObservation(null);
@@ -122,88 +128,123 @@ export function PostGameScreen({
     setDraftComparisonLoading(true);
     setParticipants(null);
     setParticipantsError(null);
-    void fetchMatchObservation(sessionToken, matchId)
-      .then(setObservation)
-      .catch(() => setObservation(null));
-    void fetchMatchParticipants(sessionToken, matchId)
-      .then((overview) => setParticipants(overview.participants))
+    void fetchMatchObservation(sessionToken, matchId, request.signal)
+      .then((value) => request.commit(() => setObservation(value)))
+      .catch(() => request.commit(() => setObservation(null)));
+    void fetchMatchParticipants(sessionToken, matchId, request.signal)
+      .then((overview) => request.commit(() => setParticipants(overview.participants)))
       .catch((error) =>
-        setParticipantsError(
-          error instanceof Error ? error.message : "Os 10 participantes não puderam ser carregados."
-        )
-      );
-    void fetchChampionRoleEvidence(sessionToken, account.puuid, match.championId, match.role)
-      .then(setRoleEvidence)
-      .catch(() => setRoleEvidence(null));
-    void fetchDraftComparison(sessionToken, matchId)
-      .then(async (response) => {
-        if (response.state === "NOT_GENERATED" && response.draftSessionId) {
-          const generated = await generateDraftComparison(sessionToken, response.draftSessionId);
-          setDraftComparison({
-            state: !generated.report.coverageDimensions.snapshotAvailable
-              ? "SNAPSHOT_MISSING"
-              : !generated.report.coverageDimensions.timelineAvailable
-                ? "TIMELINE_UNAVAILABLE"
-                : generated.report.status === "AVAILABLE"
-                  ? "AVAILABLE"
-                  : "PARTIAL",
-            draftSessionId: response.draftSessionId,
-            report: generated.report
-          });
-          return;
-        }
-        setDraftComparison(response);
-      })
-      .catch((error) =>
-        setDraftComparison({
-          state: "NOT_GENERATED",
-          report: null,
-          reason:
+        request.commit(() =>
+          setParticipantsError(
             error instanceof Error
               ? error.message
-              : "A comparação com o draft não pôde ser carregada."
-        })
+              : "Os 10 participantes não puderam ser carregados."
+          )
+        )
+      );
+    void fetchChampionRoleEvidence(
+      sessionToken,
+      account.puuid,
+      match.championId,
+      match.role,
+      request.signal
+    )
+      .then((value) => request.commit(() => setRoleEvidence(value)))
+      .catch(() => request.commit(() => setRoleEvidence(null)));
+    void fetchDraftComparison(sessionToken, matchId, request.signal)
+      .then(async (response) => {
+        if (response.state === "NOT_GENERATED" && response.draftSessionId) {
+          const generated = await generateDraftComparison(
+            sessionToken,
+            response.draftSessionId,
+            request.signal
+          );
+          request.commit(() =>
+            setDraftComparison({
+              state: !generated.report.coverageDimensions.snapshotAvailable
+                ? "SNAPSHOT_MISSING"
+                : !generated.report.coverageDimensions.timelineAvailable
+                  ? "TIMELINE_UNAVAILABLE"
+                  : generated.report.status === "AVAILABLE"
+                    ? "AVAILABLE"
+                    : "PARTIAL",
+              draftSessionId: response.draftSessionId,
+              report: generated.report
+            })
+          );
+          return;
+        }
+        request.commit(() => setDraftComparison(response));
+      })
+      .catch((error) =>
+        request.commit(() =>
+          setDraftComparison({
+            state: "NOT_GENERATED",
+            report: null,
+            reason:
+              error instanceof Error
+                ? error.message
+                : "A comparação com o draft não pôde ser carregada."
+          })
+        )
       )
-      .finally(() => setDraftComparisonLoading(false));
+      .finally(() => request.commit(() => setDraftComparisonLoading(false)));
     setReportStatus("loading");
     setReportError(null);
     try {
-      setReport(await fetchPostgameReport(sessionToken, matchId));
-      setReportStatus("idle");
+      const loadedReport = await fetchPostgameReport(sessionToken, matchId, request.signal);
+      request.commit(() => {
+        setReport(loadedReport);
+        setReportStatus("idle");
+      });
     } catch (error) {
       if (error instanceof ApiError && error.status === 404) {
         try {
-          setReport(await analyzePostgame(sessionToken, matchId));
-          setReportStatus("idle");
+          const analyzedReport = await analyzePostgame(sessionToken, matchId, request.signal);
+          request.commit(() => {
+            setReport(analyzedReport);
+            setReportStatus("idle");
+          });
         } catch (analyzeError) {
-          setReportError(
-            analyzeError instanceof Error
-              ? analyzeError.message
-              : "Não foi possível analisar a partida."
-          );
-          setReportStatus("error");
+          request.commit(() => {
+            setReportError(
+              analyzeError instanceof Error
+                ? analyzeError.message
+                : "Não foi possível analisar a partida."
+            );
+            setReportStatus("error");
+          });
         }
       } else {
-        setReportError(
-          error instanceof Error ? error.message : "Não foi possível carregar o relatório."
-        );
-        setReportStatus("error");
+        request.commit(() => {
+          setReportError(
+            error instanceof Error ? error.message : "Não foi possível carregar o relatório."
+          );
+          setReportStatus("error");
+        });
       }
     }
   }
 
   async function reanalyze() {
     if (!sessionToken || !selectedMatchId) return;
+    const request = selectionRequests.current.current(selectedMatchId);
+    if (!request) return;
     setReportStatus("loading");
     setReportError(null);
     try {
-      setReport(await analyzePostgame(sessionToken, selectedMatchId));
-      setReportStatus("idle");
+      const analyzedReport = await analyzePostgame(sessionToken, selectedMatchId, request.signal);
+      request.commit(() => {
+        setReport(analyzedReport);
+        setReportStatus("idle");
+      });
     } catch (error) {
-      setReportError(
-        error instanceof Error ? error.message : "Não foi possível reanalisar a partida."
-      );
-      setReportStatus("error");
+      request.commit(() => {
+        setReportError(
+          error instanceof Error ? error.message : "Não foi possível reanalisar a partida."
+        );
+        setReportStatus("error");
+      });
     }
   }
 
@@ -282,7 +323,11 @@ export function PostGameScreen({
               inline
               description={reportError ?? undefined}
               actions={
-                <Button variant="secondary" icon={<RefreshCw size={14} />} onClick={() => void reanalyze()}>
+                <Button
+                  variant="secondary"
+                  icon={<RefreshCw size={14} />}
+                  onClick={() => void reanalyze()}
+                >
                   Tentar de novo
                 </Button>
               }
@@ -437,7 +482,9 @@ function MatchReport({
 
       <MatchTimelineCard metrics={report.metrics} />
 
-      {recentHistoryComparison && <RecentHistoryComparisonCard comparison={recentHistoryComparison} />}
+      {recentHistoryComparison && (
+        <RecentHistoryComparisonCard comparison={recentHistoryComparison} />
+      )}
 
       <MatchParticipantsCard
         participants={participants}
@@ -540,7 +587,10 @@ const RECENT_HISTORY_METRIC_LABELS: Record<MatchVsRecentHistoryMetricKey, string
   objectiveParticipation: "Participação em objetivos"
 };
 
-function formatRecentHistoryValue(metric: MatchVsRecentHistoryMetricKey, value: number | null): string {
+function formatRecentHistoryValue(
+  metric: MatchVsRecentHistoryMetricKey,
+  value: number | null
+): string {
   if (value === null) return "Indisponível";
   if (metric === "objectiveParticipation") return `${Math.round(value * 100)}%`;
   if (metric === "kda") return value.toFixed(2);
@@ -624,17 +674,13 @@ export function MatchTimelineCard({ metrics }: { metrics: MatchPerformanceMetric
         {metrics.deathsBefore10 !== undefined && (
           <div className="sp-timeline__fact">
             <span className="sp-timeline__mark">0–10min</span>
-            <span>
-              {metrics.deathsBefore10} morte(s) registrada(s) antes dos 10 minutos.
-            </span>
+            <span>{metrics.deathsBefore10} morte(s) registrada(s) antes dos 10 minutos.</span>
           </div>
         )}
         {metrics.deathsBefore15 !== undefined && (
           <div className="sp-timeline__fact">
             <span className="sp-timeline__mark">0–15min</span>
-            <span>
-              {metrics.deathsBefore15} morte(s) registrada(s) antes dos 15 minutos.
-            </span>
+            <span>{metrics.deathsBefore15} morte(s) registrada(s) antes dos 15 minutos.</span>
           </div>
         )}
         {metrics.goldDiffAt15 !== undefined && (
@@ -697,9 +743,9 @@ export function MatchParticipantsCard({
     );
   }
 
-  const teamIds = Array.from(new Set(participants.map((p) => p.teamId).filter((id): id is number => id !== undefined))).sort(
-    (a, b) => a - b
-  );
+  const teamIds = Array.from(
+    new Set(participants.map((p) => p.teamId).filter((id): id is number => id !== undefined))
+  ).sort((a, b) => a - b);
   const untracked = participants.filter((p) => p.teamId === undefined);
 
   return (

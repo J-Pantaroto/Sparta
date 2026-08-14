@@ -27,7 +27,7 @@ export default defineConfig({
     // pro seguinte, e uma asserção de ausência podia passar (ou falhar) por
     // causa do render anterior - achado ao escrever os testes da Etapa 4.
     globals: true,
-    include: ["src/renderer/**/*.test.{ts,tsx}"],
+    include: ["src/{main,renderer}/**/*.test.{ts,tsx}"],
     css: true
   }
 });
