@@ -18,12 +18,31 @@
  * extração, e confirma que `extract-zip` agora recusa. Também confirma que
  * um symlink legítimo (alvo dentro do diretório) continua funcionando —
  * senão o patch teria corrigido a vulnerabilidade quebrando o uso normal.
+ *
+ * `extract-zip` não é declarado como dependência em lugar nenhum do
+ * monorepo (uma tentativa anterior de declará-lo direto na raiz só pra este
+ * teste importar criou um SEGUNDO alerta Dependabot duplicado, com
+ * `manifest_path` apontando pro `package.json` em vez do lockfile — revertido).
+ * Em vez disso, o teste resolve o pacote exatamente pelo mesmo caminho que
+ * o `electron` (devDependency real de `apps/desktop`) usa em produção: sobe
+ * até o `package.json` do `electron` e cria um `require` ancorado ali, que
+ * enxerga o `node_modules` próprio do `electron` — onde `extract-zip`
+ * patchado de fato mora.
  */
-import extractZip from "extract-zip";
 import { mkdtemp, readdir, readlink, rm, writeFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
+
+const desktopPackageJson = join(dirname(fileURLToPath(import.meta.url)), "../apps/desktop/package.json");
+const desktopRequire = createRequire(desktopPackageJson);
+const electronRequire = createRequire(desktopRequire.resolve("electron/package.json"));
+const extractZip = electronRequire("extract-zip") as (
+  zipPath: string,
+  opts: { dir: string }
+) => Promise<void>;
 
 const temporarios: string[] = [];
 

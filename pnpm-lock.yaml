@@ -42,9 +42,6 @@ importers:
       eslint-config-prettier:
         specifier: ^10.1.5
         version: 10.1.8(eslint@9.39.4(jiti@2.7.0))
-      extract-zip:
-        specifier: 2.0.1
-        version: 2.0.1(patch_hash=cb9c0d8484a46e6c9752b9087fc801dd0c750f75e15d94d668fd5d2c19dfe712)
       prettier:
         specifier: ^3.6.2
         version: 3.9.4

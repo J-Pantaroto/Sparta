@@ -130,9 +130,26 @@ tabela) com uma única entrada symlink:
 3. **alvo relativo legítimo, dentro do diretório de extração** → continua
    funcionando normalmente (o patch não quebra o uso real do recurso).
 
-`extract-zip` entrou como `devDependency` explícita da raiz (`package.json`,
-versão exata `2.0.1`, mesma travada pelo patch) só pra esse teste conseguir
-`import`. Não é usada por nenhum código de produto.
+**Erro cometido e corrigido no caminho**: a primeira versão declarou
+`extract-zip` como `devDependency` direta da raiz só pra esse teste
+conseguir `import extract-zip from "extract-zip"`. Isso criou um **segundo
+alerta Dependabot duplicado** (#45) pro mesmo pacote/versão, só que com
+`manifest_path: "package.json"` e `relationship: "direct"` em vez de
+`pnpm-lock.yaml`/`transitive` — o GitHub passou a rastrear a mesma
+vulnerabilidade sob dois números por causa da nova declaração direta.
+Corrigido removendo a `devDependency` e trocando o `import` estático por
+resolução manual via `node:module` `createRequire`, subindo até o
+`package.json` real do `electron` (`apps/desktop`'s devDependency) e criando
+um `require` ancorado ali — o mesmo caminho de resolução que o próprio
+`electron` usa em produção pra achar seu `extract-zip` nested, sem declarar
+nada novo em lugar nenhum do monorepo:
+
+```ts
+const desktopPackageJson = join(dirname(fileURLToPath(import.meta.url)), "../apps/desktop/package.json");
+const desktopRequire = createRequire(desktopPackageJson);
+const electronRequire = createRequire(desktopRequire.resolve("electron/package.json"));
+const extractZip = electronRequire("extract-zip");
+```
 
 Validado:
 
@@ -159,9 +176,27 @@ que o conteúdo real foi alterado, `<= 2.0.1` continua batendo.
 Isso é esperado e não é uma limitação da correção: é a natureza de corrigir
 uma dependência sem release upstream disponível. O risco real (o código que
 de fato executa na máquina) está fechado; o que pode continuar sinalizado é
-só a leitura automatizada da versão. O estado do alerta #44 no GitHub depois
-do push está registrado em `.ai/CLAUDE.md`, incluindo se foi auto-resolvido
-ou se precisou de dispensa manual com justificativa.
+só a leitura automatizada da versão.
+
+## Estado final no GitHub
+
+Confirmado via `gh api repos/.../dependabot/alerts/44` depois do push: o
+alerta **continuou `open`** mesmo após o GitHub reprocessar o lockfile (o
+`updated_at` não mudou de imediato, e mesmo quando reprocessou o
+`vulnerable_version_range` `<= 2.0.1` seguiu batendo com `2.0.1
+(patch_hash=...)`, que ainda é `2.0.1` do ponto de vista do scanner). Como
+não existe versão corrigida pra fazer o alerta fechar sozinho, **dispensado
+manualmente** via API com `dismissed_reason: "tolerable_risk"` e um
+comentário resumindo a mitigação real (build-time-only, patch local, testes
+de regressão) — a alternativa seria deixar o alerta aberto pra sempre sem
+nenhuma indicação de que já foi tratado, o que é pior para quem olhar o
+repositório depois.
+
+O erro do `devDependency` direto (ver §"Testes" acima) criou um **segundo**
+alerta, #45, com `manifest_path: "package.json"`. Corrigido na raiz (removida
+a declaração direta, teste reescrito pra resolver via `electron`) antes do
+commit final — não foi necessário dispensar #45 manualmente, porque a
+declaração que o gerou deixou de existir.
 
 ## Não regressão
 
