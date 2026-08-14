@@ -52,3 +52,7 @@ spartagg.com.br {
 www.spartagg.com.br {
 	redir https://spartagg.com.br{uri} permanent
 }
+http://127.0.0.1:8080 {
+    bind 127.0.0.1
+    respond /healthz 200
+}
