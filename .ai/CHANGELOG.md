@@ -22,6 +22,17 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-08-14 12:10 — Etapa 31M: redesign visual do site público ("Spartan Signal")
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0056-redesign-visual-site-spartan-signal.md`
+
+Redesign completo de `apps/site` com identidade própria baseada em geometria (ponta de lança,
+chanfro, linha de formação, nós), paleta Obsidian/Crimson e tipografia mono para rótulo e status.
+Três achados reais corrigidos: o **Riot ID estava legível nas 3 capturas publicadas** enquanto a
+home afirmava o contrário; **21 estilos inline** eram descartados pela CSP em produção; e **75px de
+overflow em todas as 9 páginas a 390px**. 58 testes no site (eram 17); 45/45 combinações de
+página × largura sem overflow. Infraestrutura não tocada. Ver `docs/site-visual-identity.md`.
+
 ## 2026-08-08 02:30 — Etapa 31L.1: remediação dos disclaimers Riot no site e Desktop
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0055-remediacao-disclaimers-riot.md`

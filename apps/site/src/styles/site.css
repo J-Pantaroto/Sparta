@@ -1,326 +1,851 @@
+/*
+ * SPARTAN SIGNAL - componentes do site institucional.
+ *
+ * Convencoes:
+ *  - toda classe usa o prefixo `sp-`;
+ *  - ZERO estilo inline no HTML: a CSP de producao e `style-src 'self'` sem
+ *    `unsafe-inline`, entao atributo `style=` e silenciosamente descartado
+ *    pelo navegador. Se precisar de uma variacao, ela nasce como classe aqui;
+ *  - chanfro (`--chamfer`) e usado com parcimonia: frames de captura, CTA
+ *    primario e marcadores. Nao transformar todo elemento em forma tematica.
+ */
+
+/* ====================================================================== */
+/* Layout                                                                  */
+/* ====================================================================== */
+
 .sp-container {
+  width: 100%;
   max-width: var(--content-max);
   margin: 0 auto;
-  padding: 0 var(--space-5);
+  padding-inline: var(--gutter);
 }
 
-/* ─── Header ────────────────────────────────────────────────────────── */
+.sp-container--wide {
+  max-width: var(--content-wide);
+}
+
+.sp-container--prose {
+  max-width: calc(var(--prose-max) + var(--gutter) * 2);
+}
+
+.sp-section {
+  padding-block: clamp(var(--space-10), 8vw, var(--space-14));
+  position: relative;
+}
+
+.sp-section--tight {
+  padding-block: clamp(var(--space-9), 6vw, var(--space-12));
+}
+
+/* Linha de formacao entre secoes: uma regua fina que nao fecha nas pontas -
+   sugere continuidade, nao caixa. */
+.sp-section--ruled::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: var(--gutter);
+  right: var(--gutter);
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--line-default) 12%,
+    var(--line-default) 88%,
+    transparent
+  );
+}
+
+.sp-section__head {
+  max-width: 62ch;
+  margin-bottom: var(--space-9);
+}
+
+.sp-section__head--center {
+  margin-inline: auto;
+  text-align: center;
+}
+
+/* ====================================================================== */
+/* Rotulos e marcadores                                                    */
+/* ====================================================================== */
+
+/* Eyebrow: mono + versal + ponta de lanca. E o marcador de secao da
+   identidade - o unico lugar onde o crimson aparece em todo bloco. */
+.sp-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: var(--track-wide);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.sp-eyebrow::before {
+  content: "";
+  inline-size: 9px;
+  block-size: 11px;
+  flex: none;
+  background: var(--crimson);
+  clip-path: var(--spear);
+}
+
+.sp-section__head--center .sp-eyebrow {
+  justify-content: center;
+}
+
+.sp-lede {
+  font-size: var(--text-md);
+  color: var(--text-secondary);
+  max-width: 60ch;
+}
+
+.sp-section__head--center .sp-lede {
+  margin-inline: auto;
+}
+
+/* ====================================================================== */
+/* Botoes                                                                  */
+/* ====================================================================== */
+
+.sp-btn {
+  --cut: var(--cut-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 46px;
+  padding: 0 var(--space-6);
+  border: 1px solid transparent;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
+}
+
+.sp-btn--primary {
+  background: var(--crimson);
+  color: var(--text-on-crimson);
+  clip-path: var(--chamfer);
+}
+
+.sp-btn--primary:hover {
+  background: var(--signal);
+  transform: translateY(-1px);
+}
+
+.sp-btn--ghost {
+  background: transparent;
+  border-color: var(--line-strong);
+  color: var(--text-primary);
+}
+
+.sp-btn--ghost:hover {
+  border-color: var(--crimson-edge);
+  background: var(--crimson-veil);
+  transform: translateY(-1px);
+}
+
+.sp-btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-7);
+}
+
+.sp-section__head--center .sp-btn-row {
+  justify-content: center;
+}
+
+/* ====================================================================== */
+/* Header                                                                  */
+/* ====================================================================== */
 
 .sp-header {
   position: sticky;
   top: 0;
-  z-index: 20;
-  background: rgba(5, 5, 6, 0.68);
-  backdrop-filter: blur(var(--glass-blur));
-  -webkit-backdrop-filter: blur(var(--glass-blur));
-  border-bottom: 1px solid var(--glass-border);
+  z-index: 50;
+  background: rgba(7, 8, 10, 0.82);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line-subtle);
 }
 
 .sp-header__row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  padding: var(--space-4) 0;
+  gap: var(--space-6);
+  min-height: 68px;
 }
 
 .sp-brand {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-3);
   font-weight: 800;
-  font-size: var(--text-lg);
+  font-size: var(--text-md);
+  letter-spacing: var(--track-tight);
+  color: var(--text-primary);
   text-decoration: none;
+  margin-right: auto;
 }
 
 .sp-brand img {
-  width: 28px;
-  height: 28px;
+  inline-size: 26px;
+  block-size: 26px;
 }
 
 .sp-nav {
   display: flex;
   align-items: center;
-  gap: var(--space-5);
+  gap: var(--space-1);
 }
 
 .sp-nav a {
+  position: relative;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
   color: var(--text-secondary);
   text-decoration: none;
-  font-size: var(--text-sm);
-  font-weight: 600;
-  transition: color 120ms ease-out;
+  transition: color var(--dur-fast) var(--ease-out);
 }
 
-.sp-nav a:hover,
+.sp-nav a:hover {
+  color: var(--text-primary);
+}
+
+/* Estado ativo: barra crimson embaixo - o "no" da formacao. */
 .sp-nav a[aria-current="page"] {
   color: var(--text-primary);
 }
 
+.sp-nav a[aria-current="page"]::after {
+  content: "";
+  position: absolute;
+  left: var(--space-3);
+  right: var(--space-3);
+  bottom: -1px;
+  height: 2px;
+  background: var(--crimson);
+}
+
+.sp-header .sp-btn {
+  min-height: 38px;
+  padding-inline: var(--space-4);
+  font-size: var(--text-xs);
+}
+
 .sp-nav__toggle {
   display: none;
-}
-
-@media (max-width: 760px) {
-  .sp-nav {
-    display: none;
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--space-3);
-    background: rgba(10, 10, 12, 0.78);
-    backdrop-filter: blur(var(--glass-blur));
-    -webkit-backdrop-filter: blur(var(--glass-blur));
-    border-bottom: 1px solid var(--glass-border);
-    padding: var(--space-4) var(--space-5) var(--space-5);
-  }
-
-  .sp-nav.is-open {
-    display: flex;
-  }
-
-  .sp-nav__toggle {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 40px;
-    height: 40px;
-    background: var(--surface-2);
-    border: 1px solid var(--border-default);
-    border-radius: var(--radius-sm);
-    color: var(--text-primary);
-    cursor: pointer;
-  }
-}
-
-/* ─── Hero ──────────────────────────────────────────────────────────── */
-
-.sp-hero {
-  padding: var(--space-12) 0 var(--space-10);
-  background:
-    radial-gradient(60% 50% at 50% 0%, var(--color-accent-glow), transparent 70%),
-    var(--bg-base);
-  text-align: center;
-}
-
-.sp-hero__eyebrow {
-  display: inline-block;
-  margin-bottom: var(--space-4);
-  padding: var(--space-1) var(--space-3);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-full);
-  color: var(--color-accent);
+  min-height: 40px;
+  padding: 0 var(--space-4);
+  background: transparent;
+  border: 1px solid var(--line-default);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
   font-size: var(--text-xs);
-  font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: var(--track-wide);
   text-transform: uppercase;
-}
-
-.sp-hero h1 {
-  font-size: var(--text-3xl);
-  max-width: 18ch;
-  margin: 0 auto var(--space-4);
-}
-
-.sp-hero__subtitle {
-  max-width: 56ch;
-  margin: 0 auto var(--space-6);
-  font-size: var(--text-lg);
-  color: var(--text-secondary);
-}
-
-.sp-hero__actions {
-  display: flex;
-  justify-content: center;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-}
-
-/* ─── Buttons ───────────────────────────────────────────────────────── */
-
-.sp-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-3) var(--space-5);
-  border-radius: var(--radius-md);
-  font-weight: 700;
-  font-size: var(--text-sm);
-  text-decoration: none;
-  border: 1px solid transparent;
   cursor: pointer;
 }
 
-.sp-btn--primary {
-  background: var(--color-accent);
-  color: var(--text-on-accent);
+/* ====================================================================== */
+/* Frame de captura - o elemento assinatura                                */
+/* ====================================================================== */
+
+/*
+ * Chanfro com borda de 1px: `clip-path` sozinho corta a borda junto, entao a
+ * borda e feita com um pai de 1px de padding cujo fundo e o gradiente da
+ * "borda", e o filho repete o mesmo recorte por cima. Dois elementos, mas e
+ * o unico jeito confiavel de ter contorno num poligono.
+ */
+.sp-frame {
+  --cut: var(--cut-lg);
+  padding: 1px;
+  clip-path: var(--chamfer);
+  background: linear-gradient(
+    155deg,
+    var(--crimson-edge),
+    var(--line-default) 28%,
+    var(--line-subtle) 70%
+  );
 }
 
-.sp-btn--secondary {
-  background: var(--surface-2);
-  border-color: var(--border-default);
-  color: var(--text-primary);
+.sp-frame__inner {
+  clip-path: var(--chamfer);
+  background: var(--surface-1);
+  overflow: hidden;
 }
 
-.sp-btn[aria-disabled="true"] {
-  opacity: 0.55;
-  cursor: not-allowed;
+/* Barra do frame: dois nos + rotulo, como cabecalho de instrumento. */
+.sp-frame__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--line-subtle);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  letter-spacing: var(--track-wide);
+  text-transform: uppercase;
+  color: var(--text-muted);
 }
 
-/* ─── Sections / cards ──────────────────────────────────────────────── */
-
-.sp-section {
-  padding: var(--space-10) 0;
-  border-top: 1px solid var(--border-subtle);
+.sp-frame__node {
+  inline-size: 6px;
+  block-size: 6px;
+  flex: none;
+  background: var(--crimson);
 }
 
-.sp-section__header {
-  max-width: 64ch;
-  margin: 0 auto var(--space-8);
+.sp-frame__node--dim {
+  background: var(--line-strong);
+}
+
+.sp-frame img {
+  inline-size: 100%;
+  block-size: auto;
+}
+
+.sp-frame figcaption {
+  padding: var(--space-3) var(--space-5) var(--space-4);
+  border-top: 1px solid var(--line-subtle);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+/* ====================================================================== */
+/* Hero                                                                    */
+/* ====================================================================== */
+
+.sp-hero {
+  padding-block: clamp(var(--space-9), 7vw, var(--space-12)) 0;
+}
+
+.sp-hero__copy {
+  max-width: 46rem;
+}
+
+.sp-hero h1 {
+  margin-bottom: var(--space-5);
+}
+
+/* A segunda linha do titulo em crimson: da direcao sem gritar. Texto grande,
+   entao o contraste 4.2:1 do crimson e suficiente (AA large). */
+.sp-hero__accent {
+  display: block;
+  color: var(--crimson);
+}
+
+.sp-hero__sub {
+  font-size: var(--text-md);
+  color: var(--text-secondary);
+  max-width: 54ch;
+}
+
+/* Selo de estado no topo do hero - le como instrumento, nao como badge de
+   marketing. */
+.sp-signal {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--line-default);
+  background: var(--surface-1);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  letter-spacing: var(--track-wide);
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.sp-signal__dot {
+  inline-size: 7px;
+  block-size: 7px;
+  flex: none;
+  border-radius: var(--radius-pill);
+  background: var(--state-wait);
+}
+
+/* A captura do hero ocupa a largura larga: 1280px de origem renderizados
+   perto da escala nativa e a unica forma da UI ficar legivel sem zoom. */
+.sp-hero__art {
+  margin-top: clamp(var(--space-8), 5vw, var(--space-10));
+}
+
+/* Hero das paginas internas: mesma linguagem, peso menor - a home e a unica
+   que precisa de escala editorial. */
+.sp-hero--page {
+  padding-block: clamp(var(--space-8), 5vw, var(--space-10)) 0;
+}
+
+.sp-hero--page h1 {
+  font-size: clamp(1.7rem, 1.1rem + 2.4vw, var(--text-3xl));
+}
+
+/* Utilitarios estritamente necessarios: existem porque a CSP de producao
+   descarta `style=` inline, entao toda variacao pontual precisa de classe. */
+.sp-text-center {
   text-align: center;
 }
 
-.sp-section__eyebrow {
-  display: block;
-  margin-bottom: var(--space-2);
-  color: var(--color-accent);
-  font-size: var(--text-xs);
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+.sp-callout--spaced {
+  margin-top: var(--space-8);
 }
 
-.sp-grid {
+/* ====================================================================== */
+/* Pilares                                                                 */
+/* ====================================================================== */
+
+.sp-pillars {
   display: grid;
-  gap: var(--space-5);
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(232px, 1fr));
+  gap: 1px;
+  background: var(--line-subtle);
+  border: 1px solid var(--line-subtle);
 }
 
-.sp-card {
-  padding: var(--space-6);
-  background: rgba(10, 10, 12, 0.6);
-  backdrop-filter: blur(var(--glass-blur));
-  -webkit-backdrop-filter: blur(var(--glass-blur));
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--glass-highlight);
+/* Grade de 1px de gap sobre fundo de linha: as celulas ficam separadas por
+   filete, como um quadro de instrumentos, sem cada card virar caixa isolada. */
+.sp-pillar {
+  padding: var(--space-7) var(--space-6);
+  background: var(--surface-1);
+  transition: background var(--dur-base) var(--ease-out);
 }
 
-.sp-card h3 {
-  font-size: var(--text-lg);
+.sp-pillar:hover {
+  background: var(--surface-2);
 }
 
-.sp-card p:last-child {
-  margin-bottom: 0;
+.sp-pillar__index {
+  display: block;
+  margin-bottom: var(--space-4);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  letter-spacing: var(--track-wide);
+  color: var(--crimson);
 }
+
+.sp-pillar h3 {
+  margin-bottom: var(--space-3);
+  font-size: var(--text-base);
+}
+
+.sp-pillar p {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+/* ====================================================================== */
+/* Fluxo (como funciona)                                                   */
+/* ====================================================================== */
 
 .sp-flow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: var(--space-7);
+  counter-reset: sp-stage;
+}
+
+.sp-stage {
+  position: relative;
+  padding-top: var(--space-7);
+  counter-increment: sp-stage;
+}
+
+/* Linha de formacao ligando os estagios: a regua horizontal e o no crimson
+   sao o "sinal" percorrendo a formacao da esquerda pra direita. */
+.sp-stage::before {
+  content: "";
+  position: absolute;
+  top: 5px;
+  left: 0;
+  right: calc(var(--space-7) * -1);
+  height: 1px;
+  background: var(--line-default);
+}
+
+.sp-stage:last-child::before {
+  right: 0;
+}
+
+.sp-stage::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  inline-size: 11px;
+  block-size: 11px;
+  background: var(--crimson);
+  clip-path: var(--spear);
+}
+
+.sp-stage__num {
+  display: block;
+  margin-bottom: var(--space-3);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  letter-spacing: var(--track-wide);
+  color: var(--text-muted);
+}
+
+.sp-stage h3 {
+  margin-bottom: var(--space-3);
+  font-size: var(--text-base);
+}
+
+.sp-stage p {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+/* Corrente: resumo compacto de um fluxo com muitas etapas (6+), onde a grade
+   de estagios ficaria desequilibrada. Os separadores sao pontas de lanca -
+   a mesma linha de formacao, so que inline e com quebra natural. */
+.sp-chain {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: center;
-  gap: var(--space-3);
-  margin: var(--space-6) 0;
+  gap: var(--space-3) var(--space-4);
+  padding: var(--space-6);
+  border: 1px solid var(--line-subtle);
+  background: var(--surface-1);
 }
 
-.sp-flow__step {
-  padding: var(--space-3) var(--space-4);
-  background: rgba(10, 10, 12, 0.6);
-  backdrop-filter: blur(var(--glass-blur));
-  -webkit-backdrop-filter: blur(var(--glass-blur));
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-md);
+.sp-chain__link {
+  font-family: var(--font-mono);
   font-size: var(--text-sm);
-  font-weight: 600;
+  color: var(--text-secondary);
 }
 
-.sp-flow__arrow {
-  color: var(--text-muted);
+.sp-chain__sep {
+  inline-size: 8px;
+  block-size: 10px;
+  flex: none;
+  background: var(--crimson);
+  clip-path: var(--spear);
 }
 
-.sp-shot {
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--glass-border);
-  overflow: hidden;
-  background: rgba(10, 10, 12, 0.6);
+/* ====================================================================== */
+/* Showcase de funcionalidades                                             */
+/* ====================================================================== */
+
+.sp-showcase {
+  display: grid;
+  gap: clamp(var(--space-10), 7vw, var(--space-12));
 }
 
-.sp-shot figcaption {
-  padding: var(--space-3) var(--space-4);
-  color: var(--text-muted);
-  font-size: var(--text-xs);
-  background: rgba(10, 10, 12, 0.6);
-  backdrop-filter: blur(var(--glass-blur));
-  -webkit-backdrop-filter: blur(var(--glass-blur));
-  border-top: 1px solid var(--glass-border);
+/*
+ * Coluna de texto estreita + captura ocupando o resto: manter a imagem larga
+ * e o que preserva a legibilidade da UI (a alternativa 50/50 reduz a captura
+ * a meia escala e o texto do app vira ruido).
+ */
+.sp-showcase__row {
+  display: grid;
+  grid-template-columns: minmax(260px, 330px) 1fr;
+  gap: clamp(var(--space-7), 4vw, var(--space-10));
+  align-items: center;
 }
 
-/* ─── Callouts ──────────────────────────────────────────────────────── */
+.sp-showcase__row--flip .sp-showcase__copy {
+  order: 2;
+}
+
+.sp-showcase__copy h3 {
+  margin-bottom: var(--space-4);
+  font-size: var(--text-xl);
+  letter-spacing: var(--track-tight);
+}
+
+.sp-showcase__copy p {
+  font-size: var(--text-base);
+}
+
+/* Lista do que e realmente observado - bullet e ponta de lanca, nao disco. */
+.sp-facts {
+  list-style: none;
+  margin: var(--space-5) 0 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+
+.sp-facts li {
+  position: relative;
+  padding-left: var(--space-5);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.sp-facts li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.55em;
+  inline-size: 7px;
+  block-size: 9px;
+  background: var(--crimson);
+  clip-path: var(--spear);
+}
+
+/* ====================================================================== */
+/* Transparencia                                                           */
+/* ====================================================================== */
+
+.sp-principles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--space-7);
+}
+
+.sp-principle {
+  --cut: var(--cut-sm);
+  padding: var(--space-7) var(--space-6);
+  border: 1px solid var(--line-subtle);
+  border-left: 2px solid var(--crimson-edge);
+  background: var(--surface-1);
+}
+
+.sp-principle h3 {
+  margin-bottom: var(--space-3);
+  font-size: var(--text-base);
+}
+
+.sp-principle p {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+/* ====================================================================== */
+/* Status                                                                  */
+/* ====================================================================== */
+
+.sp-status-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--line-subtle);
+}
+
+.sp-status-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-5) var(--space-6);
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--line-subtle);
+  font-size: var(--text-sm);
+}
+
+.sp-status-row:last-child {
+  border-bottom: 0;
+}
+
+.sp-status-row > span:first-child {
+  color: var(--text-primary);
+}
+
+.sp-status-dot {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  letter-spacing: var(--track-wide);
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.sp-status-dot::before {
+  content: "";
+  inline-size: 7px;
+  block-size: 7px;
+  flex: none;
+  border-radius: var(--radius-pill);
+  background: var(--state-live);
+}
+
+.sp-status-dot--preparing::before {
+  background: var(--state-wait);
+}
+
+/* ====================================================================== */
+/* CTA final                                                               */
+/* ====================================================================== */
+
+.sp-cta {
+  --cut: var(--cut-lg);
+  padding: clamp(var(--space-9), 6vw, var(--space-12)) var(--gutter);
+  clip-path: var(--chamfer);
+  background:
+    radial-gradient(ellipse 70% 140% at 50% 0%, var(--crimson-veil), transparent 70%),
+    var(--surface-1);
+  border: 1px solid var(--line-subtle);
+  text-align: center;
+}
+
+.sp-cta h2 {
+  max-width: 22ch;
+  margin-inline: auto;
+}
+
+.sp-cta .sp-lede {
+  margin-inline: auto;
+}
+
+/* ====================================================================== */
+/* Callout                                                                 */
+/* ====================================================================== */
 
 .sp-callout {
-  display: flex;
-  gap: var(--space-3);
-  padding: var(--space-4) var(--space-5);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--glass-border);
-  background: rgba(15, 15, 19, 0.62);
-  backdrop-filter: blur(var(--glass-blur));
-  -webkit-backdrop-filter: blur(var(--glass-blur));
+  padding: var(--space-6);
+  border: 1px solid var(--line-subtle);
+  border-left: 2px solid var(--line-strong);
+  background: var(--surface-1);
   font-size: var(--text-sm);
   color: var(--text-secondary);
 }
 
 .sp-callout--warning {
-  border-color: rgba(251, 191, 36, 0.35);
-  background: rgba(251, 191, 36, 0.1);
+  border-left-color: var(--state-wait);
 }
 
-.sp-callout strong {
+.sp-callout--legal {
+  border-left-color: var(--crimson-edge);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
   color: var(--text-primary);
 }
 
-/* ─── Legal/prose pages ─────────────────────────────────────────────── */
+.sp-callout p:last-child {
+  margin-bottom: 0;
+}
+
+/* ====================================================================== */
+/* Prosa (paginas legais) - legibilidade acima de efeito                   */
+/* ====================================================================== */
 
 .sp-prose {
-  max-width: 74ch;
-  margin: var(--space-8) auto;
+  max-width: var(--prose-max);
 }
 
 .sp-prose h2 {
-  margin-top: var(--space-8);
+  margin-top: var(--space-10);
   font-size: var(--text-xl);
 }
 
+.sp-prose h2:first-child {
+  margin-top: 0;
+}
+
 .sp-prose h3 {
-  margin-top: var(--space-6);
+  margin-top: var(--space-7);
   font-size: var(--text-base);
+}
+
+.sp-prose p,
+.sp-prose li {
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
 }
 
 .sp-prose ul,
 .sp-prose ol {
-  color: var(--text-secondary);
-  padding-left: var(--space-5);
+  padding-left: var(--space-6);
+  margin-bottom: var(--space-4);
 }
 
 .sp-prose li {
   margin-bottom: var(--space-2);
 }
 
-.sp-prose .sp-callout {
-  margin: var(--space-5) 0;
-}
-
 .sp-updated {
-  color: var(--text-muted);
+  font-family: var(--font-mono);
   font-size: var(--text-xs);
+  color: var(--text-muted);
+  line-height: var(--leading-snug);
 }
 
-/* ─── Status page ───────────────────────────────────────────────────── */
+/* ====================================================================== */
+/* Footer                                                                  */
+/* ====================================================================== */
 
-.sp-status-list {
+.sp-footer {
+  margin-top: clamp(var(--space-10), 8vw, var(--space-14));
+  border-top: 1px solid var(--line-subtle);
+  background: rgba(7, 8, 10, 0.6);
+}
+
+/*
+ * Mobile-first e explicito de proposito. A versao anterior misturava uma
+ * trilha fixa (`minmax(240px, 1.4fr)`) com `repeat(auto-fit, minmax(150px,
+ * 1fr))`: essa combinacao nao quebra linha - o auto-fit continua criando
+ * trilhas de 150px alem do container - e produzia 450px de largura minima,
+ * estourando 75px em telas de 390px em TODAS as paginas.
+ */
+.sp-footer__grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-8);
+  padding-block: var(--space-10) var(--space-8);
+}
+
+@media (min-width: 700px) {
+  .sp-footer__grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .sp-footer__brand {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (min-width: 1040px) {
+  .sp-footer__grid {
+    grid-template-columns: minmax(0, 1.6fr) repeat(3, minmax(0, 1fr));
+  }
+
+  .sp-footer__brand {
+    grid-column: auto;
+  }
+}
+
+.sp-footer__brand .sp-brand {
+  margin-bottom: var(--space-4);
+}
+
+.sp-footer__brand p {
+  max-width: 34ch;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.sp-footer__col h2 {
+  margin-bottom: var(--space-4);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: var(--track-wide);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.sp-footer__col ul {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -328,96 +853,139 @@
   gap: var(--space-3);
 }
 
-.sp-status-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-4) var(--space-5);
-  background: rgba(10, 10, 12, 0.6);
-  backdrop-filter: blur(var(--glass-blur));
-  -webkit-backdrop-filter: blur(var(--glass-blur));
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-md);
-}
-
-.sp-status-dot {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
+.sp-footer__col a {
   font-size: var(--text-sm);
-  font-weight: 700;
-}
-
-.sp-status-dot::before {
-  content: "";
-  width: 9px;
-  height: 9px;
-  border-radius: var(--radius-full);
-  background: var(--color-green);
-}
-
-.sp-status-dot--preparing::before {
-  background: var(--color-yellow);
-}
-
-/* ─── Footer ────────────────────────────────────────────────────────── */
-
-.sp-footer {
-  padding: var(--space-8) 0 var(--space-10);
-  border-top: 1px solid var(--border-subtle);
-  color: var(--text-muted);
-  font-size: var(--text-xs);
-}
-
-.sp-footer__grid {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: var(--space-6);
-  margin-bottom: var(--space-6);
-}
-
-.sp-footer__links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-4);
-}
-
-.sp-footer__links a {
   color: var(--text-secondary);
   text-decoration: none;
 }
 
-.sp-footer__links a:hover {
+.sp-footer__col a:hover {
   color: var(--text-primary);
 }
 
-.sp-footer__disclaimer {
-  max-width: 74ch;
-  line-height: var(--leading-normal);
+.sp-footer__legal {
+  padding-block: var(--space-6) var(--space-9);
+  border-top: 1px solid var(--line-subtle);
+  display: grid;
+  gap: var(--space-3);
 }
 
-/* ─── 404 ───────────────────────────────────────────────────────────── */
+.sp-footer__legal p {
+  margin: 0;
+  font-size: var(--text-xs);
+  line-height: var(--leading-snug);
+  color: var(--text-muted);
+}
+
+/* ====================================================================== */
+/* 404                                                                     */
+/* ====================================================================== */
 
 .sp-404 {
-  padding: var(--space-12) 0;
+  display: grid;
+  place-items: center;
+  min-height: 52vh;
   text-align: center;
 }
 
-.sp-404 .sp-eyebrow-number {
-  font-size: 96px;
-  font-weight: 800;
-  color: var(--border-default);
-  margin-bottom: var(--space-2);
+.sp-404__code {
+  font-family: var(--font-mono);
+  font-size: var(--text-4xl);
+  font-weight: 700;
+  color: var(--crimson);
+  letter-spacing: var(--track-wide);
 }
 
-@media (max-width: 640px) {
-  .sp-hero h1 {
-    font-size: var(--text-2xl);
+/* ====================================================================== */
+/* Responsivo                                                              */
+/* ====================================================================== */
+
+@media (max-width: 1100px) {
+  /* Abaixo disso a coluna de texto espremeria a captura: empilha, com o
+     texto primeiro e a imagem em largura total. */
+  .sp-showcase__row {
+    grid-template-columns: 1fr;
+    gap: var(--space-7);
   }
 
-  .sp-hero__subtitle {
+  .sp-showcase__row--flip .sp-showcase__copy {
+    order: 0;
+  }
+}
+
+@media (max-width: 860px) {
+  :root {
+    --cut: 14px;
+    --cut-lg: 20px;
+  }
+
+  .sp-header__row {
+    flex-wrap: wrap;
+    min-height: 60px;
+  }
+
+  .sp-nav__toggle {
+    display: inline-flex;
+    align-items: center;
+    margin-left: auto;
+  }
+
+  /* Menu mobile: painel proprio abaixo do cabecalho, nao um dropdown
+     flutuante - mantem a leitura vertical e a area de toque grande. */
+  .sp-nav {
+    display: none;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    width: 100%;
+    padding-bottom: var(--space-3);
+  }
+
+  .sp-nav.is-open {
+    display: flex;
+  }
+
+  .sp-nav a {
+    padding: var(--space-4) var(--space-2);
+    border-top: 1px solid var(--line-subtle);
     font-size: var(--text-base);
+  }
+
+  .sp-nav a[aria-current="page"]::after {
+    left: 0;
+    right: auto;
+    top: var(--space-4);
+    bottom: var(--space-4);
+    width: 2px;
+    height: auto;
+  }
+
+  .sp-header .sp-btn {
+    display: none;
+  }
+
+  /* A linha de formacao horizontal nao faz sentido empilhada. */
+  .sp-stage::before {
+    right: 0;
+  }
+
+  .sp-btn {
+    width: 100%;
+  }
+
+  .sp-btn-row {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 560px) {
+  .sp-frame__bar {
+    padding-inline: var(--space-4);
+  }
+
+  .sp-pillar,
+  .sp-principle,
+  .sp-status-row {
+    padding-inline: var(--space-5);
   }
 }

@@ -6,20 +6,25 @@
     <title>Sparta GG — Análise pessoal para League of Legends</title>
     <meta
       name="description"
-      content="Sparta GG é uma ferramenta de análise pessoal para League of Legends: perfil, apoio ao draft e comparação pós-partida a partir do seu próprio histórico."
+      content="Sparta GG organiza o seu próprio histórico de partidas de League of Legends em índices, contexto de draft e comparação pós-jogo. Antes e depois da partida, nunca durante."
     />
     <link rel="canonical" href="https://spartagg.com.br/" />
     <link rel="icon" type="image/png" href="/img/favicon.png" />
+    <meta name="robots" content="index, follow" />
+    <meta name="theme-color" content="#07080a" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Sparta GG" />
+    <meta property="og:locale" content="pt_BR" />
     <meta property="og:title" content="Sparta GG — Análise pessoal para League of Legends" />
     <meta
       property="og:description"
-      content="Perfil, apoio ao draft e comparação pós-partida a partir do seu próprio histórico. Projeto independente, não afiliado à Riot Games."
+      content="Índices sobre a sua amostra observada, contexto de draft e comparação pós-jogo. Projeto independente, não afiliado à Riot Games."
     />
-    <meta property="og:image" content="https://spartagg.com.br/img/favicon.png" />
+    <meta property="og:image" content="https://spartagg.com.br/img/screenshot-dashboard.jpg" />
+    <meta property="og:image:width" content="1280" />
+    <meta property="og:image:height" content="820" />
     <meta property="og:url" content="https://spartagg.com.br/" />
-    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:card" content="summary_large_image" />
     <link rel="stylesheet" href="/src/styles/tokens.css" />
     <link rel="stylesheet" href="/src/styles/base.css" />
     <link rel="stylesheet" href="/src/styles/site.css" />
@@ -29,132 +34,309 @@
     <header class="sp-header" id="sp-header"></header>
 
     <main id="sp-main">
+      <!-- ============================ HERO ============================ -->
       <section class="sp-hero">
-        <div class="sp-container">
-          <span class="sp-hero__eyebrow">Acesso público em preparação</span>
-          <h1>Análise pessoal e apoio à tomada de decisão no League of Legends</h1>
-          <p class="sp-hero__subtitle">
-            O Sparta GG organiza o seu próprio histórico de partidas em índices, recomendações de
-            draft e comparações pós-jogo — sem prometer vitória, elo garantido ou uma escolha
-            "certa". É leitura de dados reais, não uma inteligência que decide por você.
-          </p>
-          <div class="sp-hero__actions">
-            <span class="sp-btn sp-btn--primary" aria-disabled="true" role="button" tabindex="-1">
-              Download em preparação
-            </span>
-            <a class="sp-btn sp-btn--secondary" href="/como-funciona.html">Como funciona</a>
+        <div class="sp-container sp-container--wide">
+          <div class="sp-hero__copy">
+            <p class="sp-signal">
+              <span class="sp-signal__dot" aria-hidden="true"></span>
+              Acesso público em preparação
+            </p>
+            <h1>
+              Dados reais.
+              <span class="sp-hero__accent">Contexto para decidir melhor.</span>
+            </h1>
+            <p class="sp-hero__sub">
+              O Sparta GG lê o histórico da conta Riot que você vincula e organiza esse material em
+              índices, contexto de draft e comparação pós-jogo. Ele trabalha antes e depois da
+              partida — nunca durante — e mostra a evidência por trás de cada leitura, incluindo o
+              que não está disponível.
+            </p>
+            <div class="sp-btn-row">
+              <a class="sp-btn sp-btn--primary" href="/funcionalidades.html">Ver funcionalidades</a>
+              <a class="sp-btn sp-btn--ghost" href="/como-funciona.html">Como funciona</a>
+            </div>
+          </div>
+
+          <figure class="sp-frame sp-hero__art">
+            <div class="sp-frame__inner">
+              <div class="sp-frame__bar">
+                <span class="sp-frame__node" aria-hidden="true"></span>
+                <span class="sp-frame__node sp-frame__node--dim" aria-hidden="true"></span>
+                <span>Sparta GG · Dashboard</span>
+              </div>
+              <img
+                src="/img/screenshot-dashboard.jpg"
+                alt="Dashboard do Sparta GG mostrando índices pessoais calculados sobre 22 partidas observadas, com o tamanho da amostra ao lado de cada índice"
+                width="1280"
+                height="820"
+                fetchpriority="high"
+              />
+              <figcaption>
+                Captura real do aplicativo. O identificador da conta de teste foi mascarado; nenhum
+                outro dado da tela foi alterado.
+              </figcaption>
+            </div>
+          </figure>
+        </div>
+      </section>
+
+      <!-- ========================== PILARES =========================== -->
+      <section class="sp-section sp-section--tight" aria-labelledby="sp-pilares" data-reveal>
+        <div class="sp-container sp-container--wide">
+          <div class="sp-section__head">
+            <p class="sp-eyebrow">O que o Sparta faz</p>
+            <h2 id="sp-pilares">Quatro leituras sobre o seu próprio jogo</h2>
+          </div>
+          <div class="sp-pillars">
+            <article class="sp-pillar">
+              <span class="sp-pillar__index">01</span>
+              <h3>Contexto de draft</h3>
+              <p>
+                No Champion Select, o Sparta observa a sessão local do League Client e apresenta
+                opções com razões e alertas. Apenas leitura: nunca escolhe, bane nem trava campeão.
+              </p>
+            </article>
+            <article class="sp-pillar">
+              <span class="sp-pillar__index">02</span>
+              <h3>Perfil pessoal</h3>
+              <p>
+                Índices calculados sobre a sua amostra observada, sempre acompanhados do tamanho
+                dessa amostra — sem comparação com uma base global, que o Sparta não possui.
+              </p>
+            </article>
+            <article class="sp-pillar">
+              <span class="sp-pillar__index">03</span>
+              <h3>Histórico observável</h3>
+              <p>
+                Partidas, itens, runas e linha do tempo preservados como fatos com carimbo de
+                tempo, sem narrativa de causa e efeito construída por cima.
+              </p>
+            </article>
+            <article class="sp-pillar">
+              <span class="sp-pillar__index">04</span>
+              <h3>Recomendações explicáveis</h3>
+              <p>
+                Cada sugestão vem com a evidência que a sustenta e com o que ficou indisponível.
+                São várias opções, nunca uma escolha apresentada como a correta.
+              </p>
+            </article>
           </div>
         </div>
       </section>
 
-      <section class="sp-section" aria-labelledby="sp-o-que-e">
-        <div class="sp-container">
-          <div class="sp-section__header">
-            <span class="sp-section__eyebrow">O que é</span>
-            <h2 id="sp-o-que-e">Um painel sobre o seu próprio jogo</h2>
-            <p>
-              O Sparta GG lê o histórico de partidas da sua conta Riot vinculada e transforma isso
-              em índices, tendências e comparações — sempre a partir de dados que já existem, sem
-              vazamento temporal e sem inventar informação que não foi observada.
+      <!-- ======================= COMO FUNCIONA ======================== -->
+      <section
+        class="sp-section sp-section--tight sp-section--ruled"
+        aria-labelledby="sp-fluxo"
+        data-reveal
+      >
+        <div class="sp-container sp-container--wide">
+          <div class="sp-section__head">
+            <p class="sp-eyebrow">Como funciona</p>
+            <h2 id="sp-fluxo">Do vínculo com a Riot até a análise</h2>
+            <p class="sp-lede">
+              Três etapas, todas iniciadas por você. O Sparta não acessa nada antes do vínculo ser
+              autorizado.
             </p>
           </div>
-          <div class="sp-grid">
-            <article class="sp-card">
-              <h3>Perfil e evolução</h3>
-              <p>
-                Índices pessoais sobre a sua amostra observada, tendência por período e por
-                métrica, e acompanhamento de pontos fracos ao longo do tempo.
-              </p>
-            </article>
-            <article class="sp-card">
-              <h3>Apoio ao draft</h3>
-              <p>
-                Recomendações de campeão explicáveis durante o Champion Select, com razões e
-                alertas — nunca uma escolha apresentada como certa.
-              </p>
-            </article>
-            <article class="sp-card">
-              <h3>Pós-game factual</h3>
-              <p>
-                Comparação entre o que foi esperado antes da partida e o que foi observado nela,
-                com linha do tempo de fatos, sem narrativa de causa e efeito.
-              </p>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      <section class="sp-section" aria-labelledby="sp-fluxo">
-        <div class="sp-container">
-          <div class="sp-section__header">
-            <span class="sp-section__eyebrow">Como funciona</span>
-            <h2 id="sp-fluxo">Do vínculo com a Riot à análise</h2>
-          </div>
           <div class="sp-flow">
-            <span class="sp-flow__step">Conta Sparta</span>
-            <span class="sp-flow__arrow" aria-hidden="true">→</span>
-            <span class="sp-flow__step">Vínculo com conta Riot</span>
-            <span class="sp-flow__arrow" aria-hidden="true">→</span>
-            <span class="sp-flow__step">Sincronização autorizada</span>
-            <span class="sp-flow__arrow" aria-hidden="true">→</span>
-            <span class="sp-flow__step">Análise do histórico pessoal</span>
+            <article class="sp-stage">
+              <span class="sp-stage__num">Etapa 01</span>
+              <h3>Vincular</h3>
+              <p>
+                Você cria uma conta Sparta e vincula a ela a sua conta Riot. Sem esse passo não há
+                histórico para ler.
+              </p>
+            </article>
+            <article class="sp-stage">
+              <span class="sp-stage__num">Etapa 02</span>
+              <h3>Sincronizar</h3>
+              <p>
+                O Sparta busca as suas partidas pela API oficial da Riot e guarda o que foi
+                observado nelas — só da conta vinculada.
+              </p>
+            </article>
+            <article class="sp-stage">
+              <span class="sp-stage__num">Etapa 03</span>
+              <h3>Analisar</h3>
+              <p>
+                Esse material vira índices no perfil, contexto durante o draft e comparação depois
+                da partida entre o que era esperado e o que foi observado.
+              </p>
+            </article>
           </div>
-          <p style="text-align: center">
-            <a class="sp-btn sp-btn--secondary" href="/como-funciona.html">Ver o fluxo completo</a>
-          </p>
+          <div class="sp-btn-row">
+            <a class="sp-btn sp-btn--ghost" href="/como-funciona.html">Ver o fluxo completo</a>
+          </div>
         </div>
       </section>
 
-      <section class="sp-section" aria-labelledby="sp-telas">
+      <!-- ========================== SHOWCASE ========================== -->
+      <section class="sp-section sp-section--ruled" aria-labelledby="sp-produto" data-reveal>
+        <div class="sp-container sp-container--wide">
+          <div class="sp-section__head">
+            <p class="sp-eyebrow">Produto real</p>
+            <h2 id="sp-produto">Capturas do aplicativo, sem maquiagem</h2>
+            <p class="sp-lede">
+              As imagens abaixo saíram do aplicativo em execução. O identificador da conta de teste
+              foi mascarado; números, datas, campeões e estados são exatamente os observados.
+            </p>
+          </div>
+
+          <div class="sp-showcase">
+            <article class="sp-showcase__row">
+              <div class="sp-showcase__copy">
+                <h3>Contexto durante o draft</h3>
+                <p>
+                  A tela acompanha a seleção de campeões pelo League Client e reage ao que já foi
+                  revelado. Quando o cliente está fechado, ela diz isso em vez de inventar um
+                  estado.
+                </p>
+                <ul class="sp-facts">
+                  <li>Leitura da sessão local, sem nenhuma ação no cliente</li>
+                  <li>Posição, ordem de pick e time inimigo conforme revelados</li>
+                  <li>Modo manual para quem quer simular um draft fora de partida</li>
+                </ul>
+              </div>
+              <figure class="sp-frame">
+                <div class="sp-frame__inner">
+                  <div class="sp-frame__bar">
+                    <span class="sp-frame__node" aria-hidden="true"></span>
+                    <span class="sp-frame__node sp-frame__node--dim" aria-hidden="true"></span>
+                    <span>Sparta GG · Champion Select</span>
+                  </div>
+                  <img
+                    src="/img/screenshot-champion-select.jpg"
+                    alt="Tela de Champion Select do Sparta GG informando que o League Client está fechado e que a tela abre sozinha quando a seleção de campeões começar"
+                    width="1280"
+                    height="820"
+                    loading="lazy"
+                  />
+                </div>
+              </figure>
+            </article>
+
+            <article class="sp-showcase__row sp-showcase__row--flip">
+              <div class="sp-showcase__copy">
+                <h3>O que foi observado depois</h3>
+                <p>
+                  O histórico lista as suas partidas com filtros reais e abre a revisão de cada uma,
+                  comparando o que era esperado antes com o que a partida registrou.
+                </p>
+                <ul class="sp-facts">
+                  <li>Filtros por posição, resultado, período, fila e campeão</li>
+                  <li>Itens, runas e linha do tempo preservados como fatos</li>
+                  <li>Comparação com a sua média anterior, sem vazamento temporal</li>
+                </ul>
+              </div>
+              <figure class="sp-frame">
+                <div class="sp-frame__inner">
+                  <div class="sp-frame__bar">
+                    <span class="sp-frame__node" aria-hidden="true"></span>
+                    <span class="sp-frame__node sp-frame__node--dim" aria-hidden="true"></span>
+                    <span>Sparta GG · Partidas e pós-game</span>
+                  </div>
+                  <img
+                    src="/img/screenshot-postgame.jpg"
+                    alt="Histórico de partidas do Sparta GG com filtros por posição, resultado e período, listando partidas reais com KDA, itens e horário"
+                    width="1280"
+                    height="820"
+                    loading="lazy"
+                  />
+                </div>
+              </figure>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================= TRANSPARÊNCIA ======================== -->
+      <section class="sp-section sp-section--ruled" aria-labelledby="sp-transparencia" data-reveal>
+        <div class="sp-container sp-container--wide">
+          <div class="sp-section__head sp-section__head--center">
+            <p class="sp-eyebrow">Transparência</p>
+            <h2 id="sp-transparencia">O que o Sparta não faz também está escrito</h2>
+            <p class="sp-lede">
+              Um produto de análise só é útil se der para confiar no que ele afirma — e no que ele
+              admite não saber.
+            </p>
+          </div>
+          <div class="sp-principles">
+            <article class="sp-principle">
+              <h3>Disponível, indisponível e desconhecido são estados diferentes</h3>
+              <p>
+                Quando um sinal não pôde ser observado, o Sparta mostra isso como indisponível, com
+                o motivo — em vez de preencher com zero ou com um valor neutro.
+              </p>
+            </article>
+            <article class="sp-principle">
+              <h3>Antes e depois da partida, nunca durante</h3>
+              <p>
+                Não existe overlay, alerta em jogo, leitura de cooldown ou qualquer assistência
+                enquanto a partida acontece. O escopo é pré-game e pós-game.
+              </p>
+            </article>
+            <article class="sp-principle">
+              <h3>Recomendação não é previsão</h3>
+              <p>
+                O Sparta não calcula chance de vitória nem promete elo. Ele apresenta opções com a
+                evidência disponível e deixa a decisão inteiramente com você.
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- =========================== STATUS =========================== -->
+      <section class="sp-section sp-section--ruled" aria-labelledby="sp-status" data-reveal>
         <div class="sp-container">
-          <div class="sp-section__header">
-            <span class="sp-section__eyebrow">Produto real</span>
-            <h2 id="sp-telas">Capturas reais do aplicativo</h2>
-            <p>Identidade da conta usada nos testes removida das imagens; o restante é dado real.</p>
+          <div class="sp-section__head">
+            <p class="sp-eyebrow">Disponibilidade</p>
+            <h2 id="sp-status">Onde o Sparta está agora</h2>
+            <p class="sp-lede">
+              O site já está no ar. O restante ainda não foi liberado publicamente, e esta lista
+              acompanha isso sem arredondar.
+            </p>
           </div>
-          <div class="sp-grid">
-            <figure class="sp-shot">
-              <img src="/img/screenshot-dashboard.jpg" alt="Dashboard do Sparta GG com índices pessoais e tendência recente" loading="lazy" width="1280" height="820" />
-              <figcaption>Dashboard — visão geral e índices pessoais</figcaption>
-            </figure>
-            <figure class="sp-shot">
-              <img src="/img/screenshot-champion-select.jpg" alt="Tela de Champion Select do Sparta GG, aguardando sessão real do League Client" loading="lazy" width="1280" height="820" />
-              <figcaption>Champion Select — leitura, nunca ação no cliente</figcaption>
-            </figure>
-            <figure class="sp-shot">
-              <img src="/img/screenshot-postgame.jpg" alt="Histórico de partidas e revisão pós-game do Sparta GG" loading="lazy" width="1280" height="820" />
-              <figcaption>Pós-game — histórico e revisão de partidas</figcaption>
-            </figure>
+          <ul class="sp-status-list">
+            <li class="sp-status-row">
+              <span>Site institucional</span>
+              <span class="sp-status-dot">Operacional</span>
+            </li>
+            <li class="sp-status-row">
+              <span>Conta Sparta e autenticação</span>
+              <span class="sp-status-dot sp-status-dot--preparing">Em preparação</span>
+            </li>
+            <li class="sp-status-row">
+              <span>Integração com a Riot Games</span>
+              <span class="sp-status-dot sp-status-dot--preparing">Em preparação</span>
+            </li>
+            <li class="sp-status-row">
+              <span>Download do aplicativo Desktop</span>
+              <span class="sp-status-dot sp-status-dot--preparing">Em preparação</span>
+            </li>
+          </ul>
+          <div class="sp-btn-row">
+            <a class="sp-btn sp-btn--ghost" href="/status.html">Ver status completo</a>
           </div>
         </div>
       </section>
 
-      <section class="sp-section" aria-labelledby="sp-privacidade-home">
-        <div class="sp-container sp-prose" style="text-align: center; margin: 0 auto">
-          <span class="sp-section__eyebrow">Privacidade</span>
-          <h2 id="sp-privacidade-home">Só o seu histórico, com exclusão sob solicitação</h2>
-          <p>
-            O Sparta analisa a conta Riot que você vincula à sua própria conta Sparta. Você pode
-            solicitar a exclusão dos seus dados a qualquer momento —
-            <a href="/excluir-conta.html">veja como</a>. Detalhes completos na
-            <a href="/privacidade.html">Política de Privacidade</a>.
-          </p>
-        </div>
-      </section>
-
-      <section class="sp-section" aria-labelledby="sp-disponibilidade">
-        <div class="sp-container">
-          <div class="sp-section__header">
-            <span class="sp-section__eyebrow">Disponibilidade atual</span>
-            <h2 id="sp-disponibilidade">Onde o Sparta está agora</h2>
-          </div>
-          <div class="sp-callout sp-callout--warning">
-            <span>
-              <strong>O acesso público ainda não está liberado.</strong> O site e a infraestrutura
-              estão em preparação; a versão anterior do instalador foi retirada de circulação e não
-              será republicada nesta fase. Acompanhe a <a href="/status.html">página de status</a>
-              para novidades.
-            </span>
+      <!-- ========================= CTA FINAL ========================== -->
+      <section class="sp-section sp-section--tight" data-reveal>
+        <div class="sp-container sp-container--wide">
+          <div class="sp-cta">
+            <p class="sp-eyebrow">Próximo passo</p>
+            <h2>Entre na partida com contexto. Saia dela com evidência.</h2>
+            <p class="sp-lede">
+              O acesso público ainda não abriu. A página de status registra cada etapa conforme ela
+              fica pronta — sem data prometida antes da hora.
+            </p>
+            <div class="sp-btn-row">
+              <a class="sp-btn sp-btn--primary" href="/status.html">Acompanhar o lançamento</a>
+              <a class="sp-btn sp-btn--ghost" href="/funcionalidades.html">Ver funcionalidades</a>
+            </div>
           </div>
         </div>
       </section>

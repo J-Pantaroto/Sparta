@@ -35,6 +35,7 @@ export default [
         AbortSignal: "readonly",
         URLSearchParams: "readonly",
         navigator: "readonly",
+        IntersectionObserver: "readonly",
         __dirname: "readonly"
       }
     },

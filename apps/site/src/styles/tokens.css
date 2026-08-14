@@ -1,63 +1,137 @@
 /*
- * Tokens do site institucional - inspirados na identidade visual do Desktop
- * (preto profundo, vermelho contido, Manrope), mas um arquivo proprio: o
- * site nao importa nada do renderer do Electron, por decisao explicita
- * (runtimes separados).
+ * SPARTAN SIGNAL - tokens do site institucional do Sparta GG.
+ *
+ * A identidade nao vem de arte tematica (soldado, capacete, escudo
+ * desenhado): vem de GEOMETRIA. Ponta de lanca, corte diagonal, linha de
+ * formacao, no de status. Superficie rigida, raio quase zero, chanfro
+ * seletivo. O vermelho e sinal, nao decoracao - ele marca direcao, estado e
+ * o que exige atencao, e some do resto.
+ *
+ * Arquivo proprio do site: nao importa nada do renderer do Electron
+ * (runtimes separados, decisao mantida desde a Etapa 31K).
  */
 :root {
-  --bg-base: #050506;
-  --bg-sunken: #030304;
-  --surface-1: #0a0a0c;
-  --surface-2: #0f0f13;
-  --surface-3: #16161b;
-  --border-subtle: #1a1a20;
-  --border-default: #26262e;
+  /* ---------- Superficie: Obsidian -> Steel ---------------------------- */
+  --obsidian: #07080a;
+  --iron: #0d1015;
+  --steel: #171b21;
+  --steel-raised: #1f242c;
 
-  --text-primary: #f4f4f6;
-  --text-secondary: #a5a5b0;
-  --text-muted: #6f6f7b;
-  --text-on-accent: #08080a;
+  --bg-base: var(--obsidian);
+  --surface-1: var(--iron);
+  --surface-2: var(--steel);
+  --surface-3: var(--steel-raised);
 
-  --color-accent: #dc2626;
-  --color-accent-soft: #7f1d1d;
-  --color-accent-glow: rgba(220, 38, 38, 0.28);
+  /* ---------- Traco ---------------------------------------------------- */
+  --line-subtle: rgba(242, 243, 245, 0.07);
+  --line-default: rgba(242, 243, 245, 0.13);
+  --line-strong: rgba(242, 243, 245, 0.22);
 
-  --color-green: #4ade80;
-  --color-yellow: #fbbf24;
+  /* ---------- Texto ----------------------------------------------------
+     Contraste medido contra Obsidian (#07080A) e Steel (#171B21):
+       Bone  #F2F3F5 -> 18.9:1 / 16.4:1
+       Ash   #8F969F ->  6.7:1 /  5.8:1   (corpo, seguro nos dois)
+       Faint #7D848D ->  5.3:1 /  4.6:1   (legenda, ainda AA em texto normal)
+     Nada abaixo de 4.5:1 e usado para texto normal. */
+  --bone: #f2f3f5;
+  --ash: #8f969f;
+  --ash-faint: #7d848d;
 
-  /* Glassmorphism: desfoque do que esta atras de um painel translucido +
-     borda clara/realce que imita luz pegando a borda do vidro. So faz
-     sentido com um fundo com alguma cor por tras pra desfocar - ver o
-     gradiente ambiente adicionado ao body em base.css. */
-  --glass-blur: 18px;
-  --glass-border: rgba(255, 255, 255, 0.08);
-  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --text-primary: var(--bone);
+  --text-secondary: var(--ash);
+  --text-muted: var(--ash-faint);
+  --text-on-crimson: #ffffff;
 
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
-  --radius-full: 999px;
+  /* ---------- Sinal ----------------------------------------------------
+     Crimson  #E21D2E -> 4.2:1 sobre Obsidian: passa AA so em TEXTO GRANDE.
+     Signal   #FF3347 -> 5.6:1 sobre Obsidian: passa AA em texto normal.
+     Por isso a divisao e deliberada e nao intercambiavel:
+       --crimson = preenchimento, borda, no, numero grande, ponta de lanca;
+       --signal  = link e texto pequeno em vermelho.
+     Trocar um pelo outro quebra contraste - nao unifique. */
+  --crimson: #e21d2e;
+  --signal: #ff3347;
+  --crimson-deep: #8c1220;
+  --crimson-veil: rgba(226, 29, 46, 0.13);
+  --crimson-edge: rgba(226, 29, 46, 0.42);
+  --crimson-glow: rgba(226, 29, 46, 0.26);
 
+  /* ---------- Estado ---------------------------------------------------- */
+  --state-live: #3fb27f;
+  --state-wait: #d8a13a;
+
+  /* ---------- Geometria -------------------------------------------------
+     `--cut` e o tamanho do chanfro. `--chamfer` corta o canto superior
+     direito e o inferior esquerdo - a diagonal cria direcao (leitura da
+     esquerda pra direita) sem virar "forma tematica" em cada elemento. */
+  --cut: 18px;
+  --cut-sm: 10px;
+  --cut-lg: 28px;
+  --chamfer: polygon(
+    0 0,
+    calc(100% - var(--cut)) 0,
+    100% var(--cut),
+    100% 100%,
+    var(--cut) 100%,
+    0 calc(100% - var(--cut))
+  );
+  /* Ponta de lanca: usada em marcador de secao e bullet. */
+  --spear: polygon(0 0, 100% 50%, 0 100%);
+
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+  --radius-pill: 999px;
+
+  /* ---------- Espaco ---------------------------------------------------- */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
   --space-4: 16px;
   --space-5: 20px;
   --space-6: 24px;
+  --space-7: 32px;
   --space-8: 40px;
-  --space-10: 64px;
-  --space-12: 96px;
+  --space-9: 56px;
+  --space-10: 72px;
+  --space-12: 104px;
+  --space-14: 136px;
 
-  --font-sans: "Manrope", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* ---------- Tipografia ------------------------------------------------
+     Stack de sistema por decisao: a CSP e `default-src 'self'` (nenhuma
+     fonte externa carrega) e uma fonte propria custaria peso sem ganho
+     proporcional. O mono nao e enfeite - ele carrega rotulo, status e
+     numero, e e o que faz o site ler como instrumento e nao como panfleto. */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+
+  --text-2xs: 11px;
   --text-xs: 12px;
-  --text-sm: 14px;
+  --text-sm: 13px;
   --text-base: 16px;
+  --text-md: 17px;
   --text-lg: 19px;
-  --text-xl: 24px;
-  --text-2xl: 32px;
-  --text-3xl: 44px;
-  --leading-tight: 1.2;
-  --leading-normal: 1.6;
+  --text-xl: 23px;
+  --text-2xl: 29px;
+  --text-3xl: 37px;
+  --text-4xl: 46px;
 
-  --content-max: 1120px;
+  --leading-tight: 1.14;
+  --leading-snug: 1.35;
+  --leading-normal: 1.65;
+
+  --track-wide: 0.14em;
+  --track-tight: -0.02em;
+
+  /* ---------- Movimento ------------------------------------------------- */
+  --ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --dur-fast: 130ms;
+  --dur-base: 220ms;
+
+  /* ---------- Layout ---------------------------------------------------- */
+  --content-max: 1200px;
+  --content-wide: 1400px;
+  --prose-max: 68ch;
+  --gutter: clamp(20px, 5vw, 48px);
 }

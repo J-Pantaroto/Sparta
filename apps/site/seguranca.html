@@ -22,41 +22,41 @@
     <header class="sp-header" id="sp-header"></header>
 
     <main id="sp-main">
-      <section class="sp-hero" style="padding-bottom: var(--space-6)">
+      <section class="sp-hero sp-hero--page">
         <div class="sp-container">
-          <span class="sp-hero__eyebrow">Segurança</span>
+          <p class="sp-eyebrow">Segurança</p>
           <h1>Como protegemos sua conta</h1>
-          <p class="sp-hero__subtitle">
+          <p class="sp-hero__sub">
             Práticas reais, não uma lista de aspiração — cada item abaixo já está implementado.
           </p>
         </div>
       </section>
 
-      <section class="sp-section" style="border-top: none">
+      <section class="sp-section sp-section--tight">
         <div class="sp-container">
-          <div class="sp-grid">
-            <article class="sp-card">
+          <div class="sp-pillars">
+            <article class="sp-pillar">
               <h3>Conexões HTTPS</h3>
               <p>
                 Toda comunicação com o serviço acontece por HTTPS assim que a infraestrutura pública
                 estiver ativa, com certificado válido e renovação automática.
               </p>
             </article>
-            <article class="sp-card">
+            <article class="sp-pillar">
               <h3>Senhas nunca reversíveis</h3>
               <p>
                 Senhas são armazenadas apenas como hash (scrypt) — nem a própria equipe do Sparta
                 consegue ver a sua senha original.
               </p>
             </article>
-            <article class="sp-card">
+            <article class="sp-pillar">
               <h3>Confirmação de e-mail</h3>
               <p>
                 O acesso a recursos pessoais exige e-mail confirmado, com tokens de confirmação de
                 uso único, expiráveis e limitados.
               </p>
             </article>
-            <article class="sp-card">
+            <article class="sp-pillar">
               <h3>Isolamento entre contas</h3>
               <p>
                 Todo recurso pessoal deriva o dono a partir da sua sessão autenticada — tentar
@@ -64,14 +64,14 @@
                 o dado de outra pessoa.
               </p>
             </article>
-            <article class="sp-card">
+            <article class="sp-pillar">
               <h3>Vínculo Riot controlado</h3>
               <p>
                 Você decide quando vincular e quando revogar o vínculo com sua conta Riot. Nenhuma
                 sincronização acontece sem uma ação sua.
               </p>
             </article>
-            <article class="sp-card">
+            <article class="sp-pillar">
               <h3>Minimização de dados</h3>
               <p>
                 Coletamos apenas o necessário para as funcionalidades descritas publicamente. Onde um
@@ -79,14 +79,14 @@
                 preencher com um valor inventado.
               </p>
             </article>
-            <article class="sp-card">
+            <article class="sp-pillar">
               <h3>Logs sem identificadores sensíveis</h3>
               <p>
                 Identificadores pessoais em rotas são substituídos por rótulos opacos antes de irem
                 para o log; cabeçalhos de autenticação e cookies nunca são registrados.
               </p>
             </article>
-            <article class="sp-card">
+            <article class="sp-pillar">
               <h3>Exclusão sob solicitação</h3>
               <p>
                 Você pode pedir a exclusão da sua conta e dos dados associados a qualquer momento —
@@ -95,7 +95,7 @@
             </article>
           </div>
 
-          <div class="sp-callout" style="margin-top: var(--space-8)">
+          <div class="sp-callout sp-callout--spaced">
             <span>
               Encontrou uma vulnerabilidade? Consulte a
               <a href="/status.html">página de status</a> para o canal de contato vigente assim que

@@ -1,5 +1,85 @@
 # Sparta - Contexto para Continuidade
 
+## Etapa 31M: redesign visual do site público — identidade "Spartan Signal"
+
+Primeira etapa executada com o site **já publicado** em `spartagg.com.br` (confirmado nesta sessão:
+HTTP 200, TLS válido; MX `mx1/mx2.hostinger.com` existe). Redesign completo de `apps/site` —
+**nenhuma alteração de infraestrutura** (Caddyfile, Dockerfile.site, DNS, MX, API, Postgres, Redis,
+auth, RSO, Desktop intocados). Relatório em `docs/site-visual-identity.md`.
+
+**Identidade por geometria, não por arte temática**: ponta de lança (marcador de seção, bullet,
+separador, nó de estágio), `--chamfer` cortando canto superior direito e inferior esquerdo (frames
+de captura, CTA), linha de formação (réguas que não fecham nas pontas), nós de status, e
+`--font-mono` versal em todo rótulo/status — é o que faz o site ler como instrumento em vez de
+panfleto. Raio quase zero (`--radius-xs: 2px`).
+
+**A regra de contraste é a decisão de paleta mais importante e não é intercambiável**: Crimson
+`#E21D2E` dá **4,2:1** sobre Obsidian — passa AA só em texto GRANDE; Signal `#FF3347` dá **5,6:1** e
+passa em texto normal. Por isso `--crimson` é preenchimento/borda/nó/título e `--signal` é link e
+texto pequeno. Trocar um pelo outro quebra acessibilidade; está comentado nos tokens. Medido no
+navegador: 14 elementos de texto, **0 reprovados** (o limite real apareceu em `.sp-hero__accent`,
+46px, 4,24:1 — passa por ser texto grande).
+
+**Três achados reais, todos já no ar:**
+
+1. **`BLOQUEANTE` — o Riot ID estava exposto.** A home afirmava "identidade da conta usada nos
+   testes removida das imagens", mas as 3 capturas publicadas mostravam `Zekerus#117` legível (em
+   ~24px no Dashboard; no topbar e no rodapé da sidebar nas outras duas). Vazamento + afirmação
+   falsa simultâneos. Corrigido com máscara **localizada** por **detecção automática do bounding
+   box** do texto claro dentro de janelas estreitas que excluem o monograma do avatar — em vez de
+   coordenadas chutadas sobre dado real. Preservados: `Servidor BR1 · americas · Suporte` (região e
+   rota, não identificador), números, KDA, datas, campeões, itens, estados. Conferência objetiva:
+   **0 pixels quase-brancos restantes** nas janelas de topbar/sidebar.
+2. **21 estilos inline eram descartados pela CSP em produção.** A CSP servida pelo Caddy é
+   `style-src 'self'` **sem** `unsafe-inline`, então atributo `style=` nunca foi aplicado no site
+   publicado — ele renderizava diferente do que o código sugeria, e isso funcionava em dev. Todos
+   eliminados; o design system não usa nenhum. Travado por teste, um por página.
+3. **75px de overflow horizontal em todas as 9 páginas a 390px.** Achado pela varredura de
+   larguras, não por inspeção. `.sp-footer__grid` misturava trilha explícita
+   (`minmax(240px, 1.4fr)`) com `repeat(auto-fit, minmax(150px, 1fr))` — combinação que **não
+   quebra linha**, o auto-fit segue criando trilhas além do container. Reescrito mobile-first e
+   explícito. As demais grades usam `auto-fit` puro, que não tem o problema.
+
+**Achado menor**: `tokens.css` declarava `Manrope` sem nunca carregar a fonte (ela só existe no
+Desktop, via Google Fonts). O site sempre renderizou em fonte de sistema alegando outra coisa —
+agora a stack é explícita e honesta (a CSP `default-src 'self'` bloquearia fonte externa de todo
+jeito).
+
+**Decisão de UX documentada**: o pedido previa "showcase" e "capturas reais" como seções separadas,
+mas só existem 3 capturas — duas seções repetiriam imagem. Fundidas em "Produto real": Dashboard no
+hero, Champion Select e Pós-game no showcase, **cada captura aparecendo exatamente uma vez**. Para
+legibilidade (UI de 1280×820 com texto de ~13px), o hero usa a captura em **0,85 da escala nativa**
+e o showcase usa coluna de texto estreita (260–330px) + captura ocupando o resto; abaixo de 1100px
+empilha com o texto primeiro.
+
+**Nenhum CTA de download** enquanto a release 0.9.0 segue retirada — travado por teste, junto com
+ausência de link morto, de classe órfã e de métrica fictícia.
+
+**Validado por medição, não por olho**: 9 páginas × 5 larguras (360/390/768/1280/1920) = **45/45
+sem overflow**, 0 imagem quebrada, 0 estilo inline, header/footer montados; menu mobile alternando
+`aria-expanded` false→true e `display` none→flex; **0 erro de console**. O reveal (IntersectionObserver)
+tem guarda: o estado escondido só existe sob `html[data-reveal-ready]`, escrito pelo próprio JS —
+sem JS, nada fica invisível; confirmado em execução com `prefers-reduced-motion: reduce`, em que o
+reveal é corretamente pulado e os 6 blocos ficam em `opacity: 1`.
+
+**Limitação registrada**: screenshot da página construída **não foi possível** nesta sessão (a
+Browser pane não estava sendo exibida e o compositor não gera frames nesse estado). A validação
+cobriu geometria, contraste, responsividade e comportamento por DOM/CSSOM, mas **não substitui
+conferência estética humana** — recomendado abrir o site após o deploy.
+
+**Preservado por compliance**: os dois avisos legais da Riot em `termos.html` §11.1/§11.2 verbatim
+(só a apresentação mudou, via `.sp-callout--legal`); a referência de não-afiliação no rodapé; todo
+o texto das páginas legais, incluindo os marcadores `[Revisão jurídica necessária]` — a migração
+dessas páginas foi mecânica de propósito para o diff provar que o conteúdo não foi tocado.
+
+**Pendência real**: `suporte@spartagg.com.br` foi publicado no rodapé por instrução explícita e com
+MX confirmado, mas **MX existir não prova que a caixa existe** — o responsável precisa confirmar que
+ela está criada e sendo lida, senão mensagens de suporte se perdem em silêncio.
+
+**1296 testes** TypeScript (core 635, riot 97, api 353, desktop 138, site 58, raiz 15) + analyzer
+1/1. `apps/api` reproduziu a flakiness já documentada desde a Etapa 26b sob execução paralela
+(`/docs existe em desenvolvimento`) e passou **353/353 isolado**, sem alteração de código.
+
 ## Etapa 31L.1: remediação dos disclaimers Riot no site e Desktop — `RIOT_DISCLAIMERS_COMPLIANT`
 
 Pedido explícito do usuário, motivado diretamente pelas duas pendências que a própria Etapa 31L

@@ -1,9 +1,12 @@
 /**
  * Cabecalho, navegacao e rodape compartilhados entre as 9 paginas - sem
- * framework, sem build-time include: cada HTML tem um <header id="sp-header">
- * e <footer id="sp-footer"> vazios, preenchidos aqui no load. Mantem o site
- * inteiramente estatico (nenhum JS e necessario para o conteudo em si
- * aparecer - so a casca de navegacao).
+ * framework e sem include em tempo de build: cada HTML tem um
+ * `<header id="sp-header">` e um `<footer id="sp-footer">` vazios, preenchidos
+ * aqui no load. Mantem o site estatico e evita duplicar a casca em 9 arquivos.
+ *
+ * Nada aqui e essencial pro conteudo aparecer: o texto de cada pagina vive no
+ * proprio HTML. Este modulo monta so a navegacao, o rodape e a animacao de
+ * entrada - e a animacao so e ativada se o proprio JS conseguir rodar.
  */
 
 interface NavLink {
@@ -11,6 +14,7 @@ interface NavLink {
   label: string;
 }
 
+/** Navegacao principal - somente paginas que existem de verdade. */
 const NAV_LINKS: NavLink[] = [
   { href: "/", label: "Início" },
   { href: "/como-funciona.html", label: "Como funciona" },
@@ -18,13 +22,21 @@ const NAV_LINKS: NavLink[] = [
   { href: "/status.html", label: "Status" }
 ];
 
-const FOOTER_LINKS: NavLink[] = [
+const FOOTER_PRODUTO: NavLink[] = [
+  { href: "/", label: "Início" },
+  { href: "/como-funciona.html", label: "Como funciona" },
+  { href: "/funcionalidades.html", label: "Funcionalidades" },
+  { href: "/status.html", label: "Status" }
+];
+
+const FOOTER_LEGAL: NavLink[] = [
   { href: "/privacidade.html", label: "Privacidade" },
   { href: "/termos.html", label: "Termos de uso" },
   { href: "/seguranca.html", label: "Segurança" },
-  { href: "/excluir-conta.html", label: "Excluir conta" },
-  { href: "/status.html", label: "Status" }
+  { href: "/excluir-conta.html", label: "Excluir conta" }
 ];
+
+const SUPORTE_EMAIL = "suporte@spartagg.com.br";
 
 /*
  * Referência curta e discreta no rodapé de todas as páginas - o texto legal
@@ -44,7 +56,16 @@ function currentPath(): string {
   return path;
 }
 
-function renderHeader(): string {
+function brand(): string {
+  return `
+    <a class="sp-brand" href="/">
+      <img src="/img/favicon.png" alt="" width="26" height="26" />
+      Sparta GG
+    </a>
+  `;
+}
+
+export function renderHeader(): string {
   const active = currentPath();
   const items = NAV_LINKS.map((link) => {
     const isActive = link.href === active;
@@ -52,50 +73,114 @@ function renderHeader(): string {
   }).join("");
 
   return `
-    <div class="sp-container sp-header__row">
-      <a class="sp-brand" href="/">
-        <img src="/img/favicon.png" alt="" width="28" height="28" />
-        Sparta GG
-      </a>
-      <button type="button" class="sp-nav__toggle" id="sp-nav-toggle" aria-expanded="false" aria-controls="sp-nav">
-        Menu
-      </button>
-      <nav class="sp-nav" id="sp-nav" aria-label="Navegação principal">
-        ${items}
-      </nav>
+    <div class="sp-container sp-container--wide sp-header__row">
+      ${brand()}
+      <button
+        type="button"
+        class="sp-nav__toggle"
+        id="sp-nav-toggle"
+        aria-expanded="false"
+        aria-controls="sp-nav"
+      >Menu</button>
+      <nav class="sp-nav" id="sp-nav" aria-label="Navegação principal">${items}</nav>
+      <a class="sp-btn sp-btn--ghost" href="/status.html">Ver status</a>
+    </div>
+  `;
+}
+
+function footerColumn(titulo: string, links: NavLink[]): string {
+  const items = links
+    .map((link) => `<li><a href="${link.href}">${link.label}</a></li>`)
+    .join("");
+  return `
+    <div class="sp-footer__col">
+      <h2>${titulo}</h2>
+      <ul>${items}</ul>
     </div>
   `;
 }
 
 export function renderFooter(): string {
   const year = new Date().getFullYear();
-  const links = FOOTER_LINKS.map((link) => `<a href="${link.href}">${link.label}</a>`).join("");
 
   return `
-    <div class="sp-container">
+    <div class="sp-container sp-container--wide">
       <div class="sp-footer__grid">
-        <span>© ${year} Sparta GG. Projeto independente, não afiliado à Riot Games.</span>
-        <div class="sp-footer__links">${links}</div>
+        <div class="sp-footer__brand">
+          ${brand()}
+          <p>
+            Análise pessoal e apoio à tomada de decisão no League of Legends, a partir do seu
+            próprio histórico de partidas. Projeto independente.
+          </p>
+        </div>
+        ${footerColumn("Produto", FOOTER_PRODUTO)}
+        ${footerColumn("Legal", FOOTER_LEGAL)}
+        <div class="sp-footer__col">
+          <h2>Contato</h2>
+          <ul>
+            <li><a href="mailto:${SUPORTE_EMAIL}">${SUPORTE_EMAIL}</a></li>
+          </ul>
+        </div>
       </div>
-      <p class="sp-footer__disclaimer">${RIOT_DISCLAIMER}</p>
+      <div class="sp-footer__legal">
+        <p>© ${year} Sparta GG. Projeto independente, não afiliado à Riot Games.</p>
+        <p>${RIOT_DISCLAIMER}</p>
+      </div>
     </div>
   `;
 }
 
-function mount() {
+/** Alterna o menu mobile mantendo `aria-expanded` fiel ao estado real. */
+function wireNavToggle(): void {
+  const toggle = document.getElementById("sp-nav-toggle");
+  const nav = document.getElementById("sp-nav");
+  if (!toggle || !nav) return;
+
+  toggle.addEventListener("click", () => {
+    const isOpen = nav.classList.toggle("is-open");
+    toggle.setAttribute("aria-expanded", String(isOpen));
+  });
+}
+
+/**
+ * Entrada suave dos blocos. A guarda importante esta no CSS: o estado
+ * escondido so existe sob `html[data-reveal-ready]`, e esse atributo so e
+ * escrito aqui. Se este modulo nao rodar, nada fica invisivel.
+ */
+function wireReveal(): void {
+  const alvos = document.querySelectorAll<HTMLElement>("[data-reveal]");
+  if (alvos.length === 0) return;
+
+  const semMovimento =
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  if (semMovimento || typeof IntersectionObserver !== "function") return;
+
+  document.documentElement.setAttribute("data-reveal-ready", "");
+
+  const observer = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        entry.target.classList.add("is-visible");
+        observer.unobserve(entry.target);
+      }
+    },
+    { rootMargin: "0px 0px -8% 0px", threshold: 0.06 }
+  );
+
+  alvos.forEach((alvo) => observer.observe(alvo));
+}
+
+function mount(): void {
   const header = document.getElementById("sp-header");
   const footer = document.getElementById("sp-footer");
   if (header) header.innerHTML = renderHeader();
   if (footer) footer.innerHTML = renderFooter();
 
-  const toggle = document.getElementById("sp-nav-toggle");
-  const nav = document.getElementById("sp-nav");
-  if (toggle && nav) {
-    toggle.addEventListener("click", () => {
-      const isOpen = nav.classList.toggle("is-open");
-      toggle.setAttribute("aria-expanded", String(isOpen));
-    });
-  }
+  wireNavToggle();
+  wireReveal();
 }
 
 if (document.readyState === "loading") {
