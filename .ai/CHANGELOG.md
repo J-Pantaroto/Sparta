@@ -22,6 +22,18 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-08-14 19:15 — Auditoria pré-final do Desktop Sparta GG
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0060-auditoria-pre-final-desktop.md`
+
+Auditoria exclusivamente diagnóstica da `main`, sem alteração de produto. A matriz completa separa
+o que precisa ser corrigido antes do polish, o que pertence ao polish e o que segue bloqueado por
+Riot/infra externa. Encontrados bloqueios reais no build Docker da API, ciclo de autenticação/e-mail,
+estado stale do draft, concorrência do pós-game e fronteira IPC/navegação Electron. QA real cobriu
+33 cenários de tela e uma combinação de preferências sem overflow ou erro de runtime. Version,
+Prisma, typecheck, lint, build, 1.343 testes TS e analyzer passaram; relatório em
+`docs/desktop-pre-final-audit.md`.
+
 ## 2026-08-14 19:10 — Etapa 31P: resolvido Dependabot high #44 (extract-zip)
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0059-triagem-dependabot-extract-zip.md`

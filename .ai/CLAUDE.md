@@ -1,5 +1,28 @@
 # Sparta - Contexto para Continuidade
 
+## Auditoria pré-final do Desktop: bloqueios antes do polish visual
+
+Auditoria diagnóstica concluída em 2026-08-14 sobre a `main`
+`5ab38eda6d66d6440845d3f58dca3fb153bb23f8`, sem mudança de código de produto. Relatório completo
+em `docs/desktop-pre-final-audit.md` e espelho em `.ai/specs/desktop-pre-final-audit.md`.
+
+**Não iniciar o polish visual final antes de fechar a lista A do relatório.** Principais achados:
+o `Dockerfile.api` não copia `patches/` e não reconstrói a imagem atual; o fluxo de confirmação de
+e-mail não possui destino web/deep link end-to-end e recuperação de senha não existe; falha offline
+no boot apaga sessão potencialmente válida; logout pode alegar revogação sem resposta do servidor;
+o draft LCU anterior pode permanecer alimentando recomendações; o pós-game permite resposta de uma
+partida sobrescrever outra; linguagem causal ainda aparece fora do comparativo factual; navegação e
+origem dos IPCs Electron precisam ser restringidas. Links/status públicos e exclusão de conta também
+estão inconsistentes entre Desktop e site.
+
+O visual está estável: 11 telas × 1000/1280/1600 px, mais Obsidiana/compacta/reduzida, sem overflow
+estrutural, console error, exception ou HTTP >= 400. Restam apenas itens LOW/POLISH de quebra de
+texto, labels crus e marca. `release-etapa27c-v1` continua apontada como `ACTIVE` com hashes
+esperados; bundle mais recente `EXACT_REPLAY`, sem divergências/dependências. Gates: version/Prisma/
+typecheck/lint/build, 1.343 testes TS e analyzer 1/1 verdes (timeout transitório conhecido de `/docs`
+na primeira execução paralela; API 353/353 na repetição). API pública, RSO, provider e dados globais
+continuam bloqueados; release Desktop permanece `WITHDRAWN_PENDING_PUBLIC_API`.
+
 ## Etapa 31P: Dependabot high #44 (extract-zip) resolvido via patch local
 
 O GitHub sinalizou `extract-zip` `GHSA-jmr9-qjv8-65gv`/`CVE-2026-56876` (CVSS 8.1, path
