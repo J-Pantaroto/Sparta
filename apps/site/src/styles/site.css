@@ -25,8 +25,17 @@
   max-width: var(--content-wide);
 }
 
+/* Prosa legal (termos, privacidade, seguranca, excluir-conta) e a lista de
+   status: densa/escaneada, aceita a medida mais larga do sistema. */
 .sp-container--prose {
-  max-width: calc(var(--prose-max) + var(--gutter) * 2);
+  max-width: calc(var(--measure-legal) + var(--gutter) * 2);
+}
+
+/* Prosa editorial (Como funciona): corpo explicativo lido de ponta a ponta,
+   por isso mais estreito que o legal mesmo sendo mais largo que o antigo
+   valor unico que os dois compartilhavam. */
+.sp-container--editorial {
+  max-width: calc(var(--measure-editorial) + var(--gutter) * 2);
 }
 
 .sp-section {
@@ -57,7 +66,7 @@
 }
 
 .sp-section__head {
-  max-width: 62ch;
+  max-width: var(--measure-editorial);
   margin-bottom: var(--space-9);
 }
 
@@ -100,7 +109,7 @@
 .sp-lede {
   font-size: var(--text-md);
   color: var(--text-secondary);
-  max-width: 60ch;
+  max-width: var(--measure-marketing);
 }
 
 .sp-section__head--center .sp-lede {
@@ -332,8 +341,12 @@
   padding-block: clamp(var(--space-9), 7vw, var(--space-12)) 0;
 }
 
+/* Cresce em telas largas: o herói não empilha ao lado da captura (ambos são
+   blocos, um em cima do outro), então não há competição de largura real -
+   travar em 46rem sempre deixava ~500px vazios ao lado em desktop grande. O
+   minimo do clamp preserva o valor antigo em telas menores. */
 .sp-hero__copy {
-  max-width: 46rem;
+  max-width: clamp(46rem, 32vw + 22rem, 58rem);
 }
 
 .sp-hero h1 {
@@ -350,7 +363,7 @@
 .sp-hero__sub {
   font-size: var(--text-md);
   color: var(--text-secondary);
-  max-width: 54ch;
+  max-width: var(--measure-marketing);
 }
 
 /* Selo de estado no topo do hero - le como instrumento, nao como badge de
@@ -699,7 +712,7 @@
 }
 
 .sp-cta h2 {
-  max-width: 22ch;
+  max-width: 26ch;
   margin-inline: auto;
 }
 
@@ -764,10 +777,9 @@
 /* Prosa (paginas legais) - legibilidade acima de efeito                   */
 /* ====================================================================== */
 
-.sp-prose {
-  max-width: var(--prose-max);
-}
-
+/* Largura de leitura da prosa NAO vem daqui - vem do container (.sp-container
+   --prose ou --editorial, ver acima). .sp-prose so define tipografia, pra
+   funcionar em qualquer um dos dois containers sem duplicar regra. */
 .sp-prose h2 {
   margin-top: var(--space-10);
   font-size: var(--text-xl);
@@ -859,7 +871,7 @@
 }
 
 .sp-footer__brand p {
-  max-width: 34ch;
+  max-width: var(--measure-compact);
   font-size: var(--text-sm);
   color: var(--text-muted);
 }

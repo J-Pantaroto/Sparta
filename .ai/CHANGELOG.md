@@ -22,6 +22,17 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-08-14 17:20 — Etapa 31O: refino tipográfico e largura de conteúdo do site
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0058-refino-tipografico-largura-conteudo.md`
+
+Quatro categorias de largura de leitura novas no design system (`--measure-compact/marketing/
+editorial/legal`), aplicadas ao herói, títulos de seção, prosa legal e prosa editorial —
+resolvendo colunas de texto excessivamente estreitas em desktop largo sem alargar tudo
+indiscriminadamente. Ritmo vertical reduzido seletivamente (14-21% nos degraus grandes de
+espaçamento). Nenhuma mudança de identidade visual, paleta, screenshot, rota, Caddy ou conteúdo
+legal. Ver `docs/site-typography-width.md`.
+
 ## 2026-08-14 16:20 — Etapa 31N: rotas públicas limpas e Central de Suporte
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0057-rotas-limpas-central-suporte.md`

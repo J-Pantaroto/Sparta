@@ -82,7 +82,12 @@
   --radius-sm: 4px;
   --radius-pill: 999px;
 
-  /* ---------- Espaco ---------------------------------------------------- */
+  /* ---------- Espaco ------------------------------------------------------
+     --space-9/10/12/14 sao os degraus GRANDES: padding de secao, gap do
+     showcase, margem do rodape. Reduzidos ~15-21% nesta etapa porque o
+     respiro entre blocos estava excessivo em desktop largo. Os degraus 1-8
+     (espaco DENTRO de card/botao/linha) ficam intocados de proposito - a
+     ideia e cortar o excesso ENTRE secoes, nao comprimir o site inteiro. */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -91,10 +96,10 @@
   --space-6: 24px;
   --space-7: 32px;
   --space-8: 40px;
-  --space-9: 56px;
-  --space-10: 72px;
-  --space-12: 104px;
-  --space-14: 136px;
+  --space-9: 48px;
+  --space-10: 60px;
+  --space-12: 84px;
+  --space-14: 108px;
 
   /* ---------- Tipografia ------------------------------------------------
      Stack de sistema por decisao: a CSP e `default-src 'self'` (nenhuma
@@ -134,4 +139,25 @@
   --content-wide: 1400px;
   --prose-max: 68ch;
   --gutter: clamp(20px, 5vw, 48px);
+
+  /* ---------- Medidas de leitura ------------------------------------------
+     Quatro categorias de largura de TEXTO (nao de container) - cada uma tem
+     um proposito de leitura diferente, entao nao compartilham um valor so:
+       compacta   - selo, legenda, blurb curto (bio de marca no rodape).
+                    Poucas palavras, nunca devia formar paragrafo de verdade.
+       marketing  - subtitulo/lede de secao: punchy, poucas linhas por
+                    desenho, nao um paragrafo corrido.
+       editorial  - corpo explicativo (Como funciona, texto de produto):
+                    lido de ponta a ponta, por isso mais estreito que o legal.
+       legal      - prosa longa e densa (termos, privacidade...):
+                    ESCANEADA por titulo numerado, nao lida linearmente -
+                    aceita uma linha mais larga (70-90 caracteres) sem perder
+                    conforto, porque o leitor pula entre secoes, nao segue
+                    linha a linha.
+     `--prose-max` (68ch) fica como estava, sem uso novo, ate a proxima
+     limpeza - `--measure-legal` e quem controla a prosa legal agora. */
+  --measure-compact: 34ch;
+  --measure-marketing: 62ch;
+  --measure-editorial: 74ch;
+  --measure-legal: 86ch;
 }

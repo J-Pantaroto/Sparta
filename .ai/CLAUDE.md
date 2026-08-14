@@ -1,5 +1,87 @@
 # Sparta - Contexto para Continuidade
 
+## Etapa 31O: refino tipográfico e largura de conteúdo do site
+
+Pedido explícito do usuário logo após a 31N: **não** um redesign — passe exclusivo de largura de
+texto, tipografia, comprimento de linha, hierarquia e ritmo vertical sobre `apps/site`.
+Screenshots e efeitos visuais ficaram deliberadamente de fora (etapa futura). Relatório completo
+em `docs/site-typography-width.md`.
+
+**Diagnóstico real, não achismo**: inspeção de `tokens.css`/`site.css`/das 10 páginas HTML
+confirmou a causa concreta — `.sp-container--prose` + `.sp-prose` (68ch) era compartilhada por
+duas categorias de conteúdo bem diferentes: as 4 páginas legais (densas, escaneadas por título
+numerado) **e** o corpo de "Como funciona" (explicativo, lido de ponta a ponta). `.sp-hero__copy`
+(texto do herói da home) travava em `46rem` fixo mesmo **não competindo** por espaço com a
+captura — confirmado no HTML que os dois são blocos empilhados, não lado a lado, então a trava
+deixava até ~500px vazios ao lado em desktop grande. `funcionalidades.html` usava `.sp-container`
+(1200px) na seção de pilares, enquanto a seção idêntica da home já usava `.sp-container--wide`
+(1400px) para o mesmo componente — inconsistência sem motivo técnico.
+
+**Quatro categorias de largura de leitura, novas em `tokens.css`** — cada uma com propósito de
+leitura documentado, não só estético: `--measure-compact` (34ch, selo/legenda/blurb curto),
+`--measure-marketing` (62ch, subtítulo/lede — punchy, poucas linhas), `--measure-editorial` (74ch,
+corpo explicativo lido linearmente) e `--measure-legal` (86ch, prosa densa **escaneada** por
+seção numerada, aceita linha mais larga sem perder conforto porque não é lida linha a linha).
+`.sp-container--prose` (legal + `status.html`) passou a usar `--measure-legal`; nova classe
+`.sp-container--editorial` (só em `como-funciona.html`) usa `--measure-editorial`; `.sp-prose`
+deixou de definir a própria largura (só tipografia agora — evita duas fontes de verdade
+competindo na mesma propriedade). `.sp-section__head` 62ch→74ch, `.sp-lede`/`.sp-hero__sub`
+60/54ch→62ch, `.sp-cta h2` 22ch→26ch, `.sp-footer__brand p` tokenizado (mesmo valor, 34ch).
+
+**Hero da home**: `max-width: clamp(46rem, 32vw + 22rem, 58rem)` no lugar do `46rem` fixo — o
+mínimo preserva o valor antigo em telas menores (nunca mais estreito que antes), cresce com a
+viewport, teto em 928px. Medido: 736px→761,6px em 1280px, →928px em 1920px. O título continua
+quebrando em duas linhas de propósito (`.sp-hero__accent { display: block }`, a linha crimson de
+destaque) — isso é identidade visual, não efeito colateral de largura estreita, e não foi tocado.
+
+**`funcionalidades.html`**: seção de pilares (8 itens) trocou `.sp-container` por
+`.sp-container--wide`, alinhando com o mesmo componente já usado na home — sem reconstruir o
+grid (`repeat(auto-fit, minmax(232px,1fr))` intocado, "não reconstruir se já funciona"). Medido:
+1265px→1400px, cabendo 5 colunas em vez de 4 no mesmo espaço de tela.
+
+**Ritmo vertical reduzido seletivamente**: `--space-9/10/12/14` (os degraus **grandes** — padding
+de seção, gap do showcase, margem do rodapé, padding do herói/CTA) caíram 14-21%
+(56→48, 72→60, 104→84, 136→108). `--space-1` a `--space-8` (espaço **dentro** de card/botão/linha)
+ficaram intocados de propósito — a ideia era cortar o excesso **entre** blocos, não comprimir o
+site inteiro; como os quatro tokens grandes já alimentavam várias propriedades de uma vez
+(`padding-block` de `.sp-section`/`.sp-section--tight`, `margin-bottom` de `.sp-section__head`,
+`padding-block` do herói, `gap` do showcase, `padding` do CTA, `margin-top` do rodapé), a redução
+chegou a todas elas sem editar cada regra individualmente.
+
+**Tensão resolvida no pedido**: a mensagem pedia "não adicionar animações" e, ao final, "mais
+elementos interativos/transições ao rolar a página" — contradição direta. Resolvido pelo caminho
+mais conservador: o site já tinha um mecanismo de *reveal* ao rolar (`data-reveal` +
+`IntersectionObserver`, `layout.ts`, desde a Etapa 31M, com guarda de `prefers-reduced-motion` e
+sem esconder conteúdo sem JS), mas cobria só a home. Estendido a 8 seções em 6 páginas internas
+(`como-funciona`, `funcionalidades`, `privacidade`, `termos`, `seguranca`, `excluir-conta`,
+`status`, `suporte`) — zero código novo, zero biblioteca, zero animação nova, só ampliação de
+cobertura de uma animação já existente e já aprovada.
+
+**Nada tocado fora do escopo**: identidade Spartan Signal, paleta, screenshots, máscaras de
+conta, header/nav, comportamento do Caddy, rotas, API, autenticação, tickets, Desktop,
+infraestrutura, conteúdo legal/factual — confirmado por leitura direta do DOM que os marcadores
+`[Revisão jurídica necessária]` seguem presentes e intocados. `.sp-showcase__row` (coluna estreita
+ao lado da captura) não foi alterada, por exclusão explícita de screenshots/efeitos desta etapa.
+
+**Validado no dev server real** (Vite) via `getComputedStyle`/`getBoundingClientRect` — não
+captura de tela (Browser pane sem composição de frame nesta sessão, mesma limitação já registrada
+na Etapa 31M): as 9 páginas públicas reais em 390px (0/9 overflow); home/como-funciona em 360px;
+home/como-funciona/funcionalidades/privacidade em 768/1280/1920px; home/funcionalidades em
+1440px — **zero overflow em todas as combinações**, valores medidos batendo com o cálculo
+esperado em cada caso. Um artefato da própria ferramenta de automação foi contornado durante a
+validação (`resize_window` sem navegação completa em seguida deixava expressões `vw` dentro de
+`clamp()` presas na largura anterior — resolvido navegando a página depois de cada resize antes
+de medir; não é comportamento do site). Reveal confirmado funcionando como desenhado: neste
+ambiente `prefers-reduced-motion: reduce` é `true` por padrão, e a guarda pulou a animação
+corretamente (conteúdo em `opacity: 1`) nas 8 seções novas, mesmo comportamento já documentado
+na 31M. Zero erro de console.
+
+**Nenhum teste novo**: mudança 100% CSS/atributo de apresentação, sem comportamento novo pra
+cobrir — os 102 testes já existentes do site (nenhum fixava valor de `ch`/`px`) continuaram
+passando sem alteração. **1340 testes** no monorepo (raiz 15, site 102, core 635, riot 97, api
+353, desktop 138) + analyzer 1/1, mesmo total de antes da etapa. `typecheck`/`lint`/`build`
+completos nos 5 pacotes.
+
 ## Etapa 31N: rotas públicas limpas e Central de Suporte
 
 Site já publicado e com infraestrutura funcional (domínio, HTTPS, Caddy, Docker, healthcheck,
