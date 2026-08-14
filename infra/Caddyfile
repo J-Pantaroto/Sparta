@@ -37,7 +37,35 @@ spartagg.com.br {
 	# 	reverse_proxy api:3333
 	# }
 
+	# --- URLs públicas sem `.html` ---------------------------------------
+	#
+	# 1) A URL canônica de toda página é sem extensão. Pedido a
+	#    `/pagina.html` responde 301 para `/pagina`, então a versão `.html`
+	#    nunca serve conteúdo e não existe canônico duplicado.
+	#
+	#    O regex exige que o caractere após a primeira barra NÃO seja outra
+	#    barra: sem isso, um pedido a `//exemplo.com/x.html` seria capturado
+	#    como `/exemplo.com/x` e o redirect viraria `//exemplo.com/x`, que o
+	#    navegador lê como URL protocol-relative — um open redirect. Com a
+	#    guarda, esse caminho simplesmente não casa e cai no 404.
+	#
+	#    `/404.html` fica de fora de propósito: é a página de erro servida
+	#    por `handle_errors`, não uma rota pública.
+	redir /index.html / 301
+	@legado {
+		path_regexp legado ^/([^/].*)\.html$
+		not path /404.html
+	}
+	redir @legado /{re.legado.1} 301
+
 	root * /srv
+
+	# 2) `/pagina` serve `/srv/pagina.html` por reescrita INTERNA (200, sem
+	#    redirect). `try_files` roda depois de `redir` na ordem de diretivas
+	#    do Caddy, então a reescrita não volta a passar pelo redirect — não
+	#    há laço. Caminho inexistente segue para o `file_server` e vira 404.
+	try_files {path} {path}.html
+
 	file_server
 
 	# Página 404 real (apps/site/404.html) em vez do texto genérico do Caddy —

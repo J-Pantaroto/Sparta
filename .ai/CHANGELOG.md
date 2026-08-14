@@ -22,6 +22,17 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-08-14 16:20 — Etapa 31N: rotas públicas limpas e Central de Suporte
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0057-rotas-limpas-central-suporte.md`
+
+URLs públicas sem `.html` (`try_files` no Caddy + 301 dos caminhos legados, com guarda contra
+open redirect protocol-relative) e nova Central de Suporte em `/suporte`, com 6 categorias, canal
+real `suporte@spartagg.com.br` e CTA `mailto:` — sem formulário, sem SLA inventado e sem backend.
+Rodapé reestruturado em Produto/Confiança/Conta/Suporte. Validado por HTTP real em container
+Caddy com a config de produção. Nenhuma autenticação, API ou sistema de tickets foi criado.
+Ver `docs/public-routes-and-support.md`.
+
 ## 2026-08-14 12:10 — Etapa 31M: redesign visual do site público ("Spartan Signal")
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0056-redesign-visual-site-spartan-signal.md`

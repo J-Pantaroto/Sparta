@@ -13,19 +13,25 @@ const PAGINAS = [
   "seguranca.html",
   "excluir-conta.html",
   "status.html",
+  "suporte.html",
   "404.html"
 ];
 
-/** Paginas que de fato existem - qualquer href interno fora disto e link morto. */
+/**
+ * Rotas publicas canonicas - todas SEM `.html`. O arquivo no disco continua
+ * sendo `pagina.html`; quem faz a ponte e o `try_files` do Caddy. Qualquer
+ * href interno fora deste conjunto e link morto.
+ */
 const ROTAS_VALIDAS = new Set([
   "/",
-  "/como-funciona.html",
-  "/funcionalidades.html",
-  "/privacidade.html",
-  "/termos.html",
-  "/seguranca.html",
-  "/excluir-conta.html",
-  "/status.html"
+  "/como-funciona",
+  "/funcionalidades",
+  "/privacidade",
+  "/termos",
+  "/seguranca",
+  "/excluir-conta",
+  "/status",
+  "/suporte"
 ]);
 
 function ler(nome: string): string {

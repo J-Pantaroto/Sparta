@@ -5,31 +5,35 @@
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://spartagg.com.br/como-funciona.html</loc>
+    <loc>https://spartagg.com.br/como-funciona</loc>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://spartagg.com.br/funcionalidades.html</loc>
+    <loc>https://spartagg.com.br/funcionalidades</loc>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://spartagg.com.br/privacidade.html</loc>
+    <loc>https://spartagg.com.br/privacidade</loc>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://spartagg.com.br/termos.html</loc>
+    <loc>https://spartagg.com.br/termos</loc>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://spartagg.com.br/seguranca.html</loc>
+    <loc>https://spartagg.com.br/seguranca</loc>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://spartagg.com.br/excluir-conta.html</loc>
+    <loc>https://spartagg.com.br/excluir-conta</loc>
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://spartagg.com.br/status.html</loc>
+    <loc>https://spartagg.com.br/status</loc>
     <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://spartagg.com.br/suporte</loc>
+    <priority>0.6</priority>
   </url>
 </urlset>

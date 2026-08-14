@@ -1,5 +1,69 @@
 # Sparta - Contexto para Continuidade
 
+## Etapa 31N: rotas públicas limpas e Central de Suporte
+
+Site já publicado e com infraestrutura funcional (domínio, HTTPS, Caddy, Docker, healthcheck,
+`suporte@spartagg.com.br` operacional, MX/SPF/DKIM/DMARC). Esta etapa mexeu **só na arquitetura
+de rotas públicas e numa página nova** — nenhum backend criado. Relatório em
+`docs/public-routes-and-support.md`.
+
+**Estratégia de URL limpa, e por que não a "óbvia"**: a saída em diretório
+(`/como-funciona/index.html`) é a que o pedido preferia, mas o `file_server` do Caddy
+canonicaliza diretório para **barra final** — a URL pública viraria `/como-funciona/`, e forçar a
+versão sem barra exigiria `try_files` **mais** um redirect de `/x/` → `/x`, senão as duas
+responderiam 200 e haveria canônico duplicado. Escolhido então **arquivo plano +
+`try_files {path} {path}.html`**: entrega exatamente `/como-funciona`, com **zero mudança de
+build**, e sem duplicata (a versão `.html` responde 301 em vez de servir). Trade-off registrado:
+as URLs limpas dependem do `infra/Caddyfile` — que vive neste repositório, ao lado do site.
+
+**Open redirect evitado por construção**: o regex do redirect é `^/([^/].*)\.html$`, não
+`^/(.+)\.html$`. Com o segundo, `//exemplo.com/x.html` seria capturado como `exemplo.com/x` e o
+`Location` sairia `//exemplo.com/x` — protocol-relative, ou seja, open redirect. Testado contra o
+Caddy real com `//evil.com/x.html`, `///evil.com/x.html` e `/%2F%2Fevil.com/x.html`: as três
+colapsam para `Location: /evil.com/x`, caminho de barra única na própria origem.
+
+**Sem laço, por ordem de diretiva**: `redir` roda **antes** de `try_files` no Caddy. `/pagina.html`
+redireciona uma vez; `/pagina` não casa o matcher e é resolvido por reescrita **interna** (200),
+que não reentra no redirect. Medido: **1 salto, sempre**. `/404.html` fica fora do redirect de
+propósito — é página de erro do `handle_errors`, não rota.
+
+**Central de Suporte** (`/suporte`, nova): 6 categorias dizendo *o que enviar* (com link para
+`/excluir-conta`, `/seguranca` e `/privacidade` quando a página dedicada existe),
+`suporte@spartagg.com.br` em destaque e CTA `mailto:` com assunto pré-preenchido. **Sem
+`<form>`/`<input>`/`<textarea>`/`<button>`** — travado por teste, porque não existe backend de
+tickets e formulário que não envia é pior que nenhum. **Nenhum SLA inventado**: a página declara
+explicitamente que não há prazo de resposta comprometido publicamente.
+
+**Rodapé** reestruturado em Produto / Confiança / Conta / Suporte. A grade só vira marca + 4
+colunas a partir de **1180px** — abaixo disso a coluna ficaria com ~140px e o e-mail (23
+caracteres) transbordaria. O header **não** ganhou "Suporte": 4 itens + CTA já é a hierarquia
+certa, e a Central fica no rodapé, que é onde se procura suporte.
+
+**Validação HTTP real, não presumida**: o bloco do site foi extraído do `infra/Caddyfile` byte a
+byte (só o endereço trocado para `:8081`, sem TLS) e rodado em container `caddy:2-alpine` sobre o
+`dist`. `caddy validate` → *Valid configuration*. 8 legados `.html` → **301** com Location correto;
+`/index.html` → **301 → `/`**; 9 rotas limpas → **200**; `/rota-inexistente` → **404** servindo o
+404 do site com `noindex`; CSP/HSTS/X-Frame-Options/X-Content-Type-Options presentes na resposta.
+
+**Nota metodológica**: a varredura de layout (10 páginas × 5 larguras = **50/50 sem overflow**,
+zero imagem quebrada, zero estilo inline, zero link `.html` no DOM, e-mail sem transbordar) rodou
+contra o **dev server**, não contra o container: a CSP de produção tem `frame-ancestors 'none'` e
+o navegador se recusa a enquadrar as páginas servidas pelo Caddy. Isso é o comportamento correto e
+acabou servindo de confirmação de que o hardening está ativo — markup e CSS são os mesmos.
+
+**Ausências deliberadas, travadas por teste**: nenhuma página linka para `/login`, `/criar-conta`,
+`/register`, `/conta` ou `/conta/tickets`, e esses arquivos não existem. Nenhuma página "em breve"
+foi criada. API pública continua desligada; autenticação web, sessão, JWT, banco de usuários e
+backend de tickets **não** foram implementados. A possibilidade de conta única
+(Desktop + site + suporte) e de `/conta/tickets` existe **só na documentação**, sem data.
+
+**Caddy alterado no mínimo**: duas adições (`redir` + `try_files`), nada removido. TLS automático,
+HTTP→HTTPS, `www`→apex, todos os headers, CSP, `encode`, `handle_errors`, o bloco reservado da
+futura API e `/healthz` preservados — conferido por teste que lê o `Caddyfile`.
+
+**1340 testes** (raiz 15, site **102** — eram 58 —, core 635, riot 97, api 353, desktop 138) +
+analyzer 1/1, todos verdes numa única execução. `typecheck`/`lint`/`build` completos nos 5 pacotes.
+
 ## Etapa 31M: redesign visual do site público — identidade "Spartan Signal"
 
 Primeira etapa executada com o site **já publicado** em `spartagg.com.br` (confirmado nesta sessão:

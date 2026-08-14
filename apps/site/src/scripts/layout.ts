@@ -14,27 +14,35 @@ interface NavLink {
   label: string;
 }
 
+/*
+ * Toda rota publica e sem `.html`. O servidor resolve `/pagina` para
+ * `pagina.html` por reescrita interna (ver `infra/Caddyfile`), e a versao
+ * com extensao responde 301 pra ca - entao nenhum link daqui deve voltar a
+ * usar `.html`, sob pena de gerar um salto de redirect desnecessario.
+ */
+
 /** Navegacao principal - somente paginas que existem de verdade. */
 const NAV_LINKS: NavLink[] = [
   { href: "/", label: "Início" },
-  { href: "/como-funciona.html", label: "Como funciona" },
-  { href: "/funcionalidades.html", label: "Funcionalidades" },
-  { href: "/status.html", label: "Status" }
+  { href: "/como-funciona", label: "Como funciona" },
+  { href: "/funcionalidades", label: "Funcionalidades" },
+  { href: "/status", label: "Status" }
 ];
 
 const FOOTER_PRODUTO: NavLink[] = [
-  { href: "/", label: "Início" },
-  { href: "/como-funciona.html", label: "Como funciona" },
-  { href: "/funcionalidades.html", label: "Funcionalidades" },
-  { href: "/status.html", label: "Status" }
+  { href: "/como-funciona", label: "Como funciona" },
+  { href: "/funcionalidades", label: "Funcionalidades" },
+  { href: "/status", label: "Status" }
 ];
 
-const FOOTER_LEGAL: NavLink[] = [
-  { href: "/privacidade.html", label: "Privacidade" },
-  { href: "/termos.html", label: "Termos de uso" },
-  { href: "/seguranca.html", label: "Segurança" },
-  { href: "/excluir-conta.html", label: "Excluir conta" }
+/** Confianca: o que o usuario consulta antes de decidir se entrega dados. */
+const FOOTER_CONFIANCA: NavLink[] = [
+  { href: "/privacidade", label: "Privacidade" },
+  { href: "/seguranca", label: "Segurança" },
+  { href: "/termos", label: "Termos de uso" }
 ];
+
+const FOOTER_CONTA: NavLink[] = [{ href: "/excluir-conta", label: "Excluir conta" }];
 
 const SUPORTE_EMAIL = "suporte@spartagg.com.br";
 
@@ -83,7 +91,7 @@ export function renderHeader(): string {
         aria-controls="sp-nav"
       >Menu</button>
       <nav class="sp-nav" id="sp-nav" aria-label="Navegação principal">${items}</nav>
-      <a class="sp-btn sp-btn--ghost" href="/status.html">Ver status</a>
+      <a class="sp-btn sp-btn--ghost" href="/status">Ver status</a>
     </div>
   `;
 }
@@ -114,10 +122,12 @@ export function renderFooter(): string {
           </p>
         </div>
         ${footerColumn("Produto", FOOTER_PRODUTO)}
-        ${footerColumn("Legal", FOOTER_LEGAL)}
+        ${footerColumn("Confiança", FOOTER_CONFIANCA)}
+        ${footerColumn("Conta", FOOTER_CONTA)}
         <div class="sp-footer__col">
-          <h2>Contato</h2>
+          <h2>Suporte</h2>
           <ul>
+            <li><a href="/suporte">Central de suporte</a></li>
             <li><a href="mailto:${SUPORTE_EMAIL}">${SUPORTE_EMAIL}</a></li>
           </ul>
         </div>

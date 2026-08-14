@@ -19,7 +19,8 @@ describe("rodapé global - referência à Riot Games", () => {
   it("renderFooter() inclui o disclaimer e o link pros Termos de uso em toda página", () => {
     const html = renderFooter();
     expect(html).toContain(RIOT_DISCLAIMER);
-    expect(html).toContain('href="/termos.html"');
+    // URL limpa: a rota canônica dos termos deixou de ter `.html`.
+    expect(html).toContain('href="/termos"');
   });
 
   it("o rodapé não contém link pra localhost nem pro GitHub como substituto de site", () => {

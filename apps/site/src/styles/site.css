@@ -708,6 +708,30 @@
 }
 
 /* ====================================================================== */
+/* Central de Suporte                                                      */
+/* ====================================================================== */
+
+/* Endereço de contato em destaque. `overflow-wrap: anywhere` é necessário:
+   `suporte@spartagg.com.br` tem 23 caracteres e, em mono a 19px, estoura a
+   largura útil de uma tela de 360px se não puder quebrar. */
+.sp-mail {
+  display: inline-block;
+  margin-top: var(--space-6);
+  font-family: var(--font-mono);
+  font-size: var(--text-lg);
+  color: var(--text-primary);
+  text-decoration: none;
+  border-bottom: 1px solid var(--crimson-edge);
+  overflow-wrap: anywhere;
+  transition: color var(--dur-fast) var(--ease-out);
+}
+
+.sp-mail:hover {
+  color: var(--signal);
+  border-bottom-color: var(--signal);
+}
+
+/* ====================================================================== */
 /* Callout                                                                 */
 /* ====================================================================== */
 
@@ -807,7 +831,7 @@
 
 @media (min-width: 700px) {
   .sp-footer__grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .sp-footer__brand {
@@ -815,9 +839,14 @@
   }
 }
 
-@media (min-width: 1040px) {
+/*
+ * Marca + 4 colunas só a partir de 1180px. Abaixo disso a coluna ficaria com
+ * ~140px e `suporte@spartagg.com.br` (23 caracteres) transbordaria - por isso
+ * o breakpoint é mais alto que o dos outros blocos, e não 1040px.
+ */
+@media (min-width: 1180px) {
   .sp-footer__grid {
-    grid-template-columns: minmax(0, 1.6fr) repeat(3, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1.4fr) repeat(4, minmax(0, 1fr));
   }
 
   .sp-footer__brand {
@@ -857,6 +886,8 @@
   font-size: var(--text-sm);
   color: var(--text-secondary);
   text-decoration: none;
+  /* Rede de seguranca: o endereco de e-mail e o item mais longo do rodape. */
+  overflow-wrap: anywhere;
 }
 
 .sp-footer__col a:hover {

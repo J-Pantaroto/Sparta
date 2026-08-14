@@ -27,6 +27,7 @@ export default defineConfig({
         excluirConta: resolve(root, "excluir-conta.html"),
         seguranca: resolve(root, "seguranca.html"),
         status: resolve(root, "status.html"),
+        suporte: resolve(root, "suporte.html"),
         notFound: resolve(root, "404.html")
       }
     }
