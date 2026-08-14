@@ -1,0 +1,26 @@
+diff --git a/index.js b/index.js
+index 23384ea16bb848616886f356d8d69f94325535bf..e66ec7d1df8335000beec58bf4f86349f4de2533 100644
+--- a/index.js
++++ b/index.js
+@@ -126,6 +126,21 @@ class Extractor {
+ 
+     if (symlink) {
+       const link = await getStream(readStream)
++
++      // GHSA-jmr9-qjv8-65gv / CVE-2026-56876: upstream never validated where a
++      // symlink entry's TARGET points (only the entry's own destination path was
++      // checked, above in extract()). A malicious zip can ship a symlink whose
++      // link content is an absolute path or a relative path such as
++      // "../../../../etc/passwd", letting it point outside opts.dir. No fixed
++      // extract-zip release exists (last publish 2020), so this mirrors the same
++      // containment check already used for destDir, applied to the resolved
++      // link target.
++      const resolvedTarget = path.resolve(path.dirname(dest), link)
++      const relativeTarget = path.relative(this.opts.dir, resolvedTarget)
++      if (path.isAbsolute(link) || relativeTarget.split(path.sep).includes('..')) {
++        throw new Error(`Out of bound symlink target "${link}" found while processing file ${entry.fileName}`)
++      }
++
+       debug('creating symlink', link, dest)
+       await fs.symlink(link, dest)
+     } else {

@@ -1,5 +1,64 @@
 # Sparta - Contexto para Continuidade
 
+## Etapa 31P: Dependabot high #44 (extract-zip) resolvido via patch local
+
+O GitHub sinalizou `extract-zip` `GHSA-jmr9-qjv8-65gv`/`CVE-2026-56876` (CVSS 8.1, path
+traversal por symlink com alvo não validado, `<= 2.0.1`) como alerta #44 depois do push da
+Etapa 31O. Relatório completo em `docs/dependabot-extract-zip-2026-08.md`.
+
+**Cadeia real, não achismo**: `extract-zip@2.0.1` só existe na árvore via
+`electron@39.8.10` → `devDependency` de `apps/desktop` (confirmado: `electron` está em
+`devDependencies`, nunca `dependencies`) → usado pelo próprio postinstall do pacote `electron`
+(via `@electron/get`) pra descompactar o binário oficial do Electron baixado do GitHub Releases
+da Electron. **Classificação: `BUILD_TIME_ONLY`** — roda uma vez em `pnpm install`, nunca em
+produção; `devDependencies` não entram no `app.asar` (allowlist estrita desde a Etapa 30A); e o
+zip processado é o release oficial do próprio Electron, não um arquivo de origem não confiável
+no sentido descrito pelo advisório.
+
+**A falha real, lida no código**: `extract-zip` valida que o **diretório** de cada entrada
+(`destDir`) fica dentro da árvore de extração, mas nunca validava o **alvo** de uma entrada
+symlink — `fs.symlink(link, dest)` rodava sem checar se `link` (caminho absoluto ou relativo tipo
+`../../../../etc/passwd`) escapava do diretório de destino.
+
+**Sem versão corrigida pra atualizar**: `first_patched_version: null` no advisory, confirmado no
+registro do npm (`npm view extract-zip versions`) — a última versão publicada é `2.0.1`, de
+2020-06-10; o pacote está sem release há mais de 5 anos. Não existe "atualizar pro mínimo
+corrigido" possível aqui.
+
+**Correção: patch local via `pnpm patch`** (`patches/extract-zip@2.0.1.patch`, registrado em
+`package.json` → `pnpm.patchedDependencies` e no lockfile) — a menor mudança segura possível
+dado que não há upgrade disponível. O patch espelha, de propósito, a mesma checagem de
+contenção que o próprio `index.js` já usa pra `destDir` (`relativeDestDir.split(path.sep).
+includes('..')`), agora aplicada ao alvo **resolvido** do symlink: caminho absoluto ou relativo
+que escaparia do diretório de extração faz `extract-zip` lançar erro antes de criar o symlink,
+em vez de criar silenciosamente. Nenhuma outra dependência foi tocada — o diff do lockfile é só
+o registro do patch e o sufixo `patch_hash=...` nas duas referências de `extract-zip` dentro de
+`electron@39.8.10`.
+
+**Teste real do exploit, não só leitura de código**: `scripts/extract-zip-patch.test.ts` (3
+testes, suíte raiz) monta um `.zip` mínimo cru (header local + diretório central + EOCD escritos
+byte a byte, CRC-32 sem tabela — nenhuma lib de escrita de zip existia no projeto, e não valia
+adicionar uma só pra isto) com uma entrada symlink e confirma: (1) alvo relativo que escapa
+(`../../../../etc/passwd`) → rejeitado, nada criado; (2) alvo absoluto → rejeitado; (3) alvo
+relativo legítimo dentro do diretório de extração → continua funcionando normalmente, provando
+que o patch não quebrou o uso real do recurso. `extract-zip` entrou como devDependency explícita
+da raiz (versão exata `2.0.1`, a mesma travada pelo patch) só pra esse teste importar o pacote —
+não é usado por nenhum código de produto.
+
+**`pnpm audit` continua acusando `extract-zip` como `high`, e isso é esperado**: audit/Dependabot
+leem a **versão declarada** no lockfile (`2.0.1`), não o conteúdo patchado — não existe hoje
+ferramenta de auditoria que entenda `pnpm.patchedDependencies` como remediação. O risco real (o
+código que de fato executa) está fechado; o que pode continuar sinalizado automaticamente é só a
+leitura de versão. Confirmado real, não presumido: `pnpm install` reconstruído do zero rodou o
+postinstall real do `electron` (que de fato exercita `extract-zip` patchado, descompactando o
+binário oficial) sem erro, e o arquivo instalado em `.pnpm/extract-zip@2.0.1_patch_has_.../
+index.js` contém o trecho do patch.
+
+**1343 testes** no monorepo (raiz **18** — eram 15 —, site 102, core 635, riot 97, api 353,
+desktop 138) + analyzer 1/1, todos verdes. `typecheck`/`lint`/`build` completos nos 5 pacotes.
+Nenhum arquivo de `apps/`/`packages/` fora do lockfile/patch/teste novo foi tocado — confirmado
+por `git diff --stat` antes do commit.
+
 ## Etapa 31O: refino tipográfico e largura de conteúdo do site
 
 Pedido explícito do usuário logo após a 31N: **não** um redesign — passe exclusivo de largura de
