@@ -466,7 +466,7 @@ function PreGameDraftBoard({
             championId: draft.selectedChampionId,
             championName:
               catalog.find((champion) => champion.id === draft.selectedChampionId)?.name ??
-              `Campeao ${draft.selectedChampionId}`,
+              `Campeão ${draft.selectedChampionId}`,
             role: draft.playerRole,
             team: "ally" as const
           }
@@ -481,7 +481,7 @@ function PreGameDraftBoard({
         <strong>Leitura do draft</strong>
         <span>
           {draft.allies.length + draft.enemies.length + (draft.selectedChampionId ? 1 : 0)} de 10
-          campeoes conhecidos
+          campeões conhecidos
         </span>
         <small>Sem completar picks ou posicoes ausentes</small>
       </div>
@@ -528,7 +528,7 @@ function PreGameTeam({
               <ChampionAvatar
                 championId={pick.championId}
                 ddragonVersion={ddragonVersion}
-                alt={`${pick.championName}${pick.role ? `, ${roleLabels[pick.role]}` : ", posicao desconhecida"}${direct ? ", adversario direto confirmado" : ""}`}
+                alt={`${pick.championName}${pick.role ? `, ${roleLabels[pick.role]}` : ", posição desconhecida"}${direct ? ", adversário direto confirmado" : ""}`}
               />
               {direct && <small>Direto</small>}
             </span>

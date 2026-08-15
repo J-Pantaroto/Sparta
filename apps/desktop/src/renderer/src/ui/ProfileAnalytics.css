@@ -8,7 +8,7 @@
   border-radius: var(--radius-xl);
   background:
     radial-gradient(circle at 92% 0%, var(--color-accent-glow), transparent 38%),
-    linear-gradient(135deg, var(--surface-3), var(--surface-veil-strong));
+    linear-gradient(135deg, var(--surface-veil-strong), var(--surface-veil));
   backdrop-filter: blur(var(--glass-blur));
   -webkit-backdrop-filter: blur(var(--glass-blur));
   box-shadow: var(--shadow-lg);
@@ -255,6 +255,13 @@
   stroke-width: 3;
   filter: drop-shadow(0 0 5px var(--chart-glow));
 }
+/* Preenchimento sob a linha - so o `TemporalChart` (Evolucao pessoal) usa;
+   `TrendChart` (Perfil) nao desenha essa camada, entao fica sem efeito la. */
+.sp-trend-chart__area {
+  fill: var(--color-accent-glow);
+  opacity: 0.5;
+  stroke: none;
+}
 .sp-trend-chart__point {
   stroke: var(--surface-1);
   stroke-width: 3;
@@ -284,6 +291,32 @@
   display: grid;
   grid-template-columns: 110px repeat(3, minmax(0, 1fr));
   gap: var(--space-2);
+}
+/* `TemporalChart` (Evolucao) tem so 2 spans por linha (valor + resultado),
+   nao 3 - coluna dedicada evita uma 4a celula vazia sobrando no layout. */
+.sp-trend-chart__text-values--compact li {
+  grid-template-columns: 90px repeat(2, minmax(0, 1fr));
+}
+
+/* ─── Sparkline compacta (indicadores secundarios da Evolucao) ────────── */
+
+.sp-sparkline {
+  display: block;
+  width: 100%;
+  height: 34px;
+}
+
+.sp-sparkline polyline {
+  fill: none;
+  stroke: var(--chart-primary);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.sp-sparkline circle {
+  fill: var(--chart-primary);
+  stroke: none;
 }
 .sp-trend-empty {
   display: grid;
@@ -502,7 +535,10 @@
 
 @container sp-matchlist (max-width: 800px) {
   .sp-recent-match {
-    grid-template-columns: auto minmax(96px, 1fr) minmax(88px, 0.7fr) minmax(140px, 1.2fr) minmax(92px, 0.8fr);
+    grid-template-columns: auto minmax(96px, 1fr) minmax(88px, 0.7fr) minmax(140px, 1.2fr) minmax(
+        92px,
+        0.8fr
+      );
   }
   .sp-recent-match__loadout {
     display: none;

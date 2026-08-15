@@ -3,7 +3,7 @@ import { requestPasswordReset } from "../services/api-client";
 import { AuthForm, AuthLayout, Button, Field, SignalChip, TextField } from "../ui";
 
 interface ForgotPasswordScreenProps {
-  splashUrl: string;
+  splashUrl: string | null;
   onReturnToLogin: () => void;
 }
 

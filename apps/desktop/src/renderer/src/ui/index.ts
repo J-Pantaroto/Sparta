@@ -54,6 +54,9 @@ export {
 } from "./States";
 export { StatBar } from "./StatBar";
 export { InfoHint, Tooltip } from "./Tooltip";
+export { TemporalChart, TemporalSparkline, type TemporalChartPoint } from "./TemporalChart";
+export { SpartaIdentityBackdrop } from "./SpartaIdentity";
+export { BRAND_MARK_URL } from "./brand-mark";
 export {
   ChampionPerformanceCard,
   CoverageBadge,

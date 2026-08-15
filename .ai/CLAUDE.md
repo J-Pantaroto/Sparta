@@ -1,5 +1,38 @@
 # Sparta - Contexto para Continuidade
 
+## Etapa 31M.1: identidade visual dinâmica e evolução pessoal do Desktop
+
+Fecha os três pontos visuais deixados após a 31M. A tela **Evolução pessoal** agora começa por uma
+série SVG partida a partida derivada diretamente de `PlayerProfileOverview.performanceTrend`:
+`performanceIndex` como leitura principal e KDA, CS/min, visão/min e participação em objetivos como
+quatro sparklines auxiliares. Cada observação mantém `matchId`/data/resultado; zero real é mantido;
+não há interpolação, suavização nem métrica nova. Abaixo de 3 observações, nenhum gráfico é
+desenhado e a UI diz “Histórico insuficiente para medir evolução”. Comparações por bloco e barras
+anteriores continuam, mas depois da série temporal. Relatório em
+`docs/desktop-dynamic-identity-growth.md`.
+
+A splash escolhida passou de banner repetido a **uma camada ambiente única do `AppShell`**, atrás
+do conteúdo, com máscara, vinheta e opacidade controlada; intensidade reduzida a oculta e reduced
+motion elimina a transição perceptível. Sem campeão, o estado é deliberadamente **Sparta**, não
+Ahri: o contexto usa uma sentinela não persistida e login/shell renderizam `SpartaIdentityBackdrop`
+com a geometria Spartan Signal. O bloco vermelho “S” foi trocado pelo símbolo oficial auditado em
+`apps/site/public/img/favicon.png`; a cópia necessária ao bundle renderer é byte a byte idêntica
+(`62e228ba…29e6`) e tem a origem documentada. Nenhuma imagem foi gerada ou baixada.
+
+QA Electron/CDP real, instância única: 10 telas × 1000/1280/1600 = **30/30 sem overflow**, zero
+imagem quebrada, texto inválido, erro de console, exceção ou HTTP >= 400. A interface real aplicou
+Viego/Fera Lunar no Adaptativo (`hsl(23 100% 62%)`), sem splash duplicada; temas Espartano,
+Obsidiana e Adaptativo, densidade/intensidade, reduced motion, tooltip e Tab real passaram. Uma
+regressão de especificidade em `Field.css` que anulava o anel de teclado foi corrigida; o foco
+programático do `<h1 tabindex="-1">` de `399d990` continua sem anel. “League não detectado” e
+“campeões” corrigidos. “Runa 8128” continua honesta porque não existe catálogo local factual e
+adicionar integração Riot seria fora do escopo.
+
+O diff funcional está integralmente em `apps/desktop/src/renderer/`: motor, API, Prisma, auth, LCU,
+site, Docker, scoring, pesos, métricas e contratos não foram tocados. Postgres confirmou
+`release-etapa27c-v1` `ACTIVE`, ponteiro e hashes congelados iguais, e o bundle mais recente em
+`EXACT_REPLAY`, sem divergências/rejeições/dependências.
+
 ## Etapa 31M: polimento visual final do Desktop
 
 Leva o Desktop de "visualmente estável" para acabado. O design system já estava maduro (tokens por
@@ -8,7 +41,7 @@ cada mudança nasceu de um número, não de impressão. Relatório em `docs/desk
 
 **A decisão mais importante é a regra de contraste do destaque, e ela não é intercambiável.**
 `--color-accent` é dinâmico (derivado da splash da skin) e sua faixa travada (S>=55%, L 45%-62%)
-garante que a cor seja *visível*, mas **não** que seja legível como texto: medido sobre
+garante que a cor seja _visível_, mas **não** que seja legível como texto: medido sobre
 `--surface-2`, um azul (240) em L=45% dá 2,06:1 e mesmo no teto de 62% fica em 4,13:1; o vermelho
 Espartano padrão dá 3,94:1. E o accent era usado como cor de texto em 11 lugares. Separado em
 `--color-accent` (preenchimento/borda/marcador, nunca texto) e `--color-accent-text` (única
@@ -23,7 +56,7 @@ caso possível ainda reprovava em 4,47:1. (2) O anel de foco prometia "halo escu
 nenhuma regra implementava — sobre splash clara ele sumia; o halo agora existe, e o anel deixou de
 usar o accent cru (2,06:1 no pior caso) pela variante legível.
 
-**`--text-muted` reprovava AA em toda superfície** (3,38-3,99:1) e é o token dos textos *menores*
+**`--text-muted` reprovava AA em toda superfície** (3,38-3,99:1) e é o token dos textos _menores_
 do app (10-11px, 102 usos) — a pior combinação possível. `#6f6f7b` → `#8a8a98`, preservando os três
 degraus de hierarquia (15,27 / 6,87 / 4,93 sobre `--surface-4`).
 
@@ -42,7 +75,7 @@ loadout` escondia **~4 dos 8 itens** silenciosamente (`overflow: hidden` numa co
 fileiras preservando tudo; (2) `.sp-dashboard-matches` sem `grid-template-columns` deixava a
 trilha implícita virar min-content e a linha **vazava 110px para fora do cartão**; (3) o
 `@media (max-width: 1280px)` nunca poderia corrigir o Dashboard, porque media query enxerga o
-*viewport* e o cartão continua com ~530px mesmo em 1600px — substituído por **container queries**
+_viewport_ e o cartão continua com ~530px mesmo em 1600px — substituído por **container queries**
 (Chromium 142), com breakpoints somados dos mínimos reais (924/798/662px). Mais truncamento
 faltando no `strong` do histórico de drafts (invadia 17-19px) e "Sincronização" vazando 9px.
 
@@ -115,7 +148,7 @@ mecanismo.
 **Deep link avaliado e descartado antes de escrever código.** O pedido explicitamente pedia pra
 considerar deep link/protocolo do Desktop antes de criar página pública. Descartado por ser a
 opção mais frágil, não a mais simples: exige `app.setAsDefaultProtocolClient` (só funciona
-*instalado*), tratamento de `open-url`/`second-instance`, e falha se o app não estiver aberto na
+_instalado_), tratamento de `open-url`/`second-instance`, e falha se o app não estiver aberto na
 máquina que recebeu o e-mail. Duas páginas públicas mínimas (`/confirmar-email`,
 `/redefinir-senha`, `apps/site`, Spartan Signal, sem framework, `noindex` e fora do sitemap de
 propósito) funcionam em qualquer cliente de e-mail, sem exigir o Desktop aberto. Nenhuma vira área
@@ -135,10 +168,10 @@ oráculo de 1 bit (o sinal só apareceria quando a conta existe e está desverif
 implementado ali de propósito; o estado "provider indisponível" continua coberto onde é seguro
 mostrá-lo — dentro do `ForgotPasswordScreen`, que já é 100% neutro por natureza.
 
-**Desktop sem redesign**: `ForgotPasswordScreen` (novo, só faz o *pedido* — o *consumo* do token
+**Desktop sem redesign**: `ForgotPasswordScreen` (novo, só faz o _pedido_ — o _consumo_ do token
 acontece na página pública, não no Desktop) e `EmailVerificationScreen` ganhou "Já confirmei,
 verificar novamente" (reconsulta `/auth/me` via `refreshOnboarding()`, já existente; só aparece
-quando há `sessionToken`, ou seja, quando o usuário chegou ali *depois* de logar — logo após o
+quando há `sessionToken`, ou seja, quando o usuário chegou ali _depois_ de logar — logo após o
 cadastro, sem sessão, o caminho continua sendo voltar e logar de novo).
 
 **Produção falha o boot sem as duas configurações novas** — `EMAIL_PROVIDER_API_KEY` e
@@ -376,7 +409,7 @@ chegou a todas elas sem editar cada regra individualmente.
 
 **Tensão resolvida no pedido**: a mensagem pedia "não adicionar animações" e, ao final, "mais
 elementos interativos/transições ao rolar a página" — contradição direta. Resolvido pelo caminho
-mais conservador: o site já tinha um mecanismo de *reveal* ao rolar (`data-reveal` +
+mais conservador: o site já tinha um mecanismo de _reveal_ ao rolar (`data-reveal` +
 `IntersectionObserver`, `layout.ts`, desde a Etapa 31M, com guarda de `prefers-reduced-motion` e
 sem esconder conteúdo sem JS), mas cobria só a home. Estendido a 8 seções em 6 páginas internas
 (`como-funciona`, `funcionalidades`, `privacidade`, `termos`, `seguranca`, `excluir-conta`,
@@ -435,7 +468,7 @@ redireciona uma vez; `/pagina` não casa o matcher e é resolvido por reescrita 
 que não reentra no redirect. Medido: **1 salto, sempre**. `/404.html` fica fora do redirect de
 propósito — é página de erro do `handle_errors`, não rota.
 
-**Central de Suporte** (`/suporte`, nova): 6 categorias dizendo *o que enviar* (com link para
+**Central de Suporte** (`/suporte`, nova): 6 categorias dizendo _o que enviar_ (com link para
 `/excluir-conta`, `/seguranca` e `/privacidade` quando a página dedicada existe),
 `suporte@spartagg.com.br` em destaque e CTA `mailto:` com assunto pré-preenchido. **Sem
 `<form>`/`<input>`/`<textarea>`/`<button>`** — travado por teste, porque não existe backend de
@@ -449,7 +482,7 @@ certa, e a Central fica no rodapé, que é onde se procura suporte.
 
 **Validação HTTP real, não presumida**: o bloco do site foi extraído do `infra/Caddyfile` byte a
 byte (só o endereço trocado para `:8081`, sem TLS) e rodado em container `caddy:2-alpine` sobre o
-`dist`. `caddy validate` → *Valid configuration*. 8 legados `.html` → **301** com Location correto;
+`dist`. `caddy validate` → _Valid configuration_. 8 legados `.html` → **301** com Location correto;
 `/index.html` → **301 → `/`**; 9 rotas limpas → **200**; `/rota-inexistente` → **404** servindo o
 404 do site com `noindex`; CSP/HSTS/X-Frame-Options/X-Content-Type-Options presentes na resposta.
 
@@ -683,8 +716,8 @@ conta antes do envio real, não escondido nem contornado.
 **Achado real que corrige uma decisão da própria Etapa 31K**: o site publica, desde a 31K, só o
 disclaimer do Legal Jibber Jabber ("Sparta GG was created under Riot Games' 'Legal Jibber
 Jabber' policy..."). A releitura contra a fonte oficial nesta etapa mostrou que essa mesma
-política declara explicitamente uma categoria separada — *"commercial Projects that both (1)
-comply with our API Terms and API Policies; and (2) use a currently valid Riot API key"* — e que
+política declara explicitamente uma categoria separada — _"commercial Projects that both (1)
+comply with our API Terms and API Policies; and (2) use a currently valid Riot API key"_ — e que
 a política específica de LoL exige **seu próprio** texto de disclaimer ("[Your Product Name] is
 not endorsed by Riot Games and does not reflect the views or opinions of Riot Games or anyone
 officially involved in producing or managing Riot Games properties."), **não intercambiável** com

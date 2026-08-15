@@ -22,6 +22,21 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-08-15 12:38 — Etapa 31M.1: identidade visual dinâmica e evolução pessoal
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0066-identidade-visual-dinamica-evolucao-pessoal.md`
+
+Evolução pessoal agora abre com uma série real por partida (`performanceTrend`) e quatro sinais
+temporais auxiliares, sem interpolação, suavização ou histórico fabricado; abaixo de três pontos a
+UI declara histórico insuficiente. A arte da skin virou uma única camada ambiente do shell, com
+fallback Sparta neutro no lugar de Ahri, e o “S” de marca foi trocado pelo símbolo oficial do site.
+QA Electron real: 30/30 viewports limpas, três temas e troca Viego/Fera Lunar, contraste AA, foco,
+reduced motion e runtime sem erros. Motor/API/banco intactos; release ativa e replay exato
+confirmados. Gates locais: version/Prisma/typecheck/lint/build, 1.427 testes TypeScript e analyzer
+verdes. Ver `docs/desktop-dynamic-identity-growth.md`.
+
+---
+
 ## 2026-08-15 09:50 — Etapa 31M: polimento visual final do Desktop
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0065-polimento-visual-final-desktop.md`

@@ -9,7 +9,7 @@ interface PageHeroProps {
   eyebrow?: ReactNode;
   title: ReactNode;
   subtitle?: ReactNode;
-  /** Splash do tema. Sem ela o heroi cai numa superficie lisa, sem quebrar. */
+  /** Arte específica do conteúdo (não a skin ambiente do tema). */
   artUrl?: string;
   /** Conteudo a direita (score, acao principal). */
   aside?: ReactNode;
@@ -20,14 +20,21 @@ interface PageHeroProps {
 }
 
 /**
- * Cabecalho de tela. E o unico lugar onde a splash art aparece em tamanho
- * grande: o resto do app usa so a cor extraida dela, pra nao transformar
- * cada tela num wallpaper com texto por cima.
+ * Cabeçalho de tela. A skin escolhida pertence à camada ambiente única do
+ * shell; `artUrl` fica reservado para arte factual do conteúdo da tela.
  */
-export function PageHero({ eyebrow, title, subtitle, artUrl, aside, meta, variant = "compact" }: PageHeroProps) {
+export function PageHero({
+  eyebrow,
+  title,
+  subtitle,
+  artUrl,
+  aside,
+  meta,
+  variant = "compact"
+}: PageHeroProps) {
   return (
     <header
-      className={`sp-hero sp-hero--${variant}`}
+      className={`sp-hero sp-hero--${variant}${artUrl ? " sp-hero--with-art" : ""}`}
       style={artUrl ? { backgroundImage: `url(${artUrl})` } : undefined}
     >
       <div className="sp-hero__main">
@@ -50,7 +57,15 @@ export function PageSection({ children, style }: { children: ReactNode; style?: 
 }
 
 /** Grade de colunas iguais. Reduz sozinha em janelas estreitas. */
-export function Grid({ cols = 3, children, style }: { cols?: number; children: ReactNode; style?: CSSProperties }) {
+export function Grid({
+  cols = 3,
+  children,
+  style
+}: {
+  cols?: number;
+  children: ReactNode;
+  style?: CSSProperties;
+}) {
   return (
     <div className="sp-grid" style={{ ["--sp-grid-cols" as string]: cols, ...style }}>
       {children}
@@ -70,7 +85,13 @@ interface ColumnsProps {
 }
 
 /** Conteudo principal + painel lateral, virando uma coluna em telas estreitas. */
-export function Columns({ main, aside, asideWidth, asideFirst = false, stickyAside = false }: ColumnsProps) {
+export function Columns({
+  main,
+  aside,
+  asideWidth,
+  asideFirst = false,
+  stickyAside = false
+}: ColumnsProps) {
   const asideNode = <div className={stickyAside ? "sp-columns__sticky" : undefined}>{aside}</div>;
   return (
     <div
@@ -96,11 +117,21 @@ export function InlineStats({ children }: { children: ReactNode }) {
   return <div className="sp-inline-stats">{children}</div>;
 }
 
-export function InlineStat({ label, value, muted = false }: { label: ReactNode; value: ReactNode; muted?: boolean }) {
+export function InlineStat({
+  label,
+  value,
+  muted = false
+}: {
+  label: ReactNode;
+  value: ReactNode;
+  muted?: boolean;
+}) {
   return (
     <div className="sp-inline-stat">
       <span className="sp-inline-stat__label">{label}</span>
-      <span className={`sp-inline-stat__value${muted ? " sp-inline-stat__value--muted" : ""}`}>{value}</span>
+      <span className={`sp-inline-stat__value${muted ? " sp-inline-stat__value--muted" : ""}`}>
+        {value}
+      </span>
     </div>
   );
 }

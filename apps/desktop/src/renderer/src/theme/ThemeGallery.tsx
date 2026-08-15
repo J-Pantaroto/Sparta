@@ -18,7 +18,9 @@ import {
   SegmentedControl,
   SectionHeader,
   SignalChip,
-  SkeletonGrid
+  SkeletonGrid,
+  BRAND_MARK_URL,
+  SpartaIdentityBackdrop
 } from "../ui";
 import {
   VISUAL_THEMES,
@@ -44,6 +46,7 @@ export function ThemeGallery({ ddragonVersion }: { ddragonVersion: string }) {
     featuredChampion,
     setFeaturedChampion,
     splashUrl,
+    hasFeaturedChampion,
     visualTheme,
     setVisualTheme,
     density,
@@ -124,7 +127,7 @@ export function ThemeGallery({ ddragonVersion }: { ddragonVersion: string }) {
     }
   }
 
-  const offlineReady = Boolean(featuredChampion.localSplashPath);
+  const offlineReady = !hasFeaturedChampion || Boolean(featuredChampion.localSplashPath);
 
   return (
     <div style={{ display: "grid", gap: "var(--space-4)" }}>
@@ -134,7 +137,11 @@ export function ThemeGallery({ ddragonVersion }: { ddragonVersion: string }) {
           title={VISUAL_THEMES.find((theme) => theme.id === visualTheme)?.name ?? "Espartano"}
           description="O tema controla superfícies, bordas, elevação, foco, seleção, gráficos e brilho. Cores semânticas de vitória, derrota e disponibilidade não mudam."
           actions={
-            offlineReady ? (
+            !hasFeaturedChampion ? (
+              <Badge tone="positive" icon={<Check size={11} />}>
+                Identidade integrada
+              </Badge>
+            ) : offlineReady ? (
               <Badge tone="positive" icon={<Check size={11} />}>
                 Disponível offline
               </Badge>
@@ -191,23 +198,27 @@ export function ThemeGallery({ ddragonVersion }: { ddragonVersion: string }) {
         <div
           style={{ display: "flex", gap: "var(--space-5)", alignItems: "center", flexWrap: "wrap" }}
         >
-          <img
-            src={splashUrl}
-            alt={featuredChampion.skinName}
-            style={{
-              width: 220,
-              height: 82,
-              objectFit: "cover",
-              objectPosition: "center 22%",
-              borderRadius: "var(--radius-md)",
-              border: "1px solid var(--border-default)"
-            }}
-          />
+          {splashUrl ? (
+            <img
+              src={splashUrl}
+              alt={featuredChampion.skinName}
+              className="sp-theme-current__art"
+            />
+          ) : (
+            <div className="sp-theme-current__sparta" aria-label="Identidade padrão Sparta">
+              <SpartaIdentityBackdrop className="sp-identity--compact" />
+              <img src={BRAND_MARK_URL} alt="" />
+              <div>
+                <strong>Sparta</strong>
+                <span>Identidade padrão do produto</span>
+              </div>
+            </div>
+          )}
           <div>
             <span
               style={{ display: "block", color: "var(--text-muted)", fontSize: "var(--text-xs)" }}
             >
-              Cor extraída desta skin
+              {hasFeaturedChampion ? "Cor extraída desta skin" : "Paleta padrão do Sparta"}
             </span>
             <div className="sp-swatches" style={{ marginTop: "var(--space-2)" }}>
               <span
@@ -228,7 +239,7 @@ export function ThemeGallery({ ddragonVersion }: { ddragonVersion: string }) {
             </div>
           </div>
         </div>
-        {!offlineReady && (
+        {hasFeaturedChampion && !offlineReady && (
           <div style={{ marginTop: "var(--space-4)" }}>
             <SignalChip tone="info">
               Baixe a arte pra o tema continuar aparecendo mesmo sem internet. As cores já ficam
@@ -236,7 +247,7 @@ export function ThemeGallery({ ddragonVersion }: { ddragonVersion: string }) {
             </SignalChip>
           </div>
         )}
-        {visualTheme !== "adaptive" && (
+        {hasFeaturedChampion && visualTheme !== "adaptive" && (
           <div style={{ marginTop: "var(--space-4)" }}>
             <SignalChip tone="info">
               A cor extraída da arte só é aplicada no tema Adaptativo. Nos demais temas, a arte é

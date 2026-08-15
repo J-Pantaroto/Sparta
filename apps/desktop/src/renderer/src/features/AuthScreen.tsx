@@ -3,7 +3,7 @@ import { login, register } from "../services/api-client";
 import { AuthForm, AuthLayout, Button, Field, SignalChip, TextField } from "../ui";
 
 interface AuthScreenProps {
-  splashUrl: string;
+  splashUrl: string | null;
   onAuthenticated: (token: string) => void;
   onRegistrationRequested: (email: string, localPreviewToken?: string) => void;
   onForgotPassword: () => void;

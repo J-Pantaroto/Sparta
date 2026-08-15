@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import { PageHero } from "../ui";
-import { useFeaturedChampion } from "./featured-champion-context";
 
 interface ThemedPageHeroProps {
   eyebrow?: ReactNode;
@@ -12,12 +11,11 @@ interface ThemedPageHeroProps {
 }
 
 /**
- * Liga o `PageHero` (agnostico, do design system) a splash do tema atual.
- * Fica aqui e nao em `ui/` pra o design system nao depender do contexto de
- * tema - qualquer tela ganha a identidade da skin so trocando o import,
- * sem receber props extras.
+ * Variante usada pelas telas dentro do shell. A arte contextual agora vive
+ * na camada ambiente unica de `AppShell`, atrás da composição inteira; não
+ * é repetida como background de cada herói. O nome permanece para não
+ * espalhar uma migração sem valor pelos consumidores existentes.
  */
 export function ThemedPageHero(props: ThemedPageHeroProps) {
-  const { splashUrl } = useFeaturedChampion();
-  return <PageHero {...props} artUrl={splashUrl} />;
+  return <PageHero {...props} />;
 }

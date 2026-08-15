@@ -1,10 +1,9 @@
 /*
  * Composicao de uma tela: heroi (identidade + contexto) e secoes.
  *
- * O heroi e onde a skin escolhida aparece com mais forca. Fora dele, o
- * tema entra so como iluminacao e cor de destaque - splash art atras de
- * texto pequeno prejudica leitura, que e exatamente o que os apps de
- * referencia evitam.
+ * A skin escolhida vive uma unica vez na camada ambiente do shell. O heroi
+ * e uma superficie translucida acima dela; arte propria so entra quando o
+ * conteudo da tela fornece `artUrl` explicitamente.
  */
 
 .sp-page {
@@ -23,9 +22,11 @@
   overflow: hidden;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-xl);
-  background-color: var(--surface-1);
+  background-color: var(--surface-veil-strong);
   background-size: cover;
   background-position: center 24%;
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
   animation: sp-fade var(--duration-slow) var(--ease-out);
 }
 
@@ -40,16 +41,32 @@
 }
 
 /*
- * Duas camadas de scrim: uma escurece da esquerda (onde fica o texto) e
- * outra tinge o conjunto na cor do tema. Sem a primeira, titulo sobre
- * splash clara fica ilegivel; sem a segunda, o heroi nao "veste" o tema.
+ * Sem arte propria, o scrim deixa a camada ambiente aparecer sem disputar
+ * com o texto. Quando `--with-art`, o degrade fica mais denso porque a
+ * imagem pertence ao proprio heroi e pode ter areas claras.
  */
 .sp-hero::before {
   content: "";
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(95deg, rgba(4, 4, 5, 0.97) 26%, rgba(4, 4, 5, 0.82) 56%, rgba(4, 4, 5, 0.35) 100%),
+    linear-gradient(
+      95deg,
+      rgba(4, 4, 5, 0.78) 26%,
+      rgba(4, 4, 5, 0.56) 56%,
+      rgba(4, 4, 5, 0.22) 100%
+    ),
+    linear-gradient(0deg, var(--color-accent-glow), transparent 72%);
+}
+
+.sp-hero--with-art::before {
+  background:
+    linear-gradient(
+      95deg,
+      rgba(4, 4, 5, 0.97) 26%,
+      rgba(4, 4, 5, 0.82) 56%,
+      rgba(4, 4, 5, 0.35) 100%
+    ),
     linear-gradient(0deg, var(--color-accent-glow), transparent 72%);
 }
 

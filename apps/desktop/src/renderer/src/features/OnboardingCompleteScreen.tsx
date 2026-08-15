@@ -6,7 +6,7 @@ export function OnboardingCompleteScreen({
   localControlledMode,
   onContinue
 }: {
-  splashUrl: string;
+  splashUrl: string | null;
   riotId?: string;
   localControlledMode: boolean;
   onContinue: () => void;

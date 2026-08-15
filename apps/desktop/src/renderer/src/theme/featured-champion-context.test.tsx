@@ -25,6 +25,16 @@ function Probe() {
   );
 }
 
+function IdentityProbe() {
+  const preferences = useFeaturedChampion();
+  return (
+    <div>
+      <span>{preferences.hasFeaturedChampion ? "Com campeão" : "Sparta"}</span>
+      <span>{preferences.splashUrl ?? "Sem splash"}</span>
+    </div>
+  );
+}
+
 describe("preferências visuais v2", () => {
   beforeEach(() => localStorage.clear());
 
@@ -53,5 +63,17 @@ describe("preferências visuais v2", () => {
     fireEvent.click(screen.getByRole("button", { name: "Tema" }));
     const inline = document.documentElement.getAttribute("style") ?? "";
     expect(inline).not.toMatch(/--color-green|--color-red|--color-yellow/);
+  });
+
+  it("começa no estado neutro Sparta sem escolher Ahri implicitamente", () => {
+    render(
+      <FeaturedChampionProvider>
+        <IdentityProbe />
+      </FeaturedChampionProvider>
+    );
+
+    expect(screen.getByText("Sparta")).toBeDefined();
+    expect(screen.getByText("Sem splash")).toBeDefined();
+    expect(localStorage.getItem("sparta:featured-champion")).toBeNull();
   });
 });

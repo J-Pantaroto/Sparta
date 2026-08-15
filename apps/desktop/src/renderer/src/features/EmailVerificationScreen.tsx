@@ -3,7 +3,7 @@ import { confirmEmailVerification, resendEmailVerification } from "../services/a
 import { AuthLayout, Button, SignalChip } from "../ui";
 
 interface EmailVerificationScreenProps {
-  splashUrl: string;
+  splashUrl: string | null;
   email: string;
   initialLocalPreviewToken?: string;
   /**

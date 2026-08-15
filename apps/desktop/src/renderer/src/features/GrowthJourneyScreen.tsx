@@ -1,8 +1,26 @@
-import type { GrowthJourney, WeaknessTrend } from "@sparta/core";
-import { Clock, Minus, Target, TrendingDown, TrendingUp, UserPlus } from "lucide-react";
+import type {
+  GrowthJourney,
+  PerformanceTrendPoint,
+  PlayerProfileOverview,
+  WeaknessTrend
+} from "@sparta/core";
+import {
+  Activity,
+  ChartNoAxesCombined,
+  Clock,
+  Minus,
+  Target,
+  TrendingDown,
+  TrendingUp,
+  UserPlus
+} from "lucide-react";
 import { confidenceLabels } from "../app/labels";
 import { useAsyncData } from "../hooks/use-async-data";
-import { fetchGrowthJourney, type RiotAccountSummary } from "../services/api-client";
+import {
+  fetchGrowthJourney,
+  fetchMyPlayerProfile,
+  type RiotAccountSummary
+} from "../services/api-client";
 import { ThemedPageHero } from "../theme/ThemedPageHero";
 import {
   Badge,
@@ -13,10 +31,17 @@ import {
   InlineStats,
   Loading,
   PageLayout,
+  PageSection,
   SectionHeader,
   SignalChip,
-  StatBar
+  StatBar,
+  TemporalChart,
+  TemporalSparkline,
+  type TemporalChartPoint
 } from "../ui";
+import "./GrowthJourneyScreen.css";
+
+const MIN_TEMPORAL_POINTS = 3;
 
 const trendLabels: Record<WeaknessTrend["trend"], string> = {
   improving: "Melhorando",
@@ -26,15 +51,75 @@ const trendLabels: Record<WeaknessTrend["trend"], string> = {
   resolved: "Resolvido"
 };
 
+interface TemporalIndicatorDefinition {
+  key: string;
+  label: string;
+  unit: string;
+  decimals: number;
+  value: (point: PerformanceTrendPoint) => number | null;
+}
+
+const temporalIndicators: TemporalIndicatorDefinition[] = [
+  {
+    key: "kda",
+    label: "KDA observado",
+    unit: "",
+    decimals: 2,
+    value: (point) => point.kda
+  },
+  {
+    key: "farm",
+    label: "Farm por minuto",
+    unit: "",
+    decimals: 2,
+    value: (point) => point.csPerMinute
+  },
+  {
+    key: "vision",
+    label: "Visão por minuto",
+    unit: "",
+    decimals: 2,
+    value: (point) => point.visionScorePerMinute
+  },
+  {
+    key: "objectives",
+    label: "Participação em objetivos",
+    unit: "%",
+    decimals: 0,
+    value: (point) =>
+      point.objectiveParticipation === null ? null : point.objectiveParticipation * 100
+  }
+];
+
+function temporalPoints(
+  points: PerformanceTrendPoint[],
+  value: (point: PerformanceTrendPoint) => number | null
+): TemporalChartPoint[] {
+  return points.flatMap((point) => {
+    const observed = value(point);
+    return observed === null || !Number.isFinite(observed)
+      ? []
+      : [
+          {
+            matchId: point.matchId,
+            observedAt: point.observedAt,
+            value: observed,
+            won: point.won
+          }
+        ];
+  });
+}
+
+function formatObservedValue(value: number, unit: string, decimals: number): string {
+  return `${value.toFixed(decimals)}${unit}`;
+}
+
 /**
- * Progressão dos pontos fracos identificados no Pós-game. Tudo aqui deriva
- * de relatórios já persistidos - a tela não calcula nada por conta própria.
- *
- * As linhas são agrupadas por direção (melhorando / piorando / ainda sem
- * comparação) em vez de virem numa lista única: "estável" repetido em toda
- * linha não dizia nada ao jogador (feedback real), e quando ainda não
- * existe um segundo bloco de partidas antigas o valor nem significa
- * "estável" - significa "ainda não dá pra saber".
+ * Progressão pessoal apoiada em duas fontes já existentes e factuais:
+ * `PlayerProfileOverview.performanceTrend` fornece uma observação por
+ * partida; `GrowthJourney` continua fornecendo a comparação agregada entre
+ * os dois blocos de relatórios pós-game. Esta tela só apresenta os valores
+ * recebidos — não cria pontos intermediários, média móvel ou nova métrica.
  */
 export function GrowthJourneyScreen({
   riotAccounts,
@@ -45,8 +130,11 @@ export function GrowthJourneyScreen({
 }) {
   const account = riotAccounts[0];
   const journey = useAsyncData<{ puuid: string } & GrowthJourney>(
-    () =>
-      account && sessionToken ? fetchGrowthJourney(sessionToken, account.puuid) : undefined,
+    () => (account && sessionToken ? fetchGrowthJourney(sessionToken, account.puuid) : undefined),
+    [account?.puuid, sessionToken]
+  );
+  const profile = useAsyncData<PlayerProfileOverview>(
+    () => (account && sessionToken ? fetchMyPlayerProfile(sessionToken) : undefined),
     [account?.puuid, sessionToken]
   );
 
@@ -67,10 +155,18 @@ export function GrowthJourneyScreen({
 
   const trends = journey.data?.weaknessTrends ?? [];
   const comparable = trends.filter((trend) => trend.hasComparison);
-  const improving = comparable.filter((trend) => trend.trend === "improving" || trend.trend === "resolved");
-  const worsening = comparable.filter((trend) => trend.trend === "worsening" || trend.trend === "new");
+  const improving = comparable.filter(
+    (trend) => trend.trend === "improving" || trend.trend === "resolved"
+  );
+  const worsening = comparable.filter(
+    (trend) => trend.trend === "worsening" || trend.trend === "new"
+  );
   const steady = comparable.filter((trend) => trend.trend === "stable");
   const pending = trends.filter((trend) => !trend.hasComparison);
+  const performancePoints = profile.data
+    ? temporalPoints(profile.data.performanceTrend, (point) => point.performanceIndex)
+    : [];
+  const hasTemporalHistory = performancePoints.length >= MIN_TEMPORAL_POINTS;
 
   // "Foco sugerido" não é um cálculo novo: é o ponto fraco que mais aparece
   // nas partidas recentes, que é exatamente o que `recentRate` mede.
@@ -81,25 +177,138 @@ export function GrowthJourneyScreen({
       <ThemedPageHero
         eyebrow="Evolução"
         title="Jornada de progresso"
+        subtitle="Uma leitura temporal das partidas pessoais observadas, sem comparação global."
         meta={
-          journey.data && (
+          (journey.data || profile.data) && (
             <InlineStats>
-              <InlineStat label="Partidas analisadas" value={journey.data.matchesAnalyzed} />
-              <InlineStat label="Pontos acompanhados" value={trends.length} />
-              <InlineStat label="Com comparação" value={comparable.length} muted={comparable.length === 0} />
+              <InlineStat
+                label="Relatórios pós-game"
+                value={journey.data?.matchesAnalyzed ?? "Indisponível"}
+                muted={!journey.data}
+              />
+              <InlineStat
+                label="Partidas na série"
+                value={profile.data?.performanceTrend.length ?? "Indisponível"}
+                muted={!profile.data}
+              />
+              <InlineStat
+                label="Pontos com comparação"
+                value={journey.data ? comparable.length : "Indisponível"}
+                muted={!journey.data || comparable.length === 0}
+              />
             </InlineStats>
           )
         }
       />
 
-      {journey.status === "loading" && (
+      <PageSection>
+        <SectionHeader
+          eyebrow="Visão temporal principal"
+          title="Evolução partida a partida"
+          description="Cada ponto é uma partida real do histórico pessoal, na ordem observada. A linha não interpola partidas ausentes nem suaviza os valores."
+        />
+        {(profile.status === "loading" || profile.status === "idle") && (
+          <Card>
+            <Loading block label="Carregando histórico temporal" />
+          </Card>
+        )}
+        {profile.status === "error" && (
+          <Card>
+            <ErrorState
+              inline
+              title="Histórico temporal indisponível"
+              description={profile.error ?? "A série pessoal não pôde ser consultada."}
+            />
+          </Card>
+        )}
+        {profile.data && !hasTemporalHistory && (
+          <Card>
+            <EmptyState
+              icon={<ChartNoAxesCombined size={22} />}
+              title="Histórico insuficiente para medir evolução"
+              description={`${performancePoints.length} ${
+                performancePoints.length === 1 ? "partida possui" : "partidas possuem"
+              } índice temporal observado. O gráfico aparece a partir de ${MIN_TEMPORAL_POINTS}, sem fabricar pontos intermediários.`}
+            />
+          </Card>
+        )}
+        {profile.data && hasTemporalHistory && (
+          <Card className="sp-growth__primary-chart">
+            <div className="sp-growth__chart-legend" aria-label="Legenda dos pontos do gráfico">
+              <span>
+                <i
+                  className="sp-growth__legend-dot sp-growth__legend-dot--win"
+                  aria-hidden="true"
+                />
+                Vitória
+              </span>
+              <span>
+                <i
+                  className="sp-growth__legend-dot sp-growth__legend-dot--loss"
+                  aria-hidden="true"
+                />
+                Derrota
+              </span>
+            </div>
+            <TemporalChart
+              points={performancePoints}
+              label="Índice de desempenho pessoal"
+              decimals={0}
+              fixedAxisMax={100}
+              captionLabel={`${performancePoints.length} partidas observadas`}
+              emptyTitle="Histórico insuficiente para medir evolução"
+              emptyDescription="Nenhum índice pessoal foi observado."
+            />
+            <p className="sp-growth__source-note">
+              Fonte: série <code>performanceTrend</code> do perfil analítico. O índice já existia no
+              histórico; esta tela não o recalcula.
+            </p>
+          </Card>
+        )}
+      </PageSection>
+
+      {profile.data && hasTemporalHistory && (
+        <PageSection>
+          <SectionHeader
+            eyebrow="Indicadores observados"
+            title="Como os sinais variaram"
+            description="Séries auxiliares com os mesmos jogos do histórico. O primeiro e o último valor são fatos distintos, não um veredito estatístico."
+          />
+          <div className="sp-growth__indicators">
+            {temporalIndicators.map((definition) => {
+              const points = temporalPoints(profile.data!.performanceTrend, definition.value);
+              return points.length >= MIN_TEMPORAL_POINTS ? (
+                <TemporalIndicator key={definition.key} definition={definition} points={points} />
+              ) : (
+                <Card
+                  key={definition.key}
+                  className="sp-growth__indicator sp-growth__indicator--empty"
+                >
+                  <strong>{definition.label}</strong>
+                  <span>Histórico insuficiente neste sinal</span>
+                  <small>
+                    {points.length} de {MIN_TEMPORAL_POINTS} observações necessárias para desenhar a
+                    série.
+                  </small>
+                </Card>
+              );
+            })}
+          </div>
+        </PageSection>
+      )}
+
+      {(journey.status === "loading" || journey.status === "idle") && (
         <Card>
-          <Loading block />
+          <Loading block label="Carregando pontos acompanhados" />
         </Card>
       )}
       {journey.status === "error" && (
         <Card>
-          <ErrorState inline description={journey.error ?? undefined} />
+          <ErrorState
+            inline
+            title="Pontos acompanhados indisponíveis"
+            description={journey.error ?? undefined}
+          />
         </Card>
       )}
 
@@ -161,21 +370,57 @@ export function GrowthJourneyScreen({
             title="Acompanhando, mas sem histórico suficiente"
             description="O Sparta precisa de um segundo bloco de partidas mais antigas pra dizer se melhorou ou piorou. Até lá, mostra só a taxa recente."
           />
-          <div style={{ display: "grid", gap: "var(--space-4)" }}>
+          <div className="sp-growth__rates">
             {pending.map((trend) => (
-              <div key={trend.code}>
-                <StatBar
-                  label={trend.label}
-                  value={trend.recentRate}
-                  invert
-                  value_label={`${trend.recentRate}% das partidas recentes`}
-                />
-              </div>
+              <StatBar
+                key={trend.code}
+                label={trend.label}
+                value={trend.recentRate}
+                invert
+                value_label={`${trend.recentRate}% das partidas recentes`}
+              />
             ))}
           </div>
         </Card>
       )}
     </PageLayout>
+  );
+}
+
+function TemporalIndicator({
+  definition,
+  points
+}: {
+  definition: TemporalIndicatorDefinition;
+  points: TemporalChartPoint[];
+}) {
+  const ordered = [...points].sort((left, right) =>
+    left.observedAt.localeCompare(right.observedAt)
+  );
+  const first = ordered[0]!;
+  const last = ordered.at(-1)!;
+  return (
+    <Card className="sp-growth__indicator">
+      <div className="sp-growth__indicator-heading">
+        <Activity size={16} aria-hidden="true" />
+        <strong>{definition.label}</strong>
+      </div>
+      <TemporalSparkline points={ordered} />
+      <dl>
+        <div>
+          <dt>Primeira</dt>
+          <dd>{formatObservedValue(first.value, definition.unit, definition.decimals)}</dd>
+        </div>
+        <div>
+          <dt>Mais recente</dt>
+          <dd>{formatObservedValue(last.value, definition.unit, definition.decimals)}</dd>
+        </div>
+        <div>
+          <dt>Amostra</dt>
+          <dd>{ordered.length} partidas</dd>
+        </div>
+      </dl>
+    </Card>
   );
 }
 
@@ -190,32 +435,34 @@ function TrendGroup({
 }) {
   return (
     <Card>
-      <SectionHeader title={title} description={description} />
-      <div style={{ display: "grid", gap: "var(--space-5)" }}>
+      <SectionHeader eyebrow="Comparação entre blocos" title={title} description={description} />
+      <div className="sp-growth__trend-list">
         {trends.map((trend) => (
-          <div key={trend.code}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: "var(--space-3)",
-                marginBottom: "var(--space-3)"
-              }}
-            >
+          <article className="sp-growth__trend" key={trend.code}>
+            <div className="sp-growth__trend-heading">
               <strong>{trend.label}</strong>
-              <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center" }}>
+              <div className="sp-growth__trend-signals">
                 <TrendChip trend={trend.trend} />
                 <Badge tone="neutral">confiança {confidenceLabels[trend.confidence]}</Badge>
               </div>
             </div>
-            <div style={{ display: "grid", gap: "var(--space-2)" }}>
+            <div className="sp-growth__rates">
               {/* `invert`: aqui número ALTO é ruim (taxa de presença de um
                   ponto fraco), o oposto das barras de desempenho. */}
-              <StatBar label="Recente" value={trend.recentRate} invert value_label={`${trend.recentRate}%`} />
-              <StatBar label="Anterior" value={trend.previousRate} invert value_label={`${trend.previousRate}%`} />
+              <StatBar
+                label="Recente"
+                value={trend.recentRate}
+                invert
+                value_label={`${trend.recentRate}%`}
+              />
+              <StatBar
+                label="Anterior"
+                value={trend.previousRate}
+                invert
+                value_label={`${trend.previousRate}%`}
+              />
             </div>
-          </div>
+          </article>
         ))}
       </div>
     </Card>
@@ -230,7 +477,7 @@ function TrendChip({ trend }: { trend: WeaknessTrend["trend"] }) {
   const Icon = good ? TrendingUp : bad ? TrendingDown : Minus;
   return (
     <SignalChip pill tone={good ? "positive" : bad ? "negative" : "info"}>
-      <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+      <span className="sp-growth__trend-chip">
         <Icon size={12} />
         {trendLabels[trend]}
       </span>

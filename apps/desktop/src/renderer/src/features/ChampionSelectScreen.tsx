@@ -1078,7 +1078,7 @@ const explanationLabels: Record<ExplanationGroup, string> = {
   WORKS: "Por que funciona",
   RISKS: "Riscos",
   PERSONAL: "Contexto pessoal",
-  COMPOSITION: "Composicao",
+  COMPOSITION: "Composição",
   MATCHUP: "Matchup pessoal",
   UNAVAILABLE: "Dados indisponiveis"
 };
@@ -1168,28 +1168,28 @@ function DraftStage({
       <div className="sp-draft-stage__center">
         <span className="sp-draft-stage__eyebrow">Draft atual</span>
         {draft.selectedChampionId === undefined ? (
-          <EmptyAvatarSlot size="lg" label="Seu campeao ainda nao foi selecionado" />
+          <EmptyAvatarSlot size="lg" label="Seu campeão ainda não foi selecionado" />
         ) : (
           <ChampionAvatar
             championId={draft.selectedChampionId}
             ddragonVersion={ddragonVersion}
             size="lg"
-            alt={selectedChampionName ?? `Campeao ${draft.selectedChampionId}`}
+            alt={selectedChampionName ?? `Campeão ${draft.selectedChampionId}`}
             ring
           />
         )}
         <strong>{selectedChampionName ?? "Sua escolha"}</strong>
         <span>
           {selectedChampionLocked
-            ? "Campeao travado"
+            ? "Campeão travado"
             : draft.selectedChampionId
-              ? "Campeao selecionado"
-              : "Aguardando selecao"}
+              ? "Campeão selecionado"
+              : "Aguardando seleção"}
         </span>
         <Badge tone={draft.playerRole ? "accent" : "warning"}>
-          {draft.playerRole ? roleLabels[draft.playerRole] : "Posicao desconhecida"}
+          {draft.playerRole ? roleLabels[draft.playerRole] : "Posição desconhecida"}
         </Badge>
-        <small>{phase ? phaseLabel(phase) : "League nao detectado"}</small>
+        <small>{phase ? phaseLabel(phase) : "League não detectado"}</small>
       </div>
       <DraftTeam
         title="Inimigos"
@@ -1211,7 +1211,7 @@ function DraftStage({
               championId={championId}
               ddragonVersion={ddragonVersion}
               size="xs"
-              alt={`Campeao banido ${championId}`}
+              alt={`Campeão banido ${championId}`}
             />
           ))
         )}
@@ -1251,7 +1251,7 @@ function DraftTeam({
             <div
               className={`sp-draft-pick${direct ? " sp-draft-pick--direct" : ""}`}
               key={`${pick.championId}-${index}`}
-              aria-label={`${pick.championName}${pick.role ? `, ${roleLabels[pick.role]}` : ", posicao desconhecida"}${direct ? ", adversario direto confirmado" : ""}`}
+              aria-label={`${pick.championName}${pick.role ? `, ${roleLabels[pick.role]}` : ", posição desconhecida"}${direct ? ", adversário direto confirmado" : ""}`}
             >
               <ChampionAvatar
                 championId={pick.championId}
@@ -1259,7 +1259,7 @@ function DraftTeam({
                 alt={pick.championName}
               />
               <span>{pick.championName}</span>
-              <small>{pick.role ? roleLabels[pick.role] : "Posicao desconhecida"}</small>
+              <small>{pick.role ? roleLabels[pick.role] : "Posição desconhecida"}</small>
               {direct && <Badge tone="warning">Direto</Badge>}
             </div>
           );
@@ -1292,12 +1292,12 @@ function SelectedChoiceSummary({
         championId={championId}
         ddragonVersion={ddragonVersion}
         size="lg"
-        alt={championName ?? `Campeao ${championId}`}
+        alt={championName ?? `Campeão ${championId}`}
         ring
       />
       <div>
         <span className="sp-draft-stage__eyebrow">Escolha registrada</span>
-        <strong>{championName ?? `Campeao ${championId}`}</strong>
+        <strong>{championName ?? `Campeão ${championId}`}</strong>
         <p>
           {group === "NOT_IN_SNAPSHOT"
             ? "Fora do snapshot: nenhum score ou ranking retroativo foi criado."
@@ -1317,7 +1317,7 @@ function RecommendationQuickSignals({ recommendation }: { recommendation: PickRe
     <span className="sp-rec__quick">
       <span>
         Cobertura {formatCoverage(recommendation.dataCoverage)} /{" "}
-        {recommendation.role ? roleLabels[recommendation.role] : "posicao nao informada"}
+        {recommendation.role ? roleLabels[recommendation.role] : "posição não informada"}
       </span>
       <span className="sp-rec__signal sp-rec__signal--positive">
         {topFavorableSignal(recommendation)}
@@ -1388,7 +1388,7 @@ function capabilityStateLabel(state: "added" | "reinforced" | "gap" | "risk" | "
   if (state === "reinforced") return "reforca";
   if (state === "gap") return "lacuna conhecida";
   if (state === "risk") return "risco conhecido";
-  return "dado indisponivel";
+  return "dado indisponível";
 }
 
 function topFavorableSignal(recommendation: PickRecommendation): string {
@@ -1411,7 +1411,7 @@ function principalLimitation(recommendation: PickRecommendation): string {
 function formatCoverage(value?: number): string {
   return value !== undefined && Number.isFinite(value)
     ? `${Math.round(value * 100)}%`
-    : "indisponivel";
+    : "indisponível";
 }
 
 function phaseLabel(phase: string): string {
@@ -1433,10 +1433,10 @@ function championSelectOperationalState(status: LcuReadStatus, phase: LcuGameflo
   const unavailable = !["OK", "OUTSIDE_CHAMP_SELECT"].includes(status);
   if (status === "CLIENT_CLOSED" || status === "LOCKFILE_MISSING") {
     return {
-      title: "Aguardando sua selecao de campeoes",
-      heading: "League nao detectado",
+      title: "Aguardando sua seleção de campeões",
+      heading: "League não detectado",
       description:
-        "Abra o League Client. O Sparta apenas observa a sessao local e nunca escolhe ou trava campeoes.",
+        "Abra o League Client. O Sparta apenas observa a sessão local e nunca escolhe ou trava campeões.",
       badge: "League Client fechado",
       badgeState: "offline" as const,
       error: false
@@ -1444,19 +1444,19 @@ function championSelectOperationalState(status: LcuReadStatus, phase: LcuGameflo
   }
   if (unavailable) {
     return {
-      title: "Leitura do League indisponivel",
-      heading: "A LCU nao respondeu de forma estavel",
-      description: `Estado ${status}. A interface local do League nao possui garantia oficial de estabilidade; nenhum dado ausente sera inferido.`,
-      badge: "LCU indisponivel",
+      title: "Leitura do League indisponível",
+      heading: "A LCU não respondeu de forma estável",
+      description: `Estado ${status}. A interface local do League não possui garantia oficial de estabilidade; nenhum dado ausente será inferido.`,
+      badge: "LCU indisponível",
       badgeState: "warning" as const,
       error: true
     };
   }
   return {
-    title: "Aguardando sua selecao de campeoes",
+    title: "Aguardando sua seleção de campeões",
     heading: phase ? phaseLabel(phase) : "Cliente aberto, fase desconhecida",
     description:
-      "O Champion Select ainda nao comecou. Esta tela muda automaticamente quando a sessao aparecer.",
+      "O Champion Select ainda não começou. Esta tela muda automaticamente quando a sessão aparecer.",
     badge: phase ? phaseLabel(phase) : "Cliente aberto",
     badgeState: "warning" as const,
     error: false

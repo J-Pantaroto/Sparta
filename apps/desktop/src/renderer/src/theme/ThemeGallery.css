@@ -39,6 +39,53 @@
   line-height: var(--leading-snug);
 }
 
+.sp-theme-current__art,
+.sp-theme-current__sparta {
+  width: 220px;
+  height: 82px;
+  flex: 0 0 auto;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+}
+
+.sp-theme-current__art {
+  object-fit: cover;
+  object-position: center 22%;
+}
+
+.sp-theme-current__sparta {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  overflow: hidden;
+  padding: var(--space-3);
+  background: var(--surface-2);
+}
+
+.sp-theme-current__sparta > img,
+.sp-theme-current__sparta > div {
+  position: relative;
+  z-index: var(--z-raised);
+}
+
+.sp-theme-current__sparta > img {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-sm);
+}
+
+.sp-theme-current__sparta strong,
+.sp-theme-current__sparta span {
+  display: block;
+}
+
+.sp-theme-current__sparta span {
+  margin-top: var(--space-1);
+  color: var(--text-muted);
+  font-size: var(--text-2xs);
+}
+
 @media (max-width: 1280px) {
   .sp-theme-controls {
     grid-template-columns: minmax(0, 1fr);

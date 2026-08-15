@@ -11,18 +11,28 @@ import {
   Wifi,
   WifiOff
 } from "lucide-react";
+import { BRAND_MARK_URL } from "./brand-mark";
+import { SpartaIdentityBackdrop } from "./SpartaIdentity";
 import "./AppShell.css";
 
 export function AppShell({
   sidebar,
   topbar,
   children,
-  collapsed = false
+  collapsed = false,
+  ambientArtUrl
 }: {
   sidebar: ReactNode;
   topbar?: ReactNode;
   children: ReactNode;
   collapsed?: boolean;
+  /**
+   * Splash da skin escolhida, ou `null`/`undefined` quando nenhuma foi
+   * escolhida ainda - nesse caso cai pra identidade Sparta em vez de nao
+   * mostrar nada. Prop (nao contexto direto) de propósito: `ui/` não
+   * depende do contexto de tema, quem decide o valor é `App.tsx`.
+   */
+  ambientArtUrl?: string | null;
 }) {
   return (
     <div className={`sp-shell${collapsed ? " sp-shell--collapsed" : ""}`}>
@@ -30,6 +40,23 @@ export function AppShell({
       <div className="sp-shell__workspace">
         {topbar}
         <main className="sp-content" id="sp-main-content" tabIndex={-1}>
+          {/*
+            Camada de ambiente: a identidade (arte da skin escolhida, ou a
+            marca Sparta quando nenhuma foi escolhida) atrás de TODAS as
+            telas, não presa a um card isolado - a mesma arte não se repete
+            em cada hero individual porque os heróis passaram a ser
+            superfícies de vidro translúcidas que deixam essa camada
+            transparecer (ver PageLayout.css / DashboardScreen.css /
+            ProfileAnalytics.css).
+          */}
+          <div
+            key={ambientArtUrl ?? "sparta"}
+            className={`sp-content__ambient${ambientArtUrl ? "" : " sp-content__ambient--sparta"}`}
+            aria-hidden="true"
+            style={ambientArtUrl ? { backgroundImage: `url(${ambientArtUrl})` } : undefined}
+          >
+            {!ambientArtUrl && <SpartaIdentityBackdrop />}
+          </div>
           <div className="sp-content__inner" key={String(collapsed)}>
             {children}
           </div>
@@ -61,7 +88,7 @@ export function Sidebar({
       <div className="sp-sidebar__brand-row">
         <div className="sp-sidebar__brand">
           <div className="sp-sidebar__mark" aria-hidden="true">
-            S
+            <img src={BRAND_MARK_URL} alt="" />
           </div>
           <div className="sp-sidebar__brand-copy">
             <strong className="sp-sidebar__wordmark">Sparta GG</strong>

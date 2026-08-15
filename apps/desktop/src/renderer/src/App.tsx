@@ -598,7 +598,10 @@ function SpartaApp() {
 
   if (sessionStatus === "forgot-password") {
     return (
-      <ForgotPasswordScreen splashUrl={splashUrl} onReturnToLogin={() => setSessionStatus("auth")} />
+      <ForgotPasswordScreen
+        splashUrl={splashUrl}
+        onReturnToLogin={() => setSessionStatus("auth")}
+      />
     );
   }
 
@@ -701,6 +704,7 @@ function SpartaApp() {
   return (
     <AppShell
       collapsed={sidebarCollapsed}
+      ambientArtUrl={splashUrl}
       topbar={
         <Topbar
           title={currentPage.title}

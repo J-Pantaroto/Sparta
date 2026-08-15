@@ -1,8 +1,11 @@
 import { useEffect, useRef, type FormEvent, type ReactNode } from "react";
+import { BRAND_MARK_URL } from "./brand-mark";
+import { SpartaIdentityBackdrop } from "./SpartaIdentity";
 import "./AuthLayout.css";
 
 interface AuthLayoutProps {
-  splashUrl: string;
+  /** `null` quando nenhum campeão/skin foi escolhido - cai pra identidade Sparta. */
+  splashUrl: string | null;
   title: ReactNode;
   subtitle?: ReactNode;
   children: ReactNode;
@@ -10,7 +13,13 @@ interface AuthLayoutProps {
   progressStep?: 1 | 2 | 3 | 4;
 }
 
-/** Casca unica do acesso: conta, confirmacao de email e vinculo Riot. */
+/**
+ * Casca unica do acesso: conta, confirmacao de email e vinculo Riot. Antes
+ * do onboarding pedir uma conta Riot, nao ha "campeao do jogador" nenhum -
+ * por isso o fundo cai pra identidade Sparta sempre que `splashUrl` e nulo,
+ * em vez do antigo default fixo em Ahri (Ahri e conteudo do League, nao a
+ * marca do produto).
+ */
 export function AuthLayout({
   splashUrl,
   title,
@@ -22,11 +31,15 @@ export function AuthLayout({
   const titleRef = useRef<globalThis.HTMLHeadingElement>(null);
   useEffect(() => titleRef.current?.focus(), [title]);
   return (
-    <div className="sp-auth" style={{ backgroundImage: `url(${splashUrl})` }}>
+    <div
+      className="sp-auth"
+      style={splashUrl ? { backgroundImage: `url(${splashUrl})` } : undefined}
+    >
+      {!splashUrl && <SpartaIdentityBackdrop />}
       <main className="sp-auth__card">
         <div className="sp-auth__brand">
           <div className="sp-auth__mark" aria-hidden="true">
-            S
+            <img src={BRAND_MARK_URL} alt="" />
           </div>
           <div>
             <strong className="sp-auth__wordmark">Sparta</strong>

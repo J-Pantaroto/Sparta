@@ -17,7 +17,9 @@
   border-radius: var(--radius-xl);
   background:
     radial-gradient(circle at 88% 20%, var(--color-accent-glow), transparent 34%),
-    linear-gradient(135deg, var(--surface-3), var(--surface-1));
+    linear-gradient(135deg, var(--surface-veil-strong), var(--surface-veil));
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
   box-shadow: var(--shadow-lg);
 }
 
@@ -55,7 +57,7 @@
   border: 1px solid var(--border-default);
   border-radius: var(--radius-lg);
   background: var(--surface-4);
-  color: var(--color-accent-text);
+  color: var(--text-primary);
   font-size: var(--text-2xl);
   font-weight: var(--weight-black);
 }

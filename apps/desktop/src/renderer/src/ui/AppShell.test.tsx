@@ -30,6 +30,8 @@ describe("shell autenticado v2", () => {
     expect(item.getAttribute("aria-current")).toBe("page");
     expect(item.getAttribute("title")).toContain("Resumo pessoal");
     expect(document.querySelector(".sp-shell--collapsed")).not.toBeNull();
+    expect(document.querySelector(".sp-sidebar__mark img")).not.toBeNull();
+    expect(document.querySelector(".sp-content__ambient--sparta .sp-identity")).not.toBeNull();
   });
 
   it("abre o menu da conta e mantém ações navegáveis por teclado", () => {

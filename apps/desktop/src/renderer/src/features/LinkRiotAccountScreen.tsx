@@ -5,7 +5,7 @@ import { AuthForm, AuthLayout, Button, Field, SignalChip, TextField } from "../u
 
 interface LinkRiotAccountScreenProps {
   token: string;
-  splashUrl: string;
+  splashUrl: string | null;
   onboarding: AccountOnboardingStatus;
   onRefresh: () => void;
   onLogout: () => void;

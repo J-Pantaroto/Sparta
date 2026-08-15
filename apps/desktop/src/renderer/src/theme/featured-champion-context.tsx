@@ -46,19 +46,26 @@ export const VISUAL_THEMES: ReadonlyArray<{
 const STORAGE_KEY = "sparta:featured-champion";
 const VISUAL_PREFERENCES_KEY = "sparta:visual-preferences-v2";
 
-const DEFAULT_CHAMPION: FeaturedChampionOption = {
-  key: "Ahri",
-  name: "Ahri",
-  skinIndex: 0,
-  skinName: "Ahri"
-};
+/**
+ * Sentinela de "nenhum campeao escolhido ainda" - NAO um campeao real.
+ * `key === ""` e o unico sinal que os consumidores checam; nunca resolve
+ * pra uma URL de splash (`splashUrl` fica `null` nesse estado).
+ *
+ * Antes disso existia um `DEFAULT_CHAMPION` fixo em Ahri: todo usuario que
+ * nunca abriu Configuracoes via herdava a arte da Ahri como se fosse a
+ * identidade do produto - Ahri e conteudo do League, nao a marca do Sparta.
+ * O estado neutro agora e representado de verdade (sentinela), e quem
+ * renderiza cai pra identidade propria da marca (`theme/SpartaIdentity`)
+ * em vez de uma splash escolhida a dedo.
+ */
+const NO_CHAMPION: FeaturedChampionOption = { key: "", name: "", skinIndex: -1, skinName: "" };
 
 function loadStoredChampion(): FeaturedChampionOption {
   const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) return DEFAULT_CHAMPION;
+  if (!raw) return NO_CHAMPION;
   try {
     const parsed = JSON.parse(raw) as Partial<FeaturedChampionOption>;
-    if (!parsed.key || typeof parsed.skinIndex !== "number") return DEFAULT_CHAMPION;
+    if (!parsed.key || typeof parsed.skinIndex !== "number") return NO_CHAMPION;
     return {
       key: parsed.key,
       name: parsed.name ?? parsed.key,
@@ -85,7 +92,7 @@ function loadStoredChampion(): FeaturedChampionOption {
           : undefined
     };
   } catch {
-    return DEFAULT_CHAMPION;
+    return NO_CHAMPION;
   }
 }
 
@@ -110,8 +117,15 @@ function applyAccentPalette(palette: AccentPalette | undefined) {
 interface FeaturedChampionContextValue {
   featuredChampion: FeaturedChampionOption;
   setFeaturedChampion: (option: FeaturedChampionOption) => void;
-  /** URL da splash do tema atual (local baixada, se houver; senao CDN). */
-  splashUrl: string;
+  /**
+   * URL da splash do tema atual (local baixada, se houver; senao CDN).
+   * `null` quando `featuredChampion` e o sentinela (nenhum campeao
+   * escolhido ainda) - quem renderiza deve cair pra identidade Sparta
+   * nesse caso, nunca tratar `null` como "carregando".
+   */
+  splashUrl: string | null;
+  /** Atalho pra `featuredChampion.key === ""` - mais legivel que repetir a comparacao crua. */
+  hasFeaturedChampion: boolean;
   visualTheme: VisualThemeId;
   setVisualTheme: (theme: VisualThemeId) => void;
   density: InterfaceDensity;
@@ -166,16 +180,30 @@ export function FeaturedChampionProvider({ children }: { children: ReactNode }) 
     }
   });
 
+  const hasFeaturedChampion = featuredChampion.key !== "";
   const splashUrl = useMemo(
     () =>
-      featuredChampion.localSplashPath ??
-      championSplashUrl(featuredChampion.key, featuredChampion.skinIndex),
-    [featuredChampion.localSplashPath, featuredChampion.key, featuredChampion.skinIndex]
+      hasFeaturedChampion
+        ? (featuredChampion.localSplashPath ??
+          championSplashUrl(featuredChampion.key, featuredChampion.skinIndex))
+        : null,
+    [
+      hasFeaturedChampion,
+      featuredChampion.localSplashPath,
+      featuredChampion.key,
+      featuredChampion.skinIndex
+    ]
   );
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(featuredChampion));
-  }, [featuredChampion]);
+    if (hasFeaturedChampion) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(featuredChampion));
+    } else {
+      // O estado Sparta é ausência deliberada de campeão, não uma escolha
+      // vazia a ser serializada como se fosse conteúdo do jogador.
+      localStorage.removeItem(STORAGE_KEY);
+    }
+  }, [featuredChampion, hasFeaturedChampion]);
 
   useEffect(() => {
     localStorage.setItem(
@@ -195,6 +223,11 @@ export function FeaturedChampionProvider({ children }: { children: ReactNode }) 
     applyAccentPalette(visualTheme === "adaptive" ? featuredChampion.accent : undefined);
     if (visualTheme !== "adaptive") return;
     if (featuredChampion.accent) return;
+    // Sem campeao escolhido nao ha splash pra extrair cor - o tema
+    // Adaptativo cai pro accent estatico do :root (mesmo vermelho do
+    // Espartano) ate o usuario escolher uma skin, em vez de tentar
+    // extrair de uma URL nula.
+    if (!splashUrl) return;
 
     let cancelled = false;
     void extractAccentPalette(splashUrl).then((palette) => {
@@ -222,6 +255,7 @@ export function FeaturedChampionProvider({ children }: { children: ReactNode }) 
       featuredChampion,
       setFeaturedChampion,
       splashUrl,
+      hasFeaturedChampion,
       visualTheme,
       setVisualTheme,
       density,
@@ -229,7 +263,7 @@ export function FeaturedChampionProvider({ children }: { children: ReactNode }) 
       visualIntensity,
       setVisualIntensity
     }),
-    [featuredChampion, splashUrl, visualTheme, density, visualIntensity]
+    [featuredChampion, splashUrl, hasFeaturedChampion, visualTheme, density, visualIntensity]
   );
 
   return (
