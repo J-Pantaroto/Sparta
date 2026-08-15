@@ -171,7 +171,7 @@ export function DashboardScreen({
           actions={
             <Button
               variant="secondary"
-              icon={<RefreshCw size={15} />}
+              icon={<RefreshCw size={16} />}
               onClick={() => void loadProfile()}
             >
               Tentar novamente
@@ -452,7 +452,7 @@ function DashboardHero({
         <span>
           <Clock3 size={13} /> {formatSync(profile.identity.updatedAt)}
         </span>
-        <Button variant="secondary" icon={<UserRound size={15} />} onClick={onOpenProfile}>
+        <Button variant="secondary" icon={<UserRound size={16} />} onClick={onOpenProfile}>
           Abrir perfil
         </Button>
       </div>

@@ -344,7 +344,7 @@ function AnalysisBody({
 
       <details className="sp-pregame-details">
         <summary>
-          Dados indisponiveis e limitacoes <ChevronDown size={15} aria-hidden="true" />
+          Dados indisponiveis e limitacoes <ChevronDown size={16} aria-hidden="true" />
         </summary>
         <Card tone="flat">
           <SectionHeader
@@ -591,7 +591,7 @@ function CollapsibleAnalysis({ section }: { section: AnalysisSection }) {
               : section.status === "PARTIAL"
                 ? "Parcial"
                 : "Disponivel"}
-          <ChevronDown size={15} aria-hidden="true" />
+          <ChevronDown size={16} aria-hidden="true" />
         </span>
       </summary>
       <SectionCard section={section} />

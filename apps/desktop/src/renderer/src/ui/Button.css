@@ -140,7 +140,7 @@
 .sp-icon-btn--active {
   border-color: var(--color-accent-soft);
   background: var(--surface-3);
-  color: var(--color-accent);
+  color: var(--color-accent-text);
 }
 
 /* Spinner inline do estado de carregamento do botao. */

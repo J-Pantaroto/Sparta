@@ -259,13 +259,13 @@ export function Topbar({
           {menuOpen && (
             <div className="sp-account-menu__popover" role="menu">
               <button type="button" role="menuitem" onClick={onAccount}>
-                <UserRound size={15} /> Conta e segurança
+                <UserRound size={16} /> Conta e segurança
               </button>
               <button type="button" role="menuitem" onClick={onSettings}>
-                <Settings size={15} /> Configurações
+                <Settings size={16} /> Configurações
               </button>
               <button type="button" role="menuitem" onClick={onLogout}>
-                <LogOut size={15} /> Sair
+                <LogOut size={16} /> Sair
               </button>
             </div>
           )}

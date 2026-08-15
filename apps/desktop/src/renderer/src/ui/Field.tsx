@@ -105,7 +105,7 @@ export function SearchInput({ value, onChange, placeholder = "Buscar...", ariaLa
   return (
     <div className="sp-search">
       <span className="sp-search__icon" aria-hidden="true">
-        <Search size={15} />
+        <Search size={16} />
       </span>
       <input
         id={id}

@@ -315,7 +315,7 @@ export function ThemeGallery({ ddragonVersion }: { ddragonVersion: string }) {
                     <div className="sp-theme__preview-actions">
                       <Button
                         variant="secondary"
-                        icon={<Download size={15} />}
+                        icon={<Download size={16} />}
                         loading={downloading}
                         onClick={() => void downloadSkin(selectedChampion, focusedSkin)}
                       >

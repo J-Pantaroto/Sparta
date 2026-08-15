@@ -39,7 +39,7 @@
   background: var(--bg-sunken);
   color: var(--text-muted);
   font-weight: var(--weight-bold);
-  letter-spacing: 0.04em;
+  letter-spacing: var(--tracking-caps);
   text-transform: uppercase;
 }
 

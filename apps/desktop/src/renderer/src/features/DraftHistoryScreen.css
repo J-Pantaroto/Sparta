@@ -40,7 +40,13 @@
 
 .sp-draft-history__row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  /* Piso real na coluna de identidade. Com `minmax(0, 1fr)` a coluna de
+     chips (`auto`) ficava com o que quisesse e a identidade era espremida
+     ate 64px em 1000px - o subtitulo virava ~10 caracteres seguidos de
+     reticencias, texto que nao informa nada. O piso de 190px garante uma
+     linha legivel e empurra a compressao para os chips, que ja sabem
+     quebrar. */
+  grid-template-columns: auto minmax(190px, 1fr) auto;
   align-items: center;
   gap: var(--space-3);
   width: 100%;
@@ -59,12 +65,19 @@
   min-width: 0;
 }
 
+/* O `strong` (titulo da linha) tambem precisa truncar. So o `span` tinha
+   essa regra, entao o titulo definia o min-content do bloco e VAZAVA por
+   cima da coluna seguinte - medido em 17-19px de invasao a 1000px. */
+.sp-draft-history__identity strong,
 .sp-draft-history__identity span {
   overflow: hidden;
-  color: var(--text-muted);
-  font-size: var(--text-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.sp-draft-history__identity span {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
 }
 
 .sp-draft-history__detail {
@@ -83,7 +96,7 @@
   color: var(--text-muted);
   font-size: var(--text-xs);
   font-weight: var(--weight-bold);
-  letter-spacing: 0.06em;
+  letter-spacing: var(--tracking-caps);
   text-transform: uppercase;
 }
 

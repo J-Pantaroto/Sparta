@@ -1,5 +1,74 @@
 # Sparta - Contexto para Continuidade
 
+## Etapa 31M: polimento visual final do Desktop
+
+Leva o Desktop de "visualmente estável" para acabado. O design system já estava maduro (tokens por
+função, um CSS por componente, zero classe legada), então o critério foi **medir antes de mexer**:
+cada mudança nasceu de um número, não de impressão. Relatório em `docs/desktop-visual-polish.md`.
+
+**A decisão mais importante é a regra de contraste do destaque, e ela não é intercambiável.**
+`--color-accent` é dinâmico (derivado da splash da skin) e sua faixa travada (S>=55%, L 45%-62%)
+garante que a cor seja *visível*, mas **não** que seja legível como texto: medido sobre
+`--surface-2`, um azul (240) em L=45% dá 2,06:1 e mesmo no teto de 62% fica em 4,13:1; o vermelho
+Espartano padrão dá 3,94:1. E o accent era usado como cor de texto em 11 lugares. Separado em
+`--color-accent` (preenchimento/borda/marcador, nunca texto) e `--color-accent-text` (única
+aprovada para texto, mesma matiz clareada até cruzar 4,5:1, derivada em runtime por
+`readableAccentText`). Mesmo princípio que o site já aplica — não é cópia de design.
+
+**Duas afirmações erradas em comentários foram derrubadas pela medição**: (1) `--text-on-accent`
+dizia que tinta escura é sempre melhor dentro da faixa — na verdade o pior caso cai a 2,04:1, e o
+`.sp-skip-link` media 4,14:1; `readableInkOnAccent` agora escolhe entre preto e branco por medição
+(pior caso 4,58:1), e a tinta escura precisou ser preto **puro**, porque com `#08080a` o melhor
+caso possível ainda reprovava em 4,47:1. (2) O anel de foco prometia "halo escuro por trás" que
+nenhuma regra implementava — sobre splash clara ele sumia; o halo agora existe, e o anel deixou de
+usar o accent cru (2,06:1 no pior caso) pela variante legível.
+
+**`--text-muted` reprovava AA em toda superfície** (3,38-3,99:1) e é o token dos textos *menores*
+do app (10-11px, 102 usos) — a pior combinação possível. `#6f6f7b` → `#8a8a98`, preservando os três
+degraus de hierarquia (15,27 / 6,87 / 4,93 sobre `--surface-4`).
+
+**Profundidade**: `.sp-card` só tinha realce interno e nenhuma sombra projetada — lia como adesivo
+colado no fundo. Tokens `--elevation-raised`/`--elevation-hover`; `feature` sobe para `--shadow-lg`,
+`flat` fica sem sombra, `inset` ganha sombra **interna**; e cards clicáveis ganharam o estado
+`pressed` que faltava (só os botões tinham).
+
+**Tracking**: 19 rótulos UPPERCASE semanticamente idênticos usavam **cinco** valores diferentes
+(0.04 a 0.12em) — a mesma peça com espaçamento distinto por tela. Unificados em `--tracking-caps`
+(0.06em, a moda dos valores existentes). Zero `letter-spacing` literal fora de `tokens.css`.
+
+**3 bugs reais de layout achados pelo QA** (7 de 30 combinações falhavam): (1) `.sp-recent-match__
+loadout` escondia **~4 dos 8 itens** silenciosamente (`overflow: hidden` numa coluna de 160px para
+264px de conteúdo) — o usuário via meia build achando que via a inteira; agora quebra em duas
+fileiras preservando tudo; (2) `.sp-dashboard-matches` sem `grid-template-columns` deixava a
+trilha implícita virar min-content e a linha **vazava 110px para fora do cartão**; (3) o
+`@media (max-width: 1280px)` nunca poderia corrigir o Dashboard, porque media query enxerga o
+*viewport* e o cartão continua com ~530px mesmo em 1600px — substituído por **container queries**
+(Chromium 142), com breakpoints somados dos mínimos reais (924/798/662px). Mais truncamento
+faltando no `strong` do histórico de drafts (invadia 17-19px) e "Sincronização" vazando 9px.
+
+**QA no Electron real via CDP**, conta Zekerus#117: 10 telas × 1000/1280/1600 = **30/30 sem
+overflow estrutural**, 0 imagem quebrada, 0 `NaN`/`undefined`, **0 erro de console, 0 exceção, 0
+HTTP >= 400**. Contraste medido no DOM real (cada texto contra o fundo efetivamente pintado atrás):
+**628 elementos nos 3 temas, 0 abaixo de AA**. Temas/densidade/intensidade aplicados pela tela real
+de Configurações e confirmados; caminho dinâmico validado (skin real → accent `hsl(218 100% 62%)`,
+texto 5,43:1, tinta 5,96:1); Tab real e reduced motion confirmados; 18 screenshots.
+
+**Achado metodológico**: `pkill -f electron` não mata processo Windows — cinco instâncias ficaram
+empilhadas e o CDP conectava à mais antiga, servindo bundle velho e produzindo uma leitura falsa.
+Detectado ao rastrear a origem de um valor, corrigido via PowerShell e **tudo revalidado do zero**
+numa instância única.
+
+**Não regressão estrutural**: o diff inteiro está em `apps/desktop/src/renderer/` — zero arquivo em
+`packages/`, `apps/api`, `apps/site`, `infra/`, `prisma/` ou Docker; logo motor, pesos, métricas,
+proveniência e contratos não têm como ter mudado. `release-etapa27c-v1` `ACTIVE` com
+`artifactHash`/`configHash` idênticos, confirmado no Postgres. **1422 testes** (desktop 171, eram
+164; `accent-color.test.ts` novo trava as duas garantias de contraste varrendo 12.960 combinações,
+com a luminância reimplementada da especificação em vez de importada do módulo sob teste).
+
+Preservado de propósito: rótulos crus de runa (não existe catálogo local — inventar violaria a
+regra de dado real), identidade visual, glassmorphism, os três temas, LCU read-only,
+`draftRevision`, congelamento de snapshot e todos os gates de produção/RSO.
+
 ## Correção pontual: propagação de pnpm patches no Dockerfile.site
 
 O build de produção do site quebrava na VPS (`ENOENT` em `patches/extract-zip@2.0.1.patch`) porque

@@ -24,14 +24,13 @@
   color: var(--text-muted);
   font-size: var(--text-xs);
   font-weight: var(--weight-bold);
-  letter-spacing: 0.06em;
+  letter-spacing: var(--tracking-caps);
   text-transform: uppercase;
 }
 
-.sp-match-history__rows {
-  display: grid;
-  gap: var(--space-2);
-}
+/* Layout e container query da lista vivem em `ui/ProfileAnalytics.css`,
+   junto de `.sp-recent-match` - fonte unica pras tres listas de partida
+   (Perfil, Dashboard e esta). */
 
 .sp-match-history__row--selected .sp-recent-match {
   border-color: var(--color-accent);

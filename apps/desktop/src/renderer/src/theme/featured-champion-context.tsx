@@ -71,7 +71,18 @@ function loadStoredChampion(): FeaturedChampionOption {
       localSplashPath: parsed.localSplashPath?.startsWith("data:")
         ? parsed.localSplashPath
         : undefined,
-      accent: parsed.accent
+      // Paleta gravada antes de `text` existir nao tem a variante legivel do
+      // destaque. Mantê-la deixaria `--color-accent-text` no valor estatico
+      // do tema (vermelho Espartano) enquanto o resto do app usa a cor da
+      // skin - rotulo vermelho sobre tema azul. Descartar e mais seguro que
+      // completar por adivinhacao: o efeito de extracao ja re-deriva a
+      // paleta inteira da splash quando `accent` esta ausente.
+      accent:
+        parsed.accent &&
+        typeof parsed.accent.text === "string" &&
+        typeof parsed.accent.onAccent === "string"
+          ? parsed.accent
+          : undefined
     };
   } catch {
     return DEFAULT_CHAMPION;
@@ -85,11 +96,15 @@ function applyAccentPalette(palette: AccentPalette | undefined) {
     root.removeProperty("--color-accent");
     root.removeProperty("--color-accent-soft");
     root.removeProperty("--color-accent-glow");
+    root.removeProperty("--color-accent-text");
+    root.removeProperty("--text-on-accent");
     return;
   }
   root.setProperty("--color-accent", palette.accent);
   root.setProperty("--color-accent-soft", palette.soft);
   root.setProperty("--color-accent-glow", palette.glow);
+  root.setProperty("--color-accent-text", palette.text);
+  root.setProperty("--text-on-accent", palette.onAccent);
 }
 
 interface FeaturedChampionContextValue {

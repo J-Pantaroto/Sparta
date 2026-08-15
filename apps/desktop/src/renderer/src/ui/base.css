@@ -66,13 +66,24 @@ textarea {
 /*
  * Foco visivel so pra navegacao por teclado (`:focus-visible`, nao
  * `:focus`) - o app nao tinha nenhum indicador antes, o que tornava a
- * navegacao por Tab literalmente invisivel. Anel na cor do tema, com um
- * halo escuro por tras pra continuar legivel sobre splash art.
+ * navegacao por Tab literalmente invisivel.
+ *
+ * Duas correcoes medidas nesta etapa:
+ *
+ * 1. O anel usava `--color-accent`, que NAO garante contraste: na faixa
+ *    travada do accent dinamico um azul em L=45% da 2.06:1 contra a
+ *    superficie - abaixo dos 3:1 que um indicador de foco precisa. Passou a
+ *    usar `--color-accent-text`, a variante ja clareada ate >=4.5:1.
+ * 2. O comentario anterior prometia "um halo escuro por tras pra continuar
+ *    legivel sobre splash art", mas nenhuma regra implementava isso - sobre
+ *    o heroi (splash clara) o anel sumia. O halo agora existe de fato, via
+ *    `box-shadow` externo.
  */
 :focus-visible {
-  outline: 2px solid var(--color-accent);
+  outline: 2px solid var(--color-accent-text);
   outline-offset: 2px;
   border-radius: var(--radius-xs);
+  box-shadow: 0 0 0 4px rgba(4, 4, 5, 0.72);
 }
 
 ::selection {

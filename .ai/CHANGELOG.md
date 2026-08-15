@@ -22,6 +22,22 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-08-15 09:50 — Etapa 31M: polimento visual final do Desktop
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0065-polimento-visual-final-desktop.md`
+
+Acabamento visual do Desktop guiado por medição, não por gosto: separação `--color-accent`
+(preenchimento) vs `--color-accent-text` (texto) porque a faixa travada do accent dinâmico não
+garante 4.5:1; `--text-muted` que reprovava AA em toda superfície; tinta sobre preenchimento
+escolhida por medição; anel de foco com a cor certa e o halo que o comentário prometia e o CSS
+nunca implementou; tokens de elevação (cards não projetavam sombra) e estado `pressed`; 19 rótulos
+uppercase que usavam 5 trackings diferentes unificados. QA no Electron real achou 3 bugs de layout,
+incluindo itens de build silenciosamente escondidos e linhas vazando do cartão — corrigidos com
+container queries. 30/30 combinações limpas, 628 textos medidos com 0 abaixo de AA.
+Ver `docs/desktop-visual-polish.md`.
+
+---
+
 ## 2026-08-15 03:35 — Correção pontual: propagação de pnpm patches no Dockerfile.site
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0064-correcao-propagacao-patches-dockerfile-site.md`

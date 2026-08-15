@@ -999,7 +999,7 @@ export function ChampionSelectScreen({
 
                         <details className="sp-cs-details" style={{ marginTop: "var(--space-5)" }}>
                           <summary>
-                            Loadout pessoal conhecido <ChevronDown size={15} aria-hidden="true" />
+                            Loadout pessoal conhecido <ChevronDown size={16} aria-hidden="true" />
                           </summary>
                           <PersonalLoadoutHistory
                             token={sessionToken}

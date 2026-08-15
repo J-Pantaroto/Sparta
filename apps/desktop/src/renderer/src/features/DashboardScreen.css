@@ -55,7 +55,7 @@
   border: 1px solid var(--border-default);
   border-radius: var(--radius-lg);
   background: var(--surface-4);
-  color: var(--color-accent);
+  color: var(--color-accent-text);
   font-size: var(--text-2xl);
   font-weight: var(--weight-black);
 }
@@ -65,10 +65,10 @@
 }
 
 .sp-dashboard-hero__eyebrow {
-  color: var(--color-accent);
+  color: var(--color-accent-text);
   font-size: var(--text-xs);
   font-weight: var(--weight-bold);
-  letter-spacing: 0.06em;
+  letter-spacing: var(--tracking-caps);
   text-transform: uppercase;
 }
 
@@ -307,8 +307,9 @@
   gap: var(--space-3);
 }
 
+/* `.sp-dashboard-matches` NAO entra aqui: layout e container query dela
+   vivem em `ui/ProfileAnalytics.css`, junto de `.sp-recent-match`. */
 .sp-dashboard-system__list,
-.sp-dashboard-matches,
 .sp-dashboard-champions,
 .sp-dashboard-side-stack,
 .sp-dashboard-actions {
@@ -318,7 +319,12 @@
 
 .sp-dashboard-system__row {
   display: grid;
-  grid-template-columns: 28px minmax(0, 1fr) auto;
+  /* Piso de 96px no rotulo: com `minmax(0, 1fr)` a coluna de status (`auto`)
+     tomava a largura que quisesse e o rotulo caia para 67px, curto demais
+     para "Sincronizacao" (palavra unica, que nao tem onde quebrar) - a
+     palavra vazava 9px por cima do status. O piso cabe o rotulo mais longo
+     e empurra a compressao para o status, que e mais curto. */
+  grid-template-columns: 28px minmax(96px, 1fr) auto;
   gap: var(--space-2);
   min-height: 38px;
   padding: var(--space-2);
@@ -333,8 +339,8 @@
 }
 
 .sp-dashboard-system__row svg {
-  width: 15px;
-  height: 15px;
+  width: 16px;
+  height: 16px;
 }
 
 .sp-dashboard-system__row strong,

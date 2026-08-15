@@ -9,13 +9,22 @@
  * Dois eixos de cor, deliberadamente separados:
  *
  * 1. DESTAQUE (--color-accent*) - identidade. Muda com a skin escolhida:
- *    o FeaturedChampionProvider sobrescreve estes 3 tokens em runtime com
- *    a cor extraida da splash art (features/accent-color.ts). Os nomes
+ *    o FeaturedChampionProvider sobrescreve estes tokens em runtime com
+ *    a cor extraida da splash art (theme/accent-color.ts). Os nomes
  *    NAO podem mudar - ha codigo em runtime que os escreve por nome.
  *
  * 2. SEMANTICO (--color-green/-yellow/-red) - significado. Fixo de
  *    proposito: se seguisse a skin, "bom" e "ruim" trocariam de cor a cada
  *    tema e perderiam o sentido.
+ *
+ * REGRA DE CONTRASTE DO DESTAQUE (nao e intercambiavel - medida, nao
+ * estetica). `--color-accent` e cor de PREENCHIMENTO/BORDA/MARCADOR;
+ * `--color-accent-text` e a unica que pode virar TEXTO sobre superficie
+ * escura. Motivo medido: a faixa travada do accent dinamico (S>=55%,
+ * L 45%-62%, accent-color.ts) NAO garante 4.5:1 - em L=45% um azul (240)
+ * da 2.06:1 e ate no teto de 62% fica em 4.13:1; o vermelho Espartano
+ * padrao (#dc2626) da 3.94:1. Trocar um pelo outro reintroduz texto
+ * ilegivel, e o proprio site ja separa os dois papeis pela mesma razao.
  */
 
 :root {
@@ -52,16 +61,34 @@
   /* ─── Texto ────────────────────────────────────────────────────────── */
   --text-primary: #f4f4f6;
   --text-secondary: #a5a5b0;
-  --text-muted: #6f6f7b;
-  /* Texto sobre um preenchimento na cor do tema. A luminosidade do accent
-     e travada entre 45% e 62% (accent-color.ts), faixa em que tinta escura
-     tem contraste melhor e mais estavel que branco pra qualquer matiz. */
-  --text-on-accent: #08080a;
+  /* Medido: o valor anterior (#6f6f7b) dava 3.38:1 sobre `--surface-4` e
+     3.99:1 sobre `--surface-1` - reprovava AA em TODA superficie, e e
+     justamente o token dos textos MENORES do app (10-11px: rotulo de grupo
+     da sidebar, cabecalho de tabela, meta de identidade, hint de campo).
+     #8a8a98 passa em todas (4.93:1 na mais clara) e preserva os tres
+     degraus de hierarquia: 15.27 / 6.87 / 4.93 sobre `--surface-4`. */
+  --text-muted: #8a8a98;
+  /* Texto sobre um PREENCHIMENTO na cor do tema (botao primario, skip link,
+     marca da sidebar).
+     CORRIGIDO nesta etapa: a nota anterior afirmava que tinta escura tem
+     "contraste melhor e mais estavel que branco pra qualquer matiz" dentro
+     da faixa travada - a medicao derrubou isso. Com tinta escura sempre, o
+     pior caso da faixa cai a 2.04:1 (accent escuro em L=45%), e o proprio
+     `.sp-skip-link` media 4.14:1 no tema padrao. `readableInkOnAccent`
+     escolhe entre escura (preto puro) e branca por medicao a cada skin, o
+     que leva o pior caso da faixa a 4.58:1. Aqui fica o valor do Espartano
+     (#dc2626: escura 4.14 vs branca 4.83 - vence a branca). */
+  --text-on-accent: #ffffff;
 
   /* ─── Destaque (dinamico por skin - ver nota no topo) ──────────────── */
+  /* Preenchimento/borda/marcador. NUNCA texto - ver regra de contraste. */
   --color-accent: #dc2626;
   --color-accent-soft: #7f1d1d;
   --color-accent-glow: rgba(220, 38, 38, 0.32);
+  /* A unica variante do destaque aprovada para TEXTO: mesma matiz, clareada
+     ate passar 4.5:1 sobre a superficie escura (4.84:1 aqui). Derivada em
+     runtime por `readableAccentText` quando a skin troca o accent. */
+  --color-accent-text: #e24b4b;
 
   /* ─── Semantico (fixo - ver nota no topo) ──────────────────────────── */
   --color-green: #4ade80;
@@ -86,6 +113,15 @@
   --shadow-md: 0 8px 20px -12px rgba(0, 0, 0, 0.8);
   --shadow-lg: 0 20px 48px -24px rgba(0, 0, 0, 0.9);
   --shadow-accent: 0 12px 28px -18px var(--color-accent-glow);
+
+  /* Elevacao de card = realce interno no topo (luz pegando a borda) +
+     sombra de contato. Antes o card so tinha o realce interno, entao ele
+     nao projetava nada e lia como adesivo colado no fundo em vez de
+     superficie apoiada sobre ele - a "superficie chapada" do pedido.
+     `raised` e o repouso; `hover` aprofunda pra o levantar de 1px do
+     `:hover` ter sombra correspondente em vez de so deslocar o card. */
+  --elevation-raised: var(--glass-highlight), 0 2px 6px -2px rgba(0, 0, 0, 0.55);
+  --elevation-hover: var(--glass-highlight), 0 10px 24px -12px rgba(0, 0, 0, 0.75);
 
   /* ─── Raio ─────────────────────────────────────────────────────────── */
   /* Escala real: elementos pequenos NAO usam o mesmo raio dos paineis
@@ -126,6 +162,16 @@
   --leading-tight: 1.2;
   --leading-snug: 1.4;
   --leading-normal: 1.6;
+  /* Tracking por FUNCAO, nao por valor solto. Auditado: 19 rotulos
+     UPPERCASE semanticamente identicos (eyebrow de secao, cabecalho de
+     tabela, rotulo de grupo) usavam CINCO valores diferentes - 0.04, 0.06,
+     0.08, 0.1 e 0.12em - entao a mesma peca aparecia com espacamento
+     distinto dependendo da tela. `--tracking-caps` fica em 0.06em, a moda
+     dos valores ja existentes: unifica os cinco sem redesenhar nenhum. */
+  --tracking-tight: -0.015em;
+  --tracking-normal: 0;
+  --tracking-label: 0.02em;
+  --tracking-caps: 0.06em;
   --weight-regular: 400;
   --weight-medium: 500;
   --weight-semibold: 600;
@@ -178,6 +224,12 @@ html[data-sparta-theme="obsidian"] {
   --color-accent: #9b8afb;
   --color-accent-soft: #5c4eb5;
   --color-accent-glow: rgba(155, 138, 251, 0.26);
+  /* Este accent ja passa como texto (6.73:1), entao a variante coincide -
+     declarada mesmo assim pra o token existir em todo tema. */
+  --color-accent-text: #9b8afb;
+  /* Accent claro (L=76%): aqui a tinta ESCURA e que vence (7.07 vs 2.83).
+     Preto puro pelo mesmo motivo medido em `readableInkOnAccent`. */
+  --text-on-accent: #000000;
   --chart-primary: #ab9dff;
   --chart-secondary: #71c7ec;
   --chart-grid: rgba(170, 180, 215, 0.16);
