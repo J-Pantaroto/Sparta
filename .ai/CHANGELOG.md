@@ -22,6 +22,17 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-08-15 03:35 — Correção pontual: propagação de pnpm patches no Dockerfile.site
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0064-correcao-propagacao-patches-dockerfile-site.md`
+
+O build de produção do site falhava na VPS (`ENOENT` em `patches/extract-zip@2.0.1.patch`) porque
+o `Dockerfile.site` rodava `pnpm install --frozen-lockfile` sem copiar `patches/` antes — a Etapa
+0061 tinha corrigido só o `Dockerfile.api`. `COPY patches ./patches` adicionado ao estágio `build`
+do site; o teste estrutural que protegia só o Dockerfile da API foi generalizado pra escanear todo
+`Dockerfile.*` do repositório automaticamente. Validado com `docker build -f Dockerfile.site`
+(com e sem cache) real, ponta a ponta. Ver `docs/dockerfile-site-patch-propagation.md`.
+
 ## 2026-08-15 02:05 — Correção pontual: domínio do remetente transacional
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0063-correcao-dominio-remetente-transacional.md`

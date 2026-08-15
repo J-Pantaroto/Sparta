@@ -29,6 +29,13 @@ cópia nos estágios e a ausência no runtime. O build Docker real concluiu, a A
 `/health`, e a inspeção da imagem confirmou usuário `node` e ausência de `patches`, `.env`, `.git`,
 fontes da API e executáveis de lint/test/build.
 
+**Correção pontual posterior (2026-08-15)**: esta etapa corrigiu só o `Dockerfile.api` — o
+`Dockerfile.site` (que não existia como bloqueio nesta auditoria, mas já executava install congelado
+do mesmo lockfile raiz) ficou fora do escopo e quebrou na VPS com o mesmo `ENOENT` quando o site
+passou a ser buildado depois do patch do `extract-zip` entrar em `pnpm.patchedDependencies`.
+Corrigido e o teste estrutural generalizado para cobrir todo `Dockerfile.*` do repositório, não só
+o da API — ver `docs/dockerfile-site-patch-propagation.md`.
+
 ## 2. Sessão preservada durante indisponibilidade
 
 **Causa.** O boot tratava qualquer rejeição de `fetchSession` como sessão inválida, apagava o bearer

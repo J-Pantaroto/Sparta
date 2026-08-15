@@ -1,5 +1,30 @@
 # Sparta - Contexto para Continuidade
 
+## Correção pontual: propagação de pnpm patches no Dockerfile.site
+
+O build de produção do site quebrava na VPS (`ENOENT` em `patches/extract-zip@2.0.1.patch`) porque
+`Dockerfile.site` rodava `pnpm install --frozen-lockfile` sem copiar `patches/` antes — a Etapa
+0061 (ver "Correções bloqueantes pré-polish" abaixo) tinha corrigido essa propagação só no
+`Dockerfile.api`, e `Dockerfile.site` nunca tinha sido revisado porque não estava entre os cinco
+bloqueios auditados naquela etapa. `COPY patches ./patches` adicionado ao estágio `build` do site,
+no mesmo lugar relativo que a API já usa; o estágio `runtime` (Caddy + `dist/` estático) continua
+sem copiar `patches/`, porque não roda nenhum install.
+
+`scripts/dockerfile-patch-propagation.test.ts` deixou de ser específico do `Dockerfile.api` — agora
+escaneia **todo** `Dockerfile.*` da raiz (`readdirSync`, não lista fixa) e exige `COPY patches`
+antes de qualquer `pnpm install --frozen-lockfile` em qualquer estágio, excluindo deliberadamente
+`--frozen-lockfile=false` (usado por `Dockerfile.desktop-dev`, fora do escopo desta proteção).
+Confirmado que o teste **falha** sem a correção (revertido isoladamente via `git stash`, reproduziu
+a mensagem exata do erro real) e passa com ela — 7 testes no total, um `Dockerfile.*` novo entra na
+proteção automaticamente, sem precisar editar o teste.
+
+Validado com `docker build -f Dockerfile.site .` real, com e sem `--no-cache` (checkout limpo):
+os dois concluíram sem erro. `typecheck`/`lint`/`test`/`build` completos nos 5 pacotes — **1415
+testes** no monorepo (raiz 25, eram 21). Nenhum arquivo fora de `Dockerfile.site`,
+`scripts/dockerfile-patch-propagation.test.ts` e documentação foi tocado: `pnpm.patchedDependencies`,
+o patch do `extract-zip`, pnpm, Electron, o visual do site, `infra/Caddyfile`, `apps/api`, auth e
+DNS continuam intactos. Ver `docs/dockerfile-site-patch-propagation.md`.
+
 ## Etapa 31Q: autenticação de produção — e-mail transacional e recuperação de senha
 
 Fecha os dois maiores bloqueios que a auditoria pré-final (Etapa 31 anterior, `docs/desktop-pre-
