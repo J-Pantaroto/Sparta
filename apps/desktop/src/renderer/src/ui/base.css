@@ -86,6 +86,22 @@ textarea {
   box-shadow: 0 0 0 4px rgba(4, 4, 5, 0.72);
 }
 
+/*
+ * Alvo de foco PROGRAMATICO nao e posicao de navegacao por teclado.
+ * `tabindex="-1"` aqui existe pra o leitor de tela pousar no lugar certo -
+ * o titulo do fluxo de autenticacao quando a etapa muda (`AuthLayout`) e o
+ * `<main>` como destino do skip-link (`AppShell`). O Chromium ainda assim
+ * casa `:focus-visible` nesses elementos, o que desenhava um anel em volta
+ * de um TITULO (visivel na tela de entrar) e desenharia outro em volta da
+ * area de conteudo inteira ao usar o skip-link. O anel ja existia antes
+ * desta etapa; o halo novo so o tornou obvio. Anunciar continua funcionando
+ * - o que sai e o indicador visual, que ali nao significa nada.
+ */
+[tabindex="-1"]:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
 ::selection {
   background: var(--color-accent);
   color: var(--text-on-accent);

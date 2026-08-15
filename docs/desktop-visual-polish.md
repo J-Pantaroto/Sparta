@@ -176,6 +176,24 @@ soma.
 
 Após as correções: **30/30 limpo**.
 
+### 8.5 Achado posterior: anel de foco em alvo programático
+
+Ao capturar o tour de telas do produto (depois do commit da etapa), a tela de entrar apareceu com
+um **anel vermelho em volta do título "Entrar"**. Investigado no app real: o `<h1>` do
+`AuthLayout` tem `tabindex="-1"` e recebe `.focus()` quando a etapa muda — padrão de
+acessibilidade legítimo, para o leitor de tela pousar no lugar certo. O Chromium mesmo assim casa
+`:focus-visible` nesse elemento.
+
+O anel **já existia antes desta etapa** (o `:focus-visible` global sempre desenhou outline); o
+halo adicionado no item 4 apenas o tornou óbvio, transformando um contorno fino num retângulo em
+volta do título. O mesmo valia para o `<main tabindex="-1">` do `AppShell`, destino do skip-link —
+usá-lo desenharia um anel em volta da área de conteúdo inteira.
+
+Corrigido com `[tabindex="-1"]:focus-visible { outline: none; box-shadow: none }`: alvo de foco
+programático não é posição de navegação por teclado, então não recebe indicador visual. Confirmado
+no app real que o título **continua recebendo foco** (o anúncio para leitor de tela segue
+funcionando) e que o Tab real continua mostrando o anel de 2px + halo nos controles.
+
 ## QA visual executado
 
 Electron real via CDP (não aba de navegador), conta real Zekerus#117, sessão injetada por
