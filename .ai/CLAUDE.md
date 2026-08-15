@@ -50,9 +50,39 @@ cadastro, sem sessão, o caminho continua sendo voltar e logar de novo).
 **Produção falha o boot sem as duas configurações novas** — `EMAIL_PROVIDER_API_KEY` e
 `PASSWORD_RESET_URL_BASE` HTTPS, mesma filosofia que já existia pra `EMAIL_VERIFICATION_FROM`/
 `URL_BASE`. `.env.production.example` documenta os nomes reais, sem secrets; remetente
-transacional (`contas@spartagg.com.br`) explicitamente distinto de `suporte@spartagg.com.br`
-(canal humano, não tocado); nenhum valor de DNS foi inventado — o painel da Resend informa
-SPF/DKIM reais depois que o domínio for adicionado lá, ação do owner.
+transacional (`contas@mail.spartagg.com.br` — corrigido numa etapa pontual pós-31Q, ver abaixo)
+explicitamente distinto de `suporte@spartagg.com.br` (canal humano, não tocado); nenhum valor de
+DNS foi inventado — o painel da Resend informa SPF/DKIM reais depois que o domínio for adicionado
+lá, ação do owner.
+
+## Correção pontual pós-31Q: domínio do remetente transacional
+
+O domínio real verificado no painel da Resend para produção é o **subdomínio**
+`mail.spartagg.com.br`, não o apex `spartagg.com.br` que a Etapa 31Q tinha presumido (a primeira
+versão documentava `contas@spartagg.com.br`, sem confirmação do domínio real verificado no
+provider). Corrigido em `.env.production.example` (`EMAIL_VERIFICATION_FROM=contas@mail.spartagg.
+com.br`) e nos dois documentos que citavam o valor antigo (`docs/password-recovery-and-
+transactional-email.md`, `docs/desktop-pre-final-audit.md`, com os espelhos em `.ai/specs/`
+sincronizados). `EMAIL_PROVIDER_REPLY_TO=suporte@spartagg.com.br` (canal humano, apex) preservado
+sem alteração — reply-to não precisa estar no domínio verificado da Resend, só o `from` precisa.
+
+**Confirmado por leitura do código, não presumido**: confirmação de e-mail e recuperação de senha
+usam o **mesmo** `EMAIL_VERIFICATION_FROM` — `defaultEmailProviderForEnvironment`
+(`apps/api/src/modules/auth/email-provider.ts`) constrói uma única instância de
+`ResendTransactionalEmailProvider` a partir dessa variável (`from: env.EMAIL_VERIFICATION_FROM`),
+e as duas rotas (`sendEmailVerification`/`sendPasswordReset`) chamam essa mesma instância; não
+existe segunda variável de remetente nem lógica de `from` específica por fluxo em nenhum ponto do
+código. `EMAIL_VERIFICATION_URL_BASE`/`PASSWORD_RESET_URL_BASE` **não** foram tocadas — continuam
+apontando pro apex `spartagg.com.br` (as páginas públicas do site), que é um domínio diferente do
+domínio de envio de e-mail e não precisa estar verificado na Resend.
+
+**Zero mudança de código, DNS, provider ou infraestrutura** — correção isolada em
+configuração/documentação. Nenhum teste precisou de ajuste: os fixtures de
+`resend-email-provider.test.ts`/`email-provider.test.ts` usam strings de exemplo arbitrárias
+(`contas@spartagg.com.br`, `access@example.com`) que testam o repasse do valor de `from` recebido
+via construtor, não o domínio real — o comportamento testado (o provider usa exatamente o `from`
+passado a ele) continua correto e não depende do valor documentado em
+`.env.production.example`.
 
 **QA end-to-end real contra Docker/Postgres** (não simulado): cadastro → token de preview →
 confirmação → login → pedido de reset → token de preview → confirmação com nova senha → senha

@@ -71,15 +71,31 @@ próprio de 8s). Nenhum corpo de resposta do provider é logado — só o `statu
 `ExternalServiceError`, que já existia e nunca guarda header/payload/segredo.
 
 **Remetente**: `EMAIL_VERIFICATION_FROM` é um endereço transacional próprio do domínio
-(`contas@spartagg.com.br`, documentado em `.env.production.example`), **não**
-`suporte@spartagg.com.br` — esse continua sendo o canal humano, conforme instrução explícita.
-`EMAIL_PROVIDER_REPLY_TO` (opcional) pode apontar de volta pro suporte, sem misturar os dois
-papéis.
+**verificado na Resend** (`contas@mail.spartagg.com.br`, documentado em
+`.env.production.example`) — subdomínio `mail.`, não o apex `spartagg.com.br`, que é o que a
+Resend confirmou como domínio verificado para o envio de produção. **Não**
+`suporte@spartagg.com.br` — esse continua sendo o canal humano, conforme instrução explícita, e
+não precisa estar no mesmo domínio verificado da Resend porque nunca é usado como envelope
+`from`. `EMAIL_PROVIDER_REPLY_TO` (opcional) aponta de volta pro suporte no apex, sem misturar os
+dois papéis: `from` sai sempre de `mail.spartagg.com.br`, `reply-to` sai sempre de
+`spartagg.com.br`.
 
-**DNS**: nenhum valor foi inventado. O painel da Resend informa os registros SPF/DKIM exatos
-depois que o domínio é adicionado lá — isso é uma ação do owner, documentada em
-`.env.production.example` como pendência, não simulada nem preenchida com um valor de exemplo que
-pareça real.
+**Correção pontual pós-implementação**: a primeira versão desta etapa documentou o remetente como
+`contas@spartagg.com.br` (apex), presumindo que o domínio verificado seria o mesmo do site. O
+domínio real verificado no painel da Resend é o subdomínio `mail.spartagg.com.br` — corrigido em
+`.env.production.example` e nesta doc; `EMAIL_VERIFICATION_URL_BASE`/`PASSWORD_RESET_URL_BASE`
+continuam apontando pro apex (`spartagg.com.br/confirmar-email`,
+`spartagg.com.br/redefinir-senha`), porque são URLs das páginas públicas do site, não endereços de
+e-mail — não precisam estar no domínio verificado da Resend. Confirmação de e-mail e recuperação
+de senha usam **o mesmo** `EMAIL_VERIFICATION_FROM` — `defaultEmailProviderForEnvironment`
+constrói uma única instância de `ResendTransactionalEmailProvider` a partir dessa variável, e as
+duas rotas (`sendEmailVerification`/`sendPasswordReset`) chamam a mesma instância; não existe
+segunda variável de remetente em nenhum ponto do código. Nenhum DNS foi alterado, nenhum provider
+trocado, nenhuma caixa de e-mail criada — correção só de configuração/documentação.
+
+**DNS**: nenhum valor foi inventado. O painel da Resend informa os registros SPF/DKIM exatos para
+`mail.spartagg.com.br` — isso já foi feito pelo owner; a pendência restante é só gerar e configurar
+a `EMAIL_PROVIDER_API_KEY` real no cofre de produção.
 
 ## Templates
 

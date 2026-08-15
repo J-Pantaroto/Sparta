@@ -22,6 +22,17 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-08-15 02:05 — Correção pontual: domínio do remetente transacional
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0063-correcao-dominio-remetente-transacional.md`
+
+O domínio verificado no Resend para produção é o subdomínio `mail.spartagg.com.br`, não o apex
+que a Etapa 31Q tinha documentado. `EMAIL_VERIFICATION_FROM` corrigido para
+`contas@mail.spartagg.com.br` em `.env.production.example`; `EMAIL_PROVIDER_REPLY_TO=suporte@
+spartagg.com.br` preservado. Confirmação de e-mail e recuperação de senha compartilham a mesma
+variável de remetente (`defaultEmailProviderForEnvironment`), então a correção cobre os dois
+fluxos sem tocar código. Zero DNS, provider, caixa de e-mail ou infraestrutura alterados.
+
 ## 2026-08-15 01:35 — Etapa 31Q: autenticação de produção (e-mail transacional + recuperação de senha)
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0062-autenticacao-producao-email-transacional.md`
