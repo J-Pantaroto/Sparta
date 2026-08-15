@@ -14,8 +14,10 @@ const validProduction = {
   RSO_CLIENT_ID: "approved-client-id",
   RSO_REDIRECT_URI: "https://api.example.com/auth/riot/rso/callback",
   EMAIL_PROVIDER_MODE: "EXTERNAL",
+  EMAIL_PROVIDER_API_KEY: "re_test_key_not_real",
   EMAIL_VERIFICATION_FROM: "access@example.com",
-  EMAIL_VERIFICATION_URL_BASE: "https://app.example.com/verify-email"
+  EMAIL_VERIFICATION_URL_BASE: "https://app.example.com/verify-email",
+  PASSWORD_RESET_URL_BASE: "https://app.example.com/reset-password"
 };
 
 describe("configuração de produção", () => {

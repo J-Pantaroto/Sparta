@@ -10,7 +10,8 @@ export const HTTP_TIMEOUTS = {
   dataDragonMs: 8_000,
   remoteAssetMs: 10_000,
   spartaApiMs: 10_000,
-  lcuMs: 1_500
+  lcuMs: 1_500,
+  transactionalEmailMs: 8_000
 } as const;
 
 export interface RetryPolicy {

@@ -12,6 +12,7 @@ import {
   defaultEmailProviderForEnvironment,
   type TransactionalEmailProvider
 } from "./email-provider.js";
+import { confirmPasswordReset, issuePasswordReset } from "./password-reset.js";
 import { buildAccountOnboardingStatus } from "./onboarding.js";
 import { hashPassword, verifyPassword } from "./password.js";
 import { signToken, verifyToken } from "./token.js";
@@ -34,6 +35,11 @@ const confirmationSchema = z.object({ token: z.string().min(32).max(512) });
 const emailChangeSchema = z.object({
   email: z.string().email("Informe um email valido"),
   currentPassword: z.string().min(1).max(256)
+});
+const passwordResetRequestSchema = z.object({ email: z.string().email("Informe um email valido") });
+const passwordResetConfirmSchema = z.object({
+  token: z.string().min(32).max(512),
+  password: z.string().min(8, "A senha precisa ter ao menos 8 caracteres").max(256)
 });
 
 type AuthenticatedUser = {
@@ -104,6 +110,21 @@ function neutralVerificationResponse(nextAllowedAt: string, localPreviewToken?: 
     status: "VERIFICATION_REQUIRED" as const,
     message:
       "Se o endereco puder ser usado, enviaremos instrucoes de confirmacao. Verifique sua caixa de entrada.",
+    nextAllowedAt,
+    ...(localPreviewToken ? { localPreviewToken, localPreviewOnly: true as const } : {})
+  };
+}
+
+// Resposta identica exista ou nao a conta: o unico jeito de nao revelar
+// existencia de conta e a mesma resposta valer para "enviamos" e "nao ha o
+// que enviar" (conta inexistente/sem senha local). O tempo de resposta
+// tambem nao diverge de forma observavel, porque as duas ramificacoes
+// passam pela mesma transacao serializavel em `issuePasswordReset`.
+function neutralPasswordResetResponse(nextAllowedAt: string, localPreviewToken?: string) {
+  return {
+    status: "RESET_REQUESTED" as const,
+    message:
+      "Se o endereco tiver uma conta com senha, enviaremos instrucoes de redefinicao. Verifique sua caixa de entrada.",
     nextAllowedAt,
     ...(localPreviewToken ? { localPreviewToken, localPreviewOnly: true as const } : {})
   };
@@ -208,6 +229,55 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, opt
       }
       request.log.info({ event: "email_verification_confirmed" });
       return { status: "EMAIL_VERIFIED" };
+    }
+  );
+
+  app.post(
+    "/auth/password-reset/request",
+    { config: { rateLimit: CREDENTIAL_RATE_LIMIT } },
+    async (request, reply) => {
+      const responseNextAllowedAt = new Date(
+        Date.now() + env.PASSWORD_RESET_RESEND_COOLDOWN_SECONDS * 1_000
+      ).toISOString();
+      const payload = passwordResetRequestSchema.parse(request.body);
+      const user = await findUserByEmail(payload.email);
+      let previewToken: string | undefined;
+      if (user?.isActive) {
+        const issued = await issuePasswordReset({ user, provider, env });
+        previewToken = issued.rawToken;
+        request.log.info({
+          event: "password_reset_requested",
+          userRef: opaqueUserRef(user.id),
+          deliveryStatus: issued.deliveryStatus
+        });
+      }
+      const localPreviewToken =
+        env.NODE_ENV !== "production" && env.LOCAL_EMAIL_PREVIEW_ENABLED
+          ? (previewToken ?? randomBytes(32).toString("base64url"))
+          : undefined;
+      reply.code(202);
+      return neutralPasswordResetResponse(responseNextAllowedAt, localPreviewToken);
+    }
+  );
+
+  app.post(
+    "/auth/password-reset/confirm",
+    { config: { rateLimit: CREDENTIAL_RATE_LIMIT } },
+    async (request, reply) => {
+      const { token, password } = passwordResetConfirmSchema.parse(request.body);
+      const result = await confirmPasswordReset(token, password);
+      if (!result.ok) {
+        reply.code(400);
+        return {
+          code: "PASSWORD_RESET_INVALID",
+          message: "O link de redefinicao e invalido, expirou ou ja foi utilizado."
+        };
+      }
+      request.log.info({
+        event: "password_reset_confirmed",
+        userRef: opaqueUserRef(result.userId)
+      });
+      return { status: "PASSWORD_RESET" };
     }
   );
 

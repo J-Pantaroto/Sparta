@@ -6,7 +6,15 @@ interface EmailVerificationScreenProps {
   splashUrl: string;
   email: string;
   initialLocalPreviewToken?: string;
+  /**
+   * So existe quando o usuario chegou aqui DEPOIS de logar (conta ja tinha
+   * senha, so faltava confirmar o email) - nesse caso da pra reconsultar a
+   * sessao. Logo apos o cadastro nao ha token ainda, entao o botao de
+   * reconsulta some e "Voltar para entrar" e o unico caminho.
+   */
+  sessionToken?: string | null;
   onConfirmed: () => void;
+  onRecheckRequested?: () => Promise<void> | void;
   onReturnToLogin: () => void;
 }
 
@@ -14,7 +22,9 @@ export function EmailVerificationScreen({
   splashUrl,
   email,
   initialLocalPreviewToken,
+  sessionToken,
   onConfirmed,
+  onRecheckRequested,
   onReturnToLogin
 }: EmailVerificationScreenProps) {
   const queryToken =
@@ -23,7 +33,23 @@ export function EmailVerificationScreen({
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [checking, setChecking] = useState(false);
   const token = queryToken ?? localPreviewToken;
+
+  async function handleRecheck() {
+    if (!onRecheckRequested) return;
+    setChecking(true);
+    setError(null);
+    try {
+      await onRecheckRequested();
+    } catch (recheckError) {
+      setError(
+        recheckError instanceof Error ? recheckError.message : "Não foi possível verificar agora."
+      );
+    } finally {
+      setChecking(false);
+    }
+  }
 
   useEffect(() => {
     if (queryToken) void handleConfirmation(queryToken);
@@ -102,6 +128,17 @@ export function EmailVerificationScreen({
         >
           Reenviar instruções
         </Button>
+        {sessionToken && onRecheckRequested && (
+          <Button
+            variant="ghost"
+            size="lg"
+            block
+            loading={checking}
+            onClick={() => void handleRecheck()}
+          >
+            Já confirmei, verificar novamente
+          </Button>
+        )}
       </div>
     </AuthLayout>
   );

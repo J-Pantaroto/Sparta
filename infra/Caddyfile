@@ -23,8 +23,13 @@ spartagg.com.br {
 		X-Frame-Options "DENY"
 		Referrer-Policy "strict-origin-when-cross-origin"
 		# CSP deliberadamente sem `unsafe-inline`/`unsafe-eval`: o site não
-		# tem script inline nem embutido de terceiros.
-		Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+		# tem script inline nem embutido de terceiros. `connect-src` inclui o
+		# host reservado da API pública (ver bloco comentado abaixo) porque
+		# /confirmar-email e /redefinir-senha chamam a API diretamente do
+		# navegador para consumir o token - as duas únicas páginas do site que
+		# fazem fetch. Enquanto a API pública não existe, a chamada falha
+		# honestamente (erro de rede), o que já é o comportamento esperado.
+		Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self' https://api.spartagg.com.br; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
 	}
 
 	# Reservado para quando a API pública deixar de estar bloqueada — NÃO

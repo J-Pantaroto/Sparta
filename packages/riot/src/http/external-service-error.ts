@@ -17,7 +17,8 @@ export type IntegrationId =
   | "COMMUNITY_DRAGON"
   | "REMOTE_ASSET"
   | "SPARTA_API"
-  | "LCU";
+  | "LCU"
+  | "TRANSACTIONAL_EMAIL";
 
 export interface ExternalErrorDetails {
   code: ExternalErrorCode;

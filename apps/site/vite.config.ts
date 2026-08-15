@@ -28,6 +28,8 @@ export default defineConfig({
         seguranca: resolve(root, "seguranca.html"),
         status: resolve(root, "status.html"),
         suporte: resolve(root, "suporte.html"),
+        confirmarEmail: resolve(root, "confirmar-email.html"),
+        redefinirSenha: resolve(root, "redefinir-senha.html"),
         notFound: resolve(root, "404.html")
       }
     }

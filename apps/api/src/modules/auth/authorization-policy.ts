@@ -37,6 +37,8 @@ export const ROUTE_AUTHORIZATION_POLICIES: readonly RouteAuthorizationPolicy[] =
   { method: "POST", path: "/auth/login", access: "PUBLIC" },
   { method: "POST", path: "/auth/email-verification/resend", access: "PUBLIC" },
   { method: "POST", path: "/auth/email-verification/confirm", access: "PUBLIC" },
+  { method: "POST", path: "/auth/password-reset/request", access: "PUBLIC" },
+  { method: "POST", path: "/auth/password-reset/confirm", access: "PUBLIC" },
   { method: "GET", path: "/auth/me", access: "AUTHENTICATED" },
   { method: "GET", path: "/auth/onboarding-status", access: "AUTHENTICATED" },
   { method: "POST", path: "/auth/logout", access: "AUTHENTICATED" },

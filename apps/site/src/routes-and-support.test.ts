@@ -17,6 +17,8 @@ const PAGINAS = [
   "excluir-conta.html",
   "status.html",
   "suporte.html",
+  "confirmar-email.html",
+  "redefinir-senha.html",
   "404.html"
 ];
 
@@ -30,6 +32,18 @@ const ROTAS = {
   "/excluir-conta": "excluir-conta.html",
   "/status": "status.html",
   "/suporte": "suporte.html"
+} as const;
+
+/**
+ * As duas paginas de callback de conta (confirmar-email, redefinir-senha)
+ * sao rotas limpas validas como as outras, mas deliberadamente `noindex` e
+ * fora do sitemap - ninguem deve chegar nelas por busca, so pelo link que o
+ * proprio email manda. Por isso ficam num conjunto separado de `ROTAS`, que
+ * alimenta o teste do sitemap.
+ */
+const ROTAS_CALLBACK_NOINDEX = {
+  "/confirmar-email": "confirmar-email.html",
+  "/redefinir-senha": "redefinir-senha.html"
 } as const;
 
 const CADDYFILE = readFileSync(resolve(REPO_ROOT, "infra/Caddyfile"), "utf-8");
@@ -82,6 +96,11 @@ describe("URLs públicas limpas", () => {
     expect(SITEMAP).toContain("<loc>https://spartagg.com.br/suporte</loc>");
     for (const rota of Object.keys(ROTAS)) {
       expect(SITEMAP).toContain(`<loc>https://spartagg.com.br${rota}</loc>`);
+    }
+    // as paginas de callback nunca entram no sitemap - noindex e "fora do
+    // mapa" andam juntos aqui, de proposito.
+    for (const rota of Object.keys(ROTAS_CALLBACK_NOINDEX)) {
+      expect(SITEMAP).not.toContain(`<loc>https://spartagg.com.br${rota}</loc>`);
     }
   });
 });
@@ -194,6 +213,46 @@ describe("Central de Suporte", () => {
   it("está no rodapé de todas as páginas, via layout compartilhado", () => {
     expect(LAYOUT).toContain('href="/suporte"');
     expect(LAYOUT).toContain("Central de suporte");
+  });
+});
+
+describe("Páginas de callback de conta (confirmar-email, redefinir-senha)", () => {
+  it.each(Object.entries(ROTAS_CALLBACK_NOINDEX))(
+    "%s é servida por um arquivo estático existente e listada no build",
+    (_rota, arquivo) => {
+      expect(() => ler(arquivo)).not.toThrow();
+      expect(VITE).toContain(arquivo);
+    }
+  );
+
+  it.each(Object.entries(ROTAS_CALLBACK_NOINDEX))("%s é noindex e usa a URL limpa no canonical", (rota, arquivo) => {
+    const html = ler(arquivo);
+    expect(html).toMatch(/name="robots" content="noindex"/);
+    expect(html).toContain(`rel="canonical" href="https://spartagg.com.br${rota}"`);
+  });
+
+  it("confirmar-email lê o token da query string e chama a API de confirmação", () => {
+    const html = ler("confirmar-email.html");
+    expect(html).toContain('id="sp-confirm-status"');
+    const script = ler("src/scripts/confirmar-email.ts");
+    expect(script).toContain("token");
+    expect(script).toContain("/auth/email-verification/confirm");
+  });
+
+  it("redefinir-senha tem formulário de nova senha e chama a API de confirmação", () => {
+    const html = ler("redefinir-senha.html");
+    expect(html).toMatch(/<form[^>]*id="sp-reset-form"/);
+    expect(html).toMatch(/type="password"/);
+    const script = ler("src/scripts/redefinir-senha.ts");
+    expect(script).toContain("/auth/password-reset/confirm");
+  });
+
+  it("nenhuma das duas páginas é uma área de conta completa", () => {
+    for (const arquivo of Object.values(ROTAS_CALLBACK_NOINDEX)) {
+      const html = ler(arquivo);
+      expect(html).not.toContain('href="/conta"');
+      expect(html).not.toContain('href="/conta/tickets"');
+    }
   });
 });
 

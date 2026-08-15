@@ -14,6 +14,8 @@ const PAGINAS = [
   "excluir-conta.html",
   "status.html",
   "suporte.html",
+  "confirmar-email.html",
+  "redefinir-senha.html",
   "404.html"
 ];
 
@@ -31,7 +33,9 @@ const ROTAS_VALIDAS = new Set([
   "/seguranca",
   "/excluir-conta",
   "/status",
-  "/suporte"
+  "/suporte",
+  "/confirmar-email",
+  "/redefinir-senha"
 ]);
 
 function ler(nome: string): string {

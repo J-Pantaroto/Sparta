@@ -22,6 +22,18 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-08-15 01:35 — Etapa 31Q: autenticação de produção (e-mail transacional + recuperação de senha)
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0062-autenticacao-producao-email-transacional.md`
+
+Confirmação de e-mail e recuperação de senha fechadas de ponta a ponta: adaptador real de
+provider transacional (Resend), `PasswordResetToken` espelhando o desenho já sólido de
+`EmailVerificationToken`, redefinição de senha invalidando todas as sessões, duas páginas públicas
+mínimas no site (`/confirmar-email`, `/redefinir-senha`, sem deep link/SPA) e os estados que
+faltavam no Desktop (`ForgotPasswordScreen`, reconsulta de confirmação). Validado end-to-end real
+contra Docker/Postgres. Falta só a credencial real do provider em produção — configuração do
+owner, não código. Ver `docs/password-recovery-and-transactional-email.md`.
+
 ## 2026-08-14 20:55 — Correções bloqueantes pré-polish do Desktop
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0061-correcoes-bloqueantes-pre-polish.md`

@@ -29,12 +29,14 @@ export default [
         HTMLElement: "readonly",
         HTMLInputElement: "readonly",
         HTMLSelectElement: "readonly",
+        HTMLFormElement: "readonly",
         RequestInit: "readonly",
         Response: "readonly",
         AbortController: "readonly",
         AbortSignal: "readonly",
         URLSearchParams: "readonly",
         navigator: "readonly",
+        location: "readonly",
         IntersectionObserver: "readonly",
         __dirname: "readonly"
       }

@@ -51,6 +51,7 @@ import { GrowthJourneyScreen } from "./features/GrowthJourneyScreen";
 import { MotorHistoryScreen } from "./features/MotorHistoryScreen";
 import { LinkRiotAccountScreen } from "./features/LinkRiotAccountScreen";
 import { EmailVerificationScreen } from "./features/EmailVerificationScreen";
+import { ForgotPasswordScreen } from "./features/ForgotPasswordScreen";
 import { OnboardingCompleteScreen } from "./features/OnboardingCompleteScreen";
 import { PostGameScreen } from "./features/PostGameScreen";
 import { PreGameScreen } from "./features/PreGameScreen";
@@ -70,7 +71,14 @@ import {
 } from "./ui";
 
 type SessionStatus =
-  "checking" | "offline" | "auth" | "email-verification" | "link-account" | "complete" | "ready";
+  | "checking"
+  | "offline"
+  | "auth"
+  | "forgot-password"
+  | "email-verification"
+  | "link-account"
+  | "complete"
+  | "ready";
 
 /**
  * Chave técnica opaca da sessão de draft. Aleatória de propósito: qualquer
@@ -583,7 +591,14 @@ function SpartaApp() {
           setLocalPreviewToken(previewToken);
           setSessionStatus("email-verification");
         }}
+        onForgotPassword={() => setSessionStatus("forgot-password")}
       />
+    );
+  }
+
+  if (sessionStatus === "forgot-password") {
+    return (
+      <ForgotPasswordScreen splashUrl={splashUrl} onReturnToLogin={() => setSessionStatus("auth")} />
     );
   }
 
@@ -614,6 +629,8 @@ function SpartaApp() {
         splashUrl={splashUrl}
         email={verificationEmail || sessionUser?.email || "seu email"}
         initialLocalPreviewToken={localPreviewToken}
+        sessionToken={sessionToken}
+        onRecheckRequested={sessionToken ? () => refreshOnboarding() : undefined}
         onConfirmed={() => {
           setLocalPreviewToken(undefined);
           if (sessionToken) void refreshOnboarding();

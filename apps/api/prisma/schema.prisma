@@ -20,6 +20,7 @@ model User {
   accounts     RiotAccount[]
   rsoAuthorizationTransactions RsoAuthorizationTransaction[]
   emailVerificationTokens EmailVerificationToken[]
+  passwordResetTokens PasswordResetToken[]
 }
 
 model RiotAccount {
@@ -74,6 +75,23 @@ model RsoAuthorizationTransaction {
 /// Segredo de confirmacao de email armazenado exclusivamente como SHA-256.
 /// `emailSnapshot` impede que um token antigo confirme um endereco novo.
 model EmailVerificationToken {
+  id            String    @id @default(uuid())
+  userId        String
+  emailSnapshot String
+  tokenHash     String    @unique
+  expiresAt     DateTime
+  consumedAt    DateTime?
+  revokedAt     DateTime?
+  createdAt     DateTime  @default(now())
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+/// Mesma forma/ciclo de vida do EmailVerificationToken (hash, uso unico,
+/// expiracao, revogacao) - reaproveitado de proposito para redefinicao de
+/// senha em vez de inventar um segundo mecanismo.
+model PasswordResetToken {
   id            String    @id @default(uuid())
   userId        String
   emailSnapshot String

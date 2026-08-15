@@ -212,6 +212,26 @@ export function confirmEmailVerification(token: string) {
   });
 }
 
+/**
+ * So o PEDIDO de redefinicao (o usuario digita o email aqui, no Desktop -
+ * e onde ele esta quando percebe que esqueceu a senha). O CONSUMO do token
+ * (definir a nova senha) acontece na pagina publica /redefinir-senha do
+ * site, nao no Desktop - nao ha deep link nem protocolo customizado
+ * envolvido, so o mesmo link clicavel de qualquer email.
+ */
+export function requestPasswordReset(email: string) {
+  return request<{
+    status: "RESET_REQUESTED";
+    message: string;
+    nextAllowedAt: string;
+    localPreviewToken?: string;
+    localPreviewOnly?: true;
+  }>("/auth/password-reset/request", {
+    method: "POST",
+    body: JSON.stringify({ email })
+  });
+}
+
 export function fetchOnboardingStatus(token: string) {
   return request<AccountOnboardingStatus>("/auth/onboarding-status", {
     headers: { Authorization: `Bearer ${token}` }

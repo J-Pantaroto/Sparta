@@ -721,6 +721,73 @@
 }
 
 /* ====================================================================== */
+/* Formulario (confirmar-email, redefinir-senha)                          */
+/* ====================================================================== */
+
+/*
+ * Primeiro formulario real do site (as duas paginas de callback de conta).
+ * Mesma linguagem geometrica dos outros componentes - rotulo mono versal,
+ * canto quase reto - sem introduzir nenhum framework de formulario.
+ */
+.sp-form {
+  display: grid;
+  gap: var(--space-5);
+  max-width: var(--measure-marketing);
+}
+
+.sp-field label {
+  display: block;
+  margin-bottom: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: var(--track-wide);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.sp-field input {
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface-1);
+  border: 1px solid var(--line-default);
+  border-radius: var(--radius-xs);
+  color: var(--text-primary);
+  font-size: var(--text-base);
+  font-family: var(--font-sans);
+}
+
+.sp-field input:focus-visible {
+  outline: 2px solid var(--signal);
+  outline-offset: 2px;
+  border-color: var(--signal);
+}
+
+.sp-field__hint {
+  margin-top: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.sp-form-status {
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--line-subtle);
+  border-left: 2px solid var(--line-strong);
+  background: var(--surface-1);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.sp-form-status--error {
+  border-left-color: var(--crimson-edge);
+  color: var(--text-primary);
+}
+
+.sp-form-status--success {
+  border-left-color: var(--state-live);
+  color: var(--text-primary);
+}
+
+/* ====================================================================== */
 /* Central de Suporte                                                      */
 /* ====================================================================== */
 

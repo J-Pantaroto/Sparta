@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Redefinir senha — Sparta GG</title>
+    <meta
+      name="description"
+      content="Defina uma nova senha para a sua conta Sparta GG a partir do link enviado por email."
+    />
+    <link rel="canonical" href="https://spartagg.com.br/redefinir-senha" />
+    <link rel="icon" type="image/png" href="/img/favicon.png" />
+    <meta name="robots" content="noindex" />
+    <meta name="theme-color" content="#07080a" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Sparta GG" />
+    <meta property="og:locale" content="pt_BR" />
+    <meta property="og:title" content="Redefinir senha — Sparta GG" />
+    <meta property="og:description" content="Defina uma nova senha para a sua conta Sparta GG." />
+    <meta property="og:url" content="https://spartagg.com.br/redefinir-senha" />
+    <link rel="stylesheet" href="/src/styles/tokens.css" />
+    <link rel="stylesheet" href="/src/styles/base.css" />
+    <link rel="stylesheet" href="/src/styles/site.css" />
+  </head>
+  <body>
+    <a class="sp-skip-link" href="#sp-main">Ir para o conteúdo</a>
+    <header class="sp-header" id="sp-header"></header>
+
+    <main id="sp-main">
+      <section class="sp-hero sp-hero--page">
+        <div class="sp-container">
+          <p class="sp-eyebrow">Conta</p>
+          <h1>Redefinir senha</h1>
+          <p class="sp-hero__sub">
+            Defina uma nova senha para a sua conta Sparta GG. Isso encerra todas as sessões
+            anteriores, inclusive no aplicativo Desktop.
+          </p>
+        </div>
+      </section>
+
+      <section class="sp-section sp-section--tight" data-reveal>
+        <div class="sp-container">
+          <form id="sp-reset-form" class="sp-form" novalidate>
+            <div class="sp-field">
+              <label for="sp-reset-password">Nova senha</label>
+              <input
+                id="sp-reset-password"
+                name="password"
+                type="password"
+                autocomplete="new-password"
+                minlength="8"
+                required
+              />
+              <p class="sp-field__hint">Mínimo de 8 caracteres.</p>
+            </div>
+            <div class="sp-field">
+              <label for="sp-reset-password-confirm">Confirmar nova senha</label>
+              <input
+                id="sp-reset-password-confirm"
+                name="passwordConfirm"
+                type="password"
+                autocomplete="new-password"
+                minlength="8"
+                required
+              />
+            </div>
+            <div class="sp-btn-row">
+              <button id="sp-reset-submit" type="submit" class="sp-btn sp-btn--primary">
+                Redefinir senha
+              </button>
+            </div>
+          </form>
+          <div id="sp-reset-status" class="sp-form-status" role="status" aria-live="polite" hidden></div>
+          <div class="sp-btn-row">
+            <a class="sp-btn sp-btn--ghost" href="/suporte">Precisa de ajuda?</a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="sp-footer" id="sp-footer"></footer>
+    <script type="module" src="/src/scripts/layout.ts"></script>
+    <script type="module" src="/src/scripts/redefinir-senha.ts"></script>
+  </body>
+</html>

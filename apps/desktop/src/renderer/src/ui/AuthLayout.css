@@ -112,6 +112,13 @@
   text-decoration: underline;
 }
 
+.sp-auth__hint {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
+}
+
 .sp-onboarding-progress {
   display: grid;
   grid-template-columns: repeat(4, 1fr);

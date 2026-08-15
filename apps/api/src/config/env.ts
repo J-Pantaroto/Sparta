@@ -27,6 +27,10 @@ export const envSchema = z.object({
   RSO_REDIRECT_URI: z.string().url().optional(),
   LOCAL_RIOT_LINK_ENABLED: booleanFromString.default(false),
   EMAIL_PROVIDER_MODE: z.enum(["UNCONFIGURED", "IN_MEMORY", "EXTERNAL"]).optional(),
+  // Chave da API do provider externo (Resend). Nunca versionada - só existe
+  // como variável de ambiente real, fora do Git.
+  EMAIL_PROVIDER_API_KEY: z.string().optional(),
+  EMAIL_PROVIDER_REPLY_TO: optionalEmail,
   EMAIL_VERIFICATION_FROM: optionalEmail,
   EMAIL_VERIFICATION_URL_BASE: z.string().url().default("http://localhost:5173/verify-email"),
   EMAIL_VERIFICATION_TOKEN_TTL_MINUTES: z.coerce.number().int().min(5).max(1_440).default(30),
@@ -38,6 +42,14 @@ export const envSchema = z.object({
     .default(60),
   EMAIL_VERIFICATION_MAX_PER_HOUR: z.coerce.number().int().min(1).max(20).default(5),
   LOCAL_EMAIL_PREVIEW_ENABLED: booleanFromString.default(false),
+  // Redefinição de senha: mesmo desenho de token/rate-limit da confirmação
+  // de email (ver EMAIL_VERIFICATION_*), com janela própria - TTL mais curto
+  // por padrão porque a janela de exposição de um token que troca senha é
+  // mais sensível que a de um token que só confirma um endereço.
+  PASSWORD_RESET_URL_BASE: z.string().url().default("http://localhost:5173/reset-password"),
+  PASSWORD_RESET_TOKEN_TTL_MINUTES: z.coerce.number().int().min(5).max(180).default(30),
+  PASSWORD_RESET_RESEND_COOLDOWN_SECONDS: z.coerce.number().int().min(30).max(3_600).default(60),
+  PASSWORD_RESET_MAX_PER_HOUR: z.coerce.number().int().min(1).max(20).default(5),
   RIOT_PLATFORM_REGION: z.string().default("br1"),
   RIOT_REGIONAL_ROUTING: z.string().default("americas"),
   DATA_DRAGON_LOCALE: z.string().default("pt_BR"),
@@ -112,6 +124,16 @@ export function loadEnv(input = process.env): ResolvedEnv {
       throw new Error(
         "Provider, remetente e URL HTTPS de verificacao de email sao obrigatorios em producao."
       );
+    }
+    if (!env.EMAIL_PROVIDER_API_KEY || /[<>]/.test(env.EMAIL_PROVIDER_API_KEY)) {
+      throw new Error("EMAIL_PROVIDER_API_KEY e obrigatoria em producao quando o provider e EXTERNAL.");
+    }
+    if (
+      !Object.prototype.hasOwnProperty.call(input, "PASSWORD_RESET_URL_BASE") ||
+      !env.PASSWORD_RESET_URL_BASE.startsWith("https://") ||
+      /[<>]/.test(env.PASSWORD_RESET_URL_BASE)
+    ) {
+      throw new Error("PASSWORD_RESET_URL_BASE HTTPS explicita e obrigatoria em producao.");
     }
     if (
       env.AUTH_TOKEN_SECRET === DEV_AUTH_TOKEN_SECRET ||

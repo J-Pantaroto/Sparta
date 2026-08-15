@@ -6,6 +6,7 @@ interface AuthScreenProps {
   splashUrl: string;
   onAuthenticated: (token: string) => void;
   onRegistrationRequested: (email: string, localPreviewToken?: string) => void;
+  onForgotPassword: () => void;
 }
 
 type Mode = "login" | "register";
@@ -13,7 +14,8 @@ type Mode = "login" | "register";
 export function AuthScreen({
   splashUrl,
   onAuthenticated,
-  onRegistrationRequested
+  onRegistrationRequested,
+  onForgotPassword
 }: AuthScreenProps) {
   const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
@@ -119,6 +121,11 @@ export function AuthScreen({
         <Button type="submit" variant="primary" size="lg" block loading={loading}>
           {mode === "login" ? "Entrar" : "Criar conta"}
         </Button>
+        {mode === "login" && (
+          <button type="button" className="sp-auth__link" onClick={onForgotPassword}>
+            Esqueci minha senha
+          </button>
+        )}
       </AuthForm>
     </AuthLayout>
   );

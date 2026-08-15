@@ -1,5 +1,89 @@
 # Sparta - Contexto para Continuidade
 
+## Etapa 31Q: autenticação de produção — e-mail transacional e recuperação de senha
+
+Fecha os dois maiores bloqueios que a auditoria pré-final (Etapa 31 anterior, `docs/desktop-pre-
+final-audit.md`) tinha deixado explicitamente pendentes: confirmação de e-mail sem jeito real de
+concluir o clique, e recuperação de senha inexistente. Relatório completo em
+`docs/password-recovery-and-transactional-email.md`.
+
+**A abstração já existia, só faltava o adaptador real.** `TransactionalEmailProvider`
+(Etapa 31D) já tinha interface, `unavailableEmailProvider`, `InMemoryTransactionalEmailProvider` e
+o schema de env já reservava `EMAIL_PROVIDER_MODE: "EXTERNAL"` — mas nenhuma classe concreta
+existia pra esse modo. Completada, não substituída: `ResendTransactionalEmailProvider` (HTTP
+único via `fetchWithPolicy`, nova `IntegrationId: "TRANSACTIONAL_EMAIL"` em `packages/riot/src/
+http`) implementa os dois envios. Token de confirmação de e-mail (`email-verification.ts`) já era
+sólido — hash SHA-256, uso único, expiração, revogação em cascata, cooldown/limite por hora numa
+transação serializável, resposta neutra. Recuperação de senha **não existia em lugar nenhum**;
+`PasswordResetToken` (migration nova) espelha exatamente esse desenho, sem inventar um segundo
+mecanismo.
+
+**Deep link avaliado e descartado antes de escrever código.** O pedido explicitamente pedia pra
+considerar deep link/protocolo do Desktop antes de criar página pública. Descartado por ser a
+opção mais frágil, não a mais simples: exige `app.setAsDefaultProtocolClient` (só funciona
+*instalado*), tratamento de `open-url`/`second-instance`, e falha se o app não estiver aberto na
+máquina que recebeu o e-mail. Duas páginas públicas mínimas (`/confirmar-email`,
+`/redefinir-senha`, `apps/site`, Spartan Signal, sem framework, `noindex` e fora do sitemap de
+propósito) funcionam em qualquer cliente de e-mail, sem exigir o Desktop aberto. Nenhuma vira área
+de conta completa; nenhum `/conta`, sessão web ou histórico de tickets foi criado.
+
+**Redefinição de senha invalida toda sessão existente, sem exceção.** Decisão de segurança
+aplicada na mesma transação que troca `passwordHash`: `sessionVersion` incrementa, e como o token
+de sessão HMAC já carrega essa versão no payload (`ver`, existente desde o início do projeto),
+qualquer sessão emitida antes do reset passa a falhar imediatamente — sem esperar expirar.
+Validado contra o Postgres real, não só em teste mockado: um token de sessão emitido antes do
+reset, usado depois, devolve `401`.
+
+**Anti-enumeração preservado, mesmo sob pressão pra expor mais estado.** O pedido listava
+"provider indisponível" como estado de UI desejável pro reenvio de confirmação — mas adicionar
+`deliveryStatus` à resposta do `POST /auth/email-verification/resend`/`/auth/register` criaria um
+oráculo de 1 bit (o sinal só apareceria quando a conta existe e está desverificada). Não
+implementado ali de propósito; o estado "provider indisponível" continua coberto onde é seguro
+mostrá-lo — dentro do `ForgotPasswordScreen`, que já é 100% neutro por natureza.
+
+**Desktop sem redesign**: `ForgotPasswordScreen` (novo, só faz o *pedido* — o *consumo* do token
+acontece na página pública, não no Desktop) e `EmailVerificationScreen` ganhou "Já confirmei,
+verificar novamente" (reconsulta `/auth/me` via `refreshOnboarding()`, já existente; só aparece
+quando há `sessionToken`, ou seja, quando o usuário chegou ali *depois* de logar — logo após o
+cadastro, sem sessão, o caminho continua sendo voltar e logar de novo).
+
+**Produção falha o boot sem as duas configurações novas** — `EMAIL_PROVIDER_API_KEY` e
+`PASSWORD_RESET_URL_BASE` HTTPS, mesma filosofia que já existia pra `EMAIL_VERIFICATION_FROM`/
+`URL_BASE`. `.env.production.example` documenta os nomes reais, sem secrets; remetente
+transacional (`contas@spartagg.com.br`) explicitamente distinto de `suporte@spartagg.com.br`
+(canal humano, não tocado); nenhum valor de DNS foi inventado — o painel da Resend informa
+SPF/DKIM reais depois que o domínio for adicionado lá, ação do owner.
+
+**QA end-to-end real contra Docker/Postgres** (não simulado): cadastro → token de preview →
+confirmação → login → pedido de reset → token de preview → confirmação com nova senha → senha
+antiga rejeitada (401) → senha nova aceita → sessão emitida antes do reset rejeitada (401) → reuso
+do token de reset rejeitado (400) → sem `LOCAL_EMAIL_PREVIEW_ENABLED`, nenhum token vaza na
+resposta neutra mesmo pra conta que existe de verdade no banco.
+
+**4 bugs reais corrigidos no caminho**: (1) boot falhava com "Rotas sem politica de autorizacao"
+até as duas rotas novas entrarem em `authorization-policy.ts` como `PUBLIC` — a trava estrutural
+da Etapa 31C funcionou exatamente como desenhada; (2) a primeira versão de `confirmar-email.html`
+tinha um `style=` inline, que a CSP do site (`style-src 'self'` sem `unsafe-inline`, travada desde
+a Etapa 31M) teria descartado silenciosamente em produção — corrigido antes do commit; (3)
+`apps/api/vitest.config.ts` não tinha alias pro subpath `@sparta/riot/http` (só pra raiz
+`@sparta/riot`), quebrando a resolução dos novos testes — `apps/desktop/vitest.config.ts` já
+resolvia isso corretamente, mesmo padrão copiado; (4) `.env` local foi corrompido por um `echo >>`
+sem quebra de linha durante um teste manual (concatenou uma variável nova direto no valor de
+`AUTH_TOKEN_SECRET`) — percebido e corrigido na mesma sessão, sem efeito além do arquivo local
+nunca versionado.
+
+**1411 testes** no monorepo (raiz 21, site 117 — eram 102 —, core 635, riot 98, api 376 — eram
+353 —, desktop 164 — eram 157) + analyzer 1/1. `typecheck`/`lint`/`build` completos nos 5 pacotes;
+Docker da API reconstruído e reiniciado com healthcheck 200; migration nova aplicada limpa via
+`prisma migrate deploy` (25 migrations). Nenhum arquivo de `packages/core`, motor de recomendação,
+release ou replay foi tocado — confirmado pelo escopo do diff antes do commit.
+
+**Classificação final**: `EMAIL_PROVIDER`, `EMAIL_CONFIRMATION` e `PASSWORD_RECOVERY` — todos
+`NEEDS_CONFIGURATION`. Implementação completa e validada; falta só a credencial real do provider
+Resend em produção, decisão e ação do owner, não código. A matriz de `docs/desktop-pre-final-
+audit.md` foi atualizada com essa reclassificação, preservando o texto original de diagnóstico
+como histórico.
+
 ## Correções bloqueantes pré-polish: confiabilidade e segurança
 
 Etapa 0061 concluída em 2026-08-14 sobre
