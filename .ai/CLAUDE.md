@@ -1,5 +1,27 @@
 # Sparta - Contexto para Continuidade
 
+## Etapa 31N: screenshots finais do Desktop no site
+
+O site institucional agora usa quatro derivados WebP das capturas reais posteriores à 31M.1. O
+Dashboard Adaptativo é dominante no Hero; Evolução pessoal e Configurações/tema Adaptativo apoiam a
+home sem transformá-la em galeria. `/como-funciona` liga estado atual e série temporal;
+`/funcionalidades` separa explicitamente leitura pessoal de apresentação. O tema é descrito como
+somente visual: nunca altera score, recomendação ou análise. Nenhum gráfico foi recriado.
+
+Os originais de `%TEMP%/sparta-qa-31m1` foram preservados. Os derivados em
+`apps/site/public/images/product/` receberam máscaras sólidas `#0b0b0d` somente sobre todas as
+repetições do Riot ID (chip, card e sidebar), `-strip` e WebP qualidade 84. Uma inspeção intermediária
+achou duas repetições esquecidas na sidebar; os arquivos foram regenerados e reabertos. A guarda
+automatizada em `product-assets.test.ts` verifica inventário, legados, strings sensíveis, peso,
+dimensões, prioridade/lazy-load e reduced motion. Quatro WebPs somam 197.610 B contra 424.264 B dos
+três JPEGs antigos (−53,4%). Relatório completo em `docs/site-product-screenshots-polish.md`.
+
+QA no navegador real: 11 rotas × 390/768/1280/1600 = 44/44 sem overflow ou imagem quebrada; 12/12
+cenários de lazy-load; 11 rotas e quatro assets HTTP 200; zero erro de console/CSP. Desktop, API,
+auth, banco, Riot, infraestrutura, Caddy, suporte, legal e callbacks permanecem funcionais e sem
+alteração. Versão/Prisma/typecheck/lint/build, 1.432 testes TypeScript, analyzer e build Docker do site
+passaram.
+
 ## Etapa 31M.1: identidade visual dinâmica e evolução pessoal do Desktop
 
 Fecha os três pontos visuais deixados após a 31M. A tela **Evolução pessoal** agora começa por uma

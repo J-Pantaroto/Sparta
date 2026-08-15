@@ -22,6 +22,19 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-08-15 13:20 — Etapa 31N: screenshots finais do Desktop no site
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0067-polimento-visual-2-site-screenshots-desktop.md`
+
+Quatro WebPs derivados das capturas reais pós-31M.1 substituem os três JPEGs antigos: Dashboard
+Adaptativo dominante no Hero, evolução partida a partida e preferências visuais como apoios. O Riot
+ID foi coberto de forma sólida em todas as repetições e os arquivos finais foram reabertos; guardas
+automatizadas travam privacidade, inventário, peso, dimensões, lazy-load e reduced motion. QA local:
+44/44 combinações de rota/viewport, 12/12 cenários lazy, 1.432 testes TypeScript, analyzer e build
+Docker verdes. Ver `docs/site-product-screenshots-polish.md`.
+
+---
+
 ## 2026-08-15 12:38 — Etapa 31M.1: identidade visual dinâmica e evolução pessoal
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0066-identidade-visual-dinamica-evolucao-pessoal.md`

@@ -280,6 +280,7 @@
  */
 .sp-frame {
   --cut: var(--cut-lg);
+  margin: 0;
   padding: 1px;
   clip-path: var(--chamfer);
   background: linear-gradient(
@@ -322,6 +323,7 @@
 }
 
 .sp-frame img {
+  display: block;
   inline-size: 100%;
   block-size: auto;
 }
@@ -331,6 +333,103 @@
   border-top: 1px solid var(--line-subtle);
   font-size: var(--text-sm);
   color: var(--text-muted);
+}
+
+/*
+ * Capturas do produto: a imagem continua sendo o artefato real; profundidade,
+ * crop e Spartan Signal vivem no layout. Nenhum dado ou gráfico é recriado em
+ * HTML. `aspect-ratio` reserva a área antes do WebP chegar e evita CLS.
+ */
+.sp-product-stage {
+  position: relative;
+  isolation: isolate;
+}
+
+.sp-product-stage::before {
+  content: "";
+  position: absolute;
+  z-index: -2;
+  inset: clamp(-2rem, -3vw, -1rem);
+  background:
+    linear-gradient(120deg, transparent 18%, var(--crimson-veil) 18.1%, transparent 18.7%),
+    repeating-linear-gradient(
+      90deg,
+      transparent 0,
+      transparent 94px,
+      var(--line-subtle) 95px,
+      transparent 96px
+    );
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.sp-product-stage::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 10% -4% -8% 28%;
+  background: radial-gradient(ellipse, var(--crimson-veil), transparent 70%);
+  filter: blur(22px);
+  pointer-events: none;
+}
+
+.sp-product-frame {
+  position: relative;
+  box-shadow:
+    0 34px 80px rgba(0, 0, 0, 0.52),
+    0 0 42px rgba(211, 38, 50, 0.08);
+}
+
+.sp-product-frame::after {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  clip-path: var(--chamfer);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  pointer-events: none;
+}
+
+.sp-product-crop {
+  position: relative;
+  overflow: hidden;
+  background: var(--obsidian);
+}
+
+.sp-product-crop img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+  transition: transform var(--dur-base) var(--ease-out);
+}
+
+.sp-product-frame:hover .sp-product-crop img {
+  transform: scale(1.006);
+}
+
+.sp-product-crop--hero {
+  aspect-ratio: 16 / 9;
+}
+
+.sp-product-crop--growth,
+.sp-product-crop--adaptive,
+.sp-product-crop--supporting {
+  aspect-ratio: 16 / 10;
+}
+
+.sp-product-crop--growth img {
+  object-position: center 12%;
+}
+
+.sp-product-crop--adaptive img {
+  object-position: center 8%;
+}
+
+.sp-visual-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(var(--space-5), 3vw, var(--space-8));
+  align-items: start;
 }
 
 /* ====================================================================== */
@@ -393,8 +492,14 @@
 
 /* A captura do hero ocupa a largura larga: 1280px de origem renderizados
    perto da escala nativa e a unica forma da UI ficar legivel sem zoom. */
-.sp-hero__art {
+.sp-hero__stage {
+  width: 100%;
+  max-width: none;
   margin-top: clamp(var(--space-8), 5vw, var(--space-10));
+}
+
+.sp-hero__art {
+  margin: 0;
 }
 
 /* Hero das paginas internas: mesma linguagem, peso menor - a home e a unica
@@ -574,6 +679,10 @@
 
 .sp-showcase__row--flip .sp-showcase__copy {
   order: 2;
+}
+
+.sp-showcase__row--flip {
+  grid-template-columns: 1fr minmax(260px, 330px);
 }
 
 .sp-showcase__copy h3 {
@@ -1021,6 +1130,14 @@
   .sp-showcase__row--flip .sp-showcase__copy {
     order: 0;
   }
+
+  .sp-showcase__row--flip {
+    grid-template-columns: 1fr;
+  }
+
+  .sp-visual-pair {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 860px) {
@@ -1089,6 +1206,44 @@
 }
 
 @media (max-width: 560px) {
+  .sp-hero__stage {
+    width: 100%;
+    max-width: none;
+  }
+
+  .sp-product-crop--hero,
+  .sp-product-crop--growth,
+  .sp-product-crop--adaptive,
+  .sp-product-crop--supporting {
+    aspect-ratio: 1 / 1;
+  }
+
+  .sp-product-crop--hero img,
+  .sp-product-crop--supporting img {
+    object-position: 62% top;
+  }
+
+  .sp-product-crop--growth img {
+    object-position: 78% top;
+  }
+
+  .sp-product-crop--adaptive img {
+    object-position: 72% top;
+  }
+
+  .sp-visual-pair__secondary {
+    display: none;
+  }
+
+  .sp-product-stage::before {
+    inset: -0.75rem;
+    opacity: 0.42;
+  }
+
+  .sp-product-stage::after {
+    display: none;
+  }
+
   .sp-frame__bar {
     padding-inline: var(--space-4);
   }
@@ -1097,5 +1252,15 @@
   .sp-principle,
   .sp-status-row {
     padding-inline: var(--space-5);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sp-product-crop img {
+    transition: none;
+  }
+
+  .sp-product-frame:hover .sp-product-crop img {
+    transform: none;
   }
 }

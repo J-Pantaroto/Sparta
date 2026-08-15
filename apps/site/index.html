@@ -20,9 +20,12 @@
       property="og:description"
       content="Índices sobre a sua amostra observada, contexto de draft e comparação pós-jogo. Projeto independente, não afiliado à Riot Games."
     />
-    <meta property="og:image" content="https://spartagg.com.br/img/screenshot-dashboard.jpg" />
+    <meta
+      property="og:image"
+      content="https://spartagg.com.br/images/product/dashboard-adaptive.webp"
+    />
     <meta property="og:image:width" content="1280" />
-    <meta property="og:image:height" content="820" />
+    <meta property="og:image:height" content="860" />
     <meta property="og:url" content="https://spartagg.com.br/" />
     <meta name="twitter:card" content="summary_large_image" />
     <link rel="stylesheet" href="/src/styles/tokens.css" />
@@ -58,26 +61,32 @@
             </div>
           </div>
 
-          <figure class="sp-frame sp-hero__art">
-            <div class="sp-frame__inner">
-              <div class="sp-frame__bar">
-                <span class="sp-frame__node" aria-hidden="true"></span>
-                <span class="sp-frame__node sp-frame__node--dim" aria-hidden="true"></span>
-                <span>Sparta GG · Dashboard</span>
+          <div class="sp-product-stage sp-hero__stage">
+            <figure class="sp-frame sp-product-frame sp-hero__art">
+              <div class="sp-frame__inner">
+                <div class="sp-frame__bar">
+                  <span class="sp-frame__node" aria-hidden="true"></span>
+                  <span class="sp-frame__node sp-frame__node--dim" aria-hidden="true"></span>
+                  <span>Sparta GG · Dashboard · Tema Adaptativo</span>
+                </div>
+                <div class="sp-product-crop sp-product-crop--hero">
+                  <img
+                    src="/images/product/dashboard-adaptive.webp"
+                    alt="Dashboard real do Sparta GG com arte contextual de Viego integrada ao fundo e índices pessoais calculados sobre 22 partidas observadas"
+                    width="1280"
+                    height="860"
+                    fetchpriority="high"
+                    decoding="async"
+                  />
+                </div>
+                <figcaption>
+                  Aplicativo real em execução. Somente o Riot ID foi coberto; métricas, campeão e
+                  estados permanecem como observados. O tema Adaptativo altera apenas a camada
+                  visual.
+                </figcaption>
               </div>
-              <img
-                src="/img/screenshot-dashboard.jpg"
-                alt="Dashboard do Sparta GG mostrando índices pessoais calculados sobre 22 partidas observadas, com o tamanho da amostra ao lado de cada índice"
-                width="1280"
-                height="820"
-                fetchpriority="high"
-              />
-              <figcaption>
-                Captura real do aplicativo. O identificador da conta de teste foi mascarado; nenhum
-                outro dado da tela foi alterado.
-              </figcaption>
-            </div>
-          </figure>
+            </figure>
+          </div>
         </div>
       </section>
 
@@ -109,16 +118,16 @@
               <span class="sp-pillar__index">03</span>
               <h3>Histórico observável</h3>
               <p>
-                Partidas, itens, runas e linha do tempo preservados como fatos com carimbo de
-                tempo, sem narrativa de causa e efeito construída por cima.
+                Partidas, itens, runas e linha do tempo preservados como fatos com carimbo de tempo,
+                sem narrativa de causa e efeito construída por cima.
               </p>
             </article>
             <article class="sp-pillar">
               <span class="sp-pillar__index">04</span>
               <h3>Recomendações explicáveis</h3>
               <p>
-                Cada sugestão vem com a evidência que a sustenta e com o que ficou indisponível.
-                São várias opções, nunca uma escolha apresentada como a correta.
+                Cada sugestão vem com a evidência que a sustenta e com o que ficou indisponível. São
+                várias opções, nunca uma escolha apresentada como a correta.
               </p>
             </article>
           </div>
@@ -177,7 +186,7 @@
         <div class="sp-container sp-container--wide">
           <div class="sp-section__head">
             <p class="sp-eyebrow">Produto real</p>
-            <h2 id="sp-produto">Capturas do aplicativo, sem maquiagem</h2>
+            <h2 id="sp-produto">O produto em uso, do contexto à evolução</h2>
             <p class="sp-lede">
               As imagens abaixo saíram do aplicativo em execução. O identificador da conta de teste
               foi mascarado; números, datas, campeões e estados são exatamente os observados.
@@ -187,63 +196,71 @@
           <div class="sp-showcase">
             <article class="sp-showcase__row">
               <div class="sp-showcase__copy">
-                <h3>Contexto durante o draft</h3>
+                <h3>Evolução partida a partida</h3>
                 <p>
-                  A tela acompanha a seleção de campeões pelo League Client e reage ao que já foi
-                  revelado. Quando o cliente está fechado, ela diz isso em vez de inventar um
-                  estado.
+                  A jornada pessoal coloca a série temporal no centro. Cada ponto do gráfico é uma
+                  partida real do histórico observado, sem interpolação ou suavização artificial.
                 </p>
                 <ul class="sp-facts">
-                  <li>Leitura da sessão local, sem nenhuma ação no cliente</li>
-                  <li>Posição, ordem de pick e time inimigo conforme revelados</li>
-                  <li>Modo manual para quem quer simular um draft fora de partida</li>
+                  <li>22 partidas observadas, uma por ponto</li>
+                  <li>Vitória e derrota aparecem como fatos, não como julgamento</li>
+                  <li>
+                    Histórico insuficiente permanece explícito quando a série ainda não existe
+                  </li>
                 </ul>
               </div>
-              <figure class="sp-frame">
+              <figure class="sp-frame sp-product-frame">
                 <div class="sp-frame__inner">
                   <div class="sp-frame__bar">
                     <span class="sp-frame__node" aria-hidden="true"></span>
                     <span class="sp-frame__node sp-frame__node--dim" aria-hidden="true"></span>
-                    <span>Sparta GG · Champion Select</span>
+                    <span>Sparta GG · Evolução pessoal</span>
                   </div>
-                  <img
-                    src="/img/screenshot-champion-select.jpg"
-                    alt="Tela de Champion Select do Sparta GG informando que o League Client está fechado e que a tela abre sozinha quando a seleção de campeões começar"
-                    width="1280"
-                    height="820"
-                    loading="lazy"
-                  />
+                  <div class="sp-product-crop sp-product-crop--growth">
+                    <img
+                      src="/images/product/personal-growth.webp"
+                      alt="Tela real de Evolução pessoal do Sparta GG com o gráfico Evolução partida a partida e 22 observações do histórico pessoal"
+                      width="1280"
+                      height="860"
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  </div>
                 </div>
               </figure>
             </article>
 
             <article class="sp-showcase__row sp-showcase__row--flip">
               <div class="sp-showcase__copy">
-                <h3>O que foi observado depois</h3>
+                <h3>Identidade que acompanha a sua escolha</h3>
                 <p>
-                  O histórico lista as suas partidas com filtros reais e abre a revisão de cada uma,
-                  comparando o que era esperado antes com o que a partida registrou.
+                  O tema Adaptativo deriva a apresentação da skin selecionada e integra a arte ao
+                  shell. É uma preferência local de aparência: não altera recomendações, score ou
+                  análise.
                 </p>
                 <ul class="sp-facts">
-                  <li>Filtros por posição, resultado, período, fila e campeão</li>
-                  <li>Itens, runas e linha do tempo preservados como fatos</li>
-                  <li>Comparação com a sua média anterior, sem vazamento temporal</li>
+                  <li>Paleta visual derivada da arte escolhida</li>
+                  <li>Camada contextual pode ser reduzida sem perder conteúdo</li>
+                  <li>Cores de vitória, derrota e disponibilidade não mudam</li>
                 </ul>
               </div>
-              <figure class="sp-frame">
+              <figure class="sp-frame sp-product-frame">
                 <div class="sp-frame__inner">
                   <div class="sp-frame__bar">
                     <span class="sp-frame__node" aria-hidden="true"></span>
                     <span class="sp-frame__node sp-frame__node--dim" aria-hidden="true"></span>
-                    <span>Sparta GG · Partidas e pós-game</span>
+                    <span>Sparta GG · Preferências visuais</span>
                   </div>
-                  <img
-                    src="/img/screenshot-postgame.jpg"
-                    alt="Histórico de partidas do Sparta GG com filtros por posição, resultado e período, listando partidas reais com KDA, itens e horário"
-                    width="1280"
-                    height="820"
-                    loading="lazy"
-                  />
+                  <div class="sp-product-crop sp-product-crop--adaptive">
+                    <img
+                      src="/images/product/adaptive-theme.webp"
+                      alt="Configurações reais do Sparta GG mostrando o tema Adaptativo, densidade, intensidade visual e a skin Viego Fera Lunar"
+                      width="1280"
+                      height="860"
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  </div>
                 </div>
               </figure>
             </article>
