@@ -6,6 +6,7 @@ import {
   History,
   FlaskConical,
   ListChecks,
+  Radio,
   Settings,
   Shield,
   TrendingUp,
@@ -23,6 +24,7 @@ export type Page =
   | "growth"
   | "motor"
   | "calibration"
+  | "live-diagnostics"
   | "account"
   | "settings";
 
@@ -107,6 +109,13 @@ export const navGroups: { label: string; items: NavEntry[] }[] = [
         label: "Laboratório",
         icon: FlaskConical,
         description: "Ambiente controlado de calibração",
+        developmentOnly: true
+      },
+      {
+        page: "live-diagnostics",
+        label: "Observação ao vivo",
+        icon: Radio,
+        description: "Diagnóstico da fundação Live Client (protótipo local)",
         developmentOnly: true
       }
     ]

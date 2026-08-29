@@ -2,11 +2,27 @@ import type {
   LcuDraftSnapshot,
   LcuGameflowPhase,
   LcuObservedGame,
-  LcuReadStatus
+  LcuReadStatus,
+  LiveGameSessionState,
+  LiveGameSnapshot
 } from "@sparta/riot";
 import type { Role } from "@sparta/core";
 
 export {};
+
+/**
+ * Observacao ao vivo (Game Client API local), somente leitura e somente
+ * diagnostico. `enabled: false` e o normal - o protipo e desligado por
+ * padrao (`main/live-guidance-gate.ts`).
+ */
+export interface LiveClientStatePayload {
+  enabled: boolean;
+  state: LiveGameSessionState;
+  sessionId: string;
+  /** Ja redigido: nao carrega Riot ID. */
+  snapshot: LiveGameSnapshot | null;
+  recentEvents: { id: number; name: string; gameTimeSeconds?: number }[];
+}
 
 declare global {
   interface Window {
@@ -40,6 +56,12 @@ declare global {
         callback: (draft: LcuDraftSnapshot | null, revision: number) => void
       ) => () => void;
       onObservedGame: (callback: (game: LcuObservedGame | null) => void) => () => void;
+      /**
+       * Observacao local da partida em andamento. O renderer recebe o
+       * contrato normalizado - nao escolhe URL, host, porta nem endpoint.
+       */
+      getLiveClientState: () => Promise<LiveClientStatePayload>;
+      onLiveClient: (callback: (state: LiveClientStatePayload) => void) => () => void;
     };
   }
 }

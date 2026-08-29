@@ -2,6 +2,7 @@ export * from "./clients/riot-api-client.js";
 export * from "./datadragon/client.js";
 export * from "./errors/riot-api-error.js";
 export * from "./lcu/read-only-client.js";
+export * from "./live-client/index.js";
 export * from "./lcu/pick-order.js";
 export * from "./lcu/draft-snapshot.js";
 export * from "./lcu/player-role.js";

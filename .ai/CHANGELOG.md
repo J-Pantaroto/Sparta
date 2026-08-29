@@ -22,6 +22,21 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-08-29 13:05 — Etapa 31O: fundação Live Client Data (protótipo local)
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0067-live-client-data-foundation.md`
+
+Camada factual e read-only pra observar a partida em andamento via Game Client API local
+(`127.0.0.1:2999`). A auditoria de TLS pedida achou que o certificado raiz publicado pela Riot
+**não pode** ser usado como `ca` do Node (falta `basicConstraints: CA:TRUE` → `INVALID_PURPOSE`;
+teste de controle isolou que o SHA-1 não é a causa) — resolvido com `rejectUnauthorized: false`
+escopado à requisição + verificação manual da assinatura contra a raiz, preservando a garantia
+pretendida. 4 endpoints de 12 por minimização; `playerlist`/`allgamedata` não consumidos. Sessão
+com identidade e revisão (stale não atravessa partidas), eventos idempotentes por `EventID`,
+polling 1000ms single-flight. Gate `LIVE_GUIDANCE_PUBLIC_RELEASE=false`. Zero narrador/TTS/overlay/
+análise de adversário. `REAL_GAME_VALIDATION=PENDING`. Ver `docs/live-client-data-foundation.md` e
+`docs/live-client-capability-matrix.md`.
+
 ## 2026-08-15 13:20 — Etapa 31N: screenshots finais do Desktop no site
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0067-polimento-visual-2-site-screenshots-desktop.md`

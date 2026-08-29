@@ -3,9 +3,20 @@ import type {
   LcuDraftSnapshot,
   LcuGameflowPhase,
   LcuObservedGame,
-  LcuReadStatus
+  LcuReadStatus,
+  LiveGameSessionState,
+  LiveGameSnapshot
 } from "@sparta/riot";
 import type { Role } from "@sparta/core";
+
+/** Espelha `LiveClientState` do main - o que de fato cruza o IPC. */
+interface LiveClientStatePayload {
+  enabled: boolean;
+  state: LiveGameSessionState;
+  sessionId: string;
+  snapshot: LiveGameSnapshot | null;
+  recentEvents: { id: number; name: string; gameTimeSeconds?: number }[];
+}
 
 contextBridge.exposeInMainWorld("sparta", {
   version: "0.9.0",
@@ -98,5 +109,24 @@ contextBridge.exposeInMainWorld("sparta", {
     const listener = (_event: unknown, game: LcuObservedGame | null) => callback(game);
     ipcRenderer.on("sparta:observed-game", listener);
     return () => ipcRenderer.removeListener("sparta:observed-game", listener);
+  },
+  /**
+   * Observacao local da partida em andamento (Game Client API :2999),
+   * SOMENTE LEITURA e somente diagnostico - protipo local, desligado por
+   * padrao (ver `main/live-guidance-gate.ts`).
+   *
+   * A superficie e deliberadamente estreita: o renderer recebe o contrato
+   * ja normalizado e redigido (sem Riot ID) e NAO escolhe URL, host, porta
+   * nem endpoint. Nao existe aqui um `fetch(url)` generico - expor um seria
+   * dar ao renderer um proxy HTTP pra localhost, exatamente o que o
+   * hardening de IPC existe pra impedir.
+   */
+  getLiveClientState(): Promise<LiveClientStatePayload> {
+    return ipcRenderer.invoke("sparta:live-client-state");
+  },
+  onLiveClient(callback: (state: LiveClientStatePayload) => void) {
+    const listener = (_event: unknown, state: LiveClientStatePayload) => callback(state);
+    ipcRenderer.on("sparta:live-client", listener);
+    return () => ipcRenderer.removeListener("sparta:live-client", listener);
   }
 });

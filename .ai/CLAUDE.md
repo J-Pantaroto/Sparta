@@ -1,5 +1,78 @@
 # Sparta - Contexto para Continuidade
 
+## Etapa 31O: fundação Live Client Data — `PROTOTYPE_LOCAL_ONLY`
+
+Primeira camada de observação **em tempo real** do projeto: Game Client API local
+(`https://127.0.0.1:2999`), somente leitura, para uma futura experiência de acompanhamento durante
+a partida. **O narrador não foi implementado** — esta etapa constrói e valida só a fundação
+factual. Relatório em `docs/live-client-data-foundation.md`; política em
+`docs/live-client-capability-matrix.md`.
+
+**A auditoria de TLS mudou o desenho, e o achado é preciso.** O pedido mandava auditar primeiro o
+certificado raiz que a Riot publica pra validar o Game Client. Baixado e inspecionado:
+autoassinado, SHA-1, válido até 2043 — e **sem `basicConstraints: CA:TRUE`**. Medido com uma cadeia
+sintética replicando a estrutura exata: `ca` pinado falha com `INVALID_PURPOSE` nas três variantes
+(com hostname check, sem, e com `servername`); só `rejectUnauthorized: false` conecta. Um **teste
+de controle** trocando apenas `CA:FALSE` por `CA:TRUE` — mantendo SHA-1 — **passa**, isolando que o
+bloqueio é o `basicConstraints`, não o digest (OpenSSL 3.0.13 ainda aceita SHA-1 nesse caminho).
+Sem esse controle, a conclusão natural seria culpar o SHA-1, e estaria errada.
+
+**Solução, sem desistir da verificação**: `rejectUnauthorized: false` **escopado à requisição**
+(nunca `NODE_TLS_REJECT_UNAUTHORIZED`, nunca agente global — o resto do processo mantém TLS normal)
++ a checagem que o OpenSSL recusa fazer na cadeia, feita **à mão**: o certificado apresentado tem
+que ter sido assinado pela chave pública da raiz da Riot, senão a resposta é descartada com
+`UNTRUSTED_CERTIFICATE` antes de qualquer parsing. Verificado nos dois sentidos com a cadeia
+sintética. PEM **embutido como constante** (o main é empacotado em `app.asar` e caminho relativo
+não resolve depois do bundle); teste trava o `fingerprint256`, então trocar o certificado reprova
+em vez de o app confiar em outra raiz em silêncio.
+
+**4 endpoints de 12, por minimização**: `gamestats`, `activeplayer`, `playerscores` (só do jogador
+ativo) e `eventdata`. `playerlist`/`allgamedata` **não** consumidos — trariam Riot IDs e itens dos
+adversários sem finalidade, e não consumi-los é o que torna a proibição estrutural em vez de
+depender de filtrar depois. `activeplayerabilities`/`activeplayerrunes`/`activeplayername` são
+**redundantes**: já vêm embutidos em `/activeplayer`.
+
+**`ausente ≠ zero`** é a invariante do normalizador: leitores devolvem `undefined` pra campo
+ausente OU de tipo inesperado, `NaN`/`Infinity` não passam como número, e `championStats`/`scores`
+sem nenhum campo reconhecido viram ausência em vez de `{}`. `gameTime: 0` e placar zerado **reais**
+são preservados — a distinção é exatamente o ponto.
+
+**Sessão com identidade e revisão monotônica** (mesma filosofia de `draftRevision`): toda leitura
+captura a revisão antes de disparar e confere na volta, então resposta de partida anterior é
+descartada sem tocar em estado. Falha isolada vira `DEGRADED`, só 3 seguidas encerram — separa "o
+Game Client engasgou" de "a partida acabou", indistinguíveis pra quem só olha se a porta respondeu.
+Partida nova é detectada por regressão de `gameTime` > 30s, e a troca zera os IDs de evento vistos
+(sem isso a partida nova nasceria suprimindo os próprios eventos como repetidos).
+
+**Eventos idempotentes** pelo `EventID` da própria Riot: `/eventdata` devolve o histórico inteiro a
+cada chamada, então tratar a resposta como "novos" republicaria a partida a cada segundo.
+**Polling 1000ms com single-flight** e timeout 800ms (menor que o intervalo, então tentativa nunca
+sobrepõe) — requisições não acumulam.
+
+**Fronteira Electron**: sem `fetch` genérico no preload; o renderer recebe o contrato normalizado e
+não escolhe URL, host, porta nem endpoint — há teste que lê o código do preload (sem comentários) e
+reprova se aparecer qualquer um deles. Riot ID é redigido antes do IPC, com teste que serializa e
+confirma que não sobrevive. Nada persistido em disco, nenhum payload logado, fixtures sanitizadas.
+
+**Gate** `LIVE_GUIDANCE_PUBLIC_RELEASE=false` + opt-in que só funciona fora de produção: com o gate
+fechado o watcher inteiro não inicia. Num build empacotado, esquecer de esconder uma tela é erro de
+uma linha; aqui não há o que esconder.
+
+**`REAL_GAME_VALIDATION=PENDING`** — nenhuma partida ativa durante a etapa (confirmado:
+`RiotClientServices` rodando, `:2999` sem escutar, que é o próprio estado `UNAVAILABLE`). Não se
+afirma validação em partida real; o procedimento manual de 8 passos está documentado, incluindo a
+comparação com o Swagger real instalado, que também fica pendente.
+
+**Nada de narrador, TTS, voz, coach, recomendação em partida, overlay, automação, timer inferido ou
+análise de adversário** — a matriz de capacidade classifica cada categoria como
+`SAFE_FOR_FOUNDATION`/`NEEDS_RIOT_REVIEW`/`DO_NOT_USE`, com a nota de que a existência técnica do
+dado não substitui análise de política. A Riot exige saber quais endpoints locais um produto usa; o
+texto está **preparado e não enviado** — decisão do responsável.
+
+**1476 testes** (riot 98→134, desktop 171→184). Zero arquivo em `packages/core`, `apps/api`,
+`prisma/`, `infra/`, Docker ou site — a não regressão do motor é estrutural, não medida (o Postgres
+não estava em execução nesta sessão). Nenhuma dependência nova: `node:https` + `node:crypto`.
+
 ## Etapa 31N: screenshots finais do Desktop no site
 
 O site institucional agora usa quatro derivados WebP das capturas reais posteriores à 31M.1. O

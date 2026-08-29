@@ -24,6 +24,8 @@ import {
   isValidSessionToken,
   windowOpenPolicy
 } from "./security-policy";
+import { registerLiveClientWatcher } from "./live-client-watcher";
+import { isLiveClientPrototypeEnabled } from "./live-guidance-gate";
 
 /**
  * O Electron deriva `app.getName()` do campo `name` do `package.json`
@@ -394,6 +396,12 @@ void app.whenReady().then(() => {
   createWindow();
   registerLcuStateHandler();
   startGameflowWatcher();
+  // Protótipo local de observação ao vivo (Game Client API :2999). Fechado
+  // por padrão - ver `live-guidance-gate.ts`.
+  registerLiveClientWatcher({
+    enabled: isLiveClientPrototypeEnabled(),
+    expectedRendererUrl
+  });
   registerSkinDownloadHandler();
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
