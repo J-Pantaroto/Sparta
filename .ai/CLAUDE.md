@@ -101,9 +101,40 @@ análise de adversário** — a matriz de capacidade classifica cada categoria c
 dado não substitui análise de política. A Riot exige saber quais endpoints locais um produto usa; o
 texto está **preparado e não enviado** — decisão do responsável.
 
-**1480 testes** (riot 98→138, desktop 171→184). Zero arquivo em `packages/core`, `apps/api`,
-`prisma/`, `infra/`, Docker ou site — a não regressão do motor é estrutural, não medida (o Postgres
-não estava em execução nesta sessão). Nenhuma dependência nova: `node:https` + `node:crypto`.
+**Fechamento do escopo: o que faltava eram os testes das duas camadas mais difíceis de exercitar.**
+`LiveClientObserver` (quem decide *quais* endpoints são chamados) e o estado que atravessa o IPC
+não tinham teste nenhum — e a segunda era intestável por construção: as regras viviam num closure
+com Electron em escopo. Extraído `reduceLiveClientState` (`apps/desktop/src/main/live-client-state.
+ts`), função pura que aplica redação de Riot ID, isolamento do histórico entre partidas e a decisão
+de transmitir; o watcher ficou só com IPC, broadcast e agendamento. **75 testes** cobrem a fundação
+por camada (TLS 11, normalização 14, ciclo de vida 15, política de leitura 13, fronteira IPC 8,
+gate/preload 8, diagnóstico 6), com a tabela por arquivo em §9.1 do relatório.
+
+Os testes novos travam o que a documentação afirmava sem provar: que **só** os 4 endpoints são
+chamados e nenhum dos proibidos (`playerlist`, `allgamedata`, itens/feitiços/runas de terceiros) ou
+redundantes; que `/playerscores` só é pedido com o Riot ID do jogador ativo, escapado; que sem Riot
+ID o placar fica **ausente** em vez de zerado e a chamada nem acontece; que fora de partida a
+rodada para na primeira leitura em vez de varrer a API; que resposta em voo depois de `stop()` não
+vira snapshot; e que o Riot ID não sobrevive nem à serialização do IPC nem ao DOM renderizado.
+
+**Dois defeitos pequenos corrigidos no caminho**: com o gate aberto, o estado exposto continuava
+`enabled: false` até a primeira leitura terminar — o diagnóstico exibia "protótipo desligado" por
+~1s com o protótipo ligado; e a tela não mostrava **qual** parte da leitura falhou, então
+degradação parcial (`gamestats` responde, `playerscores` não) aparecia como travessão sem
+distinguir "não veio" de "não foi consultado". Agora há uma linha de disponibilidade por parte.
+
+**1507 testes** no monorepo (riot 98→151, desktop 171→198). Zero arquivo em `packages/core`,
+`apps/api`, `prisma/`, `infra/`, Docker ou site — a não regressão do motor é estrutural, não medida
+(o Postgres não estava em execução nesta sessão). Nenhuma dependência nova: `node:https` +
+`node:crypto`.
+
+**Estado final da etapa**: tudo o que não depende de partida ativa está completo e coberto —
+cliente, normalização, contrato, ciclo de vida, stale, polling, deduplicação, fronteira IPC,
+diagnóstico dev-only, privacidade, matriz de capacidade, gate e documentação. Três itens continuam
+`PENDING` e **só** se fecham com o jogo aberto: observação em partida real
+(`REAL_GAME_VALIDATION`), handshake com o certificado real do Game Client
+(`REAL_GAME_TLS_VALIDATION`) e a comparação com o Swagger instalado. Não há trabalho de
+implementação restante para nenhum dos três.
 
 ## Etapa 31N: screenshots finais do Desktop no site
 

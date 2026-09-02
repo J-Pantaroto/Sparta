@@ -125,7 +125,9 @@ LiveGameSession              (identidade, revisão, ciclo de vida, dedupe)
         ↓
 LiveClientObserver           (single-flight, polling 1000ms)
         ↓
-live-client-watcher (main)   (gate + IPC + redação de Riot ID)
+reduceLiveClientState (main) (redação de Riot ID, isolamento entre partidas)
+        ↓
+live-client-watcher (main)   (gate + IPC + broadcast)
         ↓
 LiveClientDiagnosticsScreen  (dev-only)
 ```
@@ -141,7 +143,18 @@ LiveClientDiagnosticsScreen  (dev-only)
 | `live-game-session.ts` | Máquina de estados, revisão, deduplicação de eventos |
 | `live-client-observer.ts` | Orquestra endpoints, single-flight, intervalo de polling |
 
-`apps/desktop/src/main/`: `live-guidance-gate.ts` (gate) e `live-client-watcher.ts` (IPC).
+`apps/desktop/src/main/`:
+
+| Arquivo | Papel |
+| --- | --- |
+| `live-guidance-gate.ts` | Gate de produto e opt-in de desenvolvimento |
+| `live-client-state.ts` | Reducer **puro** do estado exposto ao renderer |
+| `live-client-watcher.ts` | IPC, broadcast e agendamento do polling |
+
+A separação entre reducer e watcher não é estética: as três regras que precisam de teste —
+redação do Riot ID antes do IPC, isolamento do histórico de eventos entre partidas, e quando
+transmitir — ficavam dentro de um closure com Electron em escopo, e exercitá-las exigiria
+instanciar o processo main. Extraídas, são função pura e têm teste direto.
 
 ---
 
@@ -249,8 +262,10 @@ renderer), política de `window.open`, restrição de navegação.
 
 **Riot ID** é necessário no main (a API exige o parâmetro em `/playerscores`), mas é removido do
 snapshot antes de cruzar o IPC (`redactSnapshotForTransport`) — reconstruindo o objeto sem a chave,
-de modo que ela nem chega a ser serializada. Teste verifica que o identificador não sobrevive a
-`JSON.stringify`.
+de modo que ela nem chega a ser serializada. Dois testes cobrem isso em camadas diferentes:
+`live-client-state.test.ts` serializa o payload inteiro do IPC e confirma que o identificador não
+sobrevive, e `LiveClientDiagnosticsScreen.test.tsx` confirma que ele também não aparece no DOM
+renderizado.
 
 Nada é persistido em disco. Nenhum payload bruto é logado. As fixtures de teste são sanitizadas
 (`TestSummoner#TEST`, valores inventados).
@@ -269,17 +284,33 @@ nunca satisfaz as duas condições, e há teste travando exatamente isso.
 
 ---
 
+## 9.1 O que está coberto por teste
+
+**75** testes automatizados, distribuídos por camada. A tabela existe para separar o que é garantia
+verificada do que ainda depende de partida real (§10).
+
+| Camada | Arquivo | Cobre |
+| --- | --- | --- |
+| TLS e transporte | `live-client-client.test.ts` (11) | Identidade da raiz por `fingerprint256`, motivo do `ca` não servir, rejeição de autoassinado de outra chave/autoridade impostora/adulteração, aceitação da folha legítima, e fail-closed contra servidor TLS impostor real em `:2999` |
+| Normalização | `live-game-snapshot.test.ts` (14) | `ausente ≠ zero`, tipo inesperado vira ausência, `NaN`/`Infinity` recusados, redação do Riot ID |
+| Ciclo de vida | `live-game-session.test.ts` (15) | Identidade e revisão, `DEGRADED` vs `ENDED`, partida nova por regressão de relógio, resposta obsoleta descartada, deduplicação por `EventID` |
+| Política de leitura | `live-client-observer.test.ts` (13) | Os 4 endpoints e **nenhum** dos proibidos/redundantes, `/playerscores` só do jogador ativo, ausência de Riot ID não vira placar zerado, disponibilidade por parte, single-flight, stale em voo, `stop()` |
+| Fronteira IPC | `live-client-state.test.ts` (8) | Riot ID não sobrevive à serialização, zero real preservado, histórico isolado por partida e limitado, quando transmitir |
+| Gate e preload | `live-guidance-gate.test.ts` (8) | Release pública travada em `false`, produção nunca liga, preload sem `fetch`/host/porta/endpoint |
+| Diagnóstico | `LiveClientDiagnosticsScreen.test.tsx` (6) | Gate fechado declarado na tela, leitura factual do próprio jogador, ausência como travessão, evento único por ID, zero dado de adversário |
+
+---
+
 ## 10. Validação com partida real — `PENDING`
 
 **Nenhuma partida estava ativa durante esta etapa.** Verificado no início: `RiotClientServices`
 rodando, mas League of Legends fora de partida e **nada escutando em `:2999`** — que é exatamente
 o estado `UNAVAILABLE` que a fundação trata como repouso normal.
 
-Portanto **não** se afirma "validado em partida real". O que foi validado por teste automatizado:
-**40** em `packages/riot/src/live-client/` (cliente HTTP, TLS, normalizador, sessão, eventos) e
-**8** em `apps/desktop/src/main/live-guidance-gate.test.ts` (gate, fronteira do preload, redação de
-Riot ID), mais a auditoria de TLS executada contra uma cadeia sintética que replica a estrutura
-real do certificado da Riot.
+Portanto **não** se afirma "validado em partida real". O que foi validado por teste automatizado
+está na tabela de §9.1: **75** testes ao todo — 53 em `packages/riot/src/live-client/` e 22 em
+`apps/desktop/` — mais a auditoria de TLS executada contra uma cadeia sintética que replica a
+estrutura real do certificado da Riot.
 
 **`REAL_GAME_TLS_VALIDATION=PENDING` é um estado separado, e de propósito.** Toda a evidência de
 TLS desta etapa vem de certificados e servidores **sintéticos**; nenhum handshake foi feito com o
@@ -356,7 +387,37 @@ Application existente.
 
 ---
 
-## 12. Não alterado
+## 12. Estado por item do escopo
+
+Completo = implementado, documentado e coberto por teste automatizado.
+
+| Item | Estado | Observação |
+| --- | --- | --- |
+| `LiveClientDataClient` | **Completo** | GET fixo, host/porta não parametrizáveis, taxonomia de status, timeout e cancelamento |
+| Verificação TLS | **Completo em código**, evidência sintética | Fail-closed no `secureConnect`; ver `REAL_GAME_TLS_VALIDATION` |
+| Normalização factual | **Completo** | `ausente ≠ zero` como invariante, tipo inesperado vira ausência |
+| `LiveGameSnapshot` | **Completo** | Contrato próprio, sem campo de adversário |
+| Ciclo de vida da sessão | **Completo** | Identidade, revisão monotônica, `DEGRADED` antes de `ENDED` |
+| Stale / fora de ordem | **Completo** | Revisão capturada antes da leitura e conferida na volta, nas duas camadas |
+| Polling conservador | **Completo** | 1000 ms, single-flight, timeout menor que o intervalo |
+| Deduplicação de eventos | **Completo** | Chave é o `EventID` da Riot, por sessão |
+| Fronteira Electron/IPC | **Completo** | Sem `fetch` genérico, sender validado, contrato tipado, Riot ID redigido |
+| Diagnóstico local dev-only | **Completo** | Item de navegação e watcher ambos sob o gate |
+| Privacidade e logs | **Completo** | Nada em disco, nenhum payload logado, fixtures sanitizadas |
+| Matriz de capacidade | **Completo** | `docs/live-client-capability-matrix.md` |
+| Gate de release pública | **Completo** | `LIVE_GUIDANCE_PUBLIC_RELEASE = false` travado por teste |
+| Comunicação à Riot | **Preparada, não enviada** | Decisão do responsável (§11) |
+| Observação em partida real | **Pendente** | `REAL_GAME_VALIDATION=PENDING` (§10) |
+| Certificado real do Game Client | **Pendente** | `REAL_GAME_TLS_VALIDATION=PENDING` (§10, passo 4) |
+| Comparação com o Swagger instalado | **Pendente** | §10, passo 9 |
+
+Os três pendentes dependem **exclusivamente** de uma partida ativa na máquina: não há trabalho de
+implementação restante para eles, e nenhum pode ser fechado com dado sintético sem transformar
+evidência de laboratório em afirmação sobre o jogo real.
+
+---
+
+## 13. Não alterado
 
 Motor de recomendação, pesos, `release-etapa27c-v1`, replay, calibração, pré-game, pós-game, auth,
 RSO, e-mail/Resend, API pública, Postgres, Redis, analyzer, site, Caddy, Docker de produção, DNS,

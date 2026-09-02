@@ -22,6 +22,20 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-09-02 10:05 — Etapa 31O: fechamento do escopo (testes de política de leitura e fronteira IPC)
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0068-live-client-data-foundation.md`
+
+Auditoria do escopo original achou duas camadas sem teste: o `LiveClientObserver` (quem decide
+quais endpoints são chamados — a minimização estava documentada e não verificada) e o estado que
+atravessa o IPC, intestável porque as regras viviam num closure com Electron em escopo. Extraído
+`reduceLiveClientState` como função pura; o watcher ficou com IPC, broadcast e agendamento. 27
+testes novos (13 observador, 8 reducer, 6 tela) travam a minimização de endpoints, o placar só do
+jogador ativo, ausência não virando zero, single-flight, stale em voo, e o Riot ID não sobrevivendo
+nem à serialização nem ao DOM. Dois defeitos corrigidos: gate aberto reportando "desligado" até a
+primeira leitura, e degradação parcial invisível na tela. **1507 testes**.
+`REAL_GAME_VALIDATION`/`REAL_GAME_TLS_VALIDATION` continuam `PENDING`.
+
 ## 2026-09-02 09:20 — Correções de contexto da Etapa 31O (numeração, LCU × Game Client, TLS fail-closed)
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0068-live-client-data-foundation.md`

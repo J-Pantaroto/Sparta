@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Activity, Radio } from "lucide-react";
+import type { LiveAvailability } from "@sparta/riot";
 import type { LiveClientStatePayload } from "../sparta-global";
 import { Badge, Card, EmptyState, PageHero, PageLayout, SectionHeader } from "../ui";
 import "./LiveClientDiagnosticsScreen.css";
@@ -25,6 +26,19 @@ const STATE_TONES: Record<LiveClientStatePayload["state"], "neutral" | "positive
 function show(value: number | undefined, decimals = 0): string {
   return value === undefined ? "—" : value.toFixed(decimals);
 }
+
+/**
+ * Que partes da leitura responderam. Existe porque degradacao parcial e
+ * invisivel de outra forma: `gamestats` pode responder enquanto
+ * `playerscores` falha, e sem isso a tela mostraria travessao sem dizer se o
+ * dado nao veio ou se a API nao foi consultada.
+ */
+const AVAILABILITY_LABELS: { key: keyof LiveAvailability; label: string }[] = [
+  { key: "game", label: "Partida" },
+  { key: "activePlayer", label: "Jogador" },
+  { key: "scores", label: "Placar" },
+  { key: "events", label: "Eventos" }
+];
 
 function gameClock(seconds: number | undefined): string {
   if (seconds === undefined) return "—";
@@ -105,6 +119,17 @@ export function LiveClientDiagnosticsScreen() {
                 <dd>{snapshot?.game.mapName ?? "—"}</dd>
               </div>
             </dl>
+            {snapshot && (
+              <ul className="sp-live-availability" aria-label="Disponibilidade da leitura">
+                {AVAILABILITY_LABELS.map(({ key, label }) => (
+                  <li key={key}>
+                    <Badge tone={snapshot.availability[key] ? "positive" : "neutral"}>
+                      {label}: {snapshot.availability[key] ? "respondeu" : "indisponível"}
+                    </Badge>
+                  </li>
+                ))}
+              </ul>
+            )}
           </Card>
 
           <Card>

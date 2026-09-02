@@ -1,39 +1,14 @@
 import { BrowserWindow, ipcMain, type IpcMainInvokeEvent } from "electron";
+import { LIVE_CLIENT_POLL_INTERVAL_MS, LiveClientObserver } from "@sparta/riot";
 import {
-  LIVE_CLIENT_POLL_INTERVAL_MS,
-  LiveClientObserver,
-  redactSnapshotForTransport,
-  type LiveGameSessionState,
-  type LiveGameSnapshot
-} from "@sparta/riot";
+  DISABLED_LIVE_CLIENT_STATE,
+  reduceLiveClientState,
+  type LiveClientState
+} from "./live-client-state";
 import { assertTrustedIpcSender } from "./security-policy";
 
-/**
- * Estado que o renderer pode ver. Deliberadamente pequeno: o snapshot
- * completo fica no main, e o que atravessa o IPC já passou por
- * `redactSnapshotForTransport` (sem Riot ID).
- */
-export interface LiveClientState {
-  enabled: boolean;
-  state: LiveGameSessionState;
-  sessionId: string;
-  snapshot: LiveGameSnapshot | null;
-  /** Últimos eventos observados, mantidos só pra o painel de diagnóstico. */
-  recentEvents: { id: number; name: string; gameTimeSeconds?: number }[];
-}
 
-/** Quantos eventos o diagnóstico guarda. Nada é persistido em disco. */
-const RECENT_EVENTS_LIMIT = 8;
-
-const DISABLED_STATE: LiveClientState = {
-  enabled: false,
-  state: "UNAVAILABLE",
-  sessionId: "",
-  snapshot: null,
-  recentEvents: []
-};
-
-let liveClientState: LiveClientState = DISABLED_STATE;
+let liveClientState: LiveClientState = DISABLED_LIVE_CLIENT_STATE;
 
 /**
  * Observação local e somente leitura da partida em andamento, via Game
@@ -48,6 +23,9 @@ let liveClientState: LiveClientState = DISABLED_STATE;
  * nada mais. Não existe (e não deve existir) um `fetch(url)` genérico
  * exposto pelo preload - é o que impede este watcher de virar um proxy HTTP
  * pra localhost.
+ *
+ * A decisão de o que expor e quando transmitir é do reducer puro em
+ * `live-client-state.ts`; aqui ficam só IPC, broadcast e agendamento.
  */
 export function registerLiveClientWatcher(options: {
   enabled: boolean;
@@ -62,10 +40,12 @@ export function registerLiveClientWatcher(options: {
   // `enabled: false`), mas nenhum poll acontece e nada é observado.
   if (!options.enabled) return;
 
+  // Antes da primeira leitura o estado já é "ligado, ainda indisponível" -
+  // senão o diagnóstico exibiria "protótipo desligado" durante o primeiro
+  // segundo, com o gate aberto.
+  liveClientState = { ...DISABLED_LIVE_CLIENT_STATE, enabled: true };
+
   const observer = new LiveClientObserver();
-  let lastState: LiveGameSessionState = "UNAVAILABLE";
-  let lastSessionId = "";
-  let recentEvents: LiveClientState["recentEvents"] = [];
 
   function broadcast(payload: LiveClientState) {
     for (const window of BrowserWindow.getAllWindows()) {
@@ -78,36 +58,9 @@ export function registerLiveClientWatcher(options: {
     // `null` = já havia uma rodada em voo (single-flight). Não acumula.
     if (!result) return;
 
-    // Troca de sessão zera o histórico de eventos do diagnóstico, senão a
-    // partida nova nasceria exibindo eventos da anterior.
-    if (result.snapshot && result.snapshot.sessionId !== lastSessionId) {
-      recentEvents = [];
-      lastSessionId = result.snapshot.sessionId;
-    }
-    if (result.state === "ENDED" || result.state === "UNAVAILABLE") {
-      recentEvents = [];
-      lastSessionId = "";
-    }
-
-    if (result.snapshot?.newEvents.length) {
-      recentEvents = [...result.snapshot.newEvents, ...recentEvents].slice(0, RECENT_EVENTS_LIMIT);
-    }
-
-    const next: LiveClientState = {
-      enabled: true,
-      state: result.state,
-      sessionId: result.snapshot?.sessionId ?? lastSessionId,
-      snapshot: result.snapshot ? redactSnapshotForTransport(result.snapshot) : null,
-      recentEvents
-    };
+    const { next, shouldBroadcast } = reduceLiveClientState(liveClientState, result);
     liveClientState = next;
-
-    // Transmite em toda leitura válida (o relógio muda a cada segundo) e
-    // sempre que o estado do ciclo de vida mudar.
-    if (result.snapshot || result.state !== lastState) {
-      lastState = result.state;
-      broadcast(next);
-    }
+    if (shouldBroadcast) broadcast(next);
   }
 
   function schedulePoll() {

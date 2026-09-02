@@ -171,7 +171,7 @@ Relatório técnico em `docs/live-client-data-foundation.md` e matriz em
 - **`REAL_GAME_VALIDATION=PENDING`**: nenhuma partida ativa durante a etapa (confirmado:
   `RiotClientServices` rodando, `:2999` sem escutar — o próprio estado `UNAVAILABLE`). Procedimento
   manual documentado, incluindo a comparação com o Swagger real, que também fica pendente.
-- **1480 testes** no monorepo (riot 98→138, desktop 171→184). Zero arquivo em `packages/core`,
+- **1507 testes** no monorepo (riot 98→151, desktop 171→198). Zero arquivo em `packages/core`,
   `apps/api`, `prisma/`, `infra/`, Docker ou site — a não regressão do motor é estrutural.
 - Nenhuma dependência nova: `node:https` + `node:crypto`.
 
@@ -207,3 +207,39 @@ Relatório técnico em `docs/live-client-data-foundation.md` e matriz em
    servidor dos testes são sintéticos, e isso não é apresentado como validação em `:2999` real. O
    procedimento manual ganhou um passo dedicado a fechar essa lacuna, com instrução explícita de
    não afrouxar a verificação se o certificado real for recusado.
+
+
+## Fechamento do escopo em 2026-09-02
+
+Auditoria do escopo original item a item apontou duas camadas sem teste nenhum — justamente as
+duas mais difíceis de exercitar:
+
+1. **`LiveClientObserver`**, que é quem decide *quais* endpoints da API são chamados. A
+   minimização de endpoints estava documentada e não verificada. 13 testes novos travam: só os 4
+   endpoints da fundação são chamados; `playerlist`/`allgamedata`/itens/feitiços/runas de
+   terceiros **nunca**; os redundantes (`activeplayerabilities`/`activeplayerrunes`/
+   `activeplayername`) também não; `/playerscores` só com o Riot ID do jogador ativo, escapado;
+   sem Riot ID o placar fica ausente e a chamada nem acontece; fora de partida a rodada para na
+   primeira leitura; disponibilidade reportada por parte; single-flight; resposta em voo após
+   `stop()` descartada; `DEGRADED` antes de `ENDED`.
+2. **O estado que atravessa o IPC**, que era intestável por construção — as regras viviam num
+   closure com Electron em escopo. Extraído `reduceLiveClientState`
+   (`apps/desktop/src/main/live-client-state.ts`), função pura; o watcher ficou com IPC, broadcast
+   e agendamento. 8 testes novos: Riot ID não sobrevive à serialização do payload, zero real
+   preservado ao lado de ausência real, histórico de eventos isolado por partida e limitado,
+   `DEGRADED` preserva o que já foi observado, e quando transmitir.
+
+Mais 6 testes de tela (`LiveClientDiagnosticsScreen.test.tsx`): gate fechado declarado na
+interface, leitura factual do próprio jogador, ausência como travessão (nunca 0), evento único por
+`EventID`, e zero dado de adversário ou identidade no DOM.
+
+**Dois defeitos pequenos corrigidos**: com o gate aberto o estado exposto continuava
+`enabled: false` até a primeira leitura terminar (a tela dizia "protótipo desligado" com o
+protótipo ligado); e a tela não mostrava qual parte da leitura falhou — degradação parcial virava
+travessão sem distinguir "não veio" de "não foi consultado". Agora há uma linha de disponibilidade
+por parte.
+
+**75 testes** cobrem a fundação, com tabela por arquivo em §9.1 do relatório, e §12 lista o estado
+de cada item do escopo. **1507 testes** no monorepo. `REAL_GAME_VALIDATION=PENDING` e
+`REAL_GAME_TLS_VALIDATION=PENDING` permanecem: nenhuma partida ativa nesta sessão, e nenhuma
+evidência sintética foi apresentada como real.
