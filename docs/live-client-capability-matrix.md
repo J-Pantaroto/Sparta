@@ -16,23 +16,43 @@ análise de política.
 
 ## Contexto declarado pela própria Riot
 
-A documentação oficial (`developer.riotgames.com/docs/lol`) diz, sobre este serviço:
+### Game Client API ≠ League Client API (LCU) — distinção que importa
 
-> "This service is not officially supported for use with third party applications."
+`developer.riotgames.com/docs/lol` documenta **duas** superfícies locais, em seções separadas, e
+confundi-las leva a conclusões erradas sobre o que é permitido:
 
-e
+| | **League Client API (LCU)** | **Game Client API** (esta etapa) |
+| --- | --- | --- |
+| Onde roda | Cliente/launcher do League | Cliente **de jogo**, durante a partida |
+| Porta | Dinâmica (lockfile) | `2999`, fixa |
+| Como a Riot descreve | *"This service is not officially supported for use with third party applications"*, com *"no guarantees of full documentation, service uptime, or change communication for unsupported services"* | *"The Game Client APIs are served over HTTPS by League of Legends game client and are only available locally for native applications."* |
+| Disclaimer de "unsupported" | **Sim** | **Não** — a seção não traz nenhum |
 
-> "We provide no guarantees of full documentation, service uptime, or change communication for
-> unsupported services."
+**Correção registrada:** uma versão anterior deste documento atribuía o disclaimer de *"not
+officially supported"* à Game Client API. Isso estava **errado**. Reconferido na documentação: a
+frase pertence à seção **League Client API**, sob *"What is the League Client API?"*; a seção
+**Game Client API**, que vem logo depois, apresenta o serviço como API HTTPS local para aplicações
+nativas e **não** carrega disclaimer equivalente.
 
-Duas consequências arquiteturais diretas, ambas já aplicadas:
+O Sparta usa as duas superfícies, e o disclaimer de unsupported se aplica ao uso **do LCU**
+(`packages/riot/src/lcu/`, leitura de gameflow e champion select) — não a esta fundação.
 
-- O produto **não** fala com o JSON da Riot — fala com um contrato próprio (`LiveGameSnapshot`).
-  Um serviço sem garantia de comunicação de mudança não pode ser o tipo do domínio.
-- Só validamos os campos que realmente consumimos, tolerando adições. Uma mudança aditiva da Riot
+### Por que o produto fala com contrato próprio, então
+
+A justificativa **não** é "a Riot chama de unsupported". É a mesma regra que o projeto já aplica ao
+Match-V5 desde a Fase 1 (mappers em `packages/riot/src/mappers/`): o domínio não se acopla ao
+formato de payload de terceiro. Aqui isso vale ainda mais porque o schema acompanha o patch do
+jogo e pode ganhar campos a qualquer atualização.
+
+Consequências práticas, ambas já aplicadas:
+
+- O produto fala com `LiveGameSnapshot`, não com o JSON da Riot.
+- Só validamos os campos que realmente consumimos, tolerando adições — uma mudança aditiva da Riot
   não pode quebrar o app.
 
-A mesma documentação exige que a Riot saiba quais endpoints locais o produto usa e como:
+### Comunicação exigida
+
+A documentação exige que a Riot saiba quais endpoints locais o produto usa e como:
 
 > "we need to know about it. Either create a new application or leave a note on your existing
 > application in the Developer Portal. We need to know which endpoints you're using and how you're

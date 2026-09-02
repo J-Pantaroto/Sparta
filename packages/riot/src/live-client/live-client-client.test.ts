@@ -1,8 +1,16 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { X509Certificate } from "node:crypto";
+import https from "node:https";
+import type { AddressInfo } from "node:net";
 import { riotRootCertificate } from "./riot-root-certificate.js";
-import { verifyGameClientCertificate } from "./live-client-client.js";
+import {
+  LIVE_CLIENT_HOST,
+  LIVE_CLIENT_PORT,
+  requestLiveClient,
+  verifyGameClientCertificate
+} from "./live-client-client.js";
 import { RIOT_ROOT_CERTIFICATE_PEM } from "./riot-root-certificate-pem.js";
+import { createSyntheticCertificate } from "./__fixtures__/synthetic-certificate.js";
 
 describe("certificado raiz da Riot", () => {
   it("e a raiz publicada - identidade travada por fingerprint", () => {
@@ -46,15 +54,115 @@ describe("verifyGameClientCertificate", () => {
     expect(verifyGameClientCertificate(Buffer.from("nao sou um certificado"))).toBe(false);
   });
 
-  it("rejeita um certificado de outra cadeia", () => {
-    // A propria raiz da Riot e autoassinada, entao ela se verifica contra
-    // a propria chave; o que precisamos provar e que algo NAO assinado por
-    // ela e recusado. Um certificado publico qualquer serve de contraexemplo
-    // - aqui usamos um autoassinado gerado no proprio teste seria ideal,
-    // mas basta provar que bytes de outra origem nao passam.
-    const outsider = Buffer.from(
+  it("rejeita um certificado AUTOASSINADO de outra chave", () => {
+    // O caso que de fato importa: um impostor legitimo do ponto de vista de
+    // TLS (certificado bem formado, assinatura interna consistente) que
+    // simplesmente nao foi assinado pela raiz da Riot.
+    const impostor = createSyntheticCertificate("127.0.0.1");
+    expect(() => new X509Certificate(impostor.certificateDer)).not.toThrow();
+    expect(verifyGameClientCertificate(impostor.certificateDer)).toBe(false);
+  });
+
+  it("rejeita um certificado emitido por outra autoridade", () => {
+    // Nao basta recusar autoassinado: uma CA impostora tambem nao vale.
+    const rogueAuthority = createSyntheticCertificate("Rogue Authority");
+    const leaf = createSyntheticCertificate("127.0.0.1", {
+      commonName: rogueAuthority.commonName,
+      privateKey: rogueAuthority.privateKey
+    });
+    expect(verifyGameClientCertificate(leaf.certificateDer)).toBe(false);
+  });
+
+  it("rejeita adulteracao de um certificado legitimamente assinado", () => {
+    // Prova que a verificacao e real, nos dois sentidos: a folha assinada
+    // pela autoridade PASSA contra a chave dessa autoridade, e a mesma folha
+    // com um byte trocado REPROVA. Sem o lado positivo, "sempre false"
+    // passaria no teste sem verificar nada.
+    const authority = createSyntheticCertificate("Synthetic Authority");
+    const leaf = createSyntheticCertificate("127.0.0.1", {
+      commonName: authority.commonName,
+      privateKey: authority.privateKey
+    });
+
+    expect(new X509Certificate(leaf.certificateDer).verify(authority.publicKey)).toBe(true);
+
+    const tampered = Buffer.from(leaf.certificateDer);
+    tampered[40] ^= 0xff;
+    let tamperedAccepted: boolean;
+    try {
+      tamperedAccepted = new X509Certificate(tampered).verify(authority.publicKey);
+    } catch {
+      // DER corrompido a ponto de nao parsear tambem e rejeicao.
+      tamperedAccepted = false;
+    }
+    expect(tamperedAccepted).toBe(false);
+  });
+
+  it("rejeita adulteracao da propria raiz da Riot", () => {
+    const tamperedRoot = Buffer.from(
       riotRootCertificate().raw.map((byte, index) => (index === 300 ? byte ^ 0xff : byte))
     );
-    expect(verifyGameClientCertificate(outsider)).toBe(false);
+    expect(verifyGameClientCertificate(tamperedRoot)).toBe(false);
+  });
+});
+
+/**
+ * Prova de fail-closed no caminho real de rede: um servidor TLS impostor,
+ * na porta que o Game Client usaria, respondendo JSON perfeitamente valido.
+ * O cliente tem que descartar a resposta por causa do certificado, nao por
+ * causa do conteudo.
+ *
+ * Isto NAO e validacao contra o Game Client real (`REAL_GAME_TLS_VALIDATION=
+ * PENDING`): e um servidor sintetico montado pelo teste.
+ */
+describe("requestLiveClient contra um servidor TLS impostor", () => {
+  const impostor = createSyntheticCertificate(LIVE_CLIENT_HOST);
+  let server: https.Server | undefined;
+  let requestsServed = 0;
+
+  beforeAll(async () => {
+    const candidate = https.createServer(
+      { key: impostor.privateKeyPem, cert: impostor.certificatePem },
+      (_request, response) => {
+        requestsServed += 1;
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end(JSON.stringify({ gameTime: 42, gameMode: "CLASSIC" }));
+      }
+    );
+
+    const listening = await new Promise<boolean>((resolve) => {
+      candidate.once("error", () => resolve(false));
+      candidate.listen(LIVE_CLIENT_PORT, LIVE_CLIENT_HOST, () => resolve(true));
+    });
+
+    // Porta ocupada = ha um Game Client real rodando nesta maquina. Neste
+    // caso o servidor sintetico nao sobe e o teste se declara pulado, em vez
+    // de passar sem ter exercitado nada.
+    if (!listening) return;
+    expect((candidate.address() as AddressInfo).port).toBe(LIVE_CLIENT_PORT);
+    server = candidate;
+  });
+
+  afterAll(async () => {
+    if (!server) return;
+    await new Promise<void>((resolve) => server?.close(() => resolve()));
+  });
+
+  it("descarta a resposta com UNTRUSTED_CERTIFICATE", async (context) => {
+    if (!server) {
+      context.skip();
+      return;
+    }
+
+    const result = await requestLiveClient<unknown>(
+      "/liveclientdata/gamestats",
+      (payload): payload is unknown => payload !== null && typeof payload === "object"
+    );
+
+    expect(result.status).toBe("UNTRUSTED_CERTIFICATE");
+    expect(result).not.toHaveProperty("data");
+    // O corpo era valido e passaria no validador: a rejeicao veio do
+    // certificado, e ela acontece antes de qualquer parsing.
+    expect(requestsServed).toBe(0);
   });
 });

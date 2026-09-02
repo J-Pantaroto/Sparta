@@ -1,10 +1,13 @@
 /**
  * Contrato PROPRIO do Sparta pra observacao ao vivo. Deliberadamente NAO e
- * o JSON da Riot: a Live Client Data API e declarada pela propria Riot como
- * "not officially supported for use with third party applications", sem
- * garantia de documentacao completa nem de comunicacao de mudanca. Acoplar
- * o produto ao formato dela seria acoplar a um contrato que pode mudar sem
- * aviso.
+ * o JSON da Riot, pela mesma regra ja aplicada ao Match-V5 desde a Fase 1
+ * (mappers em `../mappers/`): o dominio nao se acopla ao formato de payload
+ * de terceiro. Aqui isso pesa mais porque o schema da Game Client API
+ * acompanha o patch do jogo e pode ganhar campos a qualquer atualizacao.
+ *
+ * (NAO confundir com a League Client API: o disclaimer de "not officially
+ * supported for use with third party applications" da documentacao da Riot
+ * pertence a secao do LCU, nao a da Game Client API. Ver `./index.ts`.)
  *
  * REGRA CENTRAL: ausente != zero.
  *

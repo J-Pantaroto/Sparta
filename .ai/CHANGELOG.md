@@ -22,9 +22,25 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-09-02 09:20 — Correções de contexto da Etapa 31O (numeração, LCU × Game Client, TLS fail-closed)
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0068-live-client-data-foundation.md`
+
+Quatro correções pedidas antes de prosseguir com a 31O. O prompt foi renumerado de `0067` (número
+que já era da Etapa 31N) para `0068`. A documentação atribuía à Game Client API o disclaimer *"not
+officially supported for use with third party applications"* — releitura da fonte confirmou que
+essa declaração é da **League Client API (LCU)**; a Game Client API é descrita como API HTTPS local
+para aplicações nativas, sem disclaimer equivalente, e a justificativa do contrato próprio foi
+re-fundamentada na regra já usada no Match-V5. A verificação TLS virou **fail-closed no
+`secureConnect`** (antes rodava no callback de resposta, com o peer já tendo atendido a requisição),
+com `agent: false` e guarda redundante; testes novos provam rejeição de certificado autoassinado de
+outra chave, de autoridade impostora e de adulteração, mais o caso positivo e um servidor TLS
+impostor real em `127.0.0.1:2999` que registra zero requisições atendidas. `REAL_GAME_TLS_VALIDATION
+=PENDING` registrado: a evidência é sintética, não validação contra `:2999` real.
+
 ## 2026-08-29 13:05 — Etapa 31O: fundação Live Client Data (protótipo local)
 
-**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0067-live-client-data-foundation.md`
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0068-live-client-data-foundation.md`
 
 Camada factual e read-only pra observar a partida em andamento via Game Client API local
 (`127.0.0.1:2999`). A auditoria de TLS pedida achou que o certificado raiz publicado pela Riot

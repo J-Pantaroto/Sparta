@@ -42,11 +42,15 @@ export type LiveClientResult<T> =
  * o SHA-1 - ver `riot-root-certificate.ts`).
  *
  * Entao a conexao e aberta com `rejectUnauthorized: false` **escopado a
- * este agente** e a verificacao de assinatura e feita aqui. O efeito de
+ * esta requisicao** e a verificacao de assinatura e feita aqui. O efeito de
  * seguranca e o mesmo que a Riot pretendia: so aceitamos resposta de um
  * certificado que ela assinou. O que se perde e a checagem de hostname -
  * irrelevante em loopback, ja que o destino e literalmente 127.0.0.1 e o
  * certificado do Game Client nao traz SAN pra esse IP.
+ *
+ * FAIL-CLOSED: a verificacao roda no `secureConnect`, ou seja, assim que o
+ * handshake termina e ANTES de qualquer resposta ser lida. Peer que nao
+ * confere derruba o socket na hora; nada do que ele mandar e parseado.
  */
 export function verifyGameClientCertificate(peerDer: Buffer | undefined): boolean {
   if (!peerDer || peerDer.length === 0) return false;
@@ -90,6 +94,12 @@ export function requestLiveClient<T>(
       return;
     }
 
+    /**
+     * So vira `true` depois que a assinatura do peer confere. Enquanto for
+     * `false`, nenhuma resposta e processada - fail-closed por construcao.
+     */
+    let certificateVerified = false;
+
     const request = https.request(
       {
         host: LIVE_CLIENT_HOST,
@@ -99,14 +109,18 @@ export function requestLiveClient<T>(
         // Escopado A ESTA requisicao. Nunca `NODE_TLS_REJECT_UNAUTHORIZED`,
         // nunca um agente global: o resto do processo (Riot API, Data
         // Dragon, API do Sparta) mantem validacao TLS normal. A verificacao
-        // real acontece logo abaixo, contra a raiz da Riot.
+        // real acontece no `secureConnect`, contra a raiz da Riot.
         rejectUnauthorized: false,
+        // Sem pool: cada requisicao abre (e verifica) o proprio handshake,
+        // em vez de herdar um socket que o agente global manteve vivo.
+        agent: false,
         headers: { Accept: "application/json" }
       },
       (response) => {
-        const socket = response.socket as TLSSocket;
-        const peer = socket.getPeerCertificate?.(false);
-        if (!verifyGameClientCertificate(peer?.raw)) {
+        // Guarda redundante de proposito: se por qualquer caminho a resposta
+        // chegar sem o peer ter sido verificado, ela e descartada.
+        if (!certificateVerified) {
+          response.destroy();
           request.destroy();
           finish({ status: "UNTRUSTED_CERTIFICATE" });
           return;
@@ -141,6 +155,32 @@ export function requestLiveClient<T>(
         });
       }
     );
+
+    /**
+     * Verificacao do peer no momento do handshake. Roda antes de a resposta
+     * ser lida; certificado que nao foi assinado pela raiz da Riot derruba o
+     * socket imediatamente, com `UNTRUSTED_CERTIFICATE`.
+     */
+    const verifyPeer = (socket: TLSSocket): void => {
+      if (verifyGameClientCertificate(socket.getPeerCertificate?.(false)?.raw)) {
+        certificateVerified = true;
+        return;
+      }
+      socket.destroy();
+      request.destroy();
+      finish({ status: "UNTRUSTED_CERTIFICATE" });
+    };
+
+    request.on("socket", (socket) => {
+      const tlsSocket = socket as TLSSocket;
+      // Socket ja handshakeado (reaproveitado): `secureConnect` nao dispara
+      // de novo, entao a verificacao acontece imediatamente.
+      if (tlsSocket.getPeerCertificate?.(false)?.raw) {
+        verifyPeer(tlsSocket);
+        return;
+      }
+      tlsSocket.once("secureConnect", () => verifyPeer(tlsSocket));
+    });
 
     request.setTimeout(options.timeoutMs ?? LIVE_CLIENT_TIMEOUT_MS, () => {
       timedOut = true;

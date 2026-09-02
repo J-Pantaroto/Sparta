@@ -3,12 +3,18 @@
 **Data:** 2026-08-29
 
 **Estado:** `PROTOTYPE_LOCAL_ONLY` · `NOT_APPROVED_FOR_PUBLIC_LIVE_GUIDANCE` ·
-`REAL_GAME_VALIDATION=PENDING`
+`REAL_GAME_VALIDATION=PENDING` · `REAL_GAME_TLS_VALIDATION=PENDING`
 
 **Escopo:** fundação factual e somente leitura para observar uma partida em andamento na própria
 máquina, via Game Client API (`https://127.0.0.1:2999`). **Não** implementa narrador, voz, coach,
 recomendação em partida, overlay, automação ou análise de adversário — ver
 `docs/live-client-capability-matrix.md`.
+
+**Superfície correta:** esta é a **Game Client API**, documentada pela Riot em seção própria como
+API HTTPS local para aplicações nativas. Não é a **League Client API (LCU)** que o Sparta já usa
+desde a Fase 6c (`packages/riot/src/lcu/`) — é da LCU, e só dela, que a Riot declara *"not
+officially supported for use with third party applications"*. A distinção, com as duas citações
+lado a lado, está em `docs/live-client-capability-matrix.md`.
 
 ---
 
@@ -64,11 +70,35 @@ Nem desabilitar TLS globalmente (proibido, e desnecessário), nem aceitar qualqu
    Data Dragon, API do Sparta) mantém validação TLS normal.
 2. A verificação que o OpenSSL se recusa a fazer na construção da cadeia é feita **à mão**:
    `verifyGameClientCertificate` confere que o certificado apresentado foi assinado pela chave
-   pública da raiz da Riot. Se não foi, a resposta é descartada com `UNTRUSTED_CERTIFICATE` antes
-   de qualquer parsing.
+   pública da raiz da Riot.
+3. **Fail-closed, no handshake.** A checagem roda no evento `secureConnect` — assim que o TLS
+   fecha e **antes** de qualquer resposta ser lida. Peer que não confere tem o socket derrubado na
+   hora, e o resultado é `UNTRUSTED_CERTIFICATE`. O callback de resposta ainda tem uma guarda
+   redundante: sem `certificateVerified === true`, a resposta é destruída sem parsing. E
+   `agent: false` impede herdar do pool um socket que não passou por esta verificação.
 
-Verificado nos dois sentidos com a cadeia sintética: folha legítima **aceita**, folha de outra
-cadeia **rejeitada**.
+Verificado nos dois sentidos, com certificados sintéticos gerados no próprio teste (DER escrito à
+mão em `__fixtures__/synthetic-certificate.ts` — não há biblioteca de emissão no projeto, e não
+valia adicionar uma só para isto):
+
+| Caso | Resultado |
+| --- | --- |
+| Folha assinada por uma autoridade, verificada contra a chave dessa autoridade | **aceita** (prova que a verificação não é "sempre false") |
+| Certificado **autoassinado de outra chave** | **rejeitado** |
+| Folha emitida por uma **autoridade impostora** | **rejeitado** |
+| Folha legítima com **um byte adulterado** | **rejeitado** |
+| Raiz da Riot com **um byte adulterado** | **rejeitado** |
+
+E a prova de fail-closed no caminho de rede real: um **servidor TLS impostor** sobe em
+`127.0.0.1:2999` respondendo `200` com JSON que passaria no validador. O cliente devolve
+`UNTRUSTED_CERTIFICATE`, sem `data` — e o servidor registra **zero requisições atendidas**, ou
+seja, a conexão morreu antes de o corpo ser sequer solicitado. Confirmado que esse teste
+**reprova** sem a correção (com a verificação no callback de resposta, o servidor contava 1
+requisição atendida). Se a porta estiver ocupada — há um Game Client real na máquina — o teste se
+declara **pulado** em vez de passar sem exercitar nada.
+
+Nada disso é validação contra o Game Client real: os certificados e o servidor são sintéticos.
+Ver §10, `REAL_GAME_TLS_VALIDATION=PENDING`.
 
 O que se perde em relação ao TLS completo é a checagem de *hostname* — irrelevante aqui, já que o
 destino é literalmente `127.0.0.1` e o certificado do Game Client não traz SAN para esse IP.
@@ -245,9 +275,19 @@ nunca satisfaz as duas condições, e há teste travando exatamente isso.
 rodando, mas League of Legends fora de partida e **nada escutando em `:2999`** — que é exatamente
 o estado `UNAVAILABLE` que a fundação trata como repouso normal.
 
-Portanto **não** se afirma "validado em partida real". O que foi validado: 36 testes automatizados
-cobrindo cliente, normalizador, sessão, eventos, IPC e privacidade, mais a auditoria de TLS
-executada contra uma cadeia sintética que replica a estrutura real do certificado da Riot.
+Portanto **não** se afirma "validado em partida real". O que foi validado por teste automatizado:
+**40** em `packages/riot/src/live-client/` (cliente HTTP, TLS, normalizador, sessão, eventos) e
+**8** em `apps/desktop/src/main/live-guidance-gate.test.ts` (gate, fronteira do preload, redação de
+Riot ID), mais a auditoria de TLS executada contra uma cadeia sintética que replica a estrutura
+real do certificado da Riot.
+
+**`REAL_GAME_TLS_VALIDATION=PENDING` é um estado separado, e de propósito.** Toda a evidência de
+TLS desta etapa vem de certificados e servidores **sintéticos**; nenhum handshake foi feito com o
+certificado que o Game Client apresenta de fato. O que está provado é o comportamento do
+verificador e o fail-closed do cliente. O que **não** está provado é que o certificado real do
+Game Client é aceito por ele — se a Riot tiver trocado a raiz que assina o certificado do jogo, o
+Sparta recusará a conexão (fail-closed, como projetado) e isso só aparece em partida real. O passo
+4-a do procedimento abaixo fecha essa lacuna.
 
 ### Procedimento manual para completar a validação
 
@@ -258,25 +298,30 @@ executada contra uma cadeia sintética que replica a estrutura real do certifica
 2. Abrir **Observação ao vivo** (grupo Evolução, visível só em desenvolvimento). Confirmar
    `Indisponível` — `:2999` ainda não existe.
 3. Abrir o League e iniciar uma partida no **Practice Tool**.
-4. Confirmar, na tela de diagnóstico:
+4. **Fechar `REAL_GAME_TLS_VALIDATION`**: confirmar que o estado sai de `Indisponível` e que
+   **não** aparece `Certificado não confiável`. Esse é o único ponto em que o certificado real do
+   Game Client é de fato verificado contra a raiz publicada pela Riot. Se aparecer
+   `UNTRUSTED_CERTIFICATE`, **não** afrouxar a verificação: registrar aqui e reauditar a raiz
+   publicada (`riotgames.pem`), porque significa que ela mudou.
+5. Confirmar, na tela de diagnóstico:
    - estado passa a `Ao vivo` e um `sessionId` aparece;
    - tempo de jogo avança;
    - modo/mapa correspondem à partida real;
    - nível, ouro, K/D/A e CS batem com o HUD do jogo;
    - eventos aparecem uma única vez cada (matar um monstro não deve duplicar linha).
-5. Minimizar/restaurar o jogo e confirmar que o estado não oscila para erro.
-6. Encerrar a partida. Confirmar que o estado volta para `Encerrada`/`Indisponível` e que os
+6. Minimizar/restaurar o jogo e confirmar que o estado não oscila para erro.
+7. Encerrar a partida. Confirmar que o estado volta para `Encerrada`/`Indisponível` e que os
    eventos são limpos.
-7. Iniciar uma **segunda** partida e confirmar que o `sessionId` é diferente e que nenhum dado da
+8. Iniciar uma **segunda** partida e confirmar que o `sessionId` é diferente e que nenhum dado da
    primeira aparece.
-8. Durante a partida, consultar o Swagger real e comparar com o assumido aqui:
+9. Durante a partida, consultar o Swagger real e comparar com o assumido aqui:
    ```bash
    curl -k https://127.0.0.1:2999/swagger/v3/openapi.json
    ```
    Registrar diferenças de endpoint/schema neste documento.
 
-**Ainda não executado:** o passo 8 (comparação com o Swagger real instalado) depende de partida
-ativa. Os endpoints e campos usados vieram da documentação oficial consultada em 2026-08-29.
+**Ainda não executado:** os passos 4 (`REAL_GAME_TLS_VALIDATION`) e 9 (comparação com o Swagger
+real instalado) dependem de partida ativa. Os endpoints e campos usados vieram da documentação oficial consultada em 2026-08-29.
 
 ---
 

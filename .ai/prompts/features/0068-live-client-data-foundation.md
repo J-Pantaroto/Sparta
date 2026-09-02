@@ -144,10 +144,9 @@ Relatório técnico em `docs/live-client-data-foundation.md` e matriz em
   conclusão natural seria culpar o SHA-1, e estaria errada.
 - **Solução**: `rejectUnauthorized: false` escopado à requisição (nunca global, nunca
   `NODE_TLS_REJECT_UNAUTHORIZED`) + verificação **manual** de que o certificado apresentado foi
-  assinado pela chave pública da raiz da Riot. Preserva a garantia que a Riot pretendia; verificado
-  nos dois sentidos (folha legítima aceita, folha de outra cadeia rejeitada). PEM embutido como
-  constante porque o main é empacotado em `app.asar` e caminho relativo não resolve; teste trava o
-  `fingerprint256`.
+  assinado pela chave pública da raiz da Riot, **no `secureConnect`** — fail-closed antes de
+  qualquer resposta ser lida. PEM embutido como constante porque o main é empacotado em `app.asar`
+  e caminho relativo não resolve; teste trava o `fingerprint256`.
 - **4 endpoints de 12**, por minimização: `gamestats`, `activeplayer`, `playerscores` (só do
   jogador ativo) e `eventdata`. `playerlist`/`allgamedata` **não** consumidos — trariam Riot IDs e
   itens dos adversários sem finalidade. `activeplayerabilities`/`activeplayerrunes`/
@@ -171,8 +170,40 @@ Relatório técnico em `docs/live-client-data-foundation.md` e matriz em
   liga.
 - **`REAL_GAME_VALIDATION=PENDING`**: nenhuma partida ativa durante a etapa (confirmado:
   `RiotClientServices` rodando, `:2999` sem escutar — o próprio estado `UNAVAILABLE`). Procedimento
-  manual de 8 passos documentado, incluindo a comparação com o Swagger real, que também fica
-  pendente.
-- **1476 testes** no monorepo (riot 98→134, desktop 171→184). Zero arquivo em `packages/core`,
+  manual documentado, incluindo a comparação com o Swagger real, que também fica pendente.
+- **1480 testes** no monorepo (riot 98→138, desktop 171→184). Zero arquivo em `packages/core`,
   `apps/api`, `prisma/`, `infra/`, Docker ou site — a não regressão do motor é estrutural.
 - Nenhuma dependência nova: `node:https` + `node:crypto`.
+
+## Correções de contexto aplicadas em 2026-09-02 (pedido do usuário)
+
+1. **Numeração**: este arquivo nasceu como `0067-...`, número que já pertencia à Etapa 31N
+   (`0067-polimento-visual-2-site-screenshots-desktop.md`). Renomeado para `0068` via `git mv`; a
+   referência no `.ai/CHANGELOG.md` foi corrigida junto.
+2. **Sequência histórica**: `671d22c` = Etapa 31M.1, `dd6871f` = Etapa 31N, esta etapa = 31O. A
+   descrição errada de `dd6871f` como continuação da 31M.1 ficou só numa mensagem de chat —
+   confirmado por busca que ela nunca chegou a `docs/`, `.ai/specs/` ou ao changelog, que já
+   listavam a ordem correta.
+3. **LCU × Game Client API**: eu tinha atribuído à Game Client API o disclaimer *"not officially
+   supported for use with third party applications"*. Errado — essa declaração é da seção **League
+   Client API (LCU)**. A seção da Game Client API descreve o serviço como *"served over HTTPS by
+   League of Legends game client and are only available locally for native applications"*, sem
+   disclaimer equivalente. Corrigido em `docs/live-client-capability-matrix.md` (com as duas
+   citações lado a lado e o registro explícito do erro), em `docs/live-client-data-foundation.md` e
+   nos comentários de `packages/riot/src/live-client/{index,live-game-snapshot}.ts`. A justificativa
+   de usar contrato próprio foi re-fundamentada na regra já aplicada ao Match-V5 desde a Fase 1.
+4. **TLS endurecido para fail-closed**, mantendo o achado empírico intacto (raiz sem
+   `basicConstraints`, `INVALID_PURPOSE`, SHA-1 descartado como causa por teste de controle):
+   verificação movida para o `secureConnect`, socket derrubado na hora quando o peer não confere,
+   guarda redundante no callback de resposta e `agent: false` para não herdar socket do pool.
+   Testes novos: certificado **autoassinado de outra chave** rejeitado, folha de **autoridade
+   impostora** rejeitada, **adulteração** (da folha legítima e da própria raiz da Riot) rejeitada, e
+   o caso **positivo** (folha legítima aceita contra a chave da sua autoridade) para o verificador
+   não poder passar devolvendo sempre `false`. Mais um teste de rede real contra **servidor TLS
+   impostor** em `127.0.0.1:2999`: `UNTRUSTED_CERTIFICATE`, sem `data`, com **zero requisições
+   atendidas** pelo servidor — confirmado que reprova sem a correção. Nada de global, nada de
+   `NODE_TLS_REJECT_UNAUTHORIZED`, host/porta continuam fora do alcance do renderer.
+5. **`REAL_GAME_TLS_VALIDATION=PENDING`** registrado como estado próprio: os certificados e o
+   servidor dos testes são sintéticos, e isso não é apresentado como validação em `:2999` real. O
+   procedimento manual ganhou um passo dedicado a fechar essa lacuna, com instrução explícita de
+   não afrouxar a verificação se o certificado real for recusado.

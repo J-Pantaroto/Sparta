@@ -8,6 +8,18 @@ a partida. **O narrador não foi implementado** — esta etapa constrói e valid
 factual. Relatório em `docs/live-client-data-foundation.md`; política em
 `docs/live-client-capability-matrix.md`.
 
+**Game Client API ≠ League Client API (LCU), e a primeira versão desta documentação errou nisso.**
+Eu havia atribuído à Game Client API o disclaimer *"not officially supported for use with third
+party applications"*. Reconferido na documentação da Riot: essa frase (e o *"no guarantees of full
+documentation, service uptime, or change communication"*) pertence à seção **League Client API** —
+a superfície que o Sparta já usa desde a Fase 6c em `packages/riot/src/lcu/`. A seção **Game
+Client API** apresenta o serviço como *"served over HTTPS by League of Legends game client and are
+only available locally for native applications"* e **não** traz disclaimer equivalente. Corrigido
+na matriz de capacidade, no relatório e nos comentários do código. A justificativa de falar com
+contrato próprio (`LiveGameSnapshot`) foi **re-fundamentada**: não é "a Riot chama de unsupported",
+é a mesma regra já aplicada ao Match-V5 desde a Fase 1 — o domínio não se acopla a payload de
+terceiro, e aqui o schema ainda acompanha o patch do jogo.
+
 **A auditoria de TLS mudou o desenho, e o achado é preciso.** O pedido mandava auditar primeiro o
 certificado raiz que a Riot publica pra validar o Game Client. Baixado e inspecionado:
 autoassinado, SHA-1, válido até 2043 — e **sem `basicConstraints: CA:TRUE`**. Medido com uma cadeia
@@ -20,11 +32,31 @@ Sem esse controle, a conclusão natural seria culpar o SHA-1, e estaria errada.
 **Solução, sem desistir da verificação**: `rejectUnauthorized: false` **escopado à requisição**
 (nunca `NODE_TLS_REJECT_UNAUTHORIZED`, nunca agente global — o resto do processo mantém TLS normal)
 + a checagem que o OpenSSL recusa fazer na cadeia, feita **à mão**: o certificado apresentado tem
-que ter sido assinado pela chave pública da raiz da Riot, senão a resposta é descartada com
-`UNTRUSTED_CERTIFICATE` antes de qualquer parsing. Verificado nos dois sentidos com a cadeia
-sintética. PEM **embutido como constante** (o main é empacotado em `app.asar` e caminho relativo
-não resolve depois do bundle); teste trava o `fingerprint256`, então trocar o certificado reprova
-em vez de o app confiar em outra raiz em silêncio.
+que ter sido assinado pela chave pública da raiz da Riot. PEM **embutido como constante** (o main é
+empacotado em `app.asar` e caminho relativo não resolve depois do bundle); teste trava o
+`fingerprint256`, então trocar o certificado reprova em vez de o app confiar em outra raiz em
+silêncio.
+
+**Fail-closed, e isso foi endurecido depois da primeira versão.** A verificação rodava no callback
+de resposta — ou seja, o peer já tinha atendido a requisição antes de ser recusado. Agora roda no
+`secureConnect`: o handshake fecha, o certificado é conferido e um peer que não confere tem o
+socket derrubado ali, com `UNTRUSTED_CERTIFICATE`; o callback de resposta mantém uma guarda
+redundante (`certificateVerified`) e `agent: false` impede herdar do pool um socket não verificado.
+Medido com **servidor TLS impostor real** em `127.0.0.1:2999` respondendo JSON que passaria no
+validador: resultado `UNTRUSTED_CERTIFICATE`, sem `data`, e o servidor contando **zero requisições
+atendidas** — contra 1 antes da correção, o que é exatamente o que o teste novo detecta (confirmado
+reprovando com o arquivo revertido). Certificados sintéticos são gerados no próprio teste, com DER
+escrito à mão (não há biblioteca de emissão no projeto): folha legítima assinada por uma autoridade
+**passa** contra a chave dela, autoassinado de outra chave **reprova**, folha de autoridade
+impostora **reprova**, e adulterar um byte — da folha legítima ou da própria raiz da Riot —
+**reprova**. Sem o caso positivo, um verificador que devolvesse sempre `false` passaria no teste.
+
+**`REAL_GAME_TLS_VALIDATION=PENDING`**, estado separado de propósito: toda essa evidência é
+sintética. Nenhum handshake foi feito com o certificado que o Game Client apresenta de fato — o que
+está provado é o verificador e o fail-closed, não que a raiz publicada ainda assina o certificado
+real. Se ela tiver mudado, o app recusa a conexão (como projetado) e isso só aparece em partida
+real; o procedimento manual ganhou um passo específico pra fechar isso, com a instrução explícita
+de **não afrouxar** a verificação nesse caso.
 
 **4 endpoints de 12, por minimização**: `gamestats`, `activeplayer`, `playerscores` (só do jogador
 ativo) e `eventdata`. `playerlist`/`allgamedata` **não** consumidos — trariam Riot IDs e itens dos
@@ -69,7 +101,7 @@ análise de adversário** — a matriz de capacidade classifica cada categoria c
 dado não substitui análise de política. A Riot exige saber quais endpoints locais um produto usa; o
 texto está **preparado e não enviado** — decisão do responsável.
 
-**1476 testes** (riot 98→134, desktop 171→184). Zero arquivo em `packages/core`, `apps/api`,
+**1480 testes** (riot 98→138, desktop 171→184). Zero arquivo em `packages/core`, `apps/api`,
 `prisma/`, `infra/`, Docker ou site — a não regressão do motor é estrutural, não medida (o Postgres
 não estava em execução nesta sessão). Nenhuma dependência nova: `node:https` + `node:crypto`.
 

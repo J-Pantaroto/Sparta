@@ -9,10 +9,16 @@
  * automacao, timer inferido ou qualquer analise de inimigo. Ver
  * `docs/live-client-capability-matrix.md`.
  *
- * A Riot declara este servico como "not officially supported for use with
- * third party applications", sem garantia de documentacao, uptime ou
- * comunicacao de mudanca - por isso o produto fala com o contrato proprio
- * (`LiveGameSnapshot`), nunca com o JSON dela direto.
+ * NAO confundir com a League Client API (LCU, `../lcu/`): sao superficies
+ * diferentes, documentadas em secoes separadas pela Riot. O disclaimer de
+ * "not officially supported for use with third party applications" pertence
+ * a secao do LCU; a Game Client API e apresentada como API HTTPS local para
+ * aplicacoes nativas, sem disclaimer equivalente.
+ *
+ * O produto fala com contrato proprio (`LiveGameSnapshot`) pela mesma regra
+ * ja aplicada ao Match-V5 desde a Fase 1: o dominio nao se acopla ao formato
+ * de payload de terceiro - aqui reforcado porque o schema acompanha o patch
+ * do jogo.
  */
 export {
   LIVE_CLIENT_HOST,
