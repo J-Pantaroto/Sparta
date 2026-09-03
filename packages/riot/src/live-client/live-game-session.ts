@@ -92,12 +92,23 @@ export class LiveGameSession {
     if (!this.isCurrent(revision)) return null;
 
     const gameTime = observation.game.gameTimeSeconds;
-    const startsNewGame =
-      this.state === "UNAVAILABLE" ||
-      this.state === "ENDED" ||
-      this.hasGameTimeRegressed(gameTime);
 
-    if (startsNewGame) this.startSession(now);
+    // Continuar a sessao corrente exige DUAS coisas: estar de fato
+    // observando uma (LIVE/DEGRADED) e o relogio nao ter regredido.
+    // Qualquer outro estado abre sessao nova.
+    //
+    // Escrito por exclusao de proposito. A versao anterior enumerava os
+    // estados que abrem sessao (`UNAVAILABLE`/`ENDED`) e esquecia
+    // `CONNECTING` - que e exatamente por onde uma partida real passa
+    // enquanto carrega, quando a porta ja responde mas ainda nao ha leitura
+    // valida. Medido contra o jogo: fechar o Practice Tool e abrir outro
+    // percorria ENDED -> UNAVAILABLE -> CONNECTING -> LIVE, e a partida nova
+    // herdava o `sessionId` da anterior. Enumerar quem CONTINUA e seguro
+    // porque `observeFailure` nunca leva de LIVE/DEGRADED a CONNECTING.
+    const continuesCurrentSession =
+      (this.state === "LIVE" || this.state === "DEGRADED") && !this.hasGameTimeRegressed(gameTime);
+
+    if (!continuesCurrentSession) this.startSession(now);
 
     this.consecutiveFailures = 0;
     this.state = "LIVE";

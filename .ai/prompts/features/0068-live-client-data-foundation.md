@@ -243,3 +243,42 @@ por parte.
 de cada item do escopo. **1507 testes** no monorepo. `REAL_GAME_VALIDATION=PENDING` e
 `REAL_GAME_TLS_VALIDATION=PENDING` permanecem: nenhuma partida ativa nesta sessão, e nenhuma
 evidência sintética foi apresentada como real.
+
+
+## Validação com partida real em 2026-09-03 — três gates em PASS
+
+Executada com Practice Tool aberto (`League of Legends.exe` servindo `127.0.0.1:2999`), em três
+partidas consecutivas.
+
+- **`REAL_GAME_TLS_VALIDATION=PASS`** — o cliente de produto recebeu `OK` do jogo real com
+  `NODE_TLS_REJECT_UNAUTHORIZED` intocado e host/porta fixos. Certificado apresentado `CN=rclient`,
+  emitido pela `LoL Game Engineering Certificate Authority` (serial `3BF10803…F9F1`,
+  `fingerprint256` `23:17:88:E9…3B:2C`), **verificado contra a raiz publicada**. Nenhum
+  afrouxamento foi necessário nem feito.
+- **`REAL_GAME_SWAGGER_COMPARISON=PASS`** — v3 (OpenAPI 3.0.0) e v2 (Swagger 2.0) consultados: 12
+  endpoints em `/liveclientdata`, confirmando o "4 de 12"; `playerscores` exige `riotId`
+  (`required: true`), `eventdata` tem `eventID` opcional não usado. O Swagger instalado **não tipa
+  as respostas** (objeto livre), então os nomes de campo só se verificam pela resposta real —
+  argumento a favor da normalização defensiva. Nenhum cliente gerado, nenhum endpoint novo.
+- **`REAL_GAME_VALIDATION=PASS`** — 197 snapshots; minimização medida no transporte (52
+  requisições = 13 × 4 endpoints, zero dos 8 proibidos/redundantes); `gameTime` monotônico; K/D/A,
+  CS e ouro reais; `currentGold: 0` e `gameTime: 0.0` preservados como zero; cadência mediana
+  1,042 s medida pelo relógio do jogo; rodada em 35 ms (mediana) contra timeout de 800 ms;
+  single-flight sem acúmulo; RSS sem crescimento monotônico; eventos reais emitidos uma única vez
+  cada.
+
+**Bug real encontrado e corrigido** (`live-game-session.ts`): a segunda partida herdava o
+`sessionId` da primeira, porque `observe()` enumerava `UNAVAILABLE`/`ENDED` como os estados que
+abrem sessão e omitia `CONNECTING` — por onde uma partida real passa ao carregar. A regressão de
+relógio também não salvava, porque `endSession()` zera `lastGameTimeSeconds`. Corrigido enumerando
+quem **continua** a sessão; 2 testes de regressão reproduzem a sequência real e reprovam sem a
+correção. Revalidado com uma terceira partida.
+
+**Teste novo** `apps/desktop/src/main/live-client-real-game.test.ts`: opt-in por
+`SPARTA_LIVE_CLIENT_REAL_GAME=1` **e** porta escutando; sem as duas condições, pulado.
+
+**Limitações registradas**: a tela de diagnóstico do Electron não foi aberta com dado real (fica
+atrás do login; Docker/API parados) — validou-se o payload que a alimenta; e a reconexão
+transitória dentro da mesma partida não foi induzida.
+
+**1510 testes** no monorepo, 2 pulados por desenho.

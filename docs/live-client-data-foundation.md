@@ -3,7 +3,8 @@
 **Data:** 2026-08-29
 
 **Estado:** `PROTOTYPE_LOCAL_ONLY` · `NOT_APPROVED_FOR_PUBLIC_LIVE_GUIDANCE` ·
-`REAL_GAME_VALIDATION=PENDING` · `REAL_GAME_TLS_VALIDATION=PENDING`
+`REAL_GAME_VALIDATION=PASS` · `REAL_GAME_TLS_VALIDATION=PASS` ·
+`REAL_GAME_SWAGGER_COMPARISON=PASS` (validação real em 2026-09-03, §10)
 
 **Escopo:** fundação factual e somente leitura para observar uma partida em andamento na própria
 máquina, via Game Client API (`https://127.0.0.1:2999`). **Não** implementa narrador, voz, coach,
@@ -97,8 +98,8 @@ seja, a conexão morreu antes de o corpo ser sequer solicitado. Confirmado que e
 requisição atendida). Se a porta estiver ocupada — há um Game Client real na máquina — o teste se
 declara **pulado** em vez de passar sem exercitar nada.
 
-Nada disso é validação contra o Game Client real: os certificados e o servidor são sintéticos.
-Ver §10, `REAL_GAME_TLS_VALIDATION=PENDING`.
+Os certificados e o servidor desses testes são sintéticos. A validação contra o certificado que o
+Game Client apresenta de fato foi executada em 2026-09-03 e **passou** — ver §10.
 
 O que se perde em relação ao TLS completo é a checagem de *hostname* — irrelevante aqui, já que o
 destino é literalmente `127.0.0.1` e o certificado do Game Client não traz SAN para esse IP.
@@ -286,73 +287,165 @@ nunca satisfaz as duas condições, e há teste travando exatamente isso.
 
 ## 9.1 O que está coberto por teste
 
-**75** testes automatizados, distribuídos por camada. A tabela existe para separar o que é garantia
-verificada do que ainda depende de partida real (§10).
+**78** testes automatizados, distribuídos por camada, mais o teste opt-in que roda contra o jogo
+de verdade.
 
 | Camada | Arquivo | Cobre |
 | --- | --- | --- |
 | TLS e transporte | `live-client-client.test.ts` (11) | Identidade da raiz por `fingerprint256`, motivo do `ca` não servir, rejeição de autoassinado de outra chave/autoridade impostora/adulteração, aceitação da folha legítima, e fail-closed contra servidor TLS impostor real em `:2999` |
 | Normalização | `live-game-snapshot.test.ts` (14) | `ausente ≠ zero`, tipo inesperado vira ausência, `NaN`/`Infinity` recusados, redação do Riot ID |
-| Ciclo de vida | `live-game-session.test.ts` (15) | Identidade e revisão, `DEGRADED` vs `ENDED`, partida nova por regressão de relógio, resposta obsoleta descartada, deduplicação por `EventID` |
+| Ciclo de vida | `live-game-session.test.ts` (17) | Identidade e revisão, `DEGRADED` vs `ENDED`, partida nova por regressão de relógio, resposta obsoleta descartada, deduplicação por `EventID` |
 | Política de leitura | `live-client-observer.test.ts` (13) | Os 4 endpoints e **nenhum** dos proibidos/redundantes, `/playerscores` só do jogador ativo, ausência de Riot ID não vira placar zerado, disponibilidade por parte, single-flight, stale em voo, `stop()` |
 | Fronteira IPC | `live-client-state.test.ts` (8) | Riot ID não sobrevive à serialização, zero real preservado, histórico isolado por partida e limitado, quando transmitir |
 | Gate e preload | `live-guidance-gate.test.ts` (8) | Release pública travada em `false`, produção nunca liga, preload sem `fetch`/host/porta/endpoint |
 | Diagnóstico | `LiveClientDiagnosticsScreen.test.tsx` (6) | Gate fechado declarado na tela, leitura factual do próprio jogador, ausência como travessão, evento único por ID, zero dado de adversário |
+| **Partida real** | `live-client-real-game.test.ts` (1, opt-in) | Roda o observador e o reducer contra o Game Client em execução: relógio avança, sessão estável, zero evento repetido, payload de IPC sem Riot ID nem campo de terceiro |
+
+`live-client-real-game.test.ts` exige `SPARTA_LIVE_CLIENT_REAL_GAME=1` **e** a porta escutando;
+sem as duas condições ele se declara **pulado**, nunca passa por omissão. É o que transforma o
+procedimento manual de §10 em algo repetível.
 
 ---
 
-## 10. Validação com partida real — `PENDING`
+## 10. Validação com partida real — executada em 2026-09-03
 
-**Nenhuma partida estava ativa durante esta etapa.** Verificado no início: `RiotClientServices`
-rodando, mas League of Legends fora de partida e **nada escutando em `:2999`** — que é exatamente
-o estado `UNAVAILABLE` que a fundação trata como repouso normal.
+**`REAL_GAME_VALIDATION=PASS` · `REAL_GAME_TLS_VALIDATION=PASS` ·
+`REAL_GAME_SWAGGER_COMPARISON=PASS`**
 
-Portanto **não** se afirma "validado em partida real". O que foi validado por teste automatizado
-está na tabela de §9.1: **75** testes ao todo — 53 em `packages/riot/src/live-client/` e 22 em
-`apps/desktop/` — mais a auditoria de TLS executada contra uma cadeia sintética que replica a
-estrutura real do certificado da Riot.
+Três partidas de Practice Tool consecutivas na máquina do responsável, com o processo
+`League of Legends.exe` servindo `127.0.0.1:2999` (confirmado por `netstat`: o PID que escuta é o
+do processo de jogo, não o do launcher).
 
-**`REAL_GAME_TLS_VALIDATION=PENDING` é um estado separado, e de propósito.** Toda a evidência de
-TLS desta etapa vem de certificados e servidores **sintéticos**; nenhum handshake foi feito com o
-certificado que o Game Client apresenta de fato. O que está provado é o comportamento do
-verificador e o fail-closed do cliente. O que **não** está provado é que o certificado real do
-Game Client é aceito por ele — se a Riot tiver trocado a raiz que assina o certificado do jogo, o
-Sparta recusará a conexão (fail-closed, como projetado) e isso só aparece em partida real. O passo
-4-a do procedimento abaixo fecha essa lacuna.
+### 10.1 TLS real
 
-### Procedimento manual para completar a validação
+O cliente de produto (`requestLiveClient`, sem alteração) falou com o Game Client e recebeu `OK`.
+Nada global foi tocado: `NODE_TLS_REJECT_UNAUTHORIZED` permaneceu `undefined`, host e porta
+permaneceram fixos em `127.0.0.1:2999`.
 
-1. Iniciar o Desktop em desenvolvimento com o protótipo habilitado:
-   ```bash
-   SPARTA_LIVE_CLIENT_PROTOTYPE=1 pnpm --filter @sparta/desktop dev
-   ```
-2. Abrir **Observação ao vivo** (grupo Evolução, visível só em desenvolvimento). Confirmar
-   `Indisponível` — `:2999` ainda não existe.
-3. Abrir o League e iniciar uma partida no **Practice Tool**.
-4. **Fechar `REAL_GAME_TLS_VALIDATION`**: confirmar que o estado sai de `Indisponível` e que
-   **não** aparece `Certificado não confiável`. Esse é o único ponto em que o certificado real do
-   Game Client é de fato verificado contra a raiz publicada pela Riot. Se aparecer
-   `UNTRUSTED_CERTIFICATE`, **não** afrouxar a verificação: registrar aqui e reauditar a raiz
-   publicada (`riotgames.pem`), porque significa que ela mudou.
-5. Confirmar, na tela de diagnóstico:
-   - estado passa a `Ao vivo` e um `sessionId` aparece;
-   - tempo de jogo avança;
-   - modo/mapa correspondem à partida real;
-   - nível, ouro, K/D/A e CS batem com o HUD do jogo;
-   - eventos aparecem uma única vez cada (matar um monstro não deve duplicar linha).
-6. Minimizar/restaurar o jogo e confirmar que o estado não oscila para erro.
-7. Encerrar a partida. Confirmar que o estado volta para `Encerrada`/`Indisponível` e que os
-   eventos são limpos.
-8. Iniciar uma **segunda** partida e confirmar que o `sessionId` é diferente e que nenhum dado da
-   primeira aparece.
-9. Durante a partida, consultar o Swagger real e comparar com o assumido aqui:
-   ```bash
-   curl -k https://127.0.0.1:2999/swagger/v3/openapi.json
-   ```
-   Registrar diferenças de endpoint/schema neste documento.
+| | Valor observado |
+| --- | --- |
+| Subject do certificado apresentado | `CN=rclient` |
+| Issuer | `CN=LoL Game Engineering Certificate Authority` |
+| Serial | `3BF10803C8CA18594F87B9B22E2055778583F9F1` |
+| Validade | 2026-01-04 → 2125-12-11 |
+| `fingerprint256` do certificado do jogo | `23:17:88:E9:B3:24:45:B6:3D:92:C8:79:31:61:02:03:E3:22:D8:EA:DC:65:D2:17:73:70:7D:78:A6:C9:3B:2C` |
+| Raiz versionada da Riot (`fingerprint256`) | `CA:8C:9D:32:5B:4C:DC:46:4C:6C:94:A5:85:C8:5E:91:EC:23:D4:0B:A5:BF:3A:E2:82:2B:95:1A:4A:50:4E:A3` |
+| `verifyGameClientCertificate(peer)` | **`true`** |
 
-**Ainda não executado:** os passos 4 (`REAL_GAME_TLS_VALIDATION`) e 9 (comparação com o Swagger
-real instalado) dependem de partida ativa. Os endpoints e campos usados vieram da documentação oficial consultada em 2026-08-29.
+A raiz publicada continua assinando o certificado que o jogo apresenta. Não foi necessário — nem
+feito — nenhum afrouxamento.
+
+### 10.2 Swagger da instalação real
+
+`/swagger/v3/openapi.json` (OpenAPI **3.0.0**) e `/swagger/v2/swagger.json` (Swagger **2.0**),
+título `LoLClient`, 26 paths, dos quais **12 em `/liveclientdata`** — confirmando o "4 de 12" que
+a etapa assumia a partir da documentação.
+
+| Comparação | Resultado |
+| --- | --- |
+| Os 4 endpoints consumidos existem | Sim, os quatro |
+| Endpoints ofertados e **não** consumidos | `activeplayerabilities`, `activeplayername`, `activeplayerrunes`, `allgamedata`, `playeritems`, `playerlist`, `playermainrunes`, `playersummonerspells` |
+| `playerscores` | Exige `riotId` em query, `required: true` — exatamente como o cliente monta |
+| `eventdata` | Aceita `eventID` **opcional**, que não usamos: buscamos o histórico e deduplicamos localmente |
+| Schemas de resposta | Declarados como objeto livre, sem propriedades tipadas |
+
+**Achado relevante**: o Swagger instalado **não tipa os campos de resposta**. Os nomes assumidos
+(`gameTime`, `gameMode`, `riotId`, `level`, `currentGold`, `kills`, `creepScore`…) não são
+verificáveis por ele — foram confirmados apenas pela resposta real, observada aqui. Isso reforça a
+decisão de normalizar defensivamente: campo ausente ou de tipo inesperado vira ausência.
+
+Nenhum cliente foi gerado a partir do Swagger, e nenhum endpoint novo foi consumido por ele
+ofertar mais dados.
+
+### 10.3 Endpoints realmente chamados
+
+Medido no **transporte** (`https.request` instrumentado fora do código de produto), 13 rodadas
+contra o jogo real: 52 requisições, distribuídas em `gamestats` (13), `activeplayer` (13),
+`playerscores` (13) e `eventdata` (13). **Zero** chamadas a `playerlist`, `allgamedata`,
+`playeritems`, `playersummonerspells`, `playermainrunes`, `activeplayerabilities`,
+`activeplayerrunes` ou `activeplayername`.
+
+O `playerscores` levou **um único** parâmetro `riotId`, idêntico ao do jogador ativo e escapado
+(`%23`) — verificado por comparação, sem imprimir o identificador.
+
+### 10.4 Snapshot, polling e eventos
+
+197 snapshots ao longo das partidas observadas:
+
+| Observação | Resultado |
+| --- | --- |
+| `gameTime` | Monotônico dentro de cada partida, **zero regressões espúrias** |
+| Modo / mapa | `PRACTICETOOL` / `Map11` |
+| Jogador ativo | Nível, ouro (fracionário real), `championStats` com 10 campos |
+| Placar | K/D/A reais (chegou a `3/0/0`), CS, ward score |
+| Disponibilidade | As 4 partes `true` em todas as rodadas |
+| Zero real | `currentGold: 0` e `gameTime: 0.0` observados e **preservados como zero** |
+| Riot ID após redação | Ausente em 100% dos snapshots |
+| Cadência efetiva (medida pelo relógio do jogo) | Mediana **1,042 s** (mín. 1,023 / máx. 1,298) |
+| Duração da rodada | Mediana 35 ms, máximo 303 ms — bem abaixo do timeout de 800 ms |
+| Single-flight | Máximo de 1 rodada em voo, zero acúmulo, zero exceção não tratada |
+| Memória (RSS do processo observador) | 36,3 → 50,2 MB, oscilando, sem crescimento monotônico |
+
+**Eventos reais** (`eventdata` devolve o histórico inteiro a cada chamada): numa das partidas foram
+emitidos os ids 0–8 — `GameStart`, `MinionsSpawning`, `ChampionKill`, `FirstBlood`, `Ace`,
+`ChampionKill`, `Ace`, `ChampionKill`, `Ace` — **cada um exatamente uma vez**, em apenas 4 das 197
+rodadas. Zero duplicação. Dois `MinionsSpawning` com `EventID` distintos foram emitidos como dois
+eventos, o que confirma que a chave é o id da Riot e não o nome.
+
+### 10.5 Fim de partida e segunda sessão
+
+Sequência observada ao encerrar o Practice Tool:
+
+| Estado | Rodada | Evidência |
+| --- | --- | --- |
+| `LIVE` | 167 | último snapshot, `gameTime` 439,9 s |
+| `DEGRADED` | 168 | rodada de 815 ms: o timeout de 800 ms disparando quando o cliente parou de responder |
+| `ENDED` | 170 | exatamente os 3 fracassos consecutivos |
+| `UNAVAILABLE` | 171 | porta recusando conexão |
+| `CONNECTING` | 301 | partida nova carregando: porta responde, leitura ainda inválida |
+| `LIVE` | 306 | primeira leitura válida da partida nova |
+
+Na transição: nenhuma requisição em voo virou snapshot, o estado antigo não permaneceu exposto
+como atual, e o histórico de eventos foi zerado. A partida nova nasceu com `sessionId`
+**`live-mtkyvkjf-2`**, distinto do `live-mtkyossi-1` da anterior, com `gameTime` voltando a 0,0 s,
+nível 1 e CS 0 — sem qualquer contaminação da partida anterior.
+
+### 10.6 Bug real encontrado e corrigido
+
+A **primeira** execução deste ciclo reprovou, e o defeito só era observável com um jogo de verdade.
+
+| | Partida 1 (último snapshot) | Partida 2 (primeiro snapshot) |
+| --- | --- | --- |
+| `gameTime` | 722,1 s | 0,7 s |
+| Nível / ouro / CS | 6 / 1242 / 60 | 1 / 500 / 0 |
+| `sessionId` | `live-mtkycj27-1` | **`live-mtkycj27-1`** (o mesmo) |
+
+**Causa**: `LiveGameSession.observe()` decidia abrir sessão nova **enumerando** os estados
+`UNAVAILABLE` e `ENDED`, e omitia `CONNECTING` — que é justamente por onde uma partida real passa
+enquanto carrega. Os dois guardas falharam juntos: a regressão de relógio (722 s → 0,7 s) também
+não disparou, porque `endSession()` já havia zerado `lastGameTimeSeconds`. Nenhum teste sintético
+cobria `CONNECTING → LIVE`; todos exercitavam `UNAVAILABLE → LIVE` ou `ENDED → LIVE`.
+
+**Correção** (mínima, uma condição): a decisão passou a enumerar quem **continua** a sessão —
+apenas `LIVE`/`DEGRADED` sem regressão de relógio — de modo que qualquer outro estado abre sessão
+nova. É seguro porque `observeFailure` nunca leva de `LIVE`/`DEGRADED` a `CONNECTING`, e fecha a
+classe inteira do defeito em vez do caso específico.
+
+**Regressão**: dois testes novos em `live-game-session.test.ts` reproduzem a sequência real
+`ENDED → UNAVAILABLE → CONNECTING → LIVE` e exigem identidade nova, mais o histórico de eventos
+limpo nessa transição. Confirmado que **reprovam sem a correção** e passam com ela. A validação
+afetada foi repetida com uma terceira partida real — resultado em §10.5.
+
+### 10.7 Limitações registradas
+
+A tela de diagnóstico do Electron **não** foi aberta com dado real nesta sessão: ela vive atrás do
+login, e Docker/Postgres/API estavam parados. O que foi validado contra o jogo real é o payload
+que a alimenta — produzido pelo `LiveClientObserver` e por `reduceLiveClientState`, ambos código
+de produto, com o teste opt-in confirmando ausência de Riot ID e de campo de terceiro. A
+renderização em si continua coberta apenas por teste de componente.
+
+Também não foi induzida uma **reconexão transitória dentro** da mesma partida (o `DEGRADED` real
+observado foi sempre o do encerramento). Esse caminho segue coberto de forma sintética.
 
 ---
 
@@ -407,13 +500,14 @@ Completo = implementado, documentado e coberto por teste automatizado.
 | Matriz de capacidade | **Completo** | `docs/live-client-capability-matrix.md` |
 | Gate de release pública | **Completo** | `LIVE_GUIDANCE_PUBLIC_RELEASE = false` travado por teste |
 | Comunicação à Riot | **Preparada, não enviada** | Decisão do responsável (§11) |
-| Observação em partida real | **Pendente** | `REAL_GAME_VALIDATION=PENDING` (§10) |
-| Certificado real do Game Client | **Pendente** | `REAL_GAME_TLS_VALIDATION=PENDING` (§10, passo 4) |
-| Comparação com o Swagger instalado | **Pendente** | §10, passo 9 |
+| Observação em partida real | **Completo** | `REAL_GAME_VALIDATION=PASS` (§10.3–10.5) |
+| Certificado real do Game Client | **Completo** | `REAL_GAME_TLS_VALIDATION=PASS` (§10.1) |
+| Comparação com o Swagger instalado | **Completo** | `REAL_GAME_SWAGGER_COMPARISON=PASS` (§10.2) |
+| Tela de diagnóstico com dado real no Electron | **Não exercitada** | Depende de API/login; o payload que a alimenta foi validado (§10.7) |
+| Reconexão transitória dentro da mesma partida | **Não induzida** | Coberta de forma sintética (§10.7) |
 
-Os três pendentes dependem **exclusivamente** de uma partida ativa na máquina: não há trabalho de
-implementação restante para eles, e nenhum pode ser fechado com dado sintético sem transformar
-evidência de laboratório em afirmação sobre o jogo real.
+Os três gates da validação real estão fechados. O único item que continua fora do alcance técnico
+é a comunicação à Riot, que é decisão do responsável, não trabalho de implementação.
 
 ---
 

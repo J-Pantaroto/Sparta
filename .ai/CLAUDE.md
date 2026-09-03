@@ -128,13 +128,62 @@ distinguir "não veio" de "não foi consultado". Agora há uma linha de disponib
 (o Postgres não estava em execução nesta sessão). Nenhuma dependência nova: `node:https` +
 `node:crypto`.
 
-**Estado final da etapa**: tudo o que não depende de partida ativa está completo e coberto —
-cliente, normalização, contrato, ciclo de vida, stale, polling, deduplicação, fronteira IPC,
-diagnóstico dev-only, privacidade, matriz de capacidade, gate e documentação. Três itens continuam
-`PENDING` e **só** se fecham com o jogo aberto: observação em partida real
-(`REAL_GAME_VALIDATION`), handshake com o certificado real do Game Client
-(`REAL_GAME_TLS_VALIDATION`) e a comparação com o Swagger instalado. Não há trabalho de
-implementação restante para nenhum dos três.
+**Validação com partida REAL executada em 2026-09-03 — os três gates fecharam em `PASS`.** Três
+Practice Tools consecutivos, com `League of Legends.exe` servindo `:2999`.
+
+`REAL_GAME_TLS_VALIDATION=PASS`: o cliente de produto recebeu `OK` do jogo, com
+`NODE_TLS_REJECT_UNAUTHORIZED` intocado e host/porta fixos. O certificado apresentado (`CN=rclient`,
+emitido pela `LoL Game Engineering Certificate Authority`, serial `3BF10803…F9F1`,
+`fingerprint256` `23:17:88:E9…3B:2C`) **verifica contra a raiz publicada** — a raiz versionada
+continua assinando o certificado real, e nada precisou ser afrouxado.
+
+`REAL_GAME_SWAGGER_COMPARISON=PASS`: `/swagger/v3/openapi.json` (3.0.0) e `/swagger/v2/swagger.json`
+(2.0) consultados. **12 endpoints em `/liveclientdata`** — confirma o "4 de 12" que a etapa assumia
+da documentação. `playerscores` exige mesmo `riotId` em query (`required: true`); `eventdata` tem um
+`eventID` opcional que não usamos de propósito. **Achado**: o Swagger instalado declara as respostas
+como objeto livre, **sem tipar campo nenhum** — os nomes (`gameTime`, `currentGold`, `creepScore`…)
+não são verificáveis por ele, só pela resposta real. Reforça a normalização defensiva em vez de
+enfraquecê-la. Nenhum cliente gerado, nenhum endpoint novo consumido.
+
+`REAL_GAME_VALIDATION=PASS`: 197 snapshots. Minimização medida **no transporte** (`https.request`
+instrumentado, fora do produto): 13 rodadas → 52 requisições, exatamente 13 de cada um dos 4
+endpoints e **zero** dos 8 proibidos/redundantes; `/playerscores` com um único `riotId`, o do
+jogador ativo, escapado. `gameTime` monotônico, `PRACTICETOOL`/`Map11`, K/D/A reais (chegou a
+`3/0/0`), e `currentGold: 0` e `gameTime: 0.0` **reais preservados como zero**. Cadência efetiva
+medida pelo relógio do próprio jogo: mediana **1,042 s**; rodada em 35 ms (mediana), teto de 303 ms
+contra timeout de 800 ms; nunca mais de uma rodada em voo; RSS oscilando 36→50 MB sem crescimento
+monotônico. Eventos reais (`GameStart`, `MinionsSpawning`, `ChampionKill`, `FirstBlood`, `Ace`…)
+emitidos **uma única vez cada**, em 4 de 197 rodadas — e dois `MinionsSpawning` com `EventID`
+distintos saíram como dois eventos, confirmando que a chave é o id da Riot, não o nome.
+
+**Bug real, que só um jogo de verdade revelava.** Ao trocar de partida, a segunda nascia com o
+**mesmo `sessionId`** da primeira (medido: partida 1 terminou em `gameTime` 722,1 s / nível 6 / CS
+60 e a partida 2 começou em 0,7 s / nível 1 / CS 0, ambas como `live-mtkycj27-1`). Causa:
+`observe()` decidia abrir sessão **enumerando** `UNAVAILABLE`/`ENDED` e omitia `CONNECTING` — que é
+por onde uma partida real passa enquanto carrega. Os dois guardas falharam juntos: a regressão de
+relógio também não disparou, porque `endSession()` já tinha zerado `lastGameTimeSeconds`. Nenhum
+teste sintético cobria `CONNECTING → LIVE`. Corrigido invertendo a condição para enumerar quem
+**continua** (`LIVE`/`DEGRADED` sem regressão), o que fecha a classe inteira em vez do caso; dois
+testes de regressão reproduzem a sequência real e **reprovam sem a correção**. Revalidado com uma
+terceira partida: `live-mtkyossi-1` → `live-mtkyvkjf-2`, relógio de volta a 0,0 s, sem contaminação.
+
+O encerramento real seguiu o contrato à risca: `LIVE` → `DEGRADED` (rodada de 815 ms, o timeout de
+800 ms disparando quando o cliente parou de responder) → `ENDED` nos 3 fracassos → `UNAVAILABLE` →
+`CONNECTING` → `LIVE`.
+
+**Duas limitações registradas, não escondidas**: a tela de diagnóstico do Electron não foi aberta
+com dado real (fica atrás do login e Docker/API estavam parados) — validou-se o **payload** que a
+alimenta, por código de produto; e a reconexão transitória *dentro* da mesma partida não foi
+induzida, seguindo coberta sinteticamente.
+
+Novo `live-client-real-game.test.ts` (opt-in por `SPARTA_LIVE_CLIENT_REAL_GAME=1` **e** porta
+escutando, senão **pulado**) roda observador + reducer contra o jogo e transforma o procedimento
+manual em algo repetível. **1510 testes** no monorepo, 2 pulados por desenho (o do servidor TLS
+impostor pula quando o jogo real ocupa a `:2999` — comportamento previsto).
+
+**Estado final da etapa**: fundação completa e validada contra partida real. O único item aberto é
+a comunicação à Riot, preparada e não enviada — decisão do responsável, não trabalho de
+implementação.
 
 ## Etapa 31N: screenshots finais do Desktop no site
 

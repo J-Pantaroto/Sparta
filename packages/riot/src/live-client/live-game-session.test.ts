@@ -58,6 +58,58 @@ describe("LiveGameSession - ciclo de vida", () => {
     expect(session.getState()).toBe("ENDED");
   });
 
+  /**
+   * REGRESSAO - bug encontrado na validacao com partida REAL (31O).
+   *
+   * Fechar o Practice Tool e abrir outro percorre, no jogo de verdade,
+   * ENDED -> UNAVAILABLE -> CONNECTING -> LIVE: enquanto a partida nova
+   * carrega, a porta ja responde mas ainda nao ha leitura valida, e isso e
+   * `CONNECTING`. A versao anterior enumerava `UNAVAILABLE`/`ENDED` como os
+   * estados que abrem sessao, entao a partida nova herdava o `sessionId` da
+   * anterior. Medido: partida 1 terminou em gameTime 722.1s e a partida 2
+   * comecou em 0.7s com o MESMO id.
+   */
+  it("segunda partida apos CONNECTING abre sessao NOVA", () => {
+    const session = new LiveGameSession();
+    observe(session, 722.1);
+    const firstSessionId = session.getSessionId();
+
+    // Encerramento real: timeout (cliente ainda alcancavel), depois recusa.
+    session.observeFailure(session.getRevision(), true);
+    session.observeFailure(session.getRevision(), false);
+    expect(session.observeFailure(session.getRevision(), false)).toBe("ENDED");
+    expect(session.observeFailure(session.getRevision(), false)).toBe("UNAVAILABLE");
+
+    // Partida nova carregando: porta responde, leitura ainda invalida.
+    expect(session.observeFailure(session.getRevision(), true)).toBe("CONNECTING");
+
+    const snapshot = observe(session, 0.7);
+    expect(session.getState()).toBe("LIVE");
+    expect(snapshot?.sessionId).not.toBe(firstSessionId);
+    expect(session.getSessionId()).not.toBe(firstSessionId);
+  });
+
+  it("partida nova a partir de CONNECTING nasce com historico de eventos limpo", () => {
+    const session = new LiveGameSession();
+    observe(session, 722.1, [
+      { id: 0, name: "GameStart" },
+      { id: 1, name: "MinionsSpawning" }
+    ]);
+
+    for (let attempt = 0; attempt < MAX_CONSECUTIVE_FAILURES; attempt += 1) {
+      session.observeFailure(session.getRevision(), false);
+    }
+    expect(session.observeFailure(session.getRevision(), true)).toBe("CONNECTING");
+
+    // Mesmos EventIDs da partida anterior: a nova precisa emiti-los, senao
+    // o inicio dela apareceria suprimido como se ja tivesse sido visto.
+    const snapshot = observe(session, 0.7, [
+      { id: 0, name: "GameStart" },
+      { id: 1, name: "MinionsSpawning" }
+    ]);
+    expect(snapshot?.newEvents.map((entry) => entry.id)).toEqual([0, 1]);
+  });
+
   it("Game Client alcancavel mas sem partida fica em CONNECTING, nao em erro", () => {
     const session = new LiveGameSession();
     expect(session.observeFailure(session.getRevision(), true)).toBe("CONNECTING");

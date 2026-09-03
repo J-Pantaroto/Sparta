@@ -22,6 +22,20 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-09-03 03:35 — Etapa 31O: validação com partida real (3 gates em PASS + 1 bug corrigido)
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0068-live-client-data-foundation.md`
+
+Validação executada contra três Practice Tools reais. `REAL_GAME_TLS_VALIDATION=PASS`: o
+certificado do Game Client (`CN=rclient`) verifica contra a raiz publicada, sem afrouxar nada.
+`REAL_GAME_SWAGGER_COMPARISON=PASS`: v3/v2 consultados, 12 endpoints confirmados, respostas não
+tipadas pelo próprio Swagger. `REAL_GAME_VALIDATION=PASS`: 197 snapshots, minimização medida no
+transporte (52 requisições, só os 4 endpoints), cadência mediana 1,042 s, eventos reais sem
+duplicação. **Bug real corrigido**: a segunda partida herdava o `sessionId` da primeira porque
+`CONNECTING` — o estado por onde uma partida real passa ao carregar — não abria sessão nova; 2
+testes de regressão + revalidação numa terceira partida. Teste opt-in novo roda a fundação contra
+o jogo de verdade. **1510 testes**.
+
 ## 2026-09-02 10:05 — Etapa 31O: fechamento do escopo (testes de política de leitura e fronteira IPC)
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0068-live-client-data-foundation.md`
