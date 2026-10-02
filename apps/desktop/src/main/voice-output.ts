@@ -56,10 +56,13 @@ function complete(child: ChildProcessWithoutNullStreams, input?: string): Promis
 export class WindowsSpeechVoiceOutput implements VoiceOutput {
   private active: ChildProcessWithoutNullStreams | null = null;
 
-  constructor(private readonly run: SpawnVoice = spawnPowerShell) {}
+  constructor(
+    private readonly run: SpawnVoice = spawnPowerShell,
+    private readonly platform: string = process.platform
+  ) {}
 
   async listVoices(): Promise<VoiceDescriptor[]> {
-    if (process.platform !== "win32") return [];
+    if (this.platform !== "win32") return [];
     try {
       const raw = await complete(this.run(LIST_SCRIPT));
       const value = JSON.parse(raw || "[]") as VoiceDescriptor | VoiceDescriptor[];
@@ -79,7 +82,7 @@ export class WindowsSpeechVoiceOutput implements VoiceOutput {
     text: string,
     options: { volume: number; rate: number; voiceId: string | null }
   ): Promise<void> {
-    if (process.platform !== "win32" || !text || text.length > 500)
+    if (this.platform !== "win32" || !text || text.length > 500)
       throw new Error("VOICE_UNAVAILABLE");
     this.cancel();
     const child = this.run(SPEAK_SCRIPT);

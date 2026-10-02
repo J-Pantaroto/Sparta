@@ -43,7 +43,7 @@ describe("WindowsSpeechVoiceOutput", () => {
         void Promise.resolve().then(() => child.emit("close", 0));
       });
     });
-    const voice = new WindowsSpeechVoiceOutput(run);
+    const voice = new WindowsSpeechVoiceOutput(run, "win32");
     expect(await voice.listVoices()).toEqual([{ id: "Maria", name: "Maria", language: "pt-BR" }]);
     const text = "Uma opção segura; $(não executar) ' \"";
     await voice.speak(text, { volume: 70, rate: 0, voiceId: "Maria" });
@@ -61,7 +61,7 @@ describe("WindowsSpeechVoiceOutput", () => {
     const voice = new WindowsSpeechVoiceOutput(() => {
       active = childProcess(() => undefined);
       return active;
-    });
+    }, "win32");
     const speaking = voice.speak("Teste", { volume: 50, rate: 0, voiceId: null });
     voice.cancel();
     await expect(speaking).rejects.toThrow("VOICE_EXIT_1");
