@@ -2,7 +2,10 @@
 
 Sparta é um aplicativo desktop para jogadores de League of Legends focado em análise de perfil, recomendação explicável de campeões no champion select, análise pré-game e análise pós-game.
 
-O produto não implementa overlay, tracking durante a partida, automação de pick/ban ou qualquer assistência em tempo real. Toda análise do MVP acontece antes ou depois da partida.
+O produto público não implementa overlay, tracking de adversário, automação de pick/ban ou
+assistência durante a partida. Existe um coach por voz estritamente local em estado
+`LOCAL_AI_COACH_PROTOTYPE`, OFF por padrão e bloqueado em produção enquanto aguarda revisão da
+Riot; ele usa somente fatos do próprio jogador e não integra o MVP distribuído.
 
 ## Convenções pra agentes de IA (`.ai/`)
 

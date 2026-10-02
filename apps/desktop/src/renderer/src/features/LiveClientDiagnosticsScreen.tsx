@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Activity, Radio } from "lucide-react";
 import type { LiveAvailability } from "@sparta/riot";
+import type { CoachingDiagnosticsEntry, CoachingRuntimeState } from "@sparta/core";
 import type { LiveClientStatePayload } from "../sparta-global";
 import { Badge, Card, EmptyState, PageHero, PageLayout, SectionHeader } from "../ui";
 import "./LiveClientDiagnosticsScreen.css";
@@ -58,6 +59,8 @@ function gameClock(seconds: number | undefined): string {
  */
 export function LiveClientDiagnosticsScreen() {
   const [live, setLive] = useState<LiveClientStatePayload | null>(null);
+  const [coach, setCoach] = useState<CoachingRuntimeState | null>(null);
+  const [coachEvents, setCoachEvents] = useState<CoachingDiagnosticsEntry[]>([]);
 
   useEffect(() => {
     let active = true;
@@ -65,9 +68,18 @@ export function LiveClientDiagnosticsScreen() {
       if (active) setLive(state);
     });
     const unsubscribe = window.sparta.onLiveClient((state) => setLive(state));
+    const coachBridge = window.sparta.localCoach;
+    void coachBridge?.getState().then((state) => active && setCoach(state));
+    void coachBridge?.getDiagnostics().then((events) => active && setCoachEvents(events));
+    const unsubscribeCoach =
+      coachBridge?.onState((state) => {
+        setCoach(state);
+        void coachBridge.getDiagnostics().then(setCoachEvents);
+      }) ?? (() => undefined);
     return () => {
       active = false;
       unsubscribe();
+      unsubscribeCoach();
     };
   }, []);
 
@@ -179,9 +191,7 @@ export function LiveClientDiagnosticsScreen() {
               <ul className="sp-live-events">
                 {live.recentEvents.map((event) => (
                   <li key={event.id}>
-                    <span className="sp-live-events__time">
-                      {gameClock(event.gameTimeSeconds)}
-                    </span>
+                    <span className="sp-live-events__time">{gameClock(event.gameTimeSeconds)}</span>
                     <strong>{event.name}</strong>
                     <span className="sp-live-events__id">#{event.id}</span>
                   </li>
@@ -190,6 +200,64 @@ export function LiveClientDiagnosticsScreen() {
             )}
           </Card>
         </>
+      )}
+
+      {coach && (
+        <Card>
+          <SectionHeader
+            eyebrow="Diagnóstico sanitizado"
+            title="Coach local"
+            description="Somente estados, categorias, motivos e latência. Sem prompt completo, Riot ID, dados de adversário ou secrets."
+            actions={
+              <Badge tone={coach.modelStatus === "AVAILABLE" ? "positive" : "neutral"}>
+                {coach.modelStatus}
+              </Badge>
+            }
+          />
+          <dl className="sp-live-diag">
+            <div>
+              <dt>Gate local</dt>
+              <dd>{coach.prototypeEnabled ? "aberto" : "fechado"}</dd>
+            </div>
+            <div>
+              <dt>Fila</dt>
+              <dd>{coach.queueState}</dd>
+            </div>
+            <div>
+              <dt>Inferências</dt>
+              <dd>{coach.metrics.inferenceCount}</dd>
+            </div>
+            <div>
+              <dt>P95</dt>
+              <dd>
+                {coach.metrics.inferenceP95Ms === null ? "—" : `${coach.metrics.inferenceP95Ms} ms`}
+              </dd>
+            </div>
+            <div>
+              <dt>Silêncio</dt>
+              <dd>{coach.metrics.silence}</dd>
+            </div>
+            <div>
+              <dt>Rejeitados</dt>
+              <dd>{coach.metrics.rejected}</dd>
+            </div>
+          </dl>
+          {coachEvents.length > 0 && (
+            <ul className="sp-live-events" aria-label="Eventos sanitizados do coach">
+              {coachEvents.slice(0, 8).map((event, index) => (
+                <li key={`${event.at}-${index}`}>
+                  <span className="sp-live-events__time">
+                    {new Date(event.at).toLocaleTimeString("pt-BR")}
+                  </span>
+                  <strong>{event.event}</strong>
+                  <span className="sp-live-events__id">
+                    {event.category ?? event.reason ?? "—"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
       )}
     </PageLayout>
   );

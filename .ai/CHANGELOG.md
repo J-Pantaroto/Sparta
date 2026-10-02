@@ -22,6 +22,17 @@ de `git log --merges` e do histórico narrativo em `.ai/CLAUDE.md`.
 
 ---
 
+## 2026-10-02 17:39 — Etapa 31O.1: runtime local de coaching contextual por voz
+
+**Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0069-local-ai-coaching-runtime.md`
+
+Pipeline local e OFF por padrão com fatos próprios sanitizados, delta/heartbeat, contexto pessoal,
+knowledge versionado, provider Ollama loopback, schema/policy determinísticos, anti-spam, frase
+PT-BR fora do modelo e TTS offline do Windows. Três gates impedem release pública; enemy tracking
+continua `DO_NOT_USE`. Não havia modelo nem partida real: `AI_UNAVAILABLE`, Practice Tool e
+`/playeritems` ficaram honestamente pendentes; TTS real passou com três vozes pt-BR. Capability
+Matrix e texto não enviado à Riot atualizados. **1.543 testes TS/JS + 1 analyzer verdes**.
+
 ## 2026-09-03 03:35 — Etapa 31O: validação com partida real (3 gates em PASS + 1 bug corrigido)
 
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0068-live-client-data-foundation.md`
@@ -55,8 +66,8 @@ primeira leitura, e degradação parcial invisível na tela. **1507 testes**.
 **Status:** IMPLEMENTADA · Prompt: `.ai/prompts/features/0068-live-client-data-foundation.md`
 
 Quatro correções pedidas antes de prosseguir com a 31O. O prompt foi renumerado de `0067` (número
-que já era da Etapa 31N) para `0068`. A documentação atribuía à Game Client API o disclaimer *"not
-officially supported for use with third party applications"* — releitura da fonte confirmou que
+que já era da Etapa 31N) para `0068`. A documentação atribuía à Game Client API o disclaimer _"not
+officially supported for use with third party applications"_ — releitura da fonte confirmou que
 essa declaração é da **League Client API (LCU)**; a Game Client API é descrita como API HTTPS local
 para aplicações nativas, sem disclaimer equivalente, e a justificativa do contrato próprio foi
 re-fundamentada na regra já usada no Match-V5. A verificação TLS virou **fail-closed no

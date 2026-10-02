@@ -2,11 +2,15 @@
 
 ## Identidade verificável e aprovação (Etapa 31C)
 
-Legado é `UNVERIFIED_LEGACY`; produção exige `VERIFIED_BY_RSO`. RSO está apenas contratado/gated,
-sem adapter, credenciais ou solicitação. Pacote: `docs/riot-production-application-package.md`.
+O vínculo antigo por Riot ID é somente `UNVERIFIED_LEGACY` e funciona apenas no modo local
+controlado. Produção exige RSO e Account-V1 `/accounts/me`; adapter, credenciais e solicitação
+continuam ausentes até aprovação. Pacote não enviado:
+`docs/riot-production-application-package.md`.
 
-Cada leitura LCU tem timeout de 1,5 s e status explícito. O LCU nunca usa stale: qualquer perda
-de observação limpa o draft, e credenciais/headers nunca entram em logs ou erros públicos.
+Cada leitura LCU tem timeout de 1,5 s e motivo explícito para indisponibilidade. Não há cache
+stale: cliente fechado, lockfile inválido, conexão recusada, timeout, endpoint indisponível,
+saída do champion select ou payload inválido limpam imediatamente o draft. A senha do lockfile
+e o header Basic nunca entram em logs ou erros públicos.
 
 Princípios do Sparta:
 
@@ -16,7 +20,9 @@ Princípios do Sparta:
 - Usar Data Dragon e APIs oficiais sempre que possível.
 - Sugerir picks sem executar decisões automaticamente.
 - Não automatizar pick, ban, troca de campeão, runas ou ações no cliente.
-- Não oferecer assistência durante a partida.
+- Não oferecer assistência durante a partida no produto público. O protótipo local 31O.1 é uma
+  exceção controlada: OFF por padrão, bloqueado em produção, somente fatos próprios, sem ação no
+  jogo e `NEEDS_RIOT_REVIEW_FOR_PUBLIC_RELEASE`.
 - Não rastrear cooldowns inimigos, summoner spells inimigos ou dados não disponíveis legitimamente.
 - Tratar LCU como integração local e read-only no MVP.
 - Documentar qualquer endpoint LCU antes de habilitar uso real.
@@ -51,6 +57,11 @@ Dados que a Riot não fornece (ex.: objeto `challenges` ausente em patches antig
 Implementados em `packages/riot/src/lcu/read-only-client.ts` (`LcuReadOnlyClient`), consumidos apenas pelo processo `main` do Electron (`apps/desktop/src/main/index.ts`), nunca pelo backend nem por integrações remotas:
 
 - `GET /lol-gameflow/v1/gameflow-phase` — poll a cada 2.5s so para saber a fase atual (ex.: `ChampSelect`) e trocar a aba da UI do Sparta automaticamente. Nenhuma escrita, nenhuma automação.
+- `GET /lol-gameflow/v1/session` — leitura do `gameData.gameId` durante champion select/início da
+  partida. O valor numérico é usado somente como identidade auditável para reconciliar a sessão
+  persistida com a partida Match-V5; não aciona nenhuma ação no cliente. A Riot classifica a
+  League Client API como não oficialmente suportada e sem garantia de documentação/estabilidade;
+  se o campo ou endpoint não estiver disponível, o vínculo permanece `PENDING` e o fluxo continua.
 - `GET /lol-champ-select/v1/session` — leitura da sessão de champion select, no mesmo poll de 2.5s. O que é lido e pra quê:
   - `myTeam[].assignedPosition` do próprio jogador → posição (Top/Jungle/Mid/ADC/Suporte), pra a recomendação usar o papel certo e refletir troca de lane feita pela ferramenta do próprio cliente;
   - `actions[]` → ordem de pick do jogador e campeões **banidos** (bans concluídos), pra o motor não recomendar quem já está fora;
@@ -66,3 +77,12 @@ Referências oficiais:
 - https://developer.riotgames.com/docs/lol
 - https://developer.riotgames.com/apis
 - https://developer.riotgames.com/policies/general
+
+## Protótipo local de coaching por voz (Etapa 31O.1)
+
+O pipeline e os endpoints exatos estão em `docs/local-ai-coaching-runtime.md`. A comunicação
+preparada para a Riot não foi enviada. Continuam proibidos: dados/inferências de adversário,
+cooldowns, fog-of-war, jungle path, item timing inimigo, comando direto, overlay, escrita no cliente
+e qualquer habilitação no instalador público. Os gates `LIVE_GUIDANCE_PUBLIC_RELEASE=false`,
+`LIVE_VOICE_GUIDANCE_PUBLIC_RELEASE=false` e `LOCAL_AI_COACH_ENABLED=false` não podem ser abertos
+sem uma nova etapa de revisão.

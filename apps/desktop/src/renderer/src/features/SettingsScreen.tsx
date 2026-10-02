@@ -1,10 +1,11 @@
-import { Check, Info, Palette, SlidersHorizontal } from "lucide-react";
+import { Check, Info, Palette, SlidersHorizontal, Volume2 } from "lucide-react";
 import { useState } from "react";
 import { useAsyncData } from "../hooks/use-async-data";
 import { fetchSettings, updateSettings } from "../services/api-client";
 import { AboutSection } from "./AboutSection";
 import { ThemeGallery } from "../theme/ThemeGallery";
 import { ThemedPageHero } from "../theme/ThemedPageHero";
+import { LocalCoachSettings } from "./LocalCoachSettings";
 import {
   Badge,
   Card,
@@ -23,7 +24,7 @@ const QUICK_LIMITS = [20, 50, 100];
 const MIN_LIMIT = 1;
 const MAX_LIMIT = 200;
 
-type Section = "theme" | "analysis" | "about";
+type Section = "theme" | "analysis" | "coach" | "about";
 
 export function SettingsScreen({
   ddragonVersion,
@@ -66,7 +67,25 @@ export function SettingsScreen({
                 <Info size={14} /> Sobre
               </span>
             )
-          }
+          },
+          ...(import.meta.env.DEV
+            ? [
+                {
+                  value: "coach" as const,
+                  label: (
+                    <span
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "var(--space-2)"
+                      }}
+                    >
+                      <Volume2 size={14} /> Coach local
+                    </span>
+                  )
+                }
+              ]
+            : [])
         ]}
       />
 
@@ -74,6 +93,8 @@ export function SettingsScreen({
         <ThemeGallery ddragonVersion={ddragonVersion} />
       ) : section === "analysis" ? (
         <AnalysisSettings sessionToken={sessionToken} />
+      ) : section === "coach" ? (
+        <LocalCoachSettings />
       ) : (
         <AboutSection />
       )}
@@ -142,7 +163,9 @@ function AnalysisSettings({ sessionToken }: { sessionToken: string | null }) {
 
       {settings.status === "loading" && <Loading />}
 
-      <div style={{ display: "flex", alignItems: "flex-end", gap: "var(--space-5)", flexWrap: "wrap" }}>
+      <div
+        style={{ display: "flex", alignItems: "flex-end", gap: "var(--space-5)", flexWrap: "wrap" }}
+      >
         <SegmentedControl<string>
           ariaLabel="Quantidade de partidas analisadas"
           value={QUICK_LIMITS.includes(currentLimit) ? String(currentLimit) : "custom"}
@@ -151,7 +174,11 @@ function AnalysisSettings({ sessionToken }: { sessionToken: string | null }) {
           }}
           options={[
             ...QUICK_LIMITS.map((limit) => ({ value: String(limit), label: `Últimas ${limit}` })),
-            { value: "custom", label: "Personalizado", disabled: QUICK_LIMITS.includes(currentLimit) }
+            {
+              value: "custom",
+              label: "Personalizado",
+              disabled: QUICK_LIMITS.includes(currentLimit)
+            }
           ]}
         />
         <div style={{ width: 130 }}>

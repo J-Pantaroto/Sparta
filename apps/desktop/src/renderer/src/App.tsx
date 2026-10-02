@@ -6,6 +6,7 @@ import type {
   AccountOnboardingStatus,
   Role
 } from "@sparta/core";
+import { buildPersonalCoachingContext, unavailablePersonalCoachingContext } from "@sparta/core";
 import type {
   LcuDraftMember,
   LcuDraftSnapshot,
@@ -24,6 +25,7 @@ import {
 import { useAsyncData } from "./hooks/use-async-data";
 import {
   fetchDraftRecommendations,
+  fetchMyPlayerProfile,
   fetchSession,
   logout,
   observeDraftSessionGame,
@@ -196,6 +198,34 @@ function SpartaApp() {
   }
 
   useEffect(loadDataDragonVersion, []);
+
+  // Envia ao main somente quatro sinais normalizados. Riot ID, partidas,
+  // adversarios e o perfil bruto nunca entram no contexto do modelo local.
+  useEffect(() => {
+    let active = true;
+    const bridge = window.sparta.localCoach;
+    if (!bridge)
+      return () => {
+        active = false;
+      };
+    void bridge.getState().then((runtime) => {
+      if (!active || !runtime.prototypeEnabled) return;
+      if (!sessionToken) {
+        void bridge.setPersonalContext(unavailablePersonalCoachingContext());
+        return;
+      }
+      void fetchMyPlayerProfile(sessionToken)
+        .then((profile) => {
+          if (active) return bridge.setPersonalContext(buildPersonalCoachingContext(profile));
+        })
+        .catch(() => {
+          if (active) void bridge.setPersonalContext(unavailablePersonalCoachingContext());
+        });
+    });
+    return () => {
+      active = false;
+    };
+  }, [sessionToken]);
 
   useEffect(() => {
     const updateCacheState: Parameters<typeof globalThis.addEventListener>[1] = (event) => {

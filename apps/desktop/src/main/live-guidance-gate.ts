@@ -21,6 +21,8 @@
  * condições - e é isso que impede a feature de sair sem decisão consciente.
  */
 export const LIVE_GUIDANCE_PUBLIC_RELEASE = false;
+export const LIVE_VOICE_GUIDANCE_PUBLIC_RELEASE = false;
+export const LOCAL_AI_COACH_ENABLED = false;
 
 export function isLiveClientPrototypeEnabled(
   // Tipo estrutural em vez de `NodeJS.ProcessEnv`: e o que a funcao de fato
@@ -29,4 +31,19 @@ export function isLiveClientPrototypeEnabled(
 ): boolean {
   if (LIVE_GUIDANCE_PUBLIC_RELEASE) return true;
   return env.NODE_ENV !== "production" && env.SPARTA_LIVE_CLIENT_PROTOTYPE === "1";
+}
+
+/**
+ * Segundo cadeado, independente do watcher: observar localmente nao implica
+ * autorizar voz. O instalador de producao jamais abre este gate.
+ */
+export function isLocalAiCoachPrototypeEnabled(
+  env: Record<string, string | undefined> = process.env
+): boolean {
+  if (LIVE_VOICE_GUIDANCE_PUBLIC_RELEASE && LOCAL_AI_COACH_ENABLED) return true;
+  return (
+    env.NODE_ENV !== "production" &&
+    env.SPARTA_LIVE_CLIENT_PROTOTYPE === "1" &&
+    env.SPARTA_LOCAL_AI_COACH === "1"
+  );
 }

@@ -7,7 +7,14 @@ import type {
   LiveGameSessionState,
   LiveGameSnapshot
 } from "@sparta/riot";
-import type { Role } from "@sparta/core";
+import type {
+  CoachingDiagnosticsEntry,
+  CoachingRuntimeState,
+  CoachingSettings,
+  PersonalCoachingContext,
+  Role,
+  VoiceDescriptor
+} from "@sparta/core";
 
 /** Espelha `LiveClientState` do main - o que de fato cruza o IPC. */
 interface LiveClientStatePayload {
@@ -128,5 +135,30 @@ contextBridge.exposeInMainWorld("sparta", {
     const listener = (_event: unknown, state: LiveClientStatePayload) => callback(state);
     ipcRenderer.on("sparta:live-client", listener);
     return () => ipcRenderer.removeListener("sparta:live-client", listener);
+  },
+  localCoach: {
+    getState(): Promise<CoachingRuntimeState> {
+      return ipcRenderer.invoke("sparta:local-coach:state");
+    },
+    onState(callback: (state: CoachingRuntimeState) => void) {
+      const listener = (_event: unknown, state: CoachingRuntimeState) => callback(state);
+      ipcRenderer.on("sparta:local-coach", listener);
+      return () => ipcRenderer.removeListener("sparta:local-coach", listener);
+    },
+    updateSettings(settings: CoachingSettings): Promise<boolean> {
+      return ipcRenderer.invoke("sparta:local-coach:settings", settings);
+    },
+    setPersonalContext(context: PersonalCoachingContext): Promise<boolean> {
+      return ipcRenderer.invoke("sparta:local-coach:personal", context);
+    },
+    listVoices(): Promise<VoiceDescriptor[]> {
+      return ipcRenderer.invoke("sparta:local-coach:voices");
+    },
+    testVoice(): Promise<boolean> {
+      return ipcRenderer.invoke("sparta:local-coach:test-voice");
+    },
+    getDiagnostics(): Promise<CoachingDiagnosticsEntry[]> {
+      return ipcRenderer.invoke("sparta:local-coach:diagnostics");
+    }
   }
 });

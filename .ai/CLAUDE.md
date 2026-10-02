@@ -1,5 +1,40 @@
 # Sparta - Contexto para Continuidade
 
+## Etapa 31O.1: Local AI Coaching Runtime — `LOCAL_AI_COACH_PROTOTYPE`
+
+Protótipo local concluído em 2026-10-02. Relatório canônico:
+`docs/local-ai-coaching-runtime.md`; prompt: `.ai/prompts/features/0069-local-ai-coaching-runtime.md`.
+Continua fora do produto público e do instalador: `LOCAL_AI_COACH_ENABLED=false`,
+`LIVE_GUIDANCE_PUBLIC_RELEASE=false`, `LIVE_VOICE_GUIDANCE_PUBLIC_RELEASE=false`, além de exigir
+`SPARTA_LIVE_CLIENT_PROTOTYPE=1`, `SPARTA_LOCAL_AI_COACH=1`, ambiente não produtivo e opt-in local.
+
+Arquitetura: snapshot da 31O redigido → segunda minimização `CoachingLiveFacts` →
+`LiveStateDelta` → contexto pessoal reduzido → knowledge genérico versionado → provider local →
+decisão com enums/refs/TTL/confidence → policy gate → fila/cooldowns → `PhraseComposer` → TTS
+offline. O modelo nunca escreve a fala e não recebe tool, URL, identidade, payload bruto, histórico
+bruto ou dado de adversário. O provider Ollama tem origem fixa `127.0.0.1:11434`, temperatura 0,
+timeout 6 s, cancelamento, uma tentativa de reparo e modelo somente por env validada.
+
+Concorrência: poll de fatos continua em 1 s, mas inferência só por delta relevante ou heartbeat de
+45 s, intervalo mínimo 10 s. Existe no máximo uma inferência; a mais nova cancela a anterior e
+aguarda seu término. Sessão antiga, evidência stale, TTL, cooldown, ref inventada, JSON/categoria/
+confidence inválida viram silêncio/drop. Fila máxima 3, global 12 s, categoria 30 s, dedupe 90 s.
+
+Ambiente real: nenhum Ollama/LM Studio/llama.cpp ou porta de modelo estava disponível, logo estado
+correto `AI_UNAVAILABLE`; nenhum software foi instalado. League/:2999 também não estava ativo,
+então Practice Tool, p50/p95 real, CPU/RAM e `/playeritems` permanecem `PENDING`. Não atribuir
+semântica a `count` nem classificar trinket antes dessa validação. TTS Windows foi provado de
+verdade: quatro vozes, três pt-BR, WAV de 125.160 bytes, temporário removido.
+
+Política: coaching próprio/TTS = `LOCAL_AI_COACH_PROTOTYPE` e
+`NEEDS_RIOT_REVIEW_FOR_PUBLIC_RELEASE`. Cooldown/posição/item timing/intenção inimiga, jungle
+path, fog, wards ocultas, gank previsto, comando, overlay e automação permanecem `DO_NOT_USE`.
+Texto exato para a Riot foi preparado no relatório, **não enviado**. Nada de aprendizado/rating.
+
+Validação: version check, Prisma generate, typecheck, lint e build verdes. 1.543 testes TS/JS
+passaram (um real opt-in ignorado por design) e 1 teste do analyzer passou. A primeira rodada
+paralela da API teve dois timeouts de 5 s; todos os 376 testes passaram isoladamente com um worker.
+
 ## Etapa 31O: fundação Live Client Data — `PROTOTYPE_LOCAL_ONLY`
 
 Primeira camada de observação **em tempo real** do projeto: Game Client API local
@@ -9,12 +44,12 @@ factual. Relatório em `docs/live-client-data-foundation.md`; política em
 `docs/live-client-capability-matrix.md`.
 
 **Game Client API ≠ League Client API (LCU), e a primeira versão desta documentação errou nisso.**
-Eu havia atribuído à Game Client API o disclaimer *"not officially supported for use with third
-party applications"*. Reconferido na documentação da Riot: essa frase (e o *"no guarantees of full
-documentation, service uptime, or change communication"*) pertence à seção **League Client API** —
+Eu havia atribuído à Game Client API o disclaimer _"not officially supported for use with third
+party applications"_. Reconferido na documentação da Riot: essa frase (e o _"no guarantees of full
+documentation, service uptime, or change communication"_) pertence à seção **League Client API** —
 a superfície que o Sparta já usa desde a Fase 6c em `packages/riot/src/lcu/`. A seção **Game
-Client API** apresenta o serviço como *"served over HTTPS by League of Legends game client and are
-only available locally for native applications"* e **não** traz disclaimer equivalente. Corrigido
+Client API** apresenta o serviço como _"served over HTTPS by League of Legends game client and are
+only available locally for native applications"_ e **não** traz disclaimer equivalente. Corrigido
 na matriz de capacidade, no relatório e nos comentários do código. A justificativa de falar com
 contrato próprio (`LiveGameSnapshot`) foi **re-fundamentada**: não é "a Riot chama de unsupported",
 é a mesma regra já aplicada ao Match-V5 desde a Fase 1 — o domínio não se acopla a payload de
@@ -31,11 +66,12 @@ Sem esse controle, a conclusão natural seria culpar o SHA-1, e estaria errada.
 
 **Solução, sem desistir da verificação**: `rejectUnauthorized: false` **escopado à requisição**
 (nunca `NODE_TLS_REJECT_UNAUTHORIZED`, nunca agente global — o resto do processo mantém TLS normal)
-+ a checagem que o OpenSSL recusa fazer na cadeia, feita **à mão**: o certificado apresentado tem
-que ter sido assinado pela chave pública da raiz da Riot. PEM **embutido como constante** (o main é
-empacotado em `app.asar` e caminho relativo não resolve depois do bundle); teste trava o
-`fingerprint256`, então trocar o certificado reprova em vez de o app confiar em outra raiz em
-silêncio.
+
+- a checagem que o OpenSSL recusa fazer na cadeia, feita **à mão**: o certificado apresentado tem
+  que ter sido assinado pela chave pública da raiz da Riot. PEM **embutido como constante** (o main é
+  empacotado em `app.asar` e caminho relativo não resolve depois do bundle); teste trava o
+  `fingerprint256`, então trocar o certificado reprova em vez de o app confiar em outra raiz em
+  silêncio.
 
 **Fail-closed, e isso foi endurecido depois da primeira versão.** A verificação rodava no callback
 de resposta — ou seja, o peer já tinha atendido a requisição antes de ser recusado. Agora roda no
@@ -102,7 +138,7 @@ dado não substitui análise de política. A Riot exige saber quais endpoints lo
 texto está **preparado e não enviado** — decisão do responsável.
 
 **Fechamento do escopo: o que faltava eram os testes das duas camadas mais difíceis de exercitar.**
-`LiveClientObserver` (quem decide *quais* endpoints são chamados) e o estado que atravessa o IPC
+`LiveClientObserver` (quem decide _quais_ endpoints são chamados) e o estado que atravessa o IPC
 não tinham teste nenhum — e a segunda era intestável por construção: as regras viviam num closure
 com Electron em escopo. Extraído `reduceLiveClientState` (`apps/desktop/src/main/live-client-state.
 ts`), função pura que aplica redação de Riot ID, isolamento do histórico entre partidas e a decisão
@@ -173,7 +209,7 @@ O encerramento real seguiu o contrato à risca: `LIVE` → `DEGRADED` (rodada de
 
 **Duas limitações registradas, não escondidas**: a tela de diagnóstico do Electron não foi aberta
 com dado real (fica atrás do login e Docker/API estavam parados) — validou-se o **payload** que a
-alimenta, por código de produto; e a reconexão transitória *dentro* da mesma partida não foi
+alimenta, por código de produto; e a reconexão transitória _dentro_ da mesma partida não foi
 induzida, seguindo coberta sinteticamente.
 
 Novo `live-client-real-game.test.ts` (opt-in por `SPARTA_LIVE_CLIENT_REAL_GAME=1` **e** porta

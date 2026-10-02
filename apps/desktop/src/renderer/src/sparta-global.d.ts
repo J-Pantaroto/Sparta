@@ -6,7 +6,14 @@ import type {
   LiveGameSessionState,
   LiveGameSnapshot
 } from "@sparta/riot";
-import type { Role } from "@sparta/core";
+import type {
+  CoachingDiagnosticsEntry,
+  CoachingRuntimeState,
+  CoachingSettings,
+  PersonalCoachingContext,
+  Role,
+  VoiceDescriptor
+} from "@sparta/core";
 
 export {};
 
@@ -62,6 +69,15 @@ declare global {
        */
       getLiveClientState: () => Promise<LiveClientStatePayload>;
       onLiveClient: (callback: (state: LiveClientStatePayload) => void) => () => void;
+      localCoach: {
+        getState: () => Promise<CoachingRuntimeState>;
+        onState: (callback: (state: CoachingRuntimeState) => void) => () => void;
+        updateSettings: (settings: CoachingSettings) => Promise<boolean>;
+        setPersonalContext: (context: PersonalCoachingContext) => Promise<boolean>;
+        listVoices: () => Promise<VoiceDescriptor[]>;
+        testVoice: () => Promise<boolean>;
+        getDiagnostics: () => Promise<CoachingDiagnosticsEntry[]>;
+      };
     };
   }
 }

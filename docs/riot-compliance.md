@@ -20,7 +20,9 @@ Princípios do Sparta:
 - Usar Data Dragon e APIs oficiais sempre que possível.
 - Sugerir picks sem executar decisões automaticamente.
 - Não automatizar pick, ban, troca de campeão, runas ou ações no cliente.
-- Não oferecer assistência durante a partida.
+- Não oferecer assistência durante a partida no produto público. O protótipo local 31O.1 é uma
+  exceção controlada: OFF por padrão, bloqueado em produção, somente fatos próprios, sem ação no
+  jogo e `NEEDS_RIOT_REVIEW_FOR_PUBLIC_RELEASE`.
 - Não rastrear cooldowns inimigos, summoner spells inimigos ou dados não disponíveis legitimamente.
 - Tratar LCU como integração local e read-only no MVP.
 - Documentar qualquer endpoint LCU antes de habilitar uso real.
@@ -75,3 +77,12 @@ Referências oficiais:
 - https://developer.riotgames.com/docs/lol
 - https://developer.riotgames.com/apis
 - https://developer.riotgames.com/policies/general
+
+## Protótipo local de coaching por voz (Etapa 31O.1)
+
+O pipeline e os endpoints exatos estão em `docs/local-ai-coaching-runtime.md`. A comunicação
+preparada para a Riot não foi enviada. Continuam proibidos: dados/inferências de adversário,
+cooldowns, fog-of-war, jungle path, item timing inimigo, comando direto, overlay, escrita no cliente
+e qualquer habilitação no instalador público. Os gates `LIVE_GUIDANCE_PUBLIC_RELEASE=false`,
+`LIVE_VOICE_GUIDANCE_PUBLIC_RELEASE=false` e `LOCAL_AI_COACH_ENABLED=false` não podem ser abertos
+sem uma nova etapa de revisão.

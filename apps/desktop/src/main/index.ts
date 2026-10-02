@@ -25,7 +25,10 @@ import {
   windowOpenPolicy
 } from "./security-policy";
 import { registerLiveClientWatcher } from "./live-client-watcher";
-import { isLiveClientPrototypeEnabled } from "./live-guidance-gate";
+import { isLiveClientPrototypeEnabled, isLocalAiCoachPrototypeEnabled } from "./live-guidance-gate";
+import { registerLocalCoachingRuntime } from "./local-coaching-runtime";
+import { OllamaLocalCoachingModel } from "./local-coaching-model";
+import { WindowsSpeechVoiceOutput } from "./voice-output";
 
 /**
  * O Electron deriva `app.getName()` do campo `name` do `package.json`
@@ -398,9 +401,18 @@ void app.whenReady().then(() => {
   startGameflowWatcher();
   // Protótipo local de observação ao vivo (Game Client API :2999). Fechado
   // por padrão - ver `live-guidance-gate.ts`.
+  const localCoach = registerLocalCoachingRuntime({
+    prototypeEnabled: isLocalAiCoachPrototypeEnabled(),
+    expectedRendererUrl,
+    settingsPath: join(app.getPath("userData"), "local-coach-settings.json"),
+    model: new OllamaLocalCoachingModel(),
+    voice: new WindowsSpeechVoiceOutput()
+  });
+  app.once("before-quit", () => localCoach.stop());
   registerLiveClientWatcher({
     enabled: isLiveClientPrototypeEnabled(),
-    expectedRendererUrl
+    expectedRendererUrl,
+    onObservation: localCoach.handleLiveObservation
   });
   registerSkinDownloadHandler();
   app.on("activate", () => {

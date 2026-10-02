@@ -1,5 +1,11 @@
 import { BrowserWindow, ipcMain, type IpcMainInvokeEvent } from "electron";
-import { LIVE_CLIENT_POLL_INTERVAL_MS, LiveClientObserver } from "@sparta/riot";
+import {
+  LIVE_CLIENT_POLL_INTERVAL_MS,
+  LiveClientObserver,
+  redactSnapshotForTransport,
+  type LiveGameSessionState,
+  type LiveGameSnapshot
+} from "@sparta/riot";
 import {
   DISABLED_LIVE_CLIENT_STATE,
   reduceLiveClientState,
@@ -7,17 +13,16 @@ import {
 } from "./live-client-state";
 import { assertTrustedIpcSender } from "./security-policy";
 
-
 let liveClientState: LiveClientState = DISABLED_LIVE_CLIENT_STATE;
 
 /**
  * Observação local e somente leitura da partida em andamento, via Game
  * Client API (https://127.0.0.1:2999).
  *
- * Escopo desta etapa (ver `docs/live-client-capability-matrix.md`): observar
- * e diagnosticar. Nenhuma orientação, narração, voz, overlay, automação ou
- * análise de adversário é produzida aqui - e nada disso deve ser adicionado
- * sem passar pela matriz de capacidade e pela comunicação à Riot.
+ * O watcher permanece factual. Um consumidor opcional pode receber somente
+ * o snapshot redigido, desde que tenha gate próprio (como o protótipo local
+ * de coaching). Overlay, automação e análise de adversário continuam fora do
+ * escopo e dependem da matriz de capacidade e da comunicação à Riot.
  *
  * O renderer NUNCA escolhe URL: o canal devolve o contrato normalizado e
  * nada mais. Não existe (e não deve existir) um `fetch(url)` genérico
@@ -30,6 +35,7 @@ let liveClientState: LiveClientState = DISABLED_LIVE_CLIENT_STATE;
 export function registerLiveClientWatcher(options: {
   enabled: boolean;
   expectedRendererUrl: () => string;
+  onObservation?: (state: LiveGameSessionState, snapshot: LiveGameSnapshot | null) => void;
 }): void {
   ipcMain.handle("sparta:live-client-state", (event: IpcMainInvokeEvent) => {
     assertTrustedIpcSender(event, options.expectedRendererUrl());
@@ -60,6 +66,12 @@ export function registerLiveClientWatcher(options: {
 
     const { next, shouldBroadcast } = reduceLiveClientState(liveClientState, result);
     liveClientState = next;
+    // A extensao do prototipo recebe a mesma fronteira redigida do IPC. O
+    // Riot ID necessario a /playerscores nunca entra no contexto do modelo.
+    options.onObservation?.(
+      result.state,
+      result.snapshot ? redactSnapshotForTransport(result.snapshot) : null
+    );
     if (shouldBroadcast) broadcast(next);
   }
 
